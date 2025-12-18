@@ -1,3 +1,11 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@layer base {
+    .bg-pup-maroon {
+    background-color: #8B0000;
+    }
+
+    .text-pup-maroon {
+    color: #8B0000;
+    }
+}
