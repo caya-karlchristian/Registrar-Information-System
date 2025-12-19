@@ -20,7 +20,7 @@ function Header() {
 
   return (
     <div className="w-full font-sans">
-      <header className="bg-white w-full shadow-sm relative z-10 border-b-[5px] border-[#FFC72C] md:border-none">        
+      <header className="bg-white w-full shadow-sm relative z-10 border-b-[5px] border-pup-yellow md:border-none">        
         <div className="w-full px-4 py-4 flex justify-between items-center">          
     
           <div className="flex space-x-4">
@@ -30,7 +30,7 @@ function Header() {
               className="w-24 h-20 lg:w-32 lg:h-32"
             />
             <div className="flex flex-col justify-center relative">
-              <h1 className="text-pup-maroon font-bold text-[14px] uppercase lg:text-[25px] leading-tight font-inter -mt-3">
+              <h1 className="text-pup-maroon font-bold text-[14px] uppercase lg:text-[25px] leading-tight font-inter">
                 Polytechnic University of the Philippines - Taguig Campus
               </h1>
               <p className="text-pup-maroon text-[10px] uppercase lg:text-[14px] font-inter mt-2">
@@ -43,7 +43,7 @@ function Header() {
           <div className="flex items-center">
             {!isMobile && (
               <button className="p-2 mr-4 hover:bg-gray-100 rounded-full transition-colors">
-                <BellIcon className="w-8 h-8 text-[#800000]" />
+                <BellIcon className="w-8 h-8 text-pup-maroon" />
               </button>
             )}
 
@@ -59,7 +59,7 @@ function Header() {
 
       {!isMobile && (
         <div className="w-full">
-          <div className="bg-[#7B1113] w-full border-b-[5px] border-[#FFC72C]"> 
+          <div className="bg-[#7B1113] w-full border-b-[5px] border-pup-yellow"> 
             <div className="w-full px-4">
               <Navigation mobile={false} />
             </div>

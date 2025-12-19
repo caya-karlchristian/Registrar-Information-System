@@ -8,4 +8,24 @@
     .text-pup-maroon {
     color: #8B0000;
     }
+
+    .color-pup-dark-maroon {
+    color: #660000;
+    }
+
+    .color-pup-maroon{
+    color: #8B0000    
+    }
+
+    .color-pup-yellow{
+    color: #F8BF1E
+    }
+
+    .border-pup-yellow{
+    border-color: #F8BF1E
+    }
+
+    .bg-pup-maroon-header{
+    background-color: #660000;
+    }
 }
