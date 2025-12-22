@@ -1,11 +1,5 @@
 @import "tailwindcss";
 
-@layer base {
-  html {
-    font-family: 'Inter', system-ui, sans-serif;
-  }
-}
-
 @layer components {
 
   .checkbox-pup {
@@ -67,5 +61,9 @@
     flex-shrink: 0;      
     accent-color: #F8BF1E;
     cursor: pointer;
+  }
+
+  .bg-pup-maroon-hover:hover {
+    background-color: #5a0c0e;
   }
 }
