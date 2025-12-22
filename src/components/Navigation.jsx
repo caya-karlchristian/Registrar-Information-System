@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from 'react-router-dom'
 
 const Navigation = ({ mobile = false }) => {
   const desktopLink = "flex-1 flex items-center justify-center text-white text-sm font-bold uppercase tracking-wider py-4 hover:bg-[#5a0c0e] transition-colors duration-200 ";
@@ -9,33 +10,33 @@ const Navigation = ({ mobile = false }) => {
       <ul className={`flex ${mobile ? "flex-col" : "flex-row"} list-none m-0 p-0 w-full`}>
         
         <li className={mobile ? "" : "flex-1"}>
-          <a href="/" className={mobile ? mobileLink : desktopLink}>
+          <Link to="/" className={mobile ? mobileLink : desktopLink}>
             Home
-          </a>
+          </Link>
         </li>
 
         <li className={mobile ? "" : "flex-1"}>
-          <a href="/about" className={mobile ? mobileLink : desktopLink}>
+          <Link to="/about" className={mobile ? mobileLink : desktopLink}>
             About
-          </a>
+          </Link>
         </li>
 
         <li className={mobile ? "" : "flex-1"}>
-          <a href="/lists" className={mobile ? mobileLink : desktopLink}>
+          <Link to="/lists" className={mobile ? mobileLink : desktopLink}>
             Lists
-          </a>
+          </Link>
         </li>
 
         <li className={mobile ? "" : "flex-1"}>
-          <a href="/request" className={mobile ? mobileLink : desktopLink}>
+          <Link to="/request" className={mobile ? mobileLink : desktopLink}>
             Request
-          </a>
+          </Link>
         </li>
 
         <li className={mobile ? "" : "flex-1"}>
-          <a href="/faqs" className={mobile ? mobileLink : desktopLink}>
+          <Link to="/faqs" className={mobile ? mobileLink : desktopLink}>
             FAQs
-          </a>
+          </Link>
         </li>
 
       </ul>

@@ -1,12 +1,44 @@
 @import "tailwindcss";
 
 @layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+
+  .checkbox-pup {
+    width: 1.25rem;        
+    height: 1.25rem;      
+    flex-shrink: 0;
+    accent-color: #F8BF1E;
+    cursor: pointer;
+    outline: 3px solid red;
+  }
+
+}
+
+
+@layer utilities {
     .bg-pup-maroon {
     background-color: #8B0000;
     }
 
+    .bg-pup-dark-maroon {
+    background-color: #660000;
+    }
+
+    .bg-pup-yellow{
+    background-color: #F8BF1E;
+    }
+
     .text-pup-maroon {
     color: #8B0000;
+    }
+
+    .text-pup-yellow {
+    color: #F8BF1E;
     }
 
     .color-pup-dark-maroon {
@@ -28,4 +60,12 @@
     .bg-pup-maroon-header{
     background-color: #660000;
     }
+
+    .checkbox-pup {
+    width: 1.25rem;      
+    height: 1.25rem;     
+    flex-shrink: 0;      
+    accent-color: #F8BF1E;
+    cursor: pointer;
+  }
 }
