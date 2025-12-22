@@ -123,9 +123,9 @@ const RequestForm = () => {
   );
 
   return (
-    <div className="min-h-screen font-sans pb-20">
+    <div className="min-h-screen pb-20">
       
-      <div className="max-w-5xl mx-auto px-4 mt-10">
+      <div className="max-w-5xl mx-auto">
         <form className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col relative">
           
           <div className="flex flex-col items-center pt-8 pb-4">
@@ -153,7 +153,7 @@ const RequestForm = () => {
             </h2>
           </div>
 
-          <div className="flex-1 px-8 md:px-16 py-4 text-white">
+          <div className="flex-1 px-30 md:px-16 py-4 text-white">
             
             {/* STEP 1: TERMS & CONDITIONS */}
             {currentStep === 1 && (

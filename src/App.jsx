@@ -5,6 +5,7 @@ import RequestHeader from './components/RequestHeader.jsx';
 import RequestForm from './layouts/RequestForm.jsx';
 import DocumentLists from './layouts/DocumentLists.jsx';
 import DocumentHeader from './components/DocumentHeader.jsx';
+import Footer from './components/Footer.jsx';
 
 const App = () => {
   return (
@@ -24,6 +25,7 @@ const App = () => {
           </>
         } />
       </Routes>
+      <Footer />
     </div>
   );
 };
