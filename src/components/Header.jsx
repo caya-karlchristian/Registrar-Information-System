@@ -68,7 +68,7 @@ function Header() {
       )}
 
       {isMobile && isMobileMenuOpen && (
-        <div className="bg-[#7B1113] w-full z-10">
+        <div className="absolute  left-0 w-full bg-[#7B1113] z-50 border-b-4 border-[#FFC72C] shadow-xl">
           <Navigation mobile={true} />
         </div>
       )}
