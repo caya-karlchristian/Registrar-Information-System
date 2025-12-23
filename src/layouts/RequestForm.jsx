@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import InputGroup from '../components/InputGroup.jsx';
+import CheckboxItem from '../components/Checkbox.jsx';
+import DropdownGroup from '../components/DropDown.jsx';
 
 const RequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -61,66 +64,15 @@ const RequestForm = () => {
     console.log("Form Submitted with Data:", formData);
     alert("Request Submitted! Check console for data.");
   };
-  
-  const DropdownGroup = ({ label, name, value, onChange, options }) => (
-    <div className="w-full">
-      <label className="block text-xs md:text-sm text-white mb-1">
-        {label}
-      </label>
 
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        className="w-full p-2 rounded text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]"
-      >
-        <option value="" >Please Select </option>
-
-        {options.map((option, index) => (
-          <option key={index} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-
-  const InputGroup = ({
-    label,
-    name,
-    value,
-    onChange,
-    type = "text",
-    placeholder = "",
-  }) => (
-    <div className="w-full">
-      <label className="block text-xs md:text-sm text-white mb-1">
-        {label}
-      </label>
-
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="w-full p-2 rounded text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]"
-      />
-    </div>
-  );
-
-  const CheckboxItem = ({ text, name, checked, onChange }) => (
-  <div className="flex items-start space-x-3">
-    <input 
-      type="checkbox" 
-      name={name}
-      checked={checked}
-      onChange={onChange}
-      className="mt-1 w-5 h-5 accent-[#FFC72C] cursor-pointer" 
-    />
-    <p>{text}</p>
-  </div>
-  );
+  const stepProcess = {
+            1: "Terms & Conditions",
+            2: "Student Profile",
+            3: "Student Records",
+            4: "Student Credentials",
+            5: "TOR For Further Studies",
+            6: "Student Request",
+          };
 
   return (
     <div className="min-h-screen pb-20">
@@ -142,15 +94,11 @@ const RequestForm = () => {
             <p className="text-pup-yellow font-bold text-sm tracking-wider">
               {currentStep} of 6 
             </p>
-            
-            <h2 className="text-white text-xl font-semibold mt-2">
-              {currentStep === 1 ? "Terms & Conditions" : 
-               currentStep === 2 ? "Student Profile" :
-               currentStep === 3 ? "Student Records" :
-               currentStep === 4 ? "Student Credentials" :
-               currentStep === 5 ? "TOR For Further Studies" :
-               currentStep === 6 ? "Student Request" : ""} 
-            </h2>
+
+          <h2 className="text-white text-xl font-semibold mt-2">
+            {stepProcess[currentStep]}
+          </h2>
+
           </div>
 
           <div className="flex-1 px-30 md:px-16 py-4 text-white">
@@ -463,7 +411,7 @@ const RequestForm = () => {
               {currentStep > 1 && (
                 <button 
                   onClick={prevStep}
-                  type="button" // Important: type="button" prevents accidental submit
+                  type="button" 
                   className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full"
                 >
                   Back
