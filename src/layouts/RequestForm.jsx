@@ -83,19 +83,21 @@ const RequestForm = () => {
     <div className="min-h-screen pb-20 ">
       
     {isSubmitted ? (
-      <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px]  items-center flex flex-col relative ">
-        <p className="mb-6 text-4xl text-center font-bold text-white mt-35">
-          Please be patient as we process your requested document. 
-        </p>
-        <p className="mb-6 text-4xl text-center font-bold text-white mt-2">
-          Thank you and keep safe always.
-        </p>
-        <button 
-          onClick={handleConfirm}
-          className="bg-pup-yellow mt-100 hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95"
-        >
-          Confirm 
-        </button>
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] items-center justify-center text-center px-10 flex flex-col relative ">
+          <p className="mb-6 text-4xl text-center font-bold text-white mt-35">
+            Please be patient as we process your requested document. 
+          </p>
+          <p className="mb-6 text-4xl text-center font-bold text-white mt-2">
+            Thank you and keep safe always.
+          </p>
+          <button 
+            onClick={handleConfirm}
+            className="bg-pup-yellow mt-70 hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95"
+          >
+            Confirm 
+          </button>
+        </div>
       </div>
 
     ) : (
