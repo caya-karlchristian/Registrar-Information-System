@@ -123,11 +123,11 @@ const RequestForm = () => {
 
           </div>
 
-          <div className="flex-1 px-10 md:px-16 py-4 text-white">
+          <div className="flex-1 px-10 md:px-20 py-4 text-white">
             
             {/* STEP 1: TERMS & CONDITIONS */}
             {currentStep === 1 && (
-              <div className="space-y-6 animate-fadeIn text-[13px] text-justify ">
+              <div className="space-y-6 animate-fadeIn text-[13px] text-justify lg:text-[15px]">
                 <CheckboxItem 
                   name="privacyConsent" 
                   checked={formData.privacyConsent} 
@@ -370,7 +370,7 @@ const RequestForm = () => {
             {(currentStep === 5) && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
-                  <p className="text-sm text-justify">For TOR request for further studies, 
+                  <p className="text-sm text-justify lg:text-[15px]">For TOR request for further studies, 
                     please secure an HONORABLE DISMISSAL first. Once processed and submitted 
                     back to the University, you may request for TOR with copy for remarks. 
                     </p>

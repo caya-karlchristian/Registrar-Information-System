@@ -8,7 +8,7 @@ const CheckboxItem = ({ text, name, checked, onChange }) => (
       name={name}
       checked={checked}
       onChange={onChange}
-      className="mt-1 w-5 h-5 accent-[#FFC72C] cursor-pointer" 
+      className="mt-1 w-5 h-5 accent-[#FFC72C] cursor-pointer shrink-0"
     />
     <p>{text}</p>
   </div>
