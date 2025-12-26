@@ -5,7 +5,7 @@ import DropdownGroup from '../components/DropDown.jsx';
 
 const RequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
-
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [formData, setFormData] = useState({
     privacyConsent: false,
     onsiteTransaction: false,
@@ -62,7 +62,12 @@ const RequestForm = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Form Submitted with Data:", formData);
-    alert("Request Submitted! Check console for data.");
+    
+    setIsSubmitted(true);
+  };
+  
+  const handleConfirm = () => {
+    window.location.reload();
   };
 
   const stepProcess = {
@@ -75,8 +80,27 @@ const RequestForm = () => {
           };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 ">
       
+    {isSubmitted ? (
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] items-center justify-center text-center px-10 flex flex-col relative ">
+          <p className="mb-6 text-4xl text-center font-bold text-white mt-35">
+            Please be patient as we process your requested document. 
+          </p>
+          <p className="mb-6 text-4xl text-center font-bold text-white mt-2">
+            Thank you and keep safe always.
+          </p>
+          <button 
+            onClick={handleConfirm}
+            className="bg-pup-yellow mt-70 hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95"
+          >
+            Confirm 
+          </button>
+        </div>
+      </div>
+
+    ) : (
       <div className="max-w-5xl mx-auto">
         <form className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col relative">
           
@@ -101,11 +125,11 @@ const RequestForm = () => {
 
           </div>
 
-          <div className="flex-1 px-30 md:px-16 py-4 text-white">
+          <div className="flex-1 px-10 md:px-20 py-4 text-white">
             
             {/* STEP 1: TERMS & CONDITIONS */}
             {currentStep === 1 && (
-              <div className="space-y-6 animate-fadeIn text-[13px] text-justify">
+              <div className="space-y-6 animate-fadeIn text-[13px] text-justify lg:text-[15px]">
                 <CheckboxItem 
                   name="privacyConsent" 
                   checked={formData.privacyConsent} 
@@ -348,7 +372,7 @@ const RequestForm = () => {
             {(currentStep === 5) && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
-                  <p className="text-sm text-justify">For TOR request for further studies, 
+                  <p className="text-sm text-justify lg:text-[15px]">For TOR request for further studies, 
                     please secure an HONORABLE DISMISSAL first. Once processed and submitted 
                     back to the University, you may request for TOR with copy for remarks. 
                     </p>
@@ -413,7 +437,7 @@ const RequestForm = () => {
                   onClick={prevStep}
                   type="button" 
                   className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full"
-                >
+                > 
                   Back
                 </button>
               )}
@@ -439,11 +463,13 @@ const RequestForm = () => {
                   Submit
                 </button>
               )}
+              
             </div>
           </div>
-
+               
         </form>
       </div>
+    )} 
     </div>
   );
 };
