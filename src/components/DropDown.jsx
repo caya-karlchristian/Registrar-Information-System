@@ -11,7 +11,7 @@ const DropdownGroup = ({ label, name, value, onChange, options }) => (
       name={name}
       value={value}
       onChange={onChange}
-      className="w-full p-2 rounded text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]"
+      className="w-full p-2 rounded text-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]"
     >
       <option value="">Please Select</option>
 
