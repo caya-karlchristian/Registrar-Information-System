@@ -10,7 +10,7 @@ const Navigation = ({ mobile = false }) => {
       <ul className={`flex ${mobile ? "flex-col" : "flex-row"} list-none m-0 p-0 w-full`}>
         
         <li className={mobile ? "" : "flex-1"}>
-          <Link to="/" className={mobile ? mobileLink : desktopLink}>
+          <Link to="/home" className={mobile ? mobileLink : desktopLink}>
             Home
           </Link>
         </li>

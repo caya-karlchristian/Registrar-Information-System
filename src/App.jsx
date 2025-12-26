@@ -6,12 +6,20 @@ import RequestForm from './layouts/RequestForm.jsx';
 import DocumentLists from './layouts/DocumentLists.jsx';
 import DocumentHeader from './components/DocumentHeader.jsx';
 import Footer from './components/Footer.jsx';
+import DashboardHeader from './components/DashboardHeader.jsx';
+import StudentDashboard from './layouts/StudentDashboard.jsx';
 
 const App = () => {
   return (
     <div>
       <Header />
       <Routes>
+        <Route path="/home" element={
+          <>
+            <DashboardHeader />
+            <StudentDashboard />
+          </>
+          } />
         <Route path="/lists" element={
           <>
             <DocumentHeader />
