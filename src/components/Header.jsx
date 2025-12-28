@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Navigation from "./Navigation.jsx";
 import { Bars3Icon, BellIcon } from '@heroicons/react/24/outline';
+import NotificationSidebar from "./Notifications.jsx";
 
 function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -42,9 +43,7 @@ function Header() {
           {/* CONDITIONS FOR DESKTOP AND MOBILE */}
           <div className="flex items-center">
             {!isMobile && (
-              <button className="p-2 mr-4 hover:bg-gray-100 rounded-full transition-colors">
-                <BellIcon className="w-8 h-8 text-pup-maroon" />
-              </button>
+              <NotificationSidebar/>
             )}
 
             {isMobile && (
