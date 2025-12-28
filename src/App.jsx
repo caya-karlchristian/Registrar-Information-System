@@ -20,6 +20,12 @@ const App = () => {
             <StudentDashboard />
           </>
           } />
+        <Route path="/home" element={
+          <>
+            <DashboardHeader />
+            <StudentDashboard />
+          </>
+          } />
         <Route path="/lists" element={
           <>
             <DocumentHeader />
