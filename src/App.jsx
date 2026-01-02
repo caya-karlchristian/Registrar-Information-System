@@ -8,18 +8,25 @@ import DocumentHeader from './components/DocumentHeader.jsx';
 import Footer from './components/Footer.jsx';
 import DashboardHeader from './components/DashboardHeader.jsx';
 import StudentDashboard from './layouts/StudentDashboard.jsx';
+import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx';
+import AnalyticsHeader from './components/AnalyticsHeader.jsx';
+import AnalyticsSummary from './components/AnalyticsSummary.jsx';
 
 const App = () => {
   return (
     <div>
       <Header />
       <Routes>
-        <Route path="/home" element={
-          <>
-            <DashboardHeader />
-            <StudentDashboard />
-          </>
-          } />
+      <Route
+          path="/about"
+          element={
+            <>
+              <AnalyticsHeader/>
+              <AnalyticsSummary/>
+              <AnalyticsDashboard />
+            </>
+          }
+        />        
         <Route path="/home" element={
           <>
             <DashboardHeader />
