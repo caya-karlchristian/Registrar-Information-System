@@ -11,12 +11,20 @@ import StudentDashboard from './layouts/StudentDashboard.jsx';
 import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx';
 import AnalyticsHeader from './components/AnalyticsHeader.jsx';
 import AnalyticsSummary from './components/AnalyticsSummary.jsx';
+import FAQsHeader from './components/FAQsHeader.jsx';
+import FAQPage from './layouts/FAQs.jsx';
 
 const App = () => {
   return (
     <div>
       <Header />
       <Routes>
+      <Route path="/faqs" element={
+          <>
+            <FAQsHeader/>
+            <FAQPage/>
+          </>
+        } />
       <Route
           path="/about"
           element={
@@ -40,6 +48,12 @@ const App = () => {
           </>
         } />
         <Route path="/request" element={
+          <>
+            <RequestHeader />
+            <RequestForm />
+          </>
+        } />
+        <Route path="/" element={
           <>
             <RequestHeader />
             <RequestForm />
