@@ -23,7 +23,7 @@ const DashboardHeader = () => {
     
                 <div className="flex flex-col items-center px-1">
                   <h2 className="text-[22px] font-bold mb-4 text-center text-white leading-tight lg:text-[50px]">
-                  REQUEST DASHBOARD         
+                  STUDENT DASHBOARD         
                   </h2>
                   <p className="text-center text-[8px] -mt-3 text-white lg:text-[15px]">
                     Here are the status of the requested documents                

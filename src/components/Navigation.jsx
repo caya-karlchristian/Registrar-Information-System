@@ -16,8 +16,8 @@ const Navigation = ({ mobile = false }) => {
         </li>
 
         <li className={mobile ? "" : "flex-1"}>
-          <Link to="/about" className={mobile ? mobileLink : desktopLink}>
-            About
+          <Link to="/analytics" className={mobile ? mobileLink : desktopLink}>
+            Staff Analytics
           </Link>
         </li>
 
