@@ -225,6 +225,7 @@ const RequestForm = () => {
                   label="First Name" 
                   value={formData.firstName} 
                   onChange={handleInputChange} 
+                  placeholder='e.g., Rose'
                   />
 
                   <InputGroup 
@@ -232,6 +233,7 @@ const RequestForm = () => {
                   label="Middle Name" 
                   value={formData.middleName} 
                   onChange={handleInputChange} 
+                  placeholder='e.g., Gonzaga'
                   />
 
                   <InputGroup 
@@ -239,6 +241,7 @@ const RequestForm = () => {
                   label="Surname" 
                   value={formData.surname} 
                   onChange={handleInputChange} 
+                  placeholder='e.g., Dela Cruz'
                   />
                 </div>
 
@@ -253,8 +256,20 @@ const RequestForm = () => {
                    />
                 </div>
 
-                <InputGroup name="address" label="Present/Permanent Mailing Address" value={formData.address} onChange={handleInputChange} />
-                <InputGroup name="contactNumber" label="Contact Number" placeholder="09XXXXXXXXX" value={formData.contactNumber} onChange={handleInputChange} />
+                <InputGroup 
+                  name="address" 
+                  label="Present/Permanent Mailing Address" 
+                  value={formData.address} 
+                  onChange={handleInputChange} 
+                  placeholder="House No., Street, Barangay, City/Municipality"
+                  />
+                <InputGroup 
+                  name="contactNumber" 
+                  label="Contact Number" 
+                  placeholder="09XXXXXXXXX" 
+                  value={formData.contactNumber}
+                  onChange={handleInputChange} 
+                  />
               </div>
             )}
 
