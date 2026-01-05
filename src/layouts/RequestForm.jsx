@@ -70,6 +70,18 @@ const RequestForm = () => {
     window.location.reload();
   };
 
+  const handleAgreeAll = () => {
+    setFormData((prev) => ({
+      ...prev,
+      privacyConsent: true,
+      onsiteTransaction: true,
+      certificationsAgreed: true,
+      remindersAgreed: true,
+      authLetterAgreed: true,
+      unclaimedAgreed: true,
+    }));
+  };
+
   const stepProcess = {
             1: "Terms & Conditions",
             2: "Student Profile",
@@ -192,6 +204,15 @@ const RequestForm = () => {
                   classname="checkbox-pup"
                 />
 
+              <div className="flex justify-end mb-4">
+                  <button
+                    type="button"
+                    onClick={handleAgreeAll}
+                    className="text-xs font-white underline hover:text- transition-colors focus:outline-none"
+                  >
+                    Agree to All Terms & Conditions
+                  </button>
+                </div>
               </div>
             )}
 
@@ -429,7 +450,7 @@ const RequestForm = () => {
           </div>
 
           {/* NAVIGATION BUTTONS */}
-          <div className="p-8 flex justify-between items-center mt-auto">
+          <div className="mb-8 px-8 flex justify-between items-center mt-auto">
             {/* Back Button */}
             <div className="w-32">
               {currentStep > 1 && (
