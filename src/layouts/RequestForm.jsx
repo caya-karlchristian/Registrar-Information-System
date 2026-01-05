@@ -23,12 +23,10 @@ const RequestForm = () => {
     course: '',
     yearLevel: '',
     lastSYAttended: '',
-    yearGraduated: '',
     studentNumber: '',
     documentsRequested: [],
     purposeOfRequest: '',
     certification: '',
-    termsAccepted: false,
     noRequests: false,
     doneRequest: false,
     receiptNumber: '',
@@ -70,13 +68,33 @@ const RequestForm = () => {
     window.location.reload();
   };
 
+  const handleAgreeAll = () => {
+    setFormData((prev) => ({
+      ...prev,
+      privacyConsent: true,
+      onsiteTransaction: true,
+      certificationsAgreed: true,
+      remindersAgreed: true,
+      authLetterAgreed: true,
+      unclaimedAgreed: true,
+    }));
+  };
+
+  const certificationDocuments = [
+    "Certification of Enrollment",
+    "Certification of Grades",
+    "Certification of Academic Standing",
+    "Certification of No Academic Standing",
+    "Certification of No Record",
+  ];
+
+
   const stepProcess = {
             1: "Terms & Conditions",
             2: "Student Profile",
             3: "Student Records",
             4: "Student Credentials",
-            5: "TOR For Further Studies",
-            6: "Student Request",
+            5: "Student Request",
           };
 
   return (
@@ -106,7 +124,7 @@ const RequestForm = () => {
           
           <div className="flex flex-col items-center pt-8 pb-4">
             <div className="flex space-x-3 mb-2">
-              {[1, 2, 3, 4, 5, 6].map((step) => (
+              {[1, 2, 3, 4, 5].map((step) => (
                 <div 
                   key={step}
                   className={`w-4 h-4 rounded-full border border-pup-yellow ${
@@ -116,7 +134,7 @@ const RequestForm = () => {
               ))}
             </div>
             <p className="text-pup-yellow font-bold text-sm tracking-wider">
-              {currentStep} of 6 
+              {currentStep} of 5 
             </p>
 
           <h2 className="text-white text-xl font-semibold mt-2">
@@ -192,6 +210,15 @@ const RequestForm = () => {
                   classname="checkbox-pup"
                 />
 
+              <div className="flex justify-end mb-4">
+                  <button
+                    type="button"
+                    onClick={handleAgreeAll}
+                    className="text-xs font-white underline hover:text- transition-colors focus:outline-none"
+                  >
+                    Agree to All Terms & Conditions
+                  </button>
+                </div>
               </div>
             )}
 
@@ -204,6 +231,7 @@ const RequestForm = () => {
                   label="First Name" 
                   value={formData.firstName} 
                   onChange={handleInputChange} 
+                  placeholder='e.g., Rose'
                   />
 
                   <InputGroup 
@@ -211,6 +239,7 @@ const RequestForm = () => {
                   label="Middle Name" 
                   value={formData.middleName} 
                   onChange={handleInputChange} 
+                  placeholder='e.g., Gonzaga'
                   />
 
                   <InputGroup 
@@ -218,6 +247,7 @@ const RequestForm = () => {
                   label="Surname" 
                   value={formData.surname} 
                   onChange={handleInputChange} 
+                  placeholder='e.g., Dela Cruz'
                   />
                 </div>
 
@@ -232,8 +262,20 @@ const RequestForm = () => {
                    />
                 </div>
 
-                <InputGroup name="address" label="Present/Permanent Mailing Address" value={formData.address} onChange={handleInputChange} />
-                <InputGroup name="contactNumber" label="Contact Number" placeholder="09XXXXXXXXX" value={formData.contactNumber} onChange={handleInputChange} />
+                <InputGroup 
+                  name="address" 
+                  label="Present/Permanent Mailing Address" 
+                  value={formData.address} 
+                  onChange={handleInputChange} 
+                  placeholder="House No., Street, Barangay, City/Municipality"
+                  />
+                <InputGroup 
+                  name="contactNumber" 
+                  label="Contact Number" 
+                  placeholder="09XXXXXXXXX" 
+                  value={formData.contactNumber}
+                  onChange={handleInputChange} 
+                  />
               </div>
             )}
 
@@ -290,14 +332,6 @@ const RequestForm = () => {
                 </div>
 
                   <InputGroup
-                    name="yearGraduated"
-                    label="For Alumni: Year Graduated"
-                    value={formData.yearGraduated}
-                    onChange={handleInputChange}
-                    placeholder='XXXX'
-                  />
-
-                  <InputGroup
                     name="studentNumber"
                     label="Student Number"
                     value={formData.studentNumber}
@@ -328,6 +362,7 @@ const RequestForm = () => {
                     ]}
                   />
 
+                {certificationDocuments.includes(formData.documentsRequested) && (
                   <DropdownGroup 
                     name="certification" 
                     label="For Certification, please specify"
@@ -341,8 +376,9 @@ const RequestForm = () => {
                       "Certification of No Academic Standing",
                       "Certification of No Record",
                       "Other"
-                    ]}
-                  />
+                      ]}
+                    />
+                  )}
 
                   <DropdownGroup 
                     name="purposeOfRequest" 
@@ -358,44 +394,12 @@ const RequestForm = () => {
                     ]}
                   />
 
-                  <CheckboxItem
-                    text="Are you a graduate requesting for FIRST COPY of Diploma/TOR/Certificate of Graduation"
-                    name="termsAccepted"
-                    checked={formData.termsAccepted}
-                    onChange={handleInputChange}
-                  />
-
-              </div>
-              </div>
-            )}
-
-            {(currentStep === 5) && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
-                  <p className="text-sm text-justify lg:text-[15px]">For TOR request for further studies, 
-                    please secure an HONORABLE DISMISSAL first. Once processed and submitted 
-                    back to the University, you may request for TOR with copy for remarks. 
-                    </p>
-
-                  <CheckboxItem
-                    text="No Request Yet"
-                    name="noRequests"
-                    checked={formData.noRequests}
-                    onChange={handleCheckboxChange}
-                  />
-
-                  <CheckboxItem
-                    text="Done Honorable Dismissal Request Done"
-                    name="doneRequest"
-                    checked={formData.doneRequest}
-                    onChange={handleCheckboxChange}
-                  />
               </div>
               </div>
             )}
 
             {/* STEP 6: SUBMIT */}
-            {currentStep === 6 && (
+            {currentStep === 5 && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
                   <InputGroup
@@ -429,7 +433,7 @@ const RequestForm = () => {
           </div>
 
           {/* NAVIGATION BUTTONS */}
-          <div className="p-8 flex justify-between items-center mt-auto">
+          <div className="mb-8 px-8 flex justify-between items-center mt-auto">
             {/* Back Button */}
             <div className="w-32">
               {currentStep > 1 && (
@@ -445,7 +449,7 @@ const RequestForm = () => {
 
             {/* Next / Submit Button */}
             <div className="w-32">
-              {currentStep < 6 ? (
+              {currentStep < 5 ? (
                 <button 
                   onClick={nextStep}
                   type="button" // Important: type="button" prevents submit
