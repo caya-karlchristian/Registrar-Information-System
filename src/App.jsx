@@ -13,6 +13,8 @@ import AnalyticsHeader from './components/AnalyticsHeader.jsx';
 import AnalyticsSummary from './components/AnalyticsSummary.jsx';
 import FAQsHeader from './components/FAQsHeader.jsx';
 import FAQPage from './layouts/FAQs.jsx';
+import AlumniRequestForm from './layouts/AlumniRequest.jsx';
+import AlumniRequestHeader from './components/AlumniHeader.jsx';
 
 const App = () => {
   return (
@@ -47,10 +49,16 @@ const App = () => {
             <DocumentLists />
           </>
         } />
-        <Route path="/request" element={
+        <Route path="/student_request" element={
           <>
             <RequestHeader />
             <RequestForm />
+          </>
+        } />
+        <Route path="/alumni_request" element={
+          <>
+            <AlumniRequestHeader />
+            <AlumniRequestForm />
           </>
         } />
         <Route path="/" element={
