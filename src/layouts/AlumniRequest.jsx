@@ -94,7 +94,8 @@ const AlumniRequestForm = () => {
             2: "Student Profile",
             3: "Student Records",
             4: "Student Credentials",
-            5: "Student Request",
+            5: "TOR request",
+            6: "Student Request",
           };
 
   return (
@@ -124,7 +125,7 @@ const AlumniRequestForm = () => {
           
           <div className="flex flex-col items-center pt-8 pb-4">
             <div className="flex space-x-3 mb-2">
-              {[1, 2, 3, 4, 5].map((step) => (
+              {[1, 2, 3, 4, 5, 6].map((step) => (
                 <div 
                   key={step}
                   className={`w-4 h-4 rounded-full border border-pup-yellow ${
@@ -134,7 +135,7 @@ const AlumniRequestForm = () => {
               ))}
             </div>
             <p className="text-pup-yellow font-bold text-sm tracking-wider">
-              {currentStep} of 5 
+              {currentStep} of 6 
             </p>
 
           <h2 className="text-white text-xl font-semibold mt-2">
@@ -396,8 +397,33 @@ const AlumniRequestForm = () => {
               </div>
             )}
 
+            {(currentStep === 5) && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
+                  <p className="text-sm text-justify lg:text-[15px]">For TOR request for further studies, 
+                    please secure an HONORABLE DISMISSAL first. Once processed and submitted 
+                    back to the University, you may request for TOR with copy for remarks. 
+                    </p>
+
+                  <CheckboxItem
+                    text="No Request Yet"
+                    name="noRequests"
+                    checked={formData.noRequests}
+                    onChange={handleCheckboxChange}
+                  />
+
+                  <CheckboxItem
+                    text="Done Honorable Dismissal Request Done"
+                    name="doneRequest"
+                    checked={formData.doneRequest}
+                    onChange={handleCheckboxChange}
+                  />
+              </div>
+              </div>
+            )}
+
             {/* STEP 6: SUBMIT */}
-            {currentStep === 5 && (
+            {currentStep === 6 && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
                   <InputGroup
@@ -447,7 +473,7 @@ const AlumniRequestForm = () => {
 
             {/* Next / Submit Button */}
             <div className="w-32">
-              {currentStep < 5 ? (
+              {currentStep < 6 ? (
                 <button 
                   onClick={nextStep}
                   type="button" // Important: type="button" prevents submit

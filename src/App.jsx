@@ -28,7 +28,7 @@ const App = () => {
           </>
         } />
       <Route
-          path="/about"
+          path="/analytics"
           element={
             <>
               <AnalyticsHeader/>
