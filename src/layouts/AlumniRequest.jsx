@@ -4,7 +4,6 @@ import CheckboxItem from '../components/Checkbox.jsx';
 import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
 
-
 const AlumniRequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -83,9 +82,16 @@ const AlumniRequestForm = () => {
     }));
   };
 
-  const showCertificationDropdown = formData.documentsRequested.some(doc => 
-    certificationDocuments.includes(doc)
+  const certificationDocuments = new Set([
+    "Certificate of Good Moral Character",
+    "Certification, Authentication, Verification (CAV) / APOSTILE",
+    "Certificates of Attendance, Graduation, Medium of Instruction, General Weighted Average, Non Issuance of Special Order, and Certified True Copy"                 
+  ]);
+
+  const showCertificationDropdown = formData.documentsRequested.some(doc =>
+    certificationDocuments.has(doc)
   );
+
 
   const stepProcess = {
             1: "Terms & Conditions",
@@ -348,18 +354,16 @@ const AlumniRequestForm = () => {
                     name="documentsRequested"
                     label="Documents Requested (You may select multiple)"
                     options={[
-                      "Certification of Enrollment",
-                      "Certification of Grades",
-                      "Certification of Academic Standing",
-                      "Certification of No Academic Standing",
-                      "Certification of No Record",
                       "Transcript of Records (TOR)",
-                      "Honorable Dismissal",
-                      "Diploma",
-                      "Other"
+                      "Certificate of Good Moral Character",
+                      "Certification, Authentication, Verification (CAV) / APOSTILE",
+                      "Certificates of Attendance, Graduation, Medium of Instruction, General Weighted Average, Non Issuance of Special Order, and Certified True Copy",
+                      "Course/Subject Description",
+                      "Academic Verification Results",
+                      "Student/Alumni Referral and Recommendation Letter"
                     ]}
-                    selectedValues={formData.documentsRequested} // Pass Array
-                    onChange={handleInputChange} // Pass Handler
+                    selectedValues={formData.documentsRequested} 
+                    onChange={handleInputChange} 
                   />
 
                 {showCertificationDropdown && ( 
