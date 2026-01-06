@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import Navigation from "./Navigation.jsx";
+import StaffNavigation from "./StaffNavigation.jsx";
 import { Bars3Icon} from '@heroicons/react/24/outline';
 import NotificationSidebar from "./Notifications.jsx";
 
-function Header() {
+function StaffHeaderNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -66,7 +66,7 @@ function Header() {
         <div className="w-full">
           <div className="bg-pup-maroon w-full border-b-[5px] border-pup-yellow"> 
             <div className="w-full px-4">
-              <Navigation mobile={false} />
+              <StaffNavigation mobile={false} />
             </div>
           </div>
         </div>
@@ -74,11 +74,11 @@ function Header() {
 
       {isMobile && isMobileMenuOpen && (
         <div className="absolute left-0 w-full bg-pup-dark-maroon z-50 shadow-xl">
-          <Navigation mobile={true} />
+          <StaffNavigation mobile={true} />
         </div>
       )}
     </div>
   );
 }
 
-export default Header;
+export default StaffHeaderNav;
