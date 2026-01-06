@@ -99,3 +99,8 @@ CREATE TABLE certification_types (
 ALTER TABLE document_request 
 ADD COLUMN cert_type_id INT,
 ADD CONSTRAINT fk_cert_type FOREIGN KEY (cert_type_id) REFERENCES certification_types(cert_type_id);
+
+ALTER TABLE request_history
+ADD CONSTRAINT fk_old_status FOREIGN KEY (old_status_id) REFERENCES request_status(status_id),
+ADD CONSTRAINT fk_new_status FOREIGN KEY (new_status_id) REFERENCES request_status(status_id),
+ADD CONSTRAINT fk_changed_by FOREIGN KEY (changed_by) REFERENCES system_user(user_id);
