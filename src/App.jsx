@@ -12,6 +12,11 @@ import FAQPage from './layouts/FAQs.jsx';
 import AlumniRequest from './layouts/AlumniRequest.jsx'
 import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx'
 import StaffDashboard from './layouts/StaffDashboard.jsx'
+
+import DashboardHeader from './components/DashboardHeader.jsx'
+import RequestHeader from './components/RequestHeader.jsx'
+import DocumentHeader from './components/DocumentHeader.jsx'
+import FAQsHeader from './components/FAQsHeader.jsx'
 import Footer from './components/Footer.jsx';
 
 
@@ -23,10 +28,34 @@ const App = () => {
         <Route path="/" element={<StudentPage />}>
           {/* --- ADD BACKEND LOGIC --- */}
           <Route index element={<RequestForm />} /> {/* OUTLETTT */}
-          <Route path="/home" element={<StudentDashboard />} />
-          <Route path="/student/request" element={<RequestForm />} />
-          <Route path="/lists" element={<DocumentLists />} />
-          <Route path="/faqs" element={<FAQPage />} />
+          <Route path="/home" element={
+            <>
+            <DashboardHeader/>
+            <StudentDashboard />
+            </>
+            } 
+            />
+          <Route path="/student/request" element={
+            <>
+            <RequestHeader/>
+            <RequestForm />
+            </>
+            } 
+            />
+          <Route path="/lists" element={
+            <>
+            <DocumentHeader/>
+            <DocumentLists />
+            </>
+            } 
+            />
+          <Route path="/faqs" element={
+            <>
+            <FAQsHeader/>
+            <FAQPage />
+            </>
+            } 
+            />
 
         </Route>
 

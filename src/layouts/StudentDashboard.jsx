@@ -33,7 +33,7 @@ const StudentDashboard = () => {
     const filteredRequests = requests.filter(req => req.type === activeTab);
 
     return (
-    <main className="max-w-6xl mx-auto px-4 py-8 relative z-20">
+    <main className="max-w-6xl mx-auto px-4 relative z-20">
         
         <div className="grid grid-cols-3 md:grid-cols-3 gap-4 place-items-center mb-8">
             <div className="w-full flex justify-center">  
