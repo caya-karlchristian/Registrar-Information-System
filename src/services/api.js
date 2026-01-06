@@ -11,14 +11,14 @@ const api = axios.create({
   },
 });
 
-// ------------------- SYSTEM USERS -------------------
+//  SYSTEM USERS 
 export const getSystemUsers = () => api.get("/system-users");
 export const getSystemUser = (id) => api.get(`/system-users/${id}`);
 export const createSystemUser = (data) => api.post("/system-users", data);
 export const updateSystemUser = (id, data) => api.put(`/system-users/${id}`, data);
 export const deleteSystemUser = (id) => api.delete(`/system-users/${id}`);
 
-// ------------------- STUDENTS -------------------
+//  STUDENTS 
 export const getStudents = () => api.get("/students");
 export const getStudent = (id) => api.get(`/students/${id}`);
 export const createStudent = (data) => api.post("/students", data);
@@ -53,21 +53,21 @@ export const createCertification = (data) => api.post("/certifications", data);
 export const updateCertification = (id, data) => api.put(`/certifications/${id}`, data);
 export const deleteCertification = (id) => api.delete(`/certifications/${id}`);
 
-// ------------------- DOCUMENT REQUESTS -------------------
+// DOCUMENT REQUESTS 
 export const getDocumentRequests = () => api.get("/document-requests");
 export const getDocumentRequest = (id) => api.get(`/document-requests/${id}`);
 export const createDocumentRequest = (data) => api.post("/document-requests", data);
 export const updateDocumentRequest = (id, data) => api.put(`/document-requests/${id}`, data);
 export const deleteDocumentRequest = (id) => api.delete(`/document-requests/${id}`);
 
-// ------------------- REQUEST DOCUMENTS -------------------
+//  REQUEST DOCUMENTS 
 export const getRequestDocuments = () => api.get("/request-documents");
 export const getRequestDocument = (id) => api.get(`/request-documents/${id}`);
 export const createRequestDocument = (data) => api.post("/request-documents", data);
 export const updateRequestDocument = (id, data) => api.put(`/request-documents/${id}`, data);
 export const deleteRequestDocument = (id) => api.delete(`/request-documents/${id}`);
 
-// ------------------- REQUEST HISTORY -------------------
+//  REQUEST HISTORY 
 export const getRequestHistory = () => api.get("/request-history");
 export const getRequestHistoryItem = (id) => api.get(`/request-history/${id}`);
 export const createRequestHistoryItem = (data) => api.post("/request-history", data);
