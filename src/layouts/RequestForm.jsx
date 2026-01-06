@@ -81,17 +81,16 @@ const RequestForm = () => {
     }));
   };
 
-  const certificationDocuments = [
-    "Certification of Enrollment",
-    "Certification of Grades",
-    "Certification of Academic Standing",
-    "Certification of No Academic Standing",
-    "Certification of No Record",
-  ];
+  const certificationDocuments = new Set([
+    "Certificates of Attendance, Graduation, Medium of Instruction, General Weighted Average, Non Issuance of Special Order, and Certified True Copy",
+    "Certification, Authentication, Verification (CAV) / APOSTILE",
+    "Certificate of Good Moral Character"
+  ]);
 
-  const showCertificationDropdown = formData.documentsRequested.some(doc => 
-    certificationDocuments.includes(doc)
+  const showCertificationDropdown = formData.documentsRequested.some(doc =>
+    certificationDocuments.has(doc)
   );
+
 
   const stepProcess = {
             1: "Terms & Conditions",
@@ -355,18 +354,32 @@ const RequestForm = () => {
                     name="documentsRequested"
                     label="Documents Requested (You may select multiple)"
                     options={[
-                      "Certification of Enrollment",
-                      "Certification of Grades",
-                      "Certification of Academic Standing",
-                      "Certification of No Academic Standing",
-                      "Certification of No Record",
+                      "Application for New Identification Card",
+                      "Replacement of Lost Identification Card",
+                      "Consultation Service",
+                      "Counseling Service",
+                      "Recommendation Letter",
+                      "Student/Alumni Referral and Recommendation Letter",
+                      "Permit to Conduct an Activity",
+                      "Application for Graduation",
+                      "Clearance for Graduation",
+                      "Course/Subject Description",
+                      "Correction of Entry of Grade",
+                      "Completion of Incomplete Grade",
+                      "Late Reporting of Grade",
+                      "Correction of Name in School Records",
+                      "Course Accreditation Service (SHS to Bridge Course)",
+                      "Course Accreditation Service (for Transferees)",
+                      "Certificates of Attendance, Graduation, Medium of Instruction, General Weighted Average, Non Issuance of Special Order, and Certified True Copy",
+                      "Certification, Authentication, Verification (CAV) / APOSTILE",
                       "Transcript of Records (TOR)",
-                      "Honorable Dismissal",
-                      "Diploma",
-                      "Other"
+                      "Informative Copy of Grades",
+                      "Approved Leave of Absence (LOA)",
+                      "Re-Admission Certificate",
+                      "Certificate of Good Moral Character"
                     ]}
-                    selectedValues={formData.documentsRequested} // Pass Array
-                    onChange={handleInputChange} // Pass Handler
+                    selectedValues={formData.documentsRequested} 
+                    onChange={handleInputChange} 
                   />
 
                 {showCertificationDropdown && ( 
