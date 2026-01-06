@@ -1,3 +1,9 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
 class StudentAcademicRecord extends Model
 {
     protected $table = 'student_academic_record';
