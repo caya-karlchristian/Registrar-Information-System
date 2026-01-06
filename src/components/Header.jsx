@@ -42,9 +42,15 @@ function Header() {
 
           {/* CONDITIONS FOR DESKTOP AND MOBILE */}
           <div className="flex items-center">
-            {!isMobile && (
-              <NotificationSidebar/>
-            )}
+            <div 
+              className={
+                isMobile 
+                  ? "fixed bottom-6 right-6 z-50 shadow-2xl  round-white max-w-[90vw] bg-white rounded-full w-11 h-10" // Mobile Styles
+                  : "relative block" 
+              }
+            >
+              <NotificationSidebar />
+            </div>
 
             {isMobile && (
               <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
