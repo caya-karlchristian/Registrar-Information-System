@@ -59,7 +59,7 @@ const StaffDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-800 pb-10">
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-800 pb-10 z-0">
       <main className="max-w-7xl mx-auto px-6 py-8">
         
         {/* --- 1. CARDS --- */}
@@ -129,7 +129,7 @@ const StaffDashboard = () => {
         </div>
 
         {/* --- 3. DATA TABLE --- */}
-        <div className="bg-white shadow-md rounded-xl overflow-hidden border border-gray-200">
+        <div className="bg-white shadow-md rounded-xlborder border-gray-200">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
