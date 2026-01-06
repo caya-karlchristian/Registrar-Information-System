@@ -9,10 +9,15 @@ class StudentAcademicRecord extends Model
     protected $table = 'student_academic_record';
     protected $primaryKey = 'academic_record_id';
     public $timestamps = false;
+    protected $guarded = [];
 
-    protected $fillable = [
-        'student_profile_id','student_number','course','year_level',
-        'school_year_admitted','last_school_year_attended',
-        'has_honorable_dismissal','graduation_date'
-    ];
+    public function studentProfile()
+    {
+        return $this->belongsTo(StudentProfile::class, 'student_profile_id');
+    }
+
+    public function documentRequests()
+    {
+        return $this->hasMany(DocumentRequest::class, 'academic_record_id');
+    }
 }

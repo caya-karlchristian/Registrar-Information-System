@@ -9,24 +9,40 @@ class DocumentRequest extends Model
     protected $table = 'document_request';
     protected $primaryKey = 'request_id';
     public $timestamps = false;
+    protected $guarded = [];
 
-    protected $fillable = [
-        'user_id','student_profile_id','academic_record_id',
-        'status_id','purpose_of_request','receipt_number',
-        'receipt_date','number_of_copies','additional_notes',
-        'certification_detail','honors_dismissal_status','cert_type_id'
-    ];
+    public function user()
+    {
+        return $this->belongsTo(SystemUser::class, 'user_id');
+    }
 
-    public function status() {
+    public function studentProfile()
+    {
+        return $this->belongsTo(StudentProfile::class, 'student_profile_id');
+    }
+
+    public function academicRecord()
+    {
+        return $this->belongsTo(StudentAcademicRecord::class, 'academic_record_id');
+    }
+
+    public function status()
+    {
         return $this->belongsTo(RequestStatus::class, 'status_id');
     }
 
-    public function documents() {
-        return $this->belongsToMany(
-            DocumentType::class,
-            'request_document',
-            'request_id',
-            'document_type_id'
-        );
+    public function documents()
+    {
+        return $this->hasMany(RequestDocument::class, 'request_id');
+    }
+
+    public function certificationType()
+    {
+        return $this->belongsTo(CertificationType::class, 'cert_type_id');
+    }
+
+    public function history()
+    {
+        return $this->hasMany(RequestHistory::class, 'request_id');
     }
 }
