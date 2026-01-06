@@ -22,6 +22,12 @@ const Navigation = ({ mobile = false }) => {
         </li>
 
         <li className={mobile ? "" : "flex-1"}>
+          <Link to="/staff_dashboard" className={mobile ? mobileLink : desktopLink}>
+            Staff Dashboard
+          </Link>
+        </li>
+
+        <li className={mobile ? "" : "flex-1"}>
           <Link to="/lists" className={mobile ? mobileLink : desktopLink}>
             Lists
           </Link>

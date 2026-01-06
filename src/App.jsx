@@ -15,12 +15,20 @@ import FAQsHeader from './components/FAQsHeader.jsx';
 import FAQPage from './layouts/FAQs.jsx';
 import AlumniRequestForm from './layouts/AlumniRequest.jsx';
 import AlumniRequestHeader from './components/AlumniHeader.jsx';
+import StaffDashboard from './layouts/StaffDashboard.jsx';
+import StaffDashboardHeader from './components/StaffHeader.jsx';
 
 const App = () => {
   return (
     <div>
       <Header />
       <Routes>
+        <Route path="/staff_dashboard" element={
+          <>
+            <StaffDashboardHeader/>
+            <StaffDashboard/>
+          </>
+        } />
       <Route path="/faqs" element={
           <>
             <FAQsHeader/>

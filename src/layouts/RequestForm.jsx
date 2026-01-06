@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import InputGroup from '../components/InputGroup.jsx';
 import CheckboxItem from '../components/Checkbox.jsx';
 import DropdownGroup from '../components/DropDown.jsx';
+import MultiSelectDropdown from '../components/MultiSelection.jsx';
 
 const RequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -88,6 +89,9 @@ const RequestForm = () => {
     "Certification of No Record",
   ];
 
+  const showCertificationDropdown = formData.documentsRequested.some(doc => 
+    certificationDocuments.includes(doc)
+  );
 
   const stepProcess = {
             1: "Terms & Conditions",
@@ -347,22 +351,25 @@ const RequestForm = () => {
             {(currentStep === 4) && (
               <div className="space-y-6 animate-fadeIn ">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
-                  <DropdownGroup 
-                    name="documentsRequested" 
-                    label="Documents Requested"
-                    value={formData.documentsRequested}
-                    onChange={handleInputChange}
+                  <MultiSelectDropdown 
+                    name="documentsRequested"
+                    label="Documents Requested (You may select multiple)"
                     options={[
                       "Certification of Enrollment",
                       "Certification of Grades",
                       "Certification of Academic Standing",
                       "Certification of No Academic Standing",
                       "Certification of No Record",
+                      "Transcript of Records (TOR)",
+                      "Honorable Dismissal",
+                      "Diploma",
                       "Other"
                     ]}
+                    selectedValues={formData.documentsRequested} // Pass Array
+                    onChange={handleInputChange} // Pass Handler
                   />
 
-                {certificationDocuments.includes(formData.documentsRequested) && (
+                {showCertificationDropdown && ( 
                   <DropdownGroup 
                     name="certification" 
                     label="For Certification, please specify"
