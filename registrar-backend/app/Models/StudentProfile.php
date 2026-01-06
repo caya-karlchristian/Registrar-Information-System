@@ -9,14 +9,20 @@ class StudentProfile extends Model
     protected $table = 'student_profile';
     protected $primaryKey = 'student_profile_id';
     public $timestamps = false;
+    protected $guarded = [];
 
-    protected $fillable = [
-        'user_id',
-        'first_name',
-        'middle_name',
-        'last_name',
-        'date_of_birth',
-        'permanent_address',
-        'contact_number'
-    ];
+    public function user()
+    {
+        return $this->belongsTo(SystemUser::class, 'user_id');
+    }
+
+    public function academicRecords()
+    {
+        return $this->hasMany(StudentAcademicRecord::class, 'student_profile_id');
+    }
+
+    public function documentRequests()
+    {
+        return $this->hasMany(DocumentRequest::class, 'student_profile_id');
+    }
 }
