@@ -185,15 +185,14 @@ const StaffDashboard = () => {
                                       {req.status === 'Processing' && (
                                         <button className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1 transition-colors">
                                             <CheckCircleIcon className="w-4 h-4" />
-                                            <span>Mark Ready</span>
+                                            <span>Ready</span>
                                         </button>
                                       )}
 
-                                      {/* CHANGED: Replaced 'No actions' with 'Claimed' Button */}
                                       {req.status === 'Ready to Claim' && (
-                                         <button className="px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1 transition-colors" title="Mark as Claimed/Done">
+                                         <button className="px-4 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1 transition-colors" title="Mark as Claimed/Done">
                                             <ClipboardDocumentCheckIcon className="w-4 h-4" />
-                                            <span>Claimed</span>
+                                            <span>Done</span>
                                          </button>
                                       )}
                                   </div>
