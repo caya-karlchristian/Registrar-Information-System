@@ -10,13 +10,13 @@ const StaffNavigation = ({ mobile = false }) => {
       <ul className={`flex ${mobile ? "flex-col" : "flex-row"} list-none m-0 p-0 w-full`}>
         
         <li className={mobile ? "" : "flex-1"}>
-          <Link to="/dashboard" className={mobile ? mobileLink : desktopLink}>
+          <Link to="dashboard" className={mobile ? mobileLink : desktopLink}>
             Staff Dashboard
           </Link>
         </li>
 
         <li className={mobile ? "" : "flex-1"}>
-          <Link to="/analytics" className={mobile ? mobileLink : desktopLink}>
+          <Link to="analytics" className={mobile ? mobileLink : desktopLink}>
             Staff Analytics
           </Link>
         </li>
