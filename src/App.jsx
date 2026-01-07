@@ -23,6 +23,7 @@ import StaffHeader from './components/StaffHeader.jsx';
 import Footer from './components/Footer.jsx';
 import AnalyticsHeader from './components/AnalyticsHeader.jsx';
 import AlumniHeader from './components/AlumniHeader.jsx'
+import AlumniDashboardHeader from './components/AlumniDashboardHeader.jsx';
 
 
 const App = () => {
@@ -33,7 +34,12 @@ const App = () => {
         <Route path="/" element={<LandingPage />} />
 
         <Route path="/student" element={<StudentPage />}>
-          <Route index element={<RequestForm />} /> {/* /student */}
+          <Route index element={
+            <>
+              <RequestHeader />
+              <RequestForm />
+            </>
+            } /> {/* /student */}
           <Route path="home" element={
             <>
               <DashboardHeader />
@@ -60,10 +66,15 @@ const App = () => {
           } />
         </Route>
           <Route path="/alumni" element={<AlumniPage />}>
-          <Route index element={<AlumniRequest />} /> 
+          <Route index element={
+            <>
+              <AlumniHeader/>
+              <AlumniRequest />
+            </>
+            } /> 
           <Route path="home" element={
             <>
-              <AlumniHeader />
+              <AlumniDashboardHeader />
               <StudentDashboard />
             </>
           } />
@@ -88,7 +99,12 @@ const App = () => {
         </Route>
 
         <Route path="/staff" element={<StaffPage />}>
-          <Route index element={<StaffDashboard />} /> {/* /staff */}
+          <Route index element={
+            <>
+              <StaffHeader/>
+              <StaffDashboard />
+            </>
+            } /> {/* /staff */}
           <Route path="dashboard" element={
             <>
               <StaffHeader/>
