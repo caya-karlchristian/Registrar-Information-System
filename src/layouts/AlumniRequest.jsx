@@ -6,6 +6,7 @@ import MultiSelectDropdown from '../components/MultiSelection.jsx';
 
 const AlumniRequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [formData, setFormData] = useState({
     privacyConsent: false,
@@ -49,10 +50,19 @@ const AlumniRequestForm = () => {
   };
 
   // Function to go to next step
-  const nextStep = (e) => {
-    e.preventDefault(); // Prevent form refresh
-    if (currentStep < 6) setCurrentStep(currentStep + 1);
-  };
+const nextStep = (e) => {
+  e.preventDefault();
+
+  // ONLY validate on STEP 1
+  if (currentStep === 1 && !allTermsChecked) {
+    setShowTermsError(true); // show popup
+    return;
+  }
+
+  setShowTermsError(false); // hide popup if valid
+  if (currentStep < 6) setCurrentStep(currentStep + 1);
+};
+
 
   const prevStep = (e) => {
     e.preventDefault(); 
@@ -81,6 +91,14 @@ const AlumniRequestForm = () => {
       unclaimedAgreed: true,
     }));
   };
+
+  const allTermsChecked =
+    formData.privacyConsent &&
+    formData.onsiteTransaction &&
+    formData.certificationsAgreed &&
+    formData.remindersAgreed &&
+    formData.authLetterAgreed &&
+    formData.unclaimedAgreed;
 
   const certificationDocuments = new Set([
     "Certificate of Good Moral Character",
@@ -462,42 +480,52 @@ const AlumniRequestForm = () => {
           </div>
 
           {/* NAVIGATION BUTTONS */}
-          <div className="mb-8 px-8 flex justify-between items-center mt-auto">
-            {/* Back Button */}
-            <div className="w-32">
-              {currentStep > 1 && (
-                <button 
-                  onClick={prevStep}
-                  type="button" 
-                  className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full"
-                > 
-                  Back
-                </button>
-              )}
-            </div>
+          <div className="mb-8 px-8 flex flex-col items-center mt-auto space-y-2">
+            <div className="flex justify-between items-center w-full">
+              {/* Back Button */}
+              <div className="w-32">
+                {currentStep > 1 && (
+                  <button
+                    onClick={prevStep}
+                    type="button"
+                    className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full"
+                  >
+                    Back
+                  </button>
+                )}
+              </div>
 
-            {/* Next / Submit Button */}
-            <div className="w-32">
-              {currentStep < 6 ? (
-                <button 
-                  onClick={nextStep}
-                  type="button" // Important: type="button" prevents submit
-                  className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full"
-                >
-                  Next
-                </button>
+              <div className="w-32">
+                {currentStep < 6 ? (
+                  <button
+                    onClick={nextStep}
+                    type="button"
+                    disabled={currentStep === 1 && !allTermsChecked} 
+                    className={`font-bold py-2 px-6 rounded shadow-md w-full transition-transform active:scale-95
+                      ${
+                        currentStep === 1 && !allTermsChecked
+                          ? "bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon "
+                          : "bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
+                      }`}
+                  >
+                    Next
+                  </button>
               ) : (
-                // STEP 6: This is the actual SUBMIT button
-                <button 
+                <button
                   onClick={handleSubmit}
-                  type="submit" 
-                  className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full "
+                  type="submit"
+                  className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full"
                 >
                   Submit
                 </button>
               )}
-              
             </div>
+          </div>
+          {currentStep === 1 && !allTermsChecked && (
+            <p className="text-red-400 text-xs mt-1">
+              ⚠️ Please agree to all Terms & Conditions to continue.
+            </p>
+          )}
           </div>
                
         </form>
