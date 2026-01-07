@@ -13,9 +13,7 @@ use App\Http\Controllers\RequestDocumentController;
 use App\Http\Controllers\RequestHistoryController;
 
 /*
-|--------------------------------------------------------------------------
 | API Routes
-|--------------------------------------------------------------------------
 */
 
 Route::prefix('system-users')->group(function () {
