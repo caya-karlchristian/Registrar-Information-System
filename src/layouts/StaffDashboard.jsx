@@ -29,7 +29,7 @@ const StaffDashboard = () => {
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // --- DYNAMIC CALCULATION LOGIC --- 
+  // --- DYNAMIC CALCULATION LOGIC --- `
   const pendingCount = requests.filter(r => r.status === 'Pending').length;
   const processingCount = requests.filter(r => r.status === 'Processing').length;
   const readyCount = requests.filter(r => r.status === 'Ready to Claim').length;
