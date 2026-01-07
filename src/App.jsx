@@ -32,27 +32,27 @@ const App = () => {
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
-        <Route path="/student" element={<StudentPage />}>
+        <Route path="/" element={<StudentPage />}>
           <Route index element={<RequestForm />} /> {/* /student */}
-          <Route path="home" element={
+          <Route path="/home" element={
             <>
               <DashboardHeader />
               <StudentDashboard />
             </>
           } />
-          <Route path="request" element={
+          <Route path="/student/request" element={
             <>
               <RequestHeader />
               <RequestForm />
             </>
           } />
-          <Route path="lists" element={
+          <Route path="/lists" element={
             <>
               <DocumentHeader />
               <DocumentLists />
             </>
           } />
-          <Route path="faqs" element={
+          <Route path="/faqs" element={
             <>
               <FAQsHeader />
               <FAQPage />
@@ -60,27 +60,27 @@ const App = () => {
           } />
         </Route>
 
-        <Route path="/alumni" element={<AlumniPage />}>
+        <Route path="/" element={<AlumniPage />}>
           <Route index element={<AlumniRequest />} /> 
-          <Route path="home" element={
+          <Route path="/alumni/home" element={
             <>
               <AlumniHeader />
               <StudentDashboard />
             </>
           } />
-          <Route path="request" element={
+          <Route path="/alumni/request" element={
             <>
               <AlumniHeader/>
               <AlumniRequest />
             </>
             } />
-          <Route path="lists" element={
+          <Route path="/alumni/lists" element={
             <>
               <DocumentHeader />
               <DocumentLists />
             </>
           } />
-          <Route path="faqs" element={
+          <Route path="/alumni/faqs" element={
             <>
               <FAQsHeader />
               <FAQPage />
@@ -88,15 +88,15 @@ const App = () => {
           } />
         </Route>
 
-        <Route path="/staff" element={<StaffPage />}>
+        <Route path="/" element={<StaffPage />}>
           <Route index element={<StaffDashboard />} /> {/* /staff */}
-          <Route path="dashboard" element={
+          <Route path="/dashboard" element={
             <>
               <StaffHeader/>
               <StaffDashboard />
             </>
             } />
-          <Route path="analytics" element={
+          <Route path="/analytics" element={
             <>
               <AnalyticsHeader/>
               <AnalyticsSummary/>
