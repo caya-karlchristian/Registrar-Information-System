@@ -23,6 +23,7 @@ import StaffHeader from './components/StaffHeader.jsx';
 import Footer from './components/Footer.jsx';
 import AnalyticsHeader from './components/AnalyticsHeader.jsx';
 import AlumniHeader from './components/AlumniHeader.jsx'
+import AlumniDashboardHeader from './components/AlumniDashboardHeader.jsx';
 
 
 const App = () => {
@@ -32,55 +33,64 @@ const App = () => {
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
-        <Route path="/" element={<StudentPage />}>
-          <Route index element={<RequestForm />} /> {/* /student */}
-          <Route path="/home" element={
+        <Route path="/student" element={<StudentPage />}>
+          <Route index element={
+            <>
+              <RequestHeader />
+              <RequestForm />
+            </>
+            } /> {/* /student */}
+          <Route path="home" element={
             <>
               <DashboardHeader />
               <StudentDashboard />
             </>
           } />
-          <Route path="/student/request" element={
+          <Route path="request" element={
             <>
               <RequestHeader />
               <RequestForm />
             </>
           } />
-          <Route path="/lists" element={
+          <Route path="lists" element={
             <>
               <DocumentHeader />
               <DocumentLists />
             </>
           } />
-          <Route path="/faqs" element={
+          <Route path="faqs" element={
             <>
               <FAQsHeader />
               <FAQPage />
             </>
           } />
         </Route>
-
-        <Route path="/" element={<AlumniPage />}>
-          <Route index element={<AlumniRequest />} /> 
-          <Route path="/alumni/home" element={
+          <Route path="/alumni" element={<AlumniPage />}>
+          <Route index element={
             <>
-              <AlumniHeader />
+              <AlumniHeader/>
+              <AlumniRequest />
+            </>
+            } /> 
+          <Route path="home" element={
+            <>
+              <AlumniDashboardHeader />
               <StudentDashboard />
             </>
           } />
-          <Route path="/alumni/request" element={
+          <Route path="request" element={
             <>
               <AlumniHeader/>
               <AlumniRequest />
             </>
             } />
-          <Route path="/alumni/lists" element={
+          <Route path="lists" element={
             <>
               <DocumentHeader />
               <DocumentLists />
             </>
           } />
-          <Route path="/alumni/faqs" element={
+          <Route path="faqs" element={
             <>
               <FAQsHeader />
               <FAQPage />
@@ -88,15 +98,20 @@ const App = () => {
           } />
         </Route>
 
-        <Route path="/" element={<StaffPage />}>
-          <Route index element={<StaffDashboard />} /> {/* /staff */}
-          <Route path="/dashboard" element={
+        <Route path="/staff" element={<StaffPage />}>
+          <Route index element={
+            <>
+              <StaffHeader/>
+              <StaffDashboard />
+            </>
+            } /> {/* /staff */}
+          <Route path="dashboard" element={
             <>
               <StaffHeader/>
               <StaffDashboard />
             </>
             } />
-          <Route path="/analytics" element={
+          <Route path="analytics" element={
             <>
               <AnalyticsHeader/>
               <AnalyticsSummary/>
@@ -104,6 +119,7 @@ const App = () => {
             </>
             } />
         </Route>
+        
       </Routes>
 
       <Footer />
