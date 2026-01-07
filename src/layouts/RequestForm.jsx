@@ -7,6 +7,7 @@ import MultiSelectDropdown from "../components/MultiSelection.jsx";
 
 const RequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [formData, setFormData] = useState({
     privacyConsent: false,
@@ -59,11 +60,28 @@ const RequestForm = () => {
     }));
   };
 
+  const allTermsChecked =
+    formData.privacyConsent &&
+    formData.onsiteTransaction &&
+    formData.certificationsAgreed &&
+    formData.remindersAgreed &&
+    formData.authLetterAgreed &&
+    formData.unclaimedAgreed;
+
+
   // Navigation
-  const nextStep = (e) => {
-    e.preventDefault();
-    if (currentStep < 5) setCurrentStep(currentStep + 1);
-  };
+const nextStep = (e) => {
+  e.preventDefault();
+
+  if (currentStep === 1 && !allTermsChecked) {
+    setShowTermsError(true); 
+    return;
+  }
+
+  setShowTermsError(false); 
+  setCurrentStep(currentStep + 1);
+};
+
 
   const prevStep = (e) => {
     e.preventDefault();
@@ -155,7 +173,7 @@ const RequestForm = () => {
             </div>
 
             {/* Step Contents */}
-            <div className="flex-1 px-10 md:px-20 py-4 text-white">
+            <div className="flex-1 px-10 md:px-20 py-4 text-white ">
               {/* STEP 1 */}
               {currentStep === 1 && (
                 <div className="space-y-6 animate-fadeIn text-[13px] text-justify lg:text-[15px]">
@@ -163,40 +181,51 @@ const RequestForm = () => {
                     name="privacyConsent"
                     checked={formData.privacyConsent}
                     onChange={handleCheckboxChange}
-                    text="I consent to the use of my personal data for this request (Data Privacy Act)."
+                    text="In compliance with the Data Privacy Act (DPA) of 2012, and its implementing rules 
+                    and regulations (IRR), upon filling up this Google Form, I am hereby providing my 
+                    consent and authorization to use my personal data for this request."
                   />
                   <CheckboxItem
                     name="onsiteTransaction"
                     checked={formData.onsiteTransaction}
                     onChange={handleCheckboxChange}
-                    text="This request is only for ONSITE TRANSACTION with official receipt."
+                    text="This request is only for ONSITE TRANSACTION with Official Receipt issued by the Cashier's Office"
                   />
                   <CheckboxItem
                     name="certificationsAgreed"
                     checked={formData.certificationsAgreed}
                     onChange={handleCheckboxChange}
-                    text="All certifications are processed within 3 working days; TOR within 12 working days."
+                    text="All CERTIFICATIONS are processed within three (3) working days, while TOR is within 12 working days."
                   />
                   <CheckboxItem
                     name="remindersAgreed"
                     checked={formData.remindersAgreed}
                     onChange={handleCheckboxChange}
-                    text="Bring necessary documentary stamps, photos, and IDs based on document type."
+                    text="REMINDERS: For TOR (first copy), please bring one documentary stamp, 
+                    two colored 2x2 picture in academic grown,  PUP ID, and dummy diploma 
+                    (in case of loss, please bring an affidavit of loss). 
+                    For TOR (second copy), please bring one documentary stamp (violet), 
+                    two colored 2x2 picture in formal attire with white background.
+                    For Honorable Dismissal and other certifications, please bring one 
+                    violet documentary stamp (or two brown documentary stamp) per requested document."
                   />
                   <CheckboxItem
                     name="authLetterAgreed"
                     checked={formData.authLetterAgreed}
                     onChange={handleCheckboxChange}
-                    text="Representative must submit authorization letter or SPA upon claiming documents."
+                    text="In compliance with R.A. No. 10173 (Data Privacy Act of 2012), representative must submit 
+                    a signed AUTHORIZATION LETTER if claimant is immediate family member or SPECIAL POWER OF ATTORNEY 
+                    if claimant is other than immediate family member with original valid ID of both owner/student and 
+                    representative upon claiming the requested documents."
                   />
                   <CheckboxItem
                     name="unclaimedAgreed"
                     checked={formData.unclaimedAgreed}
                     onChange={handleCheckboxChange}
-                    text="All unclaimed documents within 90 days will be shredded."
+                    text="All documents unclaimed within 90 days on the date of request will be shredded automatically."
                   />
 
-                  <div className="flex justify-end mb-4">
+                  <div className="flex justify-end">
                     <button
                       type="button"
                       onClick={handleAgreeAll}
@@ -205,50 +234,60 @@ const RequestForm = () => {
                       Agree to All Terms & Conditions
                     </button>
                   </div>
+                  {!allTermsChecked && (
+                    <p className="text-red-400 text-xs">
+                      ⚠️ Please agree to all Terms & Conditions to continue.
+                    </p>
+                  )}
                 </div>
               )}
 
               {/* STEP 2: Student Profile */}
               {currentStep === 2 && (
                 <div className="space-y-6 animate-fadeIn">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <InputGroup
                       name="firstName"
                       label="First Name"
                       value={formData.firstName}
                       onChange={handleInputChange}
+                      placeholder="e.g., Rose"
                     />
                     <InputGroup
                       name="middleName"
                       label="Middle Name"
                       value={formData.middleName}
                       onChange={handleInputChange}
+                      placeholder="e.g., Dela Cruz"
                     />
                     <InputGroup
                       name="surname"
                       label="Surname"
                       value={formData.surname}
                       onChange={handleInputChange}
+                      placeholder="e.g., Santos"
                     />
-                  </div>
-                  <InputGroup
+                    <InputGroup
                     name="dob"
                     label="Date of Birth"
                     type="date"
                     value={formData.dob}
                     onChange={handleInputChange}
                   />
+                  </div>                 
                   <InputGroup
                     name="address"
                     label="Mailing Address"
                     value={formData.address}
                     onChange={handleInputChange}
+                    placeholder="House No., Street, Barangay, City"
                   />
                   <InputGroup
                     name="contactNumber"
                     label="Contact Number"
                     value={formData.contactNumber}
                     onChange={handleInputChange}
+                    placeholder="09XXXXXXXXX"
                   />
                 </div>
               )}
@@ -258,9 +297,10 @@ const RequestForm = () => {
                 <div className="space-y-6 animate-fadeIn">
                   <InputGroup
                     name="yearAdmitted"
-                    label="Year Admitted (S.Y.)"
+                    label="Admitted in PUP Taguig (S.Y.)"
                     value={formData.yearAdmitted}
                     onChange={handleInputChange}
+                    placeholder="XXXX-XXXX"
                   />
                   <DropdownGroup
                     name="course"
@@ -275,6 +315,7 @@ const RequestForm = () => {
                       "BS in Business Administration",
                     ]}
                   />
+                  
                   <DropdownGroup
                     name="yearLevel"
                     label="Year Level"
@@ -287,12 +328,14 @@ const RequestForm = () => {
                     label="Last S.Y. Attended"
                     value={formData.lastSYAttended}
                     onChange={handleInputChange}
+                    placeholder="XXXX"
                   />
                   <InputGroup
                     name="studentNumber"
                     label="Student Number"
                     value={formData.studentNumber}
                     onChange={handleInputChange}
+                    placeholder="e.g 2023-00101-TG-0"
                   />
                 </div>
               )}
@@ -307,6 +350,21 @@ const RequestForm = () => {
                       "Certificate of Good Moral Character",
                       "Transcript of Records (TOR)",
                       "Certification, Authentication, Verification (CAV) / APOSTILE",
+                      "Authentication/Certified True Copy - Local",
+                      "Informative Copy of Grades",
+                      "CAV - CHED",
+                      "CAV - WES/CES",
+                      "Cross-enrollment Fee",
+                      "Re-admission Fee",
+                      "Admission Fee for Transfer Students (From Private School)",
+                      "Admission Fee for Transfer Students (From SUCs)",
+                      "New Copy of Registration Card (With Affidavit of Loss)",
+                      "Diploma",
+                      "Admission Fee for Transfer Students (From SUCs)",
+                      "Accreditation Fee",
+                      "Completion Fee",
+                      "Transcript of Records",
+                      "Correction in Student Information System"
                     ]}
                     selectedValues={formData.documentsRequested}
                     onChange={handleInputChange}
@@ -322,6 +380,10 @@ const RequestForm = () => {
                         "None",
                         "Certification of Enrollment",
                         "Certification of Grades",
+                        "Certificate of Registration (COR)",
+                        "Certificate of Graduation",
+                        "Certificate of Completion",
+                        "Certification for Scholarship"
                       ]}
                     />
                   )}
@@ -344,6 +406,7 @@ const RequestForm = () => {
                     label="Official Receipt Number"
                     value={formData.receiptNumber}
                     onChange={handleInputChange}
+                    placeholder="XXXXXXXXX"
                   />
                   <InputGroup
                     name="dateOfPayment"
@@ -357,6 +420,7 @@ const RequestForm = () => {
                     label="Number of Copies / Notes"
                     value={formData.numberOfCopies}
                     onChange={handleInputChange}
+                    placeholder="e.g., 1"
                   />
                 </div>
               )}
@@ -375,9 +439,15 @@ const RequestForm = () => {
               )}
 
               <button
-                type={currentStep === 5 ? "submit" : "button"}
-                onClick={currentStep < 5 ? nextStep : undefined}
-                className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md w-32"
+                type="button"
+                onClick={nextStep}
+                disabled={currentStep === 1 && !allTermsChecked}
+                className={`font-bold py-2 px-6 rounded shadow-md w-32 ml-auto
+                  ${
+                    currentStep === 1 && !allTermsChecked
+                      ? "bg-gray-400 cursor-not-allowed text-gray-700"
+                      : "bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
+                  }`}
               >
                 {currentStep < 5 ? "Next" : "Submit"}
               </button>
