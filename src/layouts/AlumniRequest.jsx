@@ -248,7 +248,7 @@ const nextStep = (e) => {
             {/* STEP 2: STUDENT PROFILE */}
             {currentStep === 2 && (
               <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <InputGroup 
                   name="firstName" 
                   label="First Name" 
@@ -272,10 +272,7 @@ const nextStep = (e) => {
                   onChange={handleInputChange} 
                   placeholder='e.g., Dela Cruz'
                   />
-                </div>
-
-                <div className="w-full ">
-                   <InputGroup 
+                  <InputGroup 
                      label="Date of Birth"
                      type="date" 
                      name="dob"
