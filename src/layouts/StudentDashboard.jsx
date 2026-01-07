@@ -77,12 +77,7 @@ const StudentDashboard = () => {
   const filteredRequests = requests.filter((req) => req.type === activeTab);
 
   return (
-    <main className="max-w-6xl mx-auto px-4 relative z-20">
-      <h2 className="text-2xl font-bold mb-4">STUDENT DASHBOARD</h2>
-      <p className="text-gray-600 mb-8">
-        Here are the status of the requested documents
-      </p>
-
+    <main className="max-w-6xl mx-auto px-4 relative z-20 mb-5">
       {/* Tabs */}
       <div className="grid grid-cols-3 md:grid-cols-3 gap-4 place-items-center mb-8">
         {[
