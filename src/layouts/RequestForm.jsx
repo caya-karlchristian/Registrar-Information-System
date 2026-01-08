@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import axios from "../services/API.js"; // Make sure this is correctly cased
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
@@ -6,16 +6,12 @@ import DropdownGroup from "../components/DropDown.jsx";
 import MultiSelectDropdown from "../components/MultiSelection.jsx";
 
 const RequestForm = () => {
+  const formRef = useRef(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [formData, setFormData] = useState({
-    privacyConsent: false,
-    onsiteTransaction: false,
-    certificationsAgreed: false,
-    remindersAgreed: false,
-    authLetterAgreed: false,
-    unclaimedAgreed: false,
+    termsAgreed: false,
     firstName: "",
     middleName: "",
     surname: "",
@@ -47,40 +43,24 @@ const RequestForm = () => {
     setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
-  // Agree to all T&C
-  const handleAgreeAll = () => {
-    setFormData((prev) => ({
-      ...prev,
-      privacyConsent: true,
-      onsiteTransaction: true,
-      certificationsAgreed: true,
-      remindersAgreed: true,
-      authLetterAgreed: true,
-      unclaimedAgreed: true,
-    }));
+  const nextStep = (e) => {
+    e.preventDefault();
+
+    if (currentStep === 1) {
+      if (!formData.termsAgreed) { 
+        setShowTermsError(true);
+        return;
+      }
+      setShowTermsError(false);
+    }
+
+    if (formRef.current && !formRef.current.checkValidity()) {
+      formRef.current.reportValidity();
+      return;
+    }
+
+    if (currentStep < 5) setCurrentStep(currentStep + 1);
   };
-
-  const allTermsChecked =
-    formData.privacyConsent &&
-    formData.onsiteTransaction &&
-    formData.certificationsAgreed &&
-    formData.remindersAgreed &&
-    formData.authLetterAgreed &&
-    formData.unclaimedAgreed;
-
-
-  // Navigation
-const nextStep = (e) => {
-  e.preventDefault();
-
-  if (currentStep === 1 && !allTermsChecked) {
-    setShowTermsError(true); 
-    return;
-  }
-
-  setShowTermsError(false); 
-  setCurrentStep(currentStep + 1);
-};
 
 
   const prevStep = (e) => {
@@ -149,6 +129,7 @@ const nextStep = (e) => {
       ) : (
         <div className="max-w-5xl mx-auto mt-5">
           <form
+            ref={formRef}
             className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col relative"
             onSubmit={handleSubmit}
           >
@@ -172,75 +153,49 @@ const nextStep = (e) => {
               </h2>
             </div>
 
-            {/* Step Contents */}
             <div className="flex-1 px-10 md:px-20 py-4 text-white ">
               {/* STEP 1 */}
               {currentStep === 1 && (
                 <div className="space-y-6 animate-fadeIn text-[13px] text-justify lg:text-[15px]">
-                  <CheckboxItem
-                    name="privacyConsent"
-                    checked={formData.privacyConsent}
-                    onChange={handleCheckboxChange}
-                    text="In compliance with the Data Privacy Act (DPA) of 2012, and its implementing rules 
+                  <p><strong>A.</strong> In compliance with the Data Privacy Act (DPA) of 2012, and its implementing rules 
                     and regulations (IRR), upon filling up this Google Form, I am hereby providing my 
                     consent and authorization to use my personal data for this request."
-                  />
-                  <CheckboxItem
-                    name="onsiteTransaction"
-                    checked={formData.onsiteTransaction}
-                    onChange={handleCheckboxChange}
-                    text="This request is only for ONSITE TRANSACTION with Official Receipt issued by the Cashier's Office"
-                  />
-                  <CheckboxItem
-                    name="certificationsAgreed"
-                    checked={formData.certificationsAgreed}
-                    onChange={handleCheckboxChange}
-                    text="All CERTIFICATIONS are processed within three (3) working days, while TOR is within 12 working days."
-                  />
-                  <CheckboxItem
-                    name="remindersAgreed"
-                    checked={formData.remindersAgreed}
-                    onChange={handleCheckboxChange}
-                    text="REMINDERS: For TOR (first copy), please bring one documentary stamp, 
+                  </p>
+
+                  <p><strong>B.</strong> This request is only for ONSITE TRANSACTION with Official Receipt issued by the Cashier's Office</p>
+
+                  <p><strong>C.</strong> All CERTIFICATIONS are processed within three (3) working days, while TOR is within 12 working days.</p>
+
+                  <p><strong>D.</strong> REMINDERS: For TOR (first copy), please bring one documentary stamp, 
                     two colored 2x2 picture in academic grown,  PUP ID, and dummy diploma 
                     (in case of loss, please bring an affidavit of loss). 
                     For TOR (second copy), please bring one documentary stamp (violet), 
                     two colored 2x2 picture in formal attire with white background.
                     For Honorable Dismissal and other certifications, please bring one 
-                    violet documentary stamp (or two brown documentary stamp) per requested document."
-                  />
-                  <CheckboxItem
-                    name="authLetterAgreed"
-                    checked={formData.authLetterAgreed}
-                    onChange={handleCheckboxChange}
-                    text="In compliance with R.A. No. 10173 (Data Privacy Act of 2012), representative must submit 
+                    violet documentary stamp (or two brown documentary stamp) per requested document."</p>
+
+                  <p><strong>E.</strong> In compliance with R.A. No. 10173 (Data Privacy Act of 2012), representative must submit 
                     a signed AUTHORIZATION LETTER if claimant is immediate family member or SPECIAL POWER OF ATTORNEY 
                     if claimant is other than immediate family member with original valid ID of both owner/student and 
-                    representative upon claiming the requested documents."
-                  />
-                  <CheckboxItem
-                    name="unclaimedAgreed"
-                    checked={formData.unclaimedAgreed}
-                    onChange={handleCheckboxChange}
-                    text="All documents unclaimed within 90 days on the date of request will be shredded automatically."
-                  />
+                    representative upon claiming the requested documents.</p>
 
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={handleAgreeAll}
-                      className="text-xs font-white underline hover:text-yellow-300 focus:outline-none"
-                    >
-                      Agree to All Terms & Conditions
-                    </button>
-                  </div>
-                  {!allTermsChecked && (
-                    <p className="text-red-400 text-xs">
-                      ⚠️ Please agree to all Terms & Conditions to continue.
+                  <p><strong> F.</strong>All documents unclaimed within 90 days on the date of request will be shredded automatically.</p>
+
+                  <div className="mt-2 pt-4 border-t text-l border-white/10">
+                    <CheckboxItem
+                      name="termsAgreed"
+                      checked={formData.termsAgreed}
+                      onChange={handleCheckboxChange}
+                      text="I have read, understood, and agree to the Terms & Conditions stated above."
+                    />
+                    {showTermsError && !formData.termsAgreed && (
+                    <p className="text-red-400 text-xs font-semibold mt-1">
+                      ⚠️ You must read the Terms & Conditions to proceed.
                     </p>
                   )}
-                </div>
-              )}
+                  </div>
+                  </div>
+                )}
 
               {/* STEP 2: Student Profile */}
               {currentStep === 2 && (
@@ -252,6 +207,7 @@ const nextStep = (e) => {
                       value={formData.firstName}
                       onChange={handleInputChange}
                       placeholder="e.g., Rose"
+                      required
                     />
                     <InputGroup
                       name="middleName"
@@ -259,6 +215,7 @@ const nextStep = (e) => {
                       value={formData.middleName}
                       onChange={handleInputChange}
                       placeholder="e.g., Dela Cruz"
+                      required
                     />
                     <InputGroup
                       name="surname"
@@ -266,6 +223,7 @@ const nextStep = (e) => {
                       value={formData.surname}
                       onChange={handleInputChange}
                       placeholder="e.g., Santos"
+                      required
                     />
                     <InputGroup
                     name="dob"
@@ -273,6 +231,7 @@ const nextStep = (e) => {
                     type="date"
                     value={formData.dob}
                     onChange={handleInputChange}
+                    required
                   />
                   </div>                 
                   <InputGroup
@@ -281,6 +240,7 @@ const nextStep = (e) => {
                     value={formData.address}
                     onChange={handleInputChange}
                     placeholder="House No., Street, Barangay, City"
+                    required
                   />
                   <InputGroup
                     name="contactNumber"
@@ -288,6 +248,7 @@ const nextStep = (e) => {
                     value={formData.contactNumber}
                     onChange={handleInputChange}
                     placeholder="09XXXXXXXXX"
+                    required
                   />
                 </div>
               )}
@@ -295,49 +256,57 @@ const nextStep = (e) => {
               {/* STEP 3: Student Records */}
               {currentStep === 3 && (
                 <div className="space-y-6 animate-fadeIn">
-                  <InputGroup
-                    name="yearAdmitted"
-                    label="Admitted in PUP Taguig (S.Y.)"
-                    value={formData.yearAdmitted}
-                    onChange={handleInputChange}
-                    placeholder="XXXX-XXXX"
-                  />
-                  <DropdownGroup
-                    name="course"
-                    label="Course"
-                    value={formData.course}
-                    onChange={handleInputChange}
-                    options={[
-                      "BS Computer Science",
-                      "BS Information Technology",
-                      "BS Information Systems",
-                      "BS in Accountancy",
-                      "BS in Business Administration",
-                    ]}
-                  />
-                  
-                  <DropdownGroup
-                    name="yearLevel"
-                    label="Year Level"
-                    value={formData.yearLevel}
-                    onChange={handleInputChange}
-                    options={["1st Year", "2nd Year", "3rd Year", "4th Year"]}
-                  />
-                  <InputGroup
-                    name="lastSYAttended"
-                    label="Last S.Y. Attended"
-                    value={formData.lastSYAttended}
-                    onChange={handleInputChange}
-                    placeholder="XXXX"
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <InputGroup
+                      name="yearAdmitted"
+                      label="Admitted in PUP Taguig (S.Y.)"
+                      value={formData.yearAdmitted}
+                      onChange={handleInputChange}
+                      placeholder="XXXX-XXXX"
+                      required
+                    />
+                    <DropdownGroup
+                      name="course"
+                      label="Course"
+                      value={formData.course}
+                      onChange={handleInputChange}
+                      required
+                      options={[
+                        "BS Computer Science",
+                        "BS Information Technology",
+                        "BS Information Systems",
+                        "BS in Accountancy",
+                        "BS in Business Administration",
+                      ]}
+                    />
+                    
+                    <DropdownGroup
+                      name="yearLevel"
+                      label="Year Level"
+                      value={formData.yearLevel}
+                      onChange={handleInputChange}
+                      options={["1st Year", "2nd Year", "3rd Year", "4th Year"]}
+                      required
+                    />
+                    <InputGroup
+                      name="lastSYAttended"
+                      label="Last S.Y. Attended"
+                      value={formData.lastSYAttended}
+                      onChange={handleInputChange}
+                      placeholder="XXXX"
+                      required
+                    />
+                  </div>
                   <InputGroup
                     name="studentNumber"
                     label="Student Number"
                     value={formData.studentNumber}
                     onChange={handleInputChange}
                     placeholder="e.g 2023-00101-TG-0"
+                    required
                   />
                 </div>
+                
               )}
 
               {/* STEP 4: Documents Requested */}
@@ -346,6 +315,7 @@ const nextStep = (e) => {
                   <MultiSelectDropdown
                     name="documentsRequested"
                     label="Documents Requested"
+                    required
                     options={[
                       "Certificate of Good Moral Character",
                       "Transcript of Records (TOR)",
@@ -376,6 +346,7 @@ const nextStep = (e) => {
                       label="For Certification, please specify"
                       value={formData.certification}
                       onChange={handleInputChange}
+                      required
                       options={[
                         "None",
                         "Certification of Enrollment",
@@ -394,6 +365,7 @@ const nextStep = (e) => {
                     value={formData.purposeOfRequest}
                     onChange={handleInputChange}
                     options={["For Admission", "For Employment", "For Scholarship", "Other"]}
+                    required
                   />
                 </div>
               )}
@@ -401,20 +373,24 @@ const nextStep = (e) => {
               {/* STEP 5: Payment & Copies */}
               {currentStep === 5 && (
                 <div className="space-y-6 animate-fadeIn">
-                  <InputGroup
-                    name="receiptNumber"
-                    label="Official Receipt Number"
-                    value={formData.receiptNumber}
-                    onChange={handleInputChange}
-                    placeholder="XXXXXXXXX"
-                  />
-                  <InputGroup
-                    name="dateOfPayment"
-                    label="Date of Payment"
-                    type="date"
-                    value={formData.dateOfPayment}
-                    onChange={handleInputChange}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <InputGroup
+                      name="receiptNumber"
+                      label="Official Receipt Number"
+                      value={formData.receiptNumber}
+                      onChange={handleInputChange}
+                      placeholder="XXXXXXXXX"
+                      required
+                    />
+                    <InputGroup
+                      name="dateOfPayment"
+                      label="Date of Payment"
+                      type="date"
+                      value={formData.dateOfPayment}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
                   <InputGroup
                     name="numberOfCopies"
                     label="Number of Copies / Notes"
@@ -441,13 +417,7 @@ const nextStep = (e) => {
               <button
                 type="button"
                 onClick={nextStep}
-                disabled={currentStep === 1 && !allTermsChecked}
-                className={`font-bold py-2 px-6 rounded shadow-md w-32 ml-auto
-                  ${
-                    currentStep === 1 && !allTermsChecked
-                      ? "bg-gray-400 cursor-not-allowed text-gray-700"
-                      : "bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
-                  }`}
+                className="font-bold py-2 px-6 rounded shadow-md w-32 ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"                  
               >
                 {currentStep < 5 ? "Next" : "Submit"}
               </button>

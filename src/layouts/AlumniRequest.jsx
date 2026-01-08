@@ -1,20 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState,useRef } from 'react';
 import InputGroup from '../components/InputGroup.jsx';
 import CheckboxItem from '../components/Checkbox.jsx';
 import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
 
 const AlumniRequestForm = () => {
+  const formRef = useRef(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [formData, setFormData] = useState({
-    privacyConsent: false,
-    onsiteTransaction: false,
-    certificationsAgreed: false,
-    remindersAgreed: false,
-    authLetterAgreed: false,
-    unclaimedAgreed: false,
+    termsAgreed: false,
     firstName: '',
     middleName: '',
     surname: '',
@@ -50,19 +46,24 @@ const AlumniRequestForm = () => {
   };
 
   // Function to go to next step
-const nextStep = (e) => {
-  e.preventDefault();
+  const nextStep = (e) => {
+    e.preventDefault();
 
-  // ONLY validate on STEP 1
-  if (currentStep === 1 && !allTermsChecked) {
-    setShowTermsError(true); // show popup
-    return;
-  }
+    if (currentStep === 1) {
+      if (!formData.termsAgreed) { 
+        setShowTermsError(true);
+        return;
+      }
+      setShowTermsError(false);
+    }
 
-  setShowTermsError(false); // hide popup if valid
-  if (currentStep < 6) setCurrentStep(currentStep + 1);
-};
+    if (formRef.current && !formRef.current.checkValidity()) {
+      formRef.current.reportValidity();
+      return;
+    }
 
+    if (currentStep < 6) setCurrentStep(currentStep + 1);
+  };
 
   const prevStep = (e) => {
     e.preventDefault(); 
@@ -79,26 +80,6 @@ const nextStep = (e) => {
   const handleConfirm = () => {
     window.location.reload();
   };
-
-  const handleAgreeAll = () => {
-    setFormData((prev) => ({
-      ...prev,
-      privacyConsent: true,
-      onsiteTransaction: true,
-      certificationsAgreed: true,
-      remindersAgreed: true,
-      authLetterAgreed: true,
-      unclaimedAgreed: true,
-    }));
-  };
-
-  const allTermsChecked =
-    formData.privacyConsent &&
-    formData.onsiteTransaction &&
-    formData.certificationsAgreed &&
-    formData.remindersAgreed &&
-    formData.authLetterAgreed &&
-    formData.unclaimedAgreed;
 
   const certificationDocuments = new Set([
     "Certificate of Good Moral Character",
@@ -143,7 +124,10 @@ const nextStep = (e) => {
 
     ) : (
       <div className="max-w-5xl mx-auto">
-        <form className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col relative">
+        <form 
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col relative">
           
           <div className="flex flex-col items-center pt-8 pb-4">
             <div className="flex space-x-3 mb-2">
@@ -171,79 +155,44 @@ const nextStep = (e) => {
             {/* STEP 1: TERMS & CONDITIONS */}
             {currentStep === 1 && (
               <div className="space-y-6 animate-fadeIn text-[13px] text-justify lg:text-[15px]">
-                <CheckboxItem 
-                  name="privacyConsent" 
-                  checked={formData.privacyConsent} 
-                  onChange={handleCheckboxChange}
-                  text="In compliance In compliance with the Data Privacy Act (DPA) of 2012, 
-                  and its implementing rules and regulations (IRR), upon filling up this 
-                  Google Form, I am hereby providing my consent and authorization to use 
-                  my personal data for this request. " 
-                  className="checkbox-pup"
-                />
+                  <p><strong>A.</strong> In compliance with the Data Privacy Act (DPA) of 2012, and its implementing rules 
+                    and regulations (IRR), upon filling up this Google Form, I am hereby providing my 
+                    consent and authorization to use my personal data for this request.
+                  </p>
 
-                <CheckboxItem 
-                  name="onsiteTransaction" 
-                  checked={formData.onsiteTransaction} 
-                  onChange={handleCheckboxChange}
-                  text="This request is only for ONSITE TRANSACTION with Official Receipt issued by the Cashier's Office" 
-                  className="checkbox-pup"
-                />
-                
-                <CheckboxItem classname="checkbox-pup"
-                  name="certificationsAgreed"
-                  checked={formData.certificationsAgreed} 
-                  onChange={handleCheckboxChange} 
-                  text="All CERTIFICATIONS are processed within three (3) working days, while TOR is within 12 working days. TOR is within 12 working days." 
-                />
+                  <p><strong>B.</strong> This request is only for ONSITE TRANSACTION with Official Receipt issued by the Cashier's Office</p>
 
-                <CheckboxItem classname="checkbox-pup"
-                  name="remindersAgreed"
-                  checked={formData.remindersAgreed}
-                  onChange={handleCheckboxChange}
-                  text="REMINDERS: For TOR (first copy), please bring one documentary stamp, 
-                  two colored 2x2 picture in academic grown,  PUP ID, and dummy diploma 
-                  (in case of loss, please bring an affidavit of loss).
-                  
-                  For TOR (second copy), please bring one documentary stamp (violet), 
-                  two colored 2x2 picture in formal attire with white background.
-                  
-                  For Honorable Dismissal and other certifications, please bring one 
-                  violet documentary stamp (or two brown documentary stamp) per requested 
-                  document."
-                  />
-                
-                <CheckboxItem
-                  name="authLetterAgreed"
-                  checked={formData.authLetterAgreed}
-                  onChange={handleCheckboxChange}
-                  text="In compliance with R.A. No. 10173 (Data Privacy Act of 2012), 
-                  representative must submit a signed AUTHORIZATION LETTER if claimant 
-                  is immediate family member or SPECIAL POWER OF ATTORNEY if claimant 
-                  is other than immediate family member with original valid ID of both 
-                  owner/student and representative upon claiming the requested documents."
-                />
+                  <p><strong>C.</strong> All CERTIFICATIONS are processed within three (3) working days, while TOR is within 12 working days.</p>
 
-                <CheckboxItem
-                  name="unclaimedAgreed"
-                  checked={formData.unclaimedAgreed}
-                  onChange={handleCheckboxChange}
-                  text="All documents unclaimed within 
-                  90 days on the date of request will be shredded automatically."
-                  classname="checkbox-pup"
-                />
+                  <p><strong>D.</strong> REMINDERS: For TOR (first copy), please bring one documentary stamp, 
+                    two colored 2x2 picture in academic grown,  PUP ID, and dummy diploma 
+                    (in case of loss, please bring an affidavit of loss). 
+                    For TOR (second copy), please bring one documentary stamp (violet), 
+                    two colored 2x2 picture in formal attire with white background.
+                    For Honorable Dismissal and other certifications, please bring one 
+                    violet documentary stamp (or two brown documentary stamp) per requested document.</p>
 
-              <div className="flex justify-end mb-4">
-                  <button
-                    type="button"
-                    onClick={handleAgreeAll}
-                    className="text-xs font-white underline hover:text- transition-colors focus:outline-none"
-                  >
-                    Agree to All Terms & Conditions
-                  </button>
-                </div>
-              </div>
-            )}
+                  <p><strong>E.</strong> In compliance with R.A. No. 10173 (Data Privacy Act of 2012), representative must submit 
+                    a signed AUTHORIZATION LETTER if claimant is immediate family member or SPECIAL POWER OF ATTORNEY 
+                    if claimant is other than immediate family member with original valid ID of both owner/student and 
+                    representative upon claiming the requested documents.</p>
+
+                  <p><strong> F.</strong>All documents unclaimed within 90 days on the date of request will be shredded automatically.</p>
+
+                  <div className="mt-2 pt-4 border-t text-l border-white/10">
+                    <CheckboxItem
+                      name="termsAgreed"
+                      checked={formData.termsAgreed}
+                      onChange={handleCheckboxChange}
+                      text="I have read, understood, and agree to the Terms & Conditions stated above."
+                    />
+                    {currentStep === 1 && showTermsError && !formData.termsAgreed && (                    <p className="text-red-400 text-xs font-semibold mt-1">
+                      ⚠️ You must read the Terms & Conditions to proceed.
+                    </p>
+                  )}
+                  </div>
+                  </div>
+                )}
 
             {/* STEP 2: STUDENT PROFILE */}
             {currentStep === 2 && (
@@ -255,6 +204,7 @@ const nextStep = (e) => {
                   value={formData.firstName} 
                   onChange={handleInputChange} 
                   placeholder='e.g., Rose'
+                  required
                   />
 
                   <InputGroup 
@@ -263,6 +213,7 @@ const nextStep = (e) => {
                   value={formData.middleName} 
                   onChange={handleInputChange} 
                   placeholder='e.g., Gonzaga'
+                  required
                   />
 
                   <InputGroup 
@@ -271,13 +222,16 @@ const nextStep = (e) => {
                   value={formData.surname} 
                   onChange={handleInputChange} 
                   placeholder='e.g., Dela Cruz'
+                  required
                   />
+
                   <InputGroup 
                      label="Date of Birth"
                      type="date" 
                      name="dob"
                      value={formData.dob}
                      onChange={handleInputChange}
+                     required
                      className="w-full p-2 rounded text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]" 
                    />
                 </div>
@@ -288,6 +242,7 @@ const nextStep = (e) => {
                   value={formData.address} 
                   onChange={handleInputChange} 
                   placeholder="House No., Street, Barangay, City/Municipality"
+                  required
                   />
                 <InputGroup 
                   name="contactNumber" 
@@ -295,6 +250,7 @@ const nextStep = (e) => {
                   placeholder="09XXXXXXXXX" 
                   value={formData.contactNumber}
                   onChange={handleInputChange} 
+                  required
                   />
               </div>
             )}
@@ -309,6 +265,7 @@ const nextStep = (e) => {
                     value={formData.yearAdmitted} 
                     onChange={handleInputChange} 
                     placeholder='XXXX-XXXX'
+                    required
                   />
 
                   <DropdownGroup 
@@ -316,6 +273,7 @@ const nextStep = (e) => {
                     label="Course" 
                     value={formData.course} 
                     onChange={handleInputChange} 
+                    required
                     options={[
                       "BS Computer Science",
                       "BS Information Technology",
@@ -328,11 +286,12 @@ const nextStep = (e) => {
                   />
 
                   <DropdownGroup 
-                    name="forgotStudentNo"  // 👈 matches your state key exactly
+                    name="forgotStudentNo"  
                     label="Do you still remember your STUDENT NUMBER?"
                     value={formData.forgotStudentNo}
                     onChange={handleInputChange}
                     options={["Yes", "No"]}
+                    required
                     />
 
                     {/* Show Last S.Y. Attended if Yes or No is selected */}
@@ -343,6 +302,7 @@ const nextStep = (e) => {
                         value={formData.lastSYAttended}
                         onChange={handleInputChange}
                         placeholder="XXXX-XXXX"
+                        required
                     />
                     )}
 
@@ -355,6 +315,7 @@ const nextStep = (e) => {
                         onChange={handleInputChange}
                         className="uppercase"
                         placeholder="e.g 2023-00101-TG-0"
+                        required
                     />
                     )}
 
@@ -368,6 +329,7 @@ const nextStep = (e) => {
                   <MultiSelectDropdown 
                     name="documentsRequested"
                     label="Documents Requested (You may select multiple)"
+                    required
                     options={[
                       "Transcript of Records (TOR)",
                       "Certificate of Good Moral Character",
@@ -387,6 +349,7 @@ const nextStep = (e) => {
                     label="For Certification, please specify"
                     value={formData.certification}
                     onChange={handleInputChange}
+                    required
                     options={[
                       "None",
                       "Certification of Enrollment",
@@ -404,6 +367,7 @@ const nextStep = (e) => {
                     label="Purpose of Request"
                     value={formData.purposeOfRequest}
                     onChange={handleInputChange}
+                    required
                     options={[
                       "For Admission",
                       "For Employment",
@@ -452,6 +416,7 @@ const nextStep = (e) => {
                     value={formData.receiptNumber}
                     onChange={handleInputChange}
                     placeholder='e.g 000-000000'
+                    required
                   />
                   
                   <InputGroup
@@ -461,6 +426,7 @@ const nextStep = (e) => {
                     value={formData.dateOfPayment}
                     onChange={handleInputChange}
                     placeholder='e.g 01/01/2024'
+                    required
                   />
                   
                   <InputGroup
@@ -497,19 +463,12 @@ const nextStep = (e) => {
                   <button
                     onClick={nextStep}
                     type="button"
-                    disabled={currentStep === 1 && !allTermsChecked} 
-                    className={`font-bold py-2 px-6 rounded shadow-md w-full transition-transform active:scale-95
-                      ${
-                        currentStep === 1 && !allTermsChecked
-                          ? "bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon "
-                          : "bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
-                      }`}
+                    className="font-bold py-2 px-6 rounded shadow-md w-full transition-transform active:scale-95 bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon" 
                   >
                     Next
                   </button>
               ) : (
                 <button
-                  onClick={handleSubmit}
                   type="submit"
                   className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full"
                 >
@@ -518,13 +477,7 @@ const nextStep = (e) => {
               )}
             </div>
           </div>
-          {currentStep === 1 && !allTermsChecked && (
-            <p className="text-red-400 text-xs mt-1">
-              ⚠️ Please agree to all Terms & Conditions to continue.
-            </p>
-          )}
-          </div>
-               
+          </div>   
         </form>
       </div>
     )} 
