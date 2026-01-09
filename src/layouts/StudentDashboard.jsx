@@ -5,7 +5,8 @@ const STATUS_MAP = {
   1: "Pending",
   2: "Ready",
   3: "Completed",
-  4: "Cancelled",
+  4: "Processing",
+  5: "Rejected",
 };
 
 const StudentDashboard = () => {
@@ -30,19 +31,23 @@ const StudentDashboard = () => {
             ...r,
             status: STATUS_MAP[r.status_id] ?? "Unknown",
             type:
-              r.status_id === 1
-                ? "pending"
-                : r.status_id === 2
-                ? "ready"
-                : "history",
-            progress:
-              r.status_id === 1
-                ? 25
-                : r.status_id === 2
-                ? 75
-                : r.status_id === 3
-                ? 100
-                : 0,
+            r.status_id === 1 || r.status_id === 4
+              ? "pending"
+              : r.status_id === 2
+              ? "ready"
+              : "history",
+
+          progress:
+            r.status_id === 1
+              ? 25
+              : r.status_id === 4
+              ? 50
+              : r.status_id === 2
+              ? 100
+              : r.status_id === 3
+              ? 100
+              : 0, // rejected
+
           }));
         setRequests(studentRequests);
         setError("");
@@ -60,11 +65,11 @@ const StudentDashboard = () => {
   const getProgressLabel = (progress) => {
     switch (progress) {
       case 0:
-        return "Checking the document request form";
+        return "Request was rejected";
       case 25:
-        return "Confirming the details of your request";
+        return "Request received and under review";
       case 50:
-        return "Document request Approved";
+        return "Your request is being processed";
       case 75:
         return "Preparing your document for pickup";
       case 100:
@@ -73,6 +78,7 @@ const StudentDashboard = () => {
         return "INVALID PROGRESS";
     }
   };
+
 
   const filteredRequests = requests.filter((req) => req.type === activeTab);
 
@@ -157,19 +163,20 @@ const StudentDashboard = () => {
                   </h4>
                   <p
                     className={`text-sm font-medium mt-1 ${
-                      req.status.toLowerCase() === "pending"
-                        ? "text-yellow-600"
-                        : ""
+                      req.status === "Pending" ? "text-yellow-600" : ""
                     } ${
-                      req.status.toLowerCase() === "ready" ? "text-green-600" : ""
+                      req.status === "Processing" ? "text-blue-600" : ""
                     } ${
-                      req.status.toLowerCase() === "completed"
-                        ? "text-gray-500"
-                        : ""
+                      req.status === "Ready" ? "text-green-600" : ""
+                    } ${
+                      req.status === "Completed" ? "text-gray-500" : ""
+                    } ${
+                      req.status === "Rejected" ? "text-red-600" : ""
                     }`}
                   >
                     Status: {req.status}
                   </p>
+
                 </div>
 
                 {["pending", "ready"].includes(req.type) && (
