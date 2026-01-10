@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import axios from "../services/API.js"; // Make sure this is correctly cased
+import axios from "../services/API.js";
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
@@ -10,6 +10,7 @@ const RequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
   const [formData, setFormData] = useState({
     termsAgreed: false,
     firstName: "",
@@ -31,13 +32,11 @@ const RequestForm = () => {
     numberOfCopies: "",
   });
 
-  // Update text inputs
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Update checkboxes
   const handleCheckboxChange = (e) => {
     const { name, checked } = e.target;
     setFormData((prev) => ({ ...prev, [name]: checked }));
@@ -46,12 +45,9 @@ const RequestForm = () => {
   const nextStep = (e) => {
     e.preventDefault();
 
-    if (currentStep === 1) {
-      if (!formData.termsAgreed) { 
-        setShowTermsError(true);
-        return;
-      }
-      setShowTermsError(false);
+    if (currentStep === 1 && !formData.termsAgreed) {
+      setShowTermsError(true);
+      return;
     }
 
     if (formRef.current && !formRef.current.checkValidity()) {
@@ -59,41 +55,119 @@ const RequestForm = () => {
       return;
     }
 
-    if (currentStep < 5) setCurrentStep(currentStep + 1);
+    setShowTermsError(false);
+    if (currentStep < 5) setCurrentStep((s) => s + 1);
   };
-
 
   const prevStep = (e) => {
     e.preventDefault();
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
+    if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
-  // Submit form to backend
+  const certificationMap = {
+    "Certificate of Attendance": 1,
+    "Certificate of Graduation": 2,
+    "Medium of Instruction": 3,
+    "General Weighted Average": 4,
+    "Non-Issuance of Special Order": 5,
+    "Certified True Copy": 6,
+    "Good Moral Character": 7,
+    "Re-Admission Certificate": 8,
+    "Leave of Absence": 9,
+    "Course Accreditation": 10,
+  };
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    try {
-      // Assuming student_id = 1 for testing
-      const payload = { ...formData, student_id: 1 };
-      const response = await axios.post("/document-requests", payload);
-
-      console.log("Document request submitted:", response.data);
-      setIsSubmitted(true);
-    } catch (error) {
-      console.error("Failed to submit request:", error);
-      alert("Failed to submit request. Please try again.");
+  try {
+    if (formData.documentsRequested.length === 0) {
+      alert("Please select at least one document.");
+      return;
     }
-  };
 
-  // Reload page after confirmation
+    const certId =
+      formData.certification && formData.certification !== "None"
+        ? certificationMap[formData.certification]
+        : null;
+
+    const documentTypeMap = {
+      "Certificate of Good Moral Character": 1,
+      "Certification, Authentication, Verification (CAV) / APOSTILE": 2,
+      "Authentication/Certified True Copy - Local": 3,
+      "Informative Copy of Grades": 4,
+      "CAV - CHED": 5,
+      "CAV - WES/CES": 6,
+      "Cross-enrollment Fee": 7,
+      "Re-admission Fee": 8,
+      "Admission Fee for Transfer Students (From Private School)": 9,
+      "Admission Fee for Transfer Students (From SUCs)": 10,
+      "New Copy of Registration Card (With Affidavit of Loss)": 11,
+      "Diploma": 12,
+      "Accreditation Fee": 13,
+      "Completion Fee": 14,
+      "Transcript of Records": 15,
+      "Correction in Student Information System": 16,
+    };
+
+    // 1️⃣ Submit main document request
+    const requestRes = await axios.post("/document-requests", {
+      user_id: 1,
+      student_profile_id: 1,
+      academic_record_id: 1,
+      status_id: 1,
+      purpose_of_request: formData.purposeOfRequest,
+      receipt_number: formData.receiptNumber,
+      receipt_date: formData.dateOfPayment,
+      number_of_copies: formData.numberOfCopies || 1,
+      additional_notes: "",
+      cert_type_id: certId,
+    });
+
+    const requestId = requestRes.data.request_id;
+    if (!requestId) {
+      throw new Error("Request ID not returned from backend");
+    }
+
+    console.log("Request created:", requestRes.data);
+
+    await Promise.all(
+      formData.documentsRequested.map((docName) => {
+        const docId = documentTypeMap[docName];
+        if (!docId) {
+          console.warn(`No document_type_id mapping for: ${docName}`);
+        }
+        return axios.post("/request-documents", {
+          request_id: requestId,
+          document_type_id: docId,
+        });
+      })
+    );
+
+    setIsSubmitted(true);
+  } catch (error) {
+    console.error(
+      "Failed to submit request:",
+      error.response?.data || error
+    );
+    alert("Failed to submit request. Please try again.");
+  }
+};
+
+
   const handleConfirm = () => window.location.reload();
 
-  // Show certification dropdown if relevant documents selected
+  /* ---------------- CERTIFICATION VISIBILITY ---------------- */
+
   const certificationDocuments = new Set([
-    "Certificates of Attendance, Graduation, Medium of Instruction, General Weighted Average, Non Issuance of Special Order, and Certified True Copy",
-    "Certification, Authentication, Verification (CAV) / APOSTILE",
     "Certificate of Good Moral Character",
+    "Certification, Authentication, Verification (CAV) / APOSTILE",
+    "Authentication/Certified True Copy - Local",
+    "CAV - CHED",
+    "CAV - WES/CES",
   ]);
+
+
 
   const showCertificationDropdown = formData.documentsRequested.some((doc) =>
     certificationDocuments.has(doc)
@@ -167,7 +241,7 @@ const RequestForm = () => {
                   <p><strong>C.</strong> All CERTIFICATIONS are processed within three (3) working days, while TOR is within 12 working days.</p>
 
                   <p><strong>D.</strong> REMINDERS: For TOR (first copy), please bring one documentary stamp, 
-                    two colored 2x2 picture in academic grown,  PUP ID, and dummy diploma 
+                    two colored 2x2 picture in academic grown, PUP ID, and dummy diploma 
                     (in case of loss, please bring an affidavit of loss). 
                     For TOR (second copy), please bring one documentary stamp (violet), 
                     two colored 2x2 picture in formal attire with white background.
@@ -318,7 +392,6 @@ const RequestForm = () => {
                     required
                     options={[
                       "Certificate of Good Moral Character",
-                      "Transcript of Records (TOR)",
                       "Certification, Authentication, Verification (CAV) / APOSTILE",
                       "Authentication/Certified True Copy - Local",
                       "Informative Copy of Grades",
@@ -330,7 +403,6 @@ const RequestForm = () => {
                       "Admission Fee for Transfer Students (From SUCs)",
                       "New Copy of Registration Card (With Affidavit of Loss)",
                       "Diploma",
-                      "Admission Fee for Transfer Students (From SUCs)",
                       "Accreditation Fee",
                       "Completion Fee",
                       "Transcript of Records",
@@ -348,14 +420,18 @@ const RequestForm = () => {
                       onChange={handleInputChange}
                       required
                       options={[
-                        "None",
-                        "Certification of Enrollment",
-                        "Certification of Grades",
-                        "Certificate of Registration (COR)",
+                        "Certificate of Attendance",
                         "Certificate of Graduation",
-                        "Certificate of Completion",
-                        "Certification for Scholarship"
+                        "Medium of Instruction",
+                        "General Weighted Average",
+                        "Non-Issuance of Special Order",
+                        "Certified True Copy",
+                        "Good Moral Character",
+                        "Re-Admission Certificate",
+                        "Leave of Absence",
+                        "Course Accreditation"
                       ]}
+
                     />
                   )}
 
@@ -415,12 +491,13 @@ const RequestForm = () => {
               )}
 
               <button
-                type="button"
-                onClick={nextStep}
-                className="font-bold py-2 px-6 rounded shadow-md w-32 ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"                  
+                type={currentStep < 5 ? "button" : "submit"}
+                onClick={currentStep < 5 ? nextStep : undefined}
+                className="font-bold py-2 px-6 rounded shadow-md w-32 ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
               >
                 {currentStep < 5 ? "Next" : "Submit"}
               </button>
+
             </div>
           </form>
         </div>
