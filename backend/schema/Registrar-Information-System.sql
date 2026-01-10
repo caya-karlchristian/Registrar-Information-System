@@ -12,7 +12,7 @@ CREATE TABLE request_status (
 );
 
 INSERT INTO request_status (status_name)
-VALUES ('Pending'), ('Ready to claim'), ('Completed');
+VALUES ('Pending'), ('Ready to claim'), ('Completed'), ('Processing'), ('Rejected');
 
 CREATE TABLE student_profile (
   student_profile_id INT AUTO_INCREMENT PRIMARY KEY,
