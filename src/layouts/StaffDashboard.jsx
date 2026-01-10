@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -30,11 +30,26 @@ const StaffDashboard = () => {
   const [updatingId, setUpdatingId] = useState(null);
 
   /* ---------------- FETCH DATA ---------------- */
-  useEffect(() => {
-    fetchData();
-  }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    const documentTypeMap = {
+      1: "Certificate of Good Moral Character",
+      2: "Certification, Authentication, Verification (CAV) / APOSTILE",
+      3: "Authentication/Certified True Copy - Local",
+      4: "Informative Copy of Grades",
+      5: "CAV - CHED",
+      6: "CAV - WES/CES",
+      7: "Cross-enrollment Fee",
+      8: "Re-admission Fee",
+      9: "Admission Fee for Transfer Students (From Private School)",
+      10: "Admission Fee for Transfer Students (From SUCs)",
+      11: "New Copy of Registration Card (With Affidavit of Loss)",
+      12: "Diploma",
+      13: "Accreditation Fee",
+      14: "Completion Fee",
+      15: "Transcript of Records",
+      16: "Correction in Student Information System",
+    };
     try {
       const res = await getDocumentRequests();
 
@@ -44,10 +59,19 @@ const StaffDashboard = () => {
           ? `${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`
           : 'N/A',
         studentNumber: r.academic_record?.student_number ?? 'N/A',
-        docType:
-          r.certification_type?.cert_name ??
-          r.documents?.[0]?.document_type?.document_name ??
-          'N/A',
+
+        docType: r.certification_type
+            ? `Certification: ${r.certification_type.cert_name}`
+            : r.documents && r.documents.length > 0
+                ? r.documents
+                    .map(d => {
+                        const name = documentTypeMap[d.document_type_id] || "Unknown Document";
+                        const copies = r.number_of_copies || 1; // default 1 if missing
+                        return `${name} (${copies} cop${copies > 1 ? 'ies' : 'y'})`;
+                    })
+                    .join(', ')
+                : 'N/A',
+
         date: r.requested_at
           ? new Date(r.requested_at).toLocaleDateString()
           : 'N/A',
@@ -61,7 +85,11 @@ const StaffDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   /* ---------------- STATUS UPDATE ---------------- */
   const handleStatusUpdate = async (id, newStatusId) => {
