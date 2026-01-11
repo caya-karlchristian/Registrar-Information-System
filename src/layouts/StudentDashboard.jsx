@@ -143,7 +143,7 @@ const StudentDashboard = () => {
             No records found.
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 overflow-y-auto max-h-[65vh] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             {filteredRequests.map((req) => (
               <div
                 key={req.request_id}
