@@ -30,6 +30,8 @@ const StaffDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [rawRequests, setRawRequests] = useState([]);
+
 
   /* ---------------- FETCH DATA ---------------- */
 
@@ -82,7 +84,7 @@ const StaffDashboard = () => {
         statusId: r.status?.status_id,
         statusName: r.status?.status_name,
       }));
-
+      setRawRequests(res.data);
       setRequests(formatted);
     } catch (error) {
       console.error('Error fetching document requests:', error);
@@ -235,7 +237,11 @@ const StaffDashboard = () => {
                       {/* View */}
                       <button
                         title="View Details"
-                        onClick={() => setSelectedRequest(req)}
+                        onClick={() =>
+                          setSelectedRequest(
+                            rawRequests.find(r => r.request_id === req.id)
+                          )
+                        }
                         className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
                       >
                         <EyeIcon className="w-5 h-5" />
