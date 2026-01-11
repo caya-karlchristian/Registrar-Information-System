@@ -12,6 +12,7 @@ import {
   getDocumentRequests,
   updateDocumentRequest,
 } from '../services/API';
+import RequestDetailsModal from '../components/RequestDetailModal';
 
 /* ---------------- STATUS IDS (MATCH YOUR DB) ---------------- */
 const STATUS = {
@@ -28,6 +29,7 @@ const StaffDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   /* ---------------- FETCH DATA ---------------- */
 
@@ -233,6 +235,7 @@ const StaffDashboard = () => {
                       {/* View */}
                       <button
                         title="View Details"
+                        onClick={() => setSelectedRequest(req)}
                         className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
                       >
                         <EyeIcon className="w-5 h-5" />
@@ -302,6 +305,10 @@ const StaffDashboard = () => {
           </div>
         </div>
       </main>
+      <RequestDetailsModal 
+        request={selectedRequest} 
+        onClose={() => setSelectedRequest(null)} 
+      />
     </div>
   );
 };
@@ -362,6 +369,8 @@ const IconBtn = ({ children, title, onClick, color, disabled }) => {
       {children}
     </button>
   );
+
+  
 };
 
 export default StaffDashboard;

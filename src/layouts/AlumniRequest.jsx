@@ -94,11 +94,10 @@ const AlumniRequestForm = () => {
 
   const stepProcess = {
             1: "Terms & Conditions",
-            2: "Student Profile",
-            3: "Student Records",
-            4: "Student Credentials",
-            5: "TOR request",
-            6: "Student Request",
+            2: "Alumni Information",
+            3: "Alumni Request",
+            4: "TOR request",
+            5: "Payment Details",
           };
 
   return (
@@ -131,7 +130,7 @@ const AlumniRequestForm = () => {
           
           <div className="flex flex-col items-center pt-8 pb-4">
             <div className="flex space-x-3 mb-2">
-              {[1, 2, 3, 4, 5, 6].map((step) => (
+              {[1, 2, 3, 4, 5].map((step) => (
                 <div 
                   key={step}
                   className={`w-4 h-4 rounded-full border border-pup-yellow ${
@@ -141,7 +140,7 @@ const AlumniRequestForm = () => {
               ))}
             </div>
             <p className="text-pup-yellow font-bold text-sm tracking-wider">
-              {currentStep} of 6 
+              {currentStep} of 5 
             </p>
 
           <h2 className="text-white text-xl font-semibold mt-2">
@@ -194,68 +193,7 @@ const AlumniRequestForm = () => {
                   </div>
                 )}
 
-            {/* STEP 2: STUDENT PROFILE */}
             {currentStep === 2 && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputGroup 
-                  name="firstName" 
-                  label="First Name" 
-                  value={formData.firstName} 
-                  onChange={handleInputChange} 
-                  placeholder='e.g., Rose'
-                  required
-                  />
-
-                  <InputGroup 
-                  name="middleName" 
-                  label="Middle Name" 
-                  value={formData.middleName} 
-                  onChange={handleInputChange} 
-                  placeholder='e.g., Gonzaga'
-                  required
-                  />
-
-                  <InputGroup 
-                  name="surname" 
-                  label="Surname" 
-                  value={formData.surname} 
-                  onChange={handleInputChange} 
-                  placeholder='e.g., Dela Cruz'
-                  required
-                  />
-
-                  <InputGroup 
-                     label="Date of Birth"
-                     type="date" 
-                     name="dob"
-                     value={formData.dob}
-                     onChange={handleInputChange}
-                     required
-                     className="w-full p-2 rounded text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]" 
-                   />
-                </div>
-
-                <InputGroup 
-                  name="address" 
-                  label="Present/Permanent Mailing Address" 
-                  value={formData.address} 
-                  onChange={handleInputChange} 
-                  placeholder="House No., Street, Barangay, City/Municipality"
-                  required
-                  />
-                <InputGroup 
-                  name="contactNumber" 
-                  label="Contact Number" 
-                  placeholder="09XXXXXXXXX" 
-                  value={formData.contactNumber}
-                  onChange={handleInputChange} 
-                  required
-                  />
-              </div>
-            )}
-
-            {currentStep === 3 && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full">
                   
@@ -323,7 +261,7 @@ const AlumniRequestForm = () => {
               </div>
             )}
 
-            {(currentStep === 4) && (
+            {(currentStep === 3) && (
               <div className="space-y-6 animate-fadeIn ">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
                   <MultiSelectDropdown 
@@ -381,7 +319,7 @@ const AlumniRequestForm = () => {
               </div>
             )}
 
-            {(currentStep === 5) && (
+            {(currentStep === 4) && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
                   <p className="text-sm text-justify lg:text-[15px]">For TOR request for further studies, 
@@ -407,7 +345,7 @@ const AlumniRequestForm = () => {
             )}
 
             {/* STEP 6: SUBMIT */}
-            {currentStep === 6 && (
+            {currentStep === 5 && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
                   <InputGroup
@@ -459,7 +397,7 @@ const AlumniRequestForm = () => {
               </div>
 
               <div className="w-32">
-                {currentStep < 6 ? (
+                {currentStep < 5 ? (
                   <button
                     onClick={nextStep}
                     type="button"

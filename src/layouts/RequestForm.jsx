@@ -182,10 +182,9 @@ const RequestForm = () => {
 
   const stepProcess = {
     1: "Terms & Conditions",
-    2: "Student Profile",
-    3: "Student Records",
-    4: "Student Credentials",
-    5: "Student Request",
+    2: "Student Information",
+    3: "Student Request",
+    4: "Payment Details",
   };
 
   return (
@@ -218,7 +217,7 @@ const RequestForm = () => {
             {/* Step Indicators */}
             <div className="flex flex-col items-center pt-8 pb-4">
               <div className="flex space-x-3 mb-2">
-                {[1, 2, 3, 4, 5].map((step) => (
+                {[1, 2, 3, 4].map((step) => (
                   <div
                     key={step}
                     className={`w-4 h-4 rounded-full border border-pup-yellow ${
@@ -228,7 +227,7 @@ const RequestForm = () => {
                 ))}
               </div>
               <p className="text-pup-yellow font-bold text-sm tracking-wider">
-                {currentStep} of 5
+                {currentStep} of 4
               </p>
               <h2 className="text-white text-xl font-semibold mt-2">
                 {stepProcess[currentStep]}
@@ -277,66 +276,10 @@ const RequestForm = () => {
                   )}
                   </div>
                   </div>
-                )}
-
-              {/* STEP 2: Student Profile */}
-              {currentStep === 2 && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <InputGroup
-                      name="firstName"
-                      label="First Name"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      placeholder="e.g., Rose"
-                      required
-                    />
-                    <InputGroup
-                      name="middleName"
-                      label="Middle Name"
-                      value={formData.middleName}
-                      onChange={handleInputChange}
-                      placeholder="e.g., Dela Cruz"
-                      required
-                    />
-                    <InputGroup
-                      name="surname"
-                      label="Surname"
-                      value={formData.surname}
-                      onChange={handleInputChange}
-                      placeholder="e.g., Santos"
-                      required
-                    />
-                    <InputGroup
-                    name="dob"
-                    label="Date of Birth"
-                    type="date"
-                    value={formData.dob}
-                    onChange={handleInputChange}
-                    required
-                  />
-                  </div>                 
-                  <InputGroup
-                    name="address"
-                    label="Mailing Address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    placeholder="House No., Street, Barangay, City"
-                    required
-                  />
-                  <InputGroup
-                    name="contactNumber"
-                    label="Contact Number"
-                    value={formData.contactNumber}
-                    onChange={handleInputChange}
-                    placeholder="09XXXXXXXXX"
-                    required
-                  />
-                </div>
-              )}
+                )}             
 
               {/* STEP 3: Student Records */}
-              {currentStep === 3 && (
+              {currentStep === 2 && (
                 <div className="space-y-6 animate-fadeIn">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <InputGroup
@@ -392,7 +335,7 @@ const RequestForm = () => {
               )}
 
               {/* STEP 4: Documents Requested */}
-              {currentStep === 4 && (
+              {currentStep === 3 && (
                 <div className="space-y-6 animate-fadeIn">
                   <MultiSelectDropdown
                     name="documentsRequested"
@@ -455,7 +398,7 @@ const RequestForm = () => {
               )}
 
               {/* STEP 5: Payment & Copies */}
-              {currentStep === 5 && (
+              {currentStep === 4 && (
                 <div className="space-y-6 animate-fadeIn">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <InputGroup
@@ -499,8 +442,8 @@ const RequestForm = () => {
               )}
 
               <button
-                type={currentStep < 5 ? "button" : "submit"}
-                onClick={currentStep < 5 ? nextStep : undefined}
+                type={currentStep < 4 ? "button" : "submit"}
+                onClick={currentStep < 4 ? nextStep : undefined}
                 className="font-bold py-2 px-6 rounded shadow-md w-32 ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
               >
                 {currentStep < 5 ? "Next" : "Submit"}

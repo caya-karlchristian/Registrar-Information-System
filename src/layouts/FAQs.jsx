@@ -16,35 +16,54 @@ const FAQPage = () => {
   ];
 
   const faqData = [
+    // Existing FAQs...
     {
-      id: 1, 
-      question: "How do I request a Transcript of Records (TOR)?",
-      answer: "The Transcript of Records is the official record of a student's academic performance. To request one, log in to your account, go to the 'Request' tab, select 'Transcript of Records', and fill out the necessary details regarding the purpose of your request.",
-      category: "Document Requests"
+      id: 13,
+      question: "What is the Registrar Information System (RIS)?",
+      answer: "The RIS is a web-based platform designed to streamline document requests, track processing, and manage student records for the Polytechnic University of the Philippines. It replaces manual forms with a secure digital system.",
+      category: "System Overview"
     },
     {
-      id: 2,
-      question: "How long is the processing time for documents?",
-      answer: "Processing times vary by document type. Certifications usually take 3 working days, while a Transcript of Records (TOR) takes approximately 12-15 working days depending on clearance verification.",
-      category: "Document Requests"
+      id: 14,
+      question: "Who can use the RIS?",
+      answer: "Current students, alumni, and authorized staff members can use the RIS. Each user has a role-based access depending on whether they are submitting requests, processing documents, or managing the system.",
+      category: "System Overview"
     },
     {
-      id: 3,
-      question: "What payment methods are accepted?",
-      answer: "We accept payments via the Cashier's Office (onsite) or through our online partners (Landbank, GCash, Maya). Please upload your proof of payment to proceed with processing.",
-      category: "Payments"
+      id: 15,
+      question: "How do I log in to the RIS?",
+      answer: "Use your university-provided credentials (student number and password) to log in. Alumni will use the credentials created during alumni registration. Ensure your email is verified for notifications.",
+      category: "System Usage"
     },
     {
-      id: 4,
-      question: "How do I claim my requested documents?",
-      answer: "Once your document status changes to 'Ready to Claim', you will receive a notification. Please present your student ID and the official receipt at the Registrar's releasing window.",
-      category: "Document Requests"
+      id: 16,
+      question: "Is my personal information safe in RIS?",
+      answer: "Yes, the RIS complies with the Data Privacy Act of 2012 (R.A. 10173). Your data is securely stored, and access is restricted based on roles. Sensitive information like grades and personal details are protected.",
+      category: "Security & Privacy"
     },
     {
-      id: 5,
-      question: "I forgot my password, how do I reset it?",
-      answer: "Click the 'Forgot Password' link on the login page. A reset link will be sent to your registered university email address.",
-      category: "Account & Profile"
+      id: 17,
+      question: "Can I access RIS on mobile devices?",
+      answer: "Yes, RIS is responsive and works on desktop, tablets, and smartphones. For best experience, use modern browsers like Chrome, Firefox, or Edge.",
+      category: "System Usage"
+    },
+    {
+      id: 18,
+      question: "What features does the RIS provide?",
+      answer: "RIS allows users to submit document requests, track request status, upload payment proofs, receive notifications, and generate printable forms. Staff can process requests, update statuses, and manage student data securely.",
+      category: "System Features"
+    },
+    {
+      id: 19,
+      question: "Who do I contact for technical issues with RIS?",
+      answer: "For technical problems, use the 'Support' tab in RIS or contact the IT/Registrar Office at PUP Taguig via email or hotline. Include details of your issue and screenshots for faster resolution.",
+      category: "Technical Support"
+    },
+    {
+      id: 20,
+      question: "Can multiple requests be submitted at once?",
+      answer: "Yes, students and alumni can submit multiple document requests in a single session, specifying the type and purpose for each document. Each request will have a unique transaction ID.",
+      category: "System Features"
     }
   ];
 
