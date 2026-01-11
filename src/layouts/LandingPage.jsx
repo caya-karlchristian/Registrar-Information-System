@@ -9,7 +9,7 @@ const LandingPage = () => {
   const handleLogin = (e) => {
     e.preventDefault();
     if (selectedRole === 'Student') navigate('/student');
-    else if (selectedRole === 'Faculty') navigate('/staff');
+    else if (selectedRole === 'Registrar Staff') navigate('/staff');
     else if (selectedRole === 'Alumni') navigate('/alumni');
   };
 
@@ -61,10 +61,10 @@ const LandingPage = () => {
                 </button>
                 
                 <button 
-                  onClick={() => setSelectedRole('Faculty')} 
+                  onClick={() => setSelectedRole('Registrar Staff')} 
                   className="w-full py-3 px-4 bg-[#dc3545] hover:bg-red-700 text-white font-bold rounded shadow-sm transition-transform transform active:scale-95"
                 >
-                  Faculty
+                  Registrar Staff
                 </button>
 
                 <button 
@@ -95,7 +95,7 @@ const LandingPage = () => {
                   </div>
                 )}
 
-                {selectedRole === 'Faculty' && (
+                {selectedRole === 'Registrar Staff' && (
                   <div>
                     <input 
                       type="email" 
