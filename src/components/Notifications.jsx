@@ -12,8 +12,8 @@ const NotificationSidebar = () => {
     }
   }, [isOpen]);
 
-  // REMINDER: REMOVE WHEN BACKEND AND DATABASE INTEGRATION
-  const  [notifications, setNotifications] = useState([
+    // REMINDER: REMOVE WHEN BACKEND AND DATABASE INTEGRATION
+  const [notifications, setNotifications] = useState([
     {
       id: 1,
       title: "Document Ready to Claim",
@@ -30,7 +30,25 @@ const NotificationSidebar = () => {
       type: "reminder",
       isRead: false,
     },
+    {
+      id: 3,
+      title: "Requirements Reminder",
+      message: (
+        <>
+          Please bring the following when claiming your TOR:<br />
+          - One documentary stamp<br />
+          - Two colored 2x2 ID pictures<br />
+          - Your PUP ID<br />
+          - Dummy diploma (if original is lost, bring affidavit of loss)
+        </>
+      ),
+      time: "1 day ago",
+      type: "reminder",
+      isRead: false,
+    },
   ]);
+
+
 
   const handleNotificationClick = (id) => {
     setNotifications((prev) =>
