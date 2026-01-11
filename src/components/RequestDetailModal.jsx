@@ -71,8 +71,16 @@ const RequestDetailsModal = ({ request, onClose }) => {
           {/* Student Information */}
           <Section title="Student Information">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <p><strong>Full Name:</strong> {request.studentName}</p>
-              <p><strong>Student Number:</strong> {request.studentNumber}</p>
+              <p>
+                <strong>Full Name:</strong>{' '}
+                {request.student_profile
+                  ? `${request.student_profile.first_name} ${
+                      request.student_profile.middle_name ?? ''
+                    } ${request.student_profile.last_name}`
+                  : 'N/A'}
+              </p>
+
+              <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
               <p><strong>Date of Birth:</strong> {request.student_profile?.date_of_birth ?? 'N/A'}</p>
               <p><strong>Contact Number:</strong> {request.student_profile?.contact_number ?? 'N/A'}</p>
               <p className="md:col-span-2">
@@ -134,7 +142,7 @@ const RequestDetailsModal = ({ request, onClose }) => {
                   : 'N/A'}
               </p>
 
-              <p><strong>Number of Copies:</strong> {request.copies}</p>
+              <p><strong>Number of Copies:</strong> {request.number_of_copies ?? 'N/A'}</p>
             </div>
           </Section>
 
