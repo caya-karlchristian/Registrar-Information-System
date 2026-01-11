@@ -4,12 +4,14 @@ import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
 import MultiSelectDropdown from "../components/MultiSelection.jsx";
+import LoadingOverlay from "../components/LoadingOverlay.jsx";
 
 const RequestForm = () => {
   const formRef = useRef(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     termsAgreed: false,
@@ -80,9 +82,12 @@ const RequestForm = () => {
   const handleSubmit = async (e) => {
   e.preventDefault();
 
+  setIsLoading(true);
+
   try {
     if (formData.documentsRequested.length === 0) {
       alert("Please select at least one document.");
+      setIsLoading(false);
       return;
     }
 
@@ -151,6 +156,8 @@ const RequestForm = () => {
       error.response?.data || error
     );
     alert("Failed to submit request. Please try again.");
+    } finally {
+      setIsLoading(false);
   }
 };
 
@@ -183,6 +190,7 @@ const RequestForm = () => {
 
   return (
     <div className="min-h-screen pb-20">
+      {isLoading && <LoadingOverlay />}
       {isSubmitted ? (
         <div className="max-w-5xl mx-auto">
           <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col items-center justify-center text-center px-10">
