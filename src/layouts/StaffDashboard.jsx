@@ -60,6 +60,8 @@ const StaffDashboard = () => {
           : 'N/A',
         studentNumber: r.academic_record?.student_number ?? 'N/A',
 
+        copies: r.number_of_copies || 1,  /* ---------------- UPDATE ---------------- */
+
         docType: r.certification_type
             ? `Certification: ${r.certification_type.cert_name}`
             : r.documents && r.documents.length > 0
@@ -196,6 +198,7 @@ const StaffDashboard = () => {
                 <Th>Student</Th>
                 <Th>Document</Th>
                 <Th>Date</Th>
+                <Th center> No. of Copies</Th>
                 <Th center>Status</Th>
                 <Th center>Actions</Th>
               </tr>
@@ -217,6 +220,11 @@ const StaffDashboard = () => {
 
                   <Td>{req.docType}</Td>
                   <Td>{req.date}</Td>
+
+                  <Td center>
+                    <span className="font-semibold text-gray-700">{req.copies}</span>
+                  </Td>
+
                   <Td center>{getStatusBadge(req.statusName)}</Td>
 
                   <Td center>
