@@ -138,7 +138,7 @@ const StaffDashboard = () => {
 
     return (
       <span
-        className={`px-3 py-1 rounded-full text-xs font-bold border ${
+        className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${
           styles[status] ?? 'bg-gray-100 text-gray-600'
         }`}
       >
