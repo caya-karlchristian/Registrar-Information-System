@@ -65,7 +65,7 @@ const SummaryLogbookModal = ({ isOpen, onClose, volumeData, documentData, status
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-30 backdrop-blur-md print:p-0 print:bg-white print:static">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-30 backdrop-blur-md print:p-0 print:bg-white print:static">
       
       {/* Modal Container */}
       <div className="bg-white w-full max-w-5xl h-[90vh] md:h-auto md:max-h-[95vh] rounded-xl shadow-2xl flex flex-col print:shadow-none print:w-full print:h-full print:max-h-full print:rounded-none">
