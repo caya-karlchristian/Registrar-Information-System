@@ -23,6 +23,9 @@ const STATUS = {
   REJECTED: 5,
 };
 
+// 1. ADD THIS CONSTANT
+const ITEMS_PER_PAGE = 10;
+
 const StaffDashboard = () => {
   const [requests, setRequests] = useState([]);
   const [filterStatus, setFilterStatus] = useState('All');
@@ -30,6 +33,10 @@ const StaffDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [rawRequests, setRawRequests] = useState([]);
+
+  // 2. ADD PAGE STATE
+  const [currentPage, setCurrentPage] = useState(1);
 
   /* ---------------- FETCH DATA ---------------- */
 
@@ -62,7 +69,7 @@ const StaffDashboard = () => {
           : 'N/A',
         studentNumber: r.academic_record?.student_number ?? 'N/A',
 
-        copies: r.number_of_copies || 1,  /* ---------------- UPDATE ---------------- */
+        copies: r.number_of_copies || 1,
 
         docType: r.certification_type
             ? `Certification: ${r.certification_type.cert_name}`
@@ -70,8 +77,8 @@ const StaffDashboard = () => {
                 ? r.documents
                     .map(d => {
                         const name = documentTypeMap[d.document_type_id] || "Unknown Document";
-                        const copies = r.number_of_copies || 1; // default 1 if missing
-                        return `${name} (${copies} cop${copies > 1 ? 'ies' : 'y'})`;
+                        const copies = r.number_of_copies || 1; 
+                        return `${name} `;
                     })
                     .join(', ')
                 : 'N/A',
@@ -82,7 +89,7 @@ const StaffDashboard = () => {
         statusId: r.status?.status_id,
         statusName: r.status?.status_name,
       }));
-
+      setRawRequests(res.data);
       setRequests(formatted);
     } catch (error) {
       console.error('Error fetching document requests:', error);
@@ -94,6 +101,11 @@ const StaffDashboard = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // 3. RESET PAGE WHEN FILTERS CHANGE
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, searchTerm]);
 
   /* ---------------- STATUS UPDATE ---------------- */
   const handleStatusUpdate = async (id, newStatusId) => {
@@ -125,6 +137,25 @@ const StaffDashboard = () => {
 
     return matchesStatus && matchesSearch;
   });
+
+  /* ---------------- PAGINATION LOGIC ---------------- */
+  // 4. CALCULATE INDICES AND SLICE DATA
+  const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
+  const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
+  const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(prev => prev + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
+  };
 
   /* ---------------- STATUS BADGE ---------------- */
   const getStatusBadge = status => {
@@ -207,7 +238,8 @@ const StaffDashboard = () => {
             </thead>
 
             <tbody className="divide-y">
-              {filteredData.map(req => (
+              {/* 5. MAP OVER currentItems INSTEAD OF filteredData */}
+              {currentItems.map(req => (
                 <tr key={req.id} className="hover:bg-gray-50">
                   <Td>{req.id}</Td>
 
@@ -235,7 +267,11 @@ const StaffDashboard = () => {
                       {/* View */}
                       <button
                         title="View Details"
-                        onClick={() => setSelectedRequest(req)}
+                        onClick={() =>
+                          setSelectedRequest(
+                            rawRequests.find(r => r.request_id === req.id)
+                          )
+                        }
                         className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
                       >
                         <EyeIcon className="w-5 h-5" />
@@ -294,13 +330,32 @@ const StaffDashboard = () => {
             </tbody>
           </table>
 
-          <div className="px-6 py-4 bg-gray-50 text-sm text-gray-500 flex justify-between">
+          {/* 6. UPDATED PAGINATION FOOTER */}
+          <div className="px-6 py-4 bg-gray-50 text-sm text-gray-500 flex justify-between items-center">
             <span>
-              Showing {filteredData.length} of {requests.length} results
+              Showing {filteredData.length > 0 ? indexOfFirstItem + 1 : 0} to{' '}
+              {Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} results
             </span>
-            <div className="flex gap-2">
-              <ChevronLeftIcon className="w-5 h-5 text-gray-400" />
-              <ChevronRightIcon className="w-5 h-5 text-gray-400" />
+            <div className="flex gap-2 items-center">
+              <button 
+                onClick={handlePrevPage}
+                disabled={currentPage === 1}
+                className={`p-1 rounded ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'}`}
+              >
+                <ChevronLeftIcon className="w-5 h-5" />
+              </button>
+              
+              <span className="text-xs font-semibold mx-2">
+                 Page {currentPage} of {totalPages || 1}
+              </span>
+
+              <button 
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages || totalPages === 0}
+                className={`p-1 rounded ${currentPage === totalPages || totalPages === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'}`}
+              >
+                <ChevronRightIcon className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </div>
