@@ -54,7 +54,7 @@ const RequestDetailsModal = ({ request, onClose }) => {
           <div>
             <h3 className="text-lg font-bold text-white">Request Details</h3>
             <p className="text-sm text-yellow-200">
-              Transaction ID: #{request.id}
+              Transaction ID: {request.request_id}
             </p>
           </div>
           <button
@@ -84,7 +84,7 @@ const RequestDetailsModal = ({ request, onClose }) => {
               <p><strong>Date of Birth:</strong> {request.student_profile?.date_of_birth ?? 'N/A'}</p>
               <p><strong>Contact Number:</strong> {request.student_profile?.contact_number ?? 'N/A'}</p>
               <p className="md:col-span-2">
-                <strong>Address:</strong> {request.student_profile?.address ?? 'N/A'}
+                <strong>Address:</strong> {request.student_profile?.permanent_address ?? 'N/A'}
               </p>
 
             </div>
