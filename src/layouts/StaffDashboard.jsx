@@ -84,8 +84,21 @@ const StaffDashboard = () => {
                 : 'N/A',
 
         date: r.requested_at
-          ? new Date(r.requested_at).toLocaleDateString()
+          ? new Date(r.requested_at).toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+            })
           : 'N/A',
+
+        time: r.requested_at
+          ? new Date(r.requested_at).toLocaleTimeString('en-GB', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false,
+            })
+          : '',
         statusId: r.status?.status_id,
         statusName: r.status?.status_name,
       }));
@@ -230,7 +243,7 @@ const StaffDashboard = () => {
                 <Th>Req ID</Th>
                 <Th>Student</Th>
                 <Th>Document</Th>
-                <Th>Date</Th>
+                <Th>Date & Time</Th>
                 <Th center> No. of Copies</Th>
                 <Th center>Status</Th>
                 <Th center>Actions</Th>
@@ -253,7 +266,10 @@ const StaffDashboard = () => {
                   </Td>
 
                   <Td>{req.docType}</Td>
-                  <Td>{req.date}</Td>
+                  <Td>
+                    <div className="text-xs text-gray-400">{req.date}</div>
+                    <div className="text-xs text-gray-400">{req.time}</div>
+                  </Td>
 
                   <Td center>
                     <span className="font-semibold text-gray-700">{req.copies}</span>
@@ -404,28 +420,5 @@ const Td = ({ children, center }) => (
     {children}
   </td>
 );
-
-const IconBtn = ({ children, title, onClick, color, disabled }) => {
-  const colors = {
-    blue: 'text-blue-500 hover:bg-blue-50',
-    red: 'text-red-500 hover:bg-red-50',
-    green: 'text-green-600 hover:bg-green-50',
-  };
-
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      disabled={disabled}
-      className={`p-2 rounded-lg ${
-        colors[color] ?? 'text-gray-400 hover:bg-gray-100'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-    >
-      {children}
-    </button>
-  );
-
-  
-};
 
 export default StaffDashboard;
