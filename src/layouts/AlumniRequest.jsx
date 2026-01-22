@@ -176,7 +176,7 @@ const AlumniRequestForm = () => {
                     if claimant is other than immediate family member with original valid ID of both owner/student and 
                     representative upon claiming the requested documents.</p>
 
-                  <p><strong> F.</strong>All documents unclaimed within 90 days on the date of request will be shredded automatically.</p>
+                  <p><strong>F.</strong>  All documents unclaimed within 90 days on the date of request will be shredded automatically.</p>
 
                   <div className="mt-2 pt-4 border-t text-l border-white/10">
                     <CheckboxItem
@@ -196,15 +196,41 @@ const AlumniRequestForm = () => {
             {currentStep === 2 && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full">
-                  
-                  <InputGroup 
-                    name="yearAdmitted" 
-                    label="Admitted in PUP Taguig (S.Y.)" 
-                    value={formData.yearAdmitted} 
-                    onChange={handleInputChange} 
-                    placeholder='XXXX-XXXX'
-                    required
-                  />
+                    <DropdownGroup                    
+                      name="yearAdmitted"
+                      label="Admitted in PUP Taguig (S.Y.)"
+                      value={formData.yearAdmitted}
+                      onChange={handleInputChange}
+                      options={[
+                        "2000–2001",
+                        "2001–2002",
+                        "2002–2003",
+                        "2003–2004",
+                        "2004–2005",
+                        "2005–2006",
+                        "2006–2007",
+                        "2007–2008",
+                        "2008–2009",
+                        "2009–2010",
+                        "2010–2011",
+                        "2011–2012",
+                        "2012–2013",
+                        "2013–2014",
+                        "2014–2015",
+                        "2015–2016",
+                        "2016–2017",
+                        "2017–2018",
+                        "2018–2019",
+                        "2019–2020",
+                        "2020–2021",
+                        "2021–2022",
+                        "2022–2023",
+                        "2023–2024",
+                        "2024–2025",
+                        "2025–2026",
+                      ]}
+                      required
+                    />
 
                   <DropdownGroup 
                     name="course" 
@@ -213,13 +239,17 @@ const AlumniRequestForm = () => {
                     onChange={handleInputChange} 
                     required
                     options={[
-                      "BS Computer Science",
-                      "BS Information Technology",
-                      "BS Information Systems",
-                      "BS in Accountancy",
-                      "BS in Business Administration",
-                      "BS in Hospitality Management",
-                      "BS in Tourism Management",
+                      "BS in Electronics Engineering (BSECE)",
+                      "BS in Information Technology (BSIT)",
+                      "BS in Information Systems (BSIS)",
+                      "BS in Accountancy (BSA)",
+                      "BS in Business Administration (BSBA)",
+                      "BS in Applied Mathematics (BSAM)",
+                      "BS in Entrepreneurship (BSENTREP)",
+                      "BS in Office Administration (BSOA)",
+                      "Bachelor in Secondary Education (BSED)",
+                      "BS in Hospitality Management (BSHM)",
+                      "BS in Civil Engineering (BSCE)",
                     ]}
                   />
 
@@ -240,6 +270,8 @@ const AlumniRequestForm = () => {
                         value={formData.lastSYAttended}
                         onChange={handleInputChange}
                         placeholder="XXXX-XXXX"
+                        pattern="^\d{4}-\d{4}$"
+                        title="Format must be YYYY-YYYY"
                         required
                     />
                     )}
@@ -253,6 +285,8 @@ const AlumniRequestForm = () => {
                         onChange={handleInputChange}
                         className="uppercase"
                         placeholder="e.g 2023-00101-TG-0"
+                        pattern="^\d{4}-\d{5}-TG-\d$"
+                        title="Format must be YYYY-XXXXX-TG-X"
                         required
                     />
                     )}
@@ -353,7 +387,9 @@ const AlumniRequestForm = () => {
                     label="Official Receipt Number"
                     value={formData.receiptNumber}
                     onChange={handleInputChange}
-                    placeholder='e.g 000-000000'
+                    placeholder='XXXXXXX'
+                    pattern="^\d{7}$"
+                    title="Format must be 7 digits"
                     required
                   />
                   
