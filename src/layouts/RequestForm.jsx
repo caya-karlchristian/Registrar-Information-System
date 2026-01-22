@@ -443,9 +443,9 @@ const RequestForm = () => {
                       label="Official Receipt Number"
                       value={formData.receiptNumber}
                       onChange={handleInputChange}
-                      placeholder="XXXXXXXXX"
-                      pattern="^\d{4}-\d{5}-TG-\d$"
-                      title="Format must be YYYY-XXXXX-TG-X"
+                      placeholder='XXXXXXX'
+                      pattern="^\d{7}$"
+                      title="Format must be 7 digits"
                       required
                     />
                     <InputGroup
