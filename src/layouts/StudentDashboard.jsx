@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getDocumentRequests } from "../services/API"; 
+import { EyeIcon } from '@heroicons/react/24/solid';
+import RequestDetailsModal from '../components/RequestDetailModal';
 
 const STATUS_MAP = {
   1: "Pending",
@@ -15,6 +17,7 @@ const StudentDashboard = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   // For testing, assume student_profile_id = 1 is the logged-in student
   const currentStudentId = 1;
@@ -180,7 +183,15 @@ const StudentDashboard = () => {
                 </div>
 
                 {["pending", "ready"].includes(req.type) && (
-                  <div className="flex flex-col justify-end">
+                  <div className="flex items-center gap-2">
+                    <button
+                      title="View Details"
+                      onClick={() => setSelectedRequest(req)}
+                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                    >
+                      <EyeIcon className="w-5 h-5" />
+                    </button>
+
                     <button
                       className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg items-end"
                       onClick={() =>
@@ -190,7 +201,7 @@ const StudentDashboard = () => {
                       }
                     >
                       {viewedRequestId === req.request_id
-                        ? "Hide Progress"
+                        ? "Hide "
                         : "View"}
                     </button>
 
@@ -214,6 +225,10 @@ const StudentDashboard = () => {
           </div>
         )}
       </div>
+      <RequestDetailsModal
+        request={selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+      />
     </main>
   );
 };
