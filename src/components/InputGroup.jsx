@@ -8,6 +8,8 @@ const InputGroup = ({
   onChange, 
   type = "text", 
   placeholder = "", 
+  pattern,
+  title,
   required = false // 1. Add default value for required prop
 }) => {
   return (
@@ -24,6 +26,8 @@ const InputGroup = ({
         onChange={onChange}
         placeholder={placeholder}
         required={required} 
+        pattern={pattern}    
+        title={title}
         className="w-full p-2 rounded text-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]"
       />
     </div>
@@ -39,6 +43,8 @@ InputGroup.propTypes = {
   type: PropTypes.string,
   placeholder: PropTypes.string,
   required: PropTypes.bool, 
+  pattern: PropTypes.string,  
+  title: PropTypes.string,
 };
 
 export default InputGroup;
