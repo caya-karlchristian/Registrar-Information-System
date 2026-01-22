@@ -47,7 +47,7 @@ const RequestDetailsModal = ({ request, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden lg:max-w-3xl print:w-full print:max-w-none print:shadow-none print:rounded-none">
 
         {/* Header */}
         <div className="bg-pup-maroon px-6 py-4 flex justify-between items-center">
@@ -66,11 +66,11 @@ const RequestDetailsModal = ({ request, onClose }) => {
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-4">
+        <div className="p-4 space-y-2 lg:space-y6 lg:p-6 print:p-0 print:mb-4">
 
           {/* Student Information */}
           <Section title="Student Information">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <p>
                 <strong>Full Name:</strong>{' '}
                 {request.student_profile
