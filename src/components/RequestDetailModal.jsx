@@ -1,4 +1,3 @@
-// src/components/RequestDetailsModal.js
 import React, { useState } from 'react';
 import { XCircleIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 
@@ -155,13 +154,6 @@ const RequestDetailsModal = ({ request, onClose }) => {
             className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-lg"
           >
             Close
-          </button>
-
-          <button
-            onClick={() => window.print()}
-            className="px-4 py-2 text-sm font-semibold text-white bg-pup-maroon hover:bg-[#660000] rounded-lg"
-          >
-            Print Details
           </button>
         </div>
       </div>
