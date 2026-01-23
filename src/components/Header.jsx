@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Navigation from "./Navigation.jsx";
-import { Bars3Icon} from '@heroicons/react/24/outline';
+import { Bars3Icon, UserCircleIcon} from '@heroicons/react/24/outline';
 import NotificationSidebar from "./Notifications.jsx";
 
 function Header() {
