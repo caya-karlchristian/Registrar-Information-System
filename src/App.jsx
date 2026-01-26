@@ -13,6 +13,7 @@ import FAQPage from './layouts/FAQs.jsx';
 import AlumniRequest from './layouts/AlumniRequest.jsx';
 import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx';
 import StaffDashboard from './layouts/StaffDashboard.jsx';
+import Logbook from './layouts/Logbook.jsx';
 
 import AnalyticsSummary from './components/AnalyticsSummary.jsx'
 import DashboardHeader from './components/DashboardHeader.jsx';
@@ -24,6 +25,7 @@ import Footer from './components/Footer.jsx';
 import AnalyticsHeader from './components/AnalyticsHeader.jsx';
 import AlumniHeader from './components/AlumniHeader.jsx'
 import AlumniDashboardHeader from './components/AlumniDashboardHeader.jsx';
+import LogbookHeader from './components/LogbookHeader.jsx';
 
 
 const App = () => {
@@ -116,6 +118,12 @@ const App = () => {
               <AnalyticsHeader/>
               <AnalyticsSummary/>
               <AnalyticsDashboard />
+            </>
+            } />
+          <Route path="logbook" element={
+            <>
+              <LogbookHeader/>
+              <Logbook />
             </>
             } />
         </Route>
