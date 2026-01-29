@@ -33,6 +33,12 @@ const AlumniNavigation = ({ mobile = false }) => {
           </Link>
         </li>
 
+        <li className={mobile ? "" : "flex-1"}>
+          <Link to="profile" className={mobile ? mobileLink : desktopLink}>
+            Alumni Profile
+          </Link>
+        </li>
+
       </ul>
     </nav>
   );
