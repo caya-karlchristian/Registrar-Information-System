@@ -77,7 +77,7 @@ const ProfilePage = ({ userType = "student" }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center font-sans">
+    <div className="min-h-screen flex items-start justify-center font-sans py-10">
       <div className="w-full max-w-7xl bg-pup-dark-maroon shadow-2xl overflow-hidden flex flex-col relative rounded-sm min-h-[700px]">
         
         <div className="h-3 w-full bg-[#eebc48]"></div>
