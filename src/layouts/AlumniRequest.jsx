@@ -3,6 +3,8 @@ import InputGroup from '../components/InputGroup.jsx';
 import CheckboxItem from '../components/Checkbox.jsx';
 import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
+import ImageUploader from "../components/ImageUploader.jsx";
+
 
 const AlumniRequestForm = () => {
   const formRef = useRef(null);
@@ -31,6 +33,8 @@ const AlumniRequestForm = () => {
     dateOfPayment: '',
     numberOfCopies: '',
     forgotStudentNo: '',
+    receiptImage: null,
+
   });
 
   // Helper to update text inputs
@@ -43,6 +47,10 @@ const AlumniRequestForm = () => {
   const handleCheckboxChange = (e) => {
     const { name, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: checked }));
+  };
+
+  const handleFileChange = (name, file) => {
+    setFormData((prev) => ({ ...prev, [name]: file }));
   };
 
   // Function to go to next step
@@ -409,6 +417,14 @@ const AlumniRequestForm = () => {
                     value={formData.numberOfCopies}
                     onChange={handleInputChange}
                     placeholder='e.g 1'
+                  />
+
+                  <ImageUploader 
+                    name="receiptImage"
+                    label="Upload Receipt Image"
+                    value={formData.receiptImage}
+                    onChange={handleFileChange}
+                    required={true}
                   />
                 </div>
               </div>
