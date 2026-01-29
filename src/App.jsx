@@ -14,6 +14,7 @@ import AlumniRequest from './layouts/AlumniRequest.jsx';
 import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx';
 import StaffDashboard from './layouts/StaffDashboard.jsx';
 import Logbook from './layouts/Logbook.jsx';
+import ProfilePage from './layouts/ProfilePage.jsx';
 
 import AnalyticsSummary from './components/AnalyticsSummary.jsx'
 import DashboardHeader from './components/DashboardHeader.jsx';
@@ -24,8 +25,8 @@ import StaffHeader from './components/StaffHeader.jsx';
 import Footer from './components/Footer.jsx';
 import AnalyticsHeader from './components/AnalyticsHeader.jsx';
 import AlumniHeader from './components/AlumniHeader.jsx'
-import AlumniDashboardHeader from './components/AlumniDashboardHeader.jsx';
 import LogbookHeader from './components/LogbookHeader.jsx';
+import StudentProfile from './components/StudentProfile.jsx';
 
 
 const App = () => {
@@ -66,6 +67,12 @@ const App = () => {
               <FAQPage />
             </>
           } />
+          <Route path="profile" element={
+            <>
+              <StudentProfile /> 
+              <ProfilePage userType="student" /> 
+            </>
+          } />
         </Route>
           <Route path="/alumni" element={<AlumniPage />}>
           <Route index element={
@@ -76,7 +83,7 @@ const App = () => {
             } /> 
           <Route path="home" element={
             <>
-              <AlumniDashboardHeader />
+              <DashboardHeader userType="alumni" />
               <StudentDashboard />
             </>
           } />
@@ -96,6 +103,12 @@ const App = () => {
             <>
               <FAQsHeader />
               <FAQPage />
+            </>
+          } />
+          <Route path="profile" element={
+            <>
+              <StudentProfile />
+              <ProfilePage userType="alumni" />
             </>
           } />
         </Route>
@@ -126,7 +139,14 @@ const App = () => {
               <Logbook />
             </>
             } />
+            <Route path="profile" element={
+            <>
+              <StudentProfile />
+              <ProfilePage userType="staff" />
+            </>
+          } />
         </Route>
+
         
       </Routes>
 

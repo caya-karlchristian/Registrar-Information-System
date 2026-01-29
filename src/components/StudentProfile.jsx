@@ -3,7 +3,7 @@ import logo from '../assets/half_background.png';
 import tech4ward from '../assets/tech4ward_logo.png';
 import ris_logo from '../assets/ris_logo.png'; 
 
-const AlumniDashboardHeader = () => {
+const DocumentHeader = () => {
   return (
     <header className='relative w-full border-pup-yellow border-b-[5px] mb-10'>
       <div>
@@ -22,10 +22,10 @@ const AlumniDashboardHeader = () => {
 
             <div className="flex flex-col items-center px-1">
               <h2 className="text-[22px] font-bold mb-4 text-center text-white leading-tight lg:text-[50px]">
-              ALUMNI DASHBOARD             
-              </h2>
+                USER PROFILE              
+            </h2>
               <p className="text-center text-[8px] -mt-3 text-white lg:text-[15px]">
-                Here’s the official online request form provided by the registrar
+                Welcome to your profile page
               </p>
             </div>
 
@@ -41,4 +41,4 @@ const AlumniDashboardHeader = () => {
   );
 };
 
-export default AlumniDashboardHeader;
+export default DocumentHeader;

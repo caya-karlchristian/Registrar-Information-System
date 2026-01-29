@@ -28,6 +28,12 @@ const Navigation = ({ mobile = false }) => {
         </li>
 
         <li className={mobile ? "" : "flex-1"}>
+          <Link to="profile" className={mobile ? mobileLink : desktopLink}>
+            Student Profile
+          </Link>
+        </li>
+
+        <li className={mobile ? "" : "flex-1"}>
           <Link to="faqs" className={mobile ? mobileLink : desktopLink}>
             FAQs
           </Link>
