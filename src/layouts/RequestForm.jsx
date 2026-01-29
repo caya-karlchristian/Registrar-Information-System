@@ -5,6 +5,7 @@ import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
 import MultiSelectDropdown from "../components/MultiSelection.jsx";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
+import ImageUploader from "../components/ImageUploader.jsx";
 
 const RequestForm = () => {
   const formRef = useRef(null);
@@ -32,6 +33,7 @@ const RequestForm = () => {
     receiptNumber: "",
     dateOfPayment: "",
     numberOfCopies: "",
+    receiptImage: null,
   });
 
   const handleInputChange = (e) => {
@@ -42,6 +44,10 @@ const RequestForm = () => {
   const handleCheckboxChange = (e) => {
     const { name, checked } = e.target;
     setFormData((prev) => ({ ...prev, [name]: checked }));
+  };
+
+  const handleFileChange = (name, file) => {
+    setFormData((prev) => ({ ...prev, [name]: file }));
   };
 
   const nextStep = (e) => {
@@ -463,6 +469,14 @@ const RequestForm = () => {
                     value={formData.numberOfCopies}
                     onChange={handleInputChange}
                     placeholder="e.g., 1"
+                  />
+                  
+                  <ImageUploader 
+                    name="receiptImage"
+                    label="Upload Receipt Image"
+                    value={formData.receiptImage}
+                    onChange={handleFileChange}
+                    required={true}
                   />
                 </div>
               )}
