@@ -27,6 +27,12 @@ const StaffNavigation = ({ mobile = false }) => {
           </Link>
         </li>
 
+        <li className={mobile ? "" : "flex-1"}>
+          <Link to="profile" className={mobile ? mobileLink : desktopLink}>
+            Staff Profile
+          </Link>
+        </li>
+
         {/* ADD GENERATE REPORT */}
       </ul>
     </nav>
