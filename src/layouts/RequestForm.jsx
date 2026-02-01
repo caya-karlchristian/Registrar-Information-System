@@ -165,14 +165,14 @@ const RequestForm = () => {
     await Promise.all(
       formData.documentsRequested.map((docName) => {
         const docId = documentTypeMap[docName];
-        const quantity = formData.documentCopies[docName] || 1; //Added for number of copies per document
+        // const quantity = formData.documentCopies[docName] || 1; //Added for number of copies per document
         if (!docId) {
           console.warn(`No document_type_id mapping for: ${docName}`);
         }
         return axios.post("/request-documents", {
           request_id: requestId,
           document_type_id: docId,
-          quantity: quantity, //Added for number of copies per document
+          // quantity: quantity, //Added for number of copies per document
         });
       })
     );
@@ -189,7 +189,6 @@ const RequestForm = () => {
   }
 };
 
-
   const handleConfirm = () => window.location.reload();
 
   /* ---------------- CERTIFICATION VISIBILITY ---------------- */
@@ -201,8 +200,6 @@ const RequestForm = () => {
     "CAV - CHED",
     "CAV - WES/CES",
   ]);
-
-
 
   const showCertificationDropdown = formData.documentsRequested.some((doc) =>
     certificationDocuments.has(doc)
