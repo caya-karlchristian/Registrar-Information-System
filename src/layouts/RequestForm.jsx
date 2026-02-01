@@ -165,14 +165,14 @@ const RequestForm = () => {
     await Promise.all(
       formData.documentsRequested.map((docName) => {
         const docId = documentTypeMap[docName];
-        const quantity = formData.documentCopies[docName] || 1; //Added for number of copies per document
+        // const quantity = formData.documentCopies[docName] || 1; //Added for number of copies per document
         if (!docId) {
           console.warn(`No document_type_id mapping for: ${docName}`);
         }
         return axios.post("/request-documents", {
           request_id: requestId,
           document_type_id: docId,
-          quantity: quantity, //Added for number of copies per document
+          // quantity: quantity, //Added for number of copies per document
         });
       })
     );
@@ -189,7 +189,6 @@ const RequestForm = () => {
   }
 };
 
-
   const handleConfirm = () => window.location.reload();
 
   /* ---------------- CERTIFICATION VISIBILITY ---------------- */
@@ -201,8 +200,6 @@ const RequestForm = () => {
     "CAV - CHED",
     "CAV - WES/CES",
   ]);
-
-
 
   const showCertificationDropdown = formData.documentsRequested.some((doc) =>
     certificationDocuments.has(doc)
@@ -484,7 +481,7 @@ const RequestForm = () => {
                     <h3 className="text-pup-yellow font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
                       {formData.documentsRequested.map((doc, index) => (
                         <div key={index} className="flex items-center justify-between gap-4">
                            <label className="text-white text-sm flex-1">{doc}</label>

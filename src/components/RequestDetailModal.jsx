@@ -121,6 +121,10 @@ const RequestDetailsModal = ({ request, onClose }) => {
               {request.documents?.map(doc => (
                 <li key={doc.request_document_id}>
                   {documentTypeMap[doc.document_type_id] ?? 'Unknown Document'}
+
+                  <span className="ml-2 bg-yellow-200 text-xs font-semibold px-2 py-0.5 rounded-full">
+                     {doc.quantity || 1} {doc.quantity > 1 ? 'Copies' : 'Copy'}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -141,7 +145,6 @@ const RequestDetailsModal = ({ request, onClose }) => {
                   : 'N/A'}
               </p>
 
-              <p><strong>Number of Copies:</strong> {request.number_of_copies ?? 'N/A'}</p>
             </div>
           </Section>
 

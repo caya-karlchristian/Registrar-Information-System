@@ -255,7 +255,7 @@ const StaffDashboard = () => {
                     <div className="text-xs text-gray-400">{req.date}</div>
                     <div className="text-xs text-gray-400">{req.time}</div>
                   </Td>
-                  <Td center><span className="font-semibold text-gray-700">{req.copies}</span></Td>
+                  <Td center><span className="font-semibold text-gray-700">{req.copies}</span><span> ...</span></Td>
                   <Td center>{getStatusBadge(req.statusName)}</Td>
                   <Td center>
                     <div className="flex items-center justify-center gap-2">
