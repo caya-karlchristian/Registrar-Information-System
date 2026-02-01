@@ -11,7 +11,6 @@ import ErrorToast from "../components/ErrorToast.jsx";
 const RequestForm = () => {
   const formRef = useRef(null);
   const [currentStep, setCurrentStep] = useState(1);
-  const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -34,13 +33,23 @@ const RequestForm = () => {
     certification: "",
     receiptNumber: "",
     dateOfPayment: "",
-    numberOfCopies: "",
+    documentCopies: {},
     receiptImage: null,
   });
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDocCopyChange = (docName, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      documentCopies: {
+        ...prev.documentCopies,
+        [docName]: value
+      }
+    }));
   };
 
   const handleCheckboxChange = (e) => {
@@ -56,7 +65,7 @@ const RequestForm = () => {
     e.preventDefault();
 
     if (currentStep === 1 && !formData.termsAgreed) {
-      setShowTermsError(true);
+      setErrorMessage("You must read and agree to the Terms & Conditions to proceed.");
       return;
     }
 
@@ -65,7 +74,16 @@ const RequestForm = () => {
       return;
     }
 
-    setShowTermsError(false);
+    if (currentStep === 3) {
+      const initialCopies = { ...formData.documentCopies };
+      formData.documentsRequested.forEach(doc => {
+        if (!initialCopies[doc]) {
+          initialCopies[doc] = 1;
+        }
+      });
+      setFormData(prev => ({ ...prev, documentCopies: initialCopies }));
+    }
+
     if (currentStep < 5) setCurrentStep((s) => s + 1);
   };
 
@@ -147,12 +165,14 @@ const RequestForm = () => {
     await Promise.all(
       formData.documentsRequested.map((docName) => {
         const docId = documentTypeMap[docName];
+        const quantity = formData.documentCopies[docName] || 1; //Added for number of copies per document
         if (!docId) {
           console.warn(`No document_type_id mapping for: ${docName}`);
         }
         return axios.post("/request-documents", {
           request_id: requestId,
           document_type_id: docId,
+          quantity: quantity, //Added for number of copies per document
         });
       })
     );
@@ -277,11 +297,6 @@ const RequestForm = () => {
                       onChange={handleCheckboxChange}
                       text="I have read, understood, and agree to the Terms & Conditions stated above."
                     />
-                    {showTermsError && !formData.termsAgreed && (
-                    <p className="text-red-400 text-xs font-semibold mt-1">
-                      ⚠️ You must read the Terms & Conditions to proceed.
-                    </p>
-                  )}
                   </div>
                   </div>
                 )}             
@@ -465,13 +480,27 @@ const RequestForm = () => {
                       required
                     />
                   </div>
-                  <InputGroup
-                    name="numberOfCopies"
-                    label="Number of Copies / Notes"
-                    value={formData.numberOfCopies}
-                    onChange={handleInputChange}
-                    placeholder="e.g., 1"
-                  />
+                  <div className="bg-white/10 p-4 rounded-lg border border-white/20">
+                    <h3 className="text-pup-yellow font-bold mb-3 uppercase text-sm tracking-wide">
+                      Number of copies per document
+                    </h3>
+                    <div className="space-y-3">
+                      {formData.documentsRequested.map((doc, index) => (
+                        <div key={index} className="flex items-center justify-between gap-4">
+                           <label className="text-white text-sm flex-1">{doc}</label>
+                           <div className="w-24">
+                              <input
+                                type="number"
+                                min="1"
+                                className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block"
+                                value={formData.documentCopies[doc] || 1}
+                                onChange={(e) => handleDocCopyChange(doc, e.target.value)}
+                              />
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   
                   <ImageUploader 
                     name="receiptImage"
