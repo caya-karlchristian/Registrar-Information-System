@@ -4,13 +4,16 @@ import CheckboxItem from '../components/Checkbox.jsx';
 import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
 import ImageUploader from "../components/ImageUploader.jsx";
-
+import ErrorToast from "../components/ErrorToast.jsx";
 
 const AlumniRequestForm = () => {
   const formRef = useRef(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  
+
   const [formData, setFormData] = useState({
     termsAgreed: false,
     firstName: '',
@@ -31,7 +34,7 @@ const AlumniRequestForm = () => {
     doneRequest: false,
     receiptNumber: '',
     dateOfPayment: '',
-    numberOfCopies: '',
+    documentCopies: {},
     forgotStudentNo: '',
     receiptImage: null,
 
@@ -49,6 +52,16 @@ const AlumniRequestForm = () => {
     setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
+  const handleDocCopyChange = (docName, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      documentCopies: {
+        ...prev.documentCopies,
+        [docName]: value
+      }
+    }));
+  };
+
   const handleFileChange = (name, file) => {
     setFormData((prev) => ({ ...prev, [name]: file }));
   };
@@ -57,17 +70,24 @@ const AlumniRequestForm = () => {
   const nextStep = (e) => {
     e.preventDefault();
 
-    if (currentStep === 1) {
-      if (!formData.termsAgreed) { 
-        setShowTermsError(true);
-        return;
-      }
-      setShowTermsError(false);
+    if (currentStep === 1 && !formData.termsAgreed) {
+      setErrorMessage("You must read and agree to the Terms & Conditions to proceed.");
+      return;
     }
 
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
+    }
+
+    if (currentStep === 3) {
+      const initialCopies = { ...formData.documentCopies };
+      formData.documentsRequested.forEach(doc => {
+        if (!initialCopies[doc]) {
+          initialCopies[doc] = 1;
+        }
+      });
+      setFormData(prev => ({ ...prev, documentCopies: initialCopies }));
     }
 
     if (currentStep < 6) setCurrentStep(currentStep + 1);
@@ -389,7 +409,7 @@ const AlumniRequestForm = () => {
             {/* STEP 6: SUBMIT */}
             {currentStep === 5 && (
               <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mt-7">
                   <InputGroup
                     name="receiptNumber"
                     label="Official Receipt Number"
@@ -410,14 +430,33 @@ const AlumniRequestForm = () => {
                     placeholder='e.g 01/01/2024'
                     required
                   />
-                  
-                  <InputGroup
-                    name="numberOfCopies"
-                    label="Note (Number of copies or other queries/clarifications)"
-                    value={formData.numberOfCopies}
-                    onChange={handleInputChange}
-                    placeholder='e.g 1'
-                  />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-1 w-full">
+                  <div className="bg-white/10 p-4 rounded-lg border border-white/20">
+                    <h3 className="text-pup-yellow font-bold mb-3 uppercase text-sm tracking-wide">
+                      Number of copies per document
+                    </h3>
+                    <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
+                      {formData.documentsRequested.length > 0 ? (
+                        formData.documentsRequested.map((doc, index) => (
+                          <div key={index} className="flex items-center justify-between gap-4">
+                              <label className="text-white text-sm flex-1">{doc}</label>
+                              <div className="w-24">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block"
+                                  value={formData.documentCopies[doc] || 1}
+                                  onChange={(e) => handleDocCopyChange(doc, e.target.value)}
+                                />
+                              </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-300 text-sm italic">No documents selected.</p>
+                      )}
+                    </div>
+                  </div>
 
                   <ImageUploader 
                     name="receiptImage"
