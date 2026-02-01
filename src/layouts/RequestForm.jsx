@@ -484,7 +484,7 @@ const RequestForm = () => {
                     <h3 className="text-pup-yellow font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
                       {formData.documentsRequested.map((doc, index) => (
                         <div key={index} className="flex items-center justify-between gap-4">
                            <label className="text-white text-sm flex-1">{doc}</label>
