@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import FieldGroup from '../components/FieldGroup'; 
 import { UserIcon } from '@heroicons/react/24/solid';
 import { PencilSquareIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 // CHANGE IF NEEDED: Configuration for different user roles
 const ROLE_CONFIG = {
@@ -42,6 +43,18 @@ const ProfilePage = ({ userType = "student" }) => {
 
   const [editData, setEditData] = useState(profileData);
 
+  const closeModal = () => {
+    setModal({ ...modal, isOpen: false });
+  };
+
+  const [modal, setModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'default',
+    onConfirm: () => {},
+  });
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setEditData({
@@ -65,15 +78,27 @@ const ProfilePage = ({ userType = "student" }) => {
   };
 
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
-      alert("Logging out...");
-    }
-  };
+      setModal({
+        isOpen: true,
+        title: 'Logout Confirmation',
+        message: 'Please confirm if you want to log out of your account.',
+        type: 'default', 
+        onConfirm: () => {
+          console.log("Logging out..."); 
+        }
+      });
+    };
 
   const handleDelete = () => {
-    if (window.confirm("WARNING: Are you sure you want to PERMANENTLY delete your account?")) {
-      alert("Account deletion request sent to server.");
-    }
+    setModal({
+      isOpen: true,
+      title: 'Delete Account',
+      message: 'This action will permanently delete your account and cannot be undone.',
+      type: 'danger', 
+      onConfirm: () => {
+        alert("Account deletion request sent to server.");
+      }
+    });
   };
 
   return (
@@ -216,6 +241,14 @@ const ProfilePage = ({ userType = "student" }) => {
           >
             Logout
           </button>
+          <ConfirmationModal
+            isOpen={modal.isOpen}
+            onClose={closeModal}
+            onConfirm={modal.onConfirm}
+            title={modal.title}
+            message={modal.message}
+            type={modal.type}
+          />
         </div>
 
       </div>
