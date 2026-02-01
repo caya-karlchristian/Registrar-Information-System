@@ -6,6 +6,7 @@ import DropdownGroup from "../components/DropDown.jsx";
 import MultiSelectDropdown from "../components/MultiSelection.jsx";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import ImageUploader from "../components/ImageUploader.jsx";
+import ErrorToast from "../components/ErrorToast.jsx";
 
 const RequestForm = () => {
   const formRef = useRef(null);
@@ -13,6 +14,7 @@ const RequestForm = () => {
   const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const [formData, setFormData] = useState({
     termsAgreed: false,
@@ -161,7 +163,7 @@ const RequestForm = () => {
       "Failed to submit request:",
       error.response?.data || error
     );
-    alert("Failed to submit request. Please try again.");
+    setErrorMessage("Failed to submit request. Please try again.");
     } finally {
       setIsLoading(false);
   }
@@ -506,6 +508,10 @@ const RequestForm = () => {
           </form>
         </div>
       )}
+      <ErrorToast 
+        message={errorMessage} 
+        onClose={() => setErrorMessage("")} 
+      />
     </div>
   );
 };
