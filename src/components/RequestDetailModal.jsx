@@ -1,24 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { XCircleIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
-
-const documentTypeMap = {
-      1: "Certificate of Good Moral Character",
-      2: "Certification, Authentication, Verification (CAV) / APOSTILE",
-      3: "Authentication/Certified True Copy - Local",
-      4: "Informative Copy of Grades",
-      5: "CAV - CHED",
-      6: "CAV - WES/CES",
-      7: "Cross-enrollment Fee",
-      8: "Re-admission Fee",
-      9: "Admission Fee for Transfer Students (From Private School)",
-      10: "Admission Fee for Transfer Students (From SUCs)",
-      11: "New Copy of Registration Card (With Affidavit of Loss)",
-      12: "Diploma",
-      13: "Accreditation Fee",
-      14: "Completion Fee",
-      15: "Transcript of Records",
-      16: "Correction in Student Information System",
-    };
+import { getDocumentTypes } from "../services/API";
 
 const getProgressLabel = (progress) => {
   switch (progress) {
@@ -53,6 +35,27 @@ const Section = ({ title, children }) => {
 };
 
 const RequestDetailsModal = ({ request, onClose }) => {
+  const [docTypes, setDocTypes] = useState([]);
+  useEffect(() => {
+    const fetchTypes = async () => {
+      try {
+        const res = await getDocumentTypes();
+        setDocTypes(res.data);
+      } catch (err) {
+        console.error("Failed to load document types:", err);
+      }
+    };
+    fetchTypes();
+  }, []);
+
+  // NEED UPDATE HERE TO USE FETCHED docTypes PLEASE
+  const getDocName = (id) => {
+    if (!docTypes.length) return "Loading...";
+    const found = docTypes.find(t => t.id === id);
+    // Adjust 'name' based on your actual DB column (e.g., name, description, type)
+    return found ? (found.name || found.description || found.type) : "Unknown Document";
+  };
+
   useEffect(() => {
     if (request) {
       document.body.style.overflow = 'hidden';
@@ -65,6 +68,8 @@ const RequestDetailsModal = ({ request, onClose }) => {
   }, [request]);
 
   if (!request) return null;
+
+  const displayStatus = request.status?.status_name || request.status || 'N/A';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -148,7 +153,7 @@ const RequestDetailsModal = ({ request, onClose }) => {
                   ? new Date(request.requested_at).toLocaleDateString()
                   : 'N/A'}
               </p>
-              <p><strong>Status:</strong> {request.status?.status_name ?? 'N/A'}</p>
+              <p><strong>Status:</strong> {displayStatus}</p>
               <p><strong>Purpose:</strong> {request.purpose_of_request}</p>
               {request.certification && (
                 <p><strong>Certification Type:</strong> {request.certification}</p>
@@ -161,7 +166,8 @@ const RequestDetailsModal = ({ request, onClose }) => {
             <ul className="list-disc ml-5 space-y-1">
               {request.documents?.map(doc => (
                 <li key={doc.request_document_id}>
-                  {documentTypeMap[doc.document_type_id] ?? 'Unknown Document'}
+                  {/* 5. Use the helper function here instead of the map */}
+                  {getDocName(doc.document_type_id)}
 
                   <span className="ml-2 bg-yellow-200 text-xs font-semibold px-2 py-0.5 rounded-full">
                      {doc.quantity || 1} {doc.quantity > 1 ? 'Copies' : 'Copy'}
