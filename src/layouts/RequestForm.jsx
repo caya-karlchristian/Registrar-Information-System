@@ -400,7 +400,8 @@ const RequestForm = () => {
                     required
                     options={[
                       "Certificate of Good Moral Character",
-                      "Certification, Authentication, Verification (CAV) / APOSTILE",
+                      "Authentication - DFA",
+                      "Certification",
                       "Authentication/Certified True Copy - Local",
                       "Informative Copy of Grades",
                       "CAV - CHED",
@@ -414,7 +415,11 @@ const RequestForm = () => {
                       "Accreditation Fee",
                       "Completion Fee",
                       "Transcript of Records",
-                      "Correction in Student Information System"
+                      "Correction in Student Information System",
+                      "Evaluation/Checklist",
+                      "Honorable Dismissal",
+                      "Retrieval Fee",
+                      "Change of Curriculum/Shifting",
                     ]}
                     selectedValues={formData.documentsRequested}
                     onChange={handleInputChange}
@@ -428,16 +433,17 @@ const RequestForm = () => {
                       onChange={handleInputChange}
                       required
                       options={[
-                        "Certificate of Attendance",
-                        "Certificate of Graduation",
-                        "Medium of Instruction",
+                        "Not Applicable",
+                        "Cross-enrollment",
+                        "Graduation",
+                        "English as Medium of Instruction",
+                        "Enrollment",
                         "General Weighted Average",
-                        "Non-Issuance of Special Order",
-                        "Certified True Copy",
                         "Good Moral Character",
-                        "Re-Admission Certificate",
-                        "Leave of Absence",
-                        "Course Accreditation"
+                        "Grades",
+                        "Registration",
+                        "Curriculum Evaluation (Units)",
+                        "Ladderized Program",
                       ]}
 
                     />
@@ -448,7 +454,14 @@ const RequestForm = () => {
                     label="Purpose of Request"
                     value={formData.purposeOfRequest}
                     onChange={handleInputChange}
-                    options={["For Admission", "For Employment", "For Scholarship", "Other"]}
+                    options={[
+                      "DFA", 
+                      "Employment - Local", 
+                      "Emploment - Abroad",
+                      "Further Studies",
+                      "Board Exam",
+                      "Scholarship", 
+                      "For Evaluation Purposes/Personal Copy",]}
                     required
                   />
                 </div>
