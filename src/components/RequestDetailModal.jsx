@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { XCircleIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 
 const documentTypeMap = {
@@ -19,6 +19,17 @@ const documentTypeMap = {
       15: "Transcript of Records",
       16: "Correction in Student Information System",
     };
+
+const getProgressLabel = (progress) => {
+  switch (progress) {
+    case 0: return "Request was rejected";
+    case 25: return "Request received and under review";
+    case 50: return "Your request is being processed";
+    case 75: return "Preparing your document for pickup";
+    case 100: return "Document is ready to claim";
+    default: return "Pending";
+  }
+};
 
 const Section = ({ title, children }) => {
   const [open, setOpen] = useState(true);
@@ -42,14 +53,25 @@ const Section = ({ title, children }) => {
 };
 
 const RequestDetailsModal = ({ request, onClose }) => {
+  useEffect(() => {
+    if (request) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [request]);
+
   if (!request) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden lg:max-w-3xl print:w-full print:max-w-none print:shadow-none print:rounded-none">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl lg:max-w-3xl flex flex-col max-h-[90vh] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none">
 
         {/* Header */}
-        <div className="bg-pup-maroon px-6 py-4 flex justify-between items-center">
+        <div className="bg-pup-maroon px-6 py-4 flex justify-between items-center shrink-0">
           <div>
             <h3 className="text-lg font-bold text-white">Request Details</h3>
             <p className="text-sm text-yellow-200">
@@ -65,8 +87,27 @@ const RequestDetailsModal = ({ request, onClose }) => {
         </div>
 
         {/* Body */}
-        <div className="p-4 space-y-2 lg:space-y6 lg:p-6 print:p-0 print:mb-4">
-
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 lg:space-y6 lg:p-6 print:p-0 print:mb-4">
+          
+          <Section title="Document Request Progress">            
+            <div className="w-full">
+              <div className="bg-gray-100 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-yellow-500 h-3 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${request.progress}%` }}
+                ></div>
+              </div>
+                
+              <div className="flex justify-between items-center mt-2">
+                <p className="font-bold text-pup-maroon text-md">
+                    {getProgressLabel(request.progress)}
+                </p>
+                <span className="text-sm font-semibold text-gray-500">
+                    {request.progress}%
+                </span>
+              </div>
+          </div>
+          </Section>
           {/* Student Information */}
           <Section title="Student Information">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -151,7 +192,7 @@ const RequestDetailsModal = ({ request, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3">
+        <div className="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3 shrink-0">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-lg"
