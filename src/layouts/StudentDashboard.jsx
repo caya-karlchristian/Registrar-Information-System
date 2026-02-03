@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getDocumentRequests } from "../services/API"; 
+import { getDocumentRequests} from "../services/API"; 
 import { EyeIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
 
@@ -11,9 +11,16 @@ const STATUS_MAP = {
   5: "Rejected",
 };
 
+const STATUS_CONFIG = {
+  1: { label: "Pending", color: "yellow" },
+  2: { label: "Ready", color: "green" },
+  3: { label: "Completed", color: "gray" },
+  4: { label: "Processing", color: "blue" },
+  5: { label: "Rejected", color: "red" },
+};
+
 const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
-  const [viewedRequestId, setViewedRequestId] = useState(null);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,7 +39,9 @@ const StudentDashboard = () => {
           .filter((r) => r.student_profile_id === currentStudentId)
           .map((r) => ({
             ...r,
+            document_name: "Document Name Here", // Placeholder for document name
             status: STATUS_MAP[r.status_id] ?? "Unknown",
+            config: STATUS_CONFIG[r.status_id] || { label: "Unknown", color: "gray" },
             type:
             r.status_id === 1 || r.status_id === 4
               ? "pending"
@@ -65,24 +74,6 @@ const StudentDashboard = () => {
     fetchRequests();
   }, []);
 
-  const getProgressLabel = (progress) => {
-    switch (progress) {
-      case 0:
-        return "Request was rejected";
-      case 25:
-        return "Request received and under review";
-      case 50:
-        return "Your request is being processed";
-      case 75:
-        return "Preparing your document for pickup";
-      case 100:
-        return "Document is ready to claim";
-      default:
-        return "INVALID PROGRESS";
-    }
-  };
-
-
   const filteredRequests = requests.filter((req) => req.type === activeTab);
 
   return (
@@ -90,7 +81,7 @@ const StudentDashboard = () => {
       {/* Tabs */}
       <div className="grid grid-cols-3 md:grid-cols-3 gap-4 place-items-center mb-8">
         {[
-          { label: "Pending", value: "pending", color: "yellow" },
+          { label: "Ongoing", value: "pending", color: "yellow" },
           { label: "To Claim", value: "ready", color: "green" },
           { label: "History", value: "history", color: "gray" },
         ].map((tab) => (
@@ -154,35 +145,32 @@ const StudentDashboard = () => {
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                      {req.request_id}
+                    <span className={`
+                      inline-block px-1 py-0.5 rounded-full text-[11px] font-bold border
+                      bg-${req.config.color}-100 
+                      text-${req.config.color}-700 
+                      border-${req.config.color}-200
+                    `}>
+                      {req.config.label}
                     </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(req.requested_at).toLocaleDateString()}
+                    <span className="text-xs text-gray-400  rounded">
+                      #{req.request_id}
+                    
+                    <span className="text-xs text-gray-400 px-0.5 " >
+                      • {new Date(req.requested_at).toLocaleDateString()}
+                    </span>
                     </span>
                   </div>
+                  {/* 4. SHOW DOCUMENT NAME AS TITLE */}
                   <h4 className="text-gray-800 font-bold text-base md:text-lg">
-                    {req.purpose_of_request}
+                    DOCUMENT NAME
                   </h4>
-                  <p
-                    className={`text-sm font-medium mt-1 ${
-                      req.status === "Pending" ? "text-yellow-600" : ""
-                    } ${
-                      req.status === "Processing" ? "text-blue-600" : ""
-                    } ${
-                      req.status === "Ready" ? "text-green-600" : ""
-                    } ${
-                      req.status === "Completed" ? "text-gray-500" : ""
-                    } ${
-                      req.status === "Rejected" ? "text-red-600" : ""
-                    }`}
-                  >
-                    Status: {req.status}
+                  {/* SHOW PURPOSE AS SUBTITLE */}
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Purpose: {req.purpose_of_request}
                   </p>
-
                 </div>
 
-                {["pending", "ready","history"].includes(req.type) && (
                   <div className="flex items-center gap-2">
                     <button
                       title="View Details"
@@ -190,37 +178,9 @@ const StudentDashboard = () => {
                       className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
                     >
                       <EyeIcon className="w-5 h-5" />
-                    </button>
-
-                    {viewedRequestId === req.request_id && (
-                      <div className="w-full mt-4 md:mt-2">
-                        <div className="bg-gray-200 rounded-full h-4">
-                          <div
-                            className="bg-yellow-500 h-4 rounded-full transition-all duration-500"
-                            style={{ width: `${req.progress}%` }}
-                          ></div>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {getProgressLabel(req.progress)}
-                        </p>
-                      </div>
-                    )}
-
-                    {viewedRequestId === req.request_id && (
-                      <div className="w-full mt-4 md:mt-2">
-                        <div className="bg-gray-200 rounded-full h-4">
-                          <div
-                            className="bg-yellow-500 h-4 rounded-full transition-all duration-500"
-                            style={{ width: `${req.progress}%` }}
-                          ></div>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {getProgressLabel(req.progress)}
-                        </p>
-                      </div>
-                    )}
+                    </button>     
+                                 
                   </div>
-                )}
               </div>
             ))}
           </div>
