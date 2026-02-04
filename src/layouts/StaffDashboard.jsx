@@ -7,9 +7,14 @@ import {
   EyeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  TrashIcon,
 } from '@heroicons/react/24/solid';
-import { getDocumentRequests, updateDocumentRequest } from '../services/API';
+import { getDocumentRequests, 
+  updateDocumentRequest, 
+  deleteDocumentRequest 
+} from '../services/API';
 import RequestDetailsModal from '../components/RequestDetailModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 
 /* ---------------- STATUS IDS ---------------- */
 const STATUS = {
@@ -20,7 +25,7 @@ const STATUS = {
   REJECTED: 5,
 };
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 8;
 
 const StaffDashboard = () => {
   const [requests, setRequests] = useState([]);
@@ -32,6 +37,8 @@ const StaffDashboard = () => {
   const [rawRequests, setRawRequests] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortOrder, setSortOrder] = useState('desc'); // desc or asc
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   /* ---------------- FETCH DATA ---------------- */
   const fetchData = useCallback(async () => {
@@ -164,10 +171,58 @@ const StaffDashboard = () => {
     );
   };
 
+  // ---------------- BULK DELETE HANDLERS ---------------- */
+  // NEED BACKEND SUPPORT FOR BULK DELETE ----- IMPORTANT -----
+  // 1. Handle "Select All" checkbox in the header
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const allIds = currentItems.map(item => item.id);
+      setSelectedIds(allIds);
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  // 2. Handle individual row checkbox
+  const handleSelectOne = (id) => {
+    if (selectedIds.includes(id)) {
+        setSelectedIds(selectedIds.filter(itemId => itemId !== id));
+      } else {
+        setSelectedIds([...selectedIds, id]);
+      }
+    };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteSelected = async () => {
+    try {
+      setLoading(true);
+
+      await Promise.all(
+        selectedIds.map(id => deleteDocumentRequest(id))
+      );
+
+      setSelectedIds([]);
+      setShowDeleteConfirm(false);
+      await fetchData();
+
+    } catch (err) {
+      console.error("Delete failed", err);
+      setError("Failed to delete selected requests.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
   if (loading) return <div className="p-6 text-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-10">
+    <div className="min-h-screen pb-10">
       <main className="max-w-7xl mx-auto px-6 py-8">
 
         {/* ---------------- CARDS ---------------- */}
@@ -178,17 +233,32 @@ const StaffDashboard = () => {
         </div>
 
         {/* ---------------- TOOLBAR ---------------- */}
-        <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between">
-          <div className="relative w-full md:w-96">
-            <MagnifyingGlassIcon className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-            <input
-              className="w-full pl-10 pr-3 py-2 border rounded-lg bg-gray-50"
-              placeholder="Search ID, Name, Student No..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
+          
+          {/* 1. TOGGLE: Show "Delete Selected" OR "Search Bar" */}
+          {selectedIds.length > 0 ? (
+            <div className="flex items-center gap-4 bg-red-50 p-2 rounded-lg border border-red-100">
+              <span className="text-red-700 font-bold text-sm ml-2">{selectedIds.length} Selected</span>
+              <button 
+                onClick={handleDeleteSelected}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
+              >
+                <TrashIcon className="w-4 h-4" /> Delete Selected
+              </button>
+            </div>
+          ) : (
+            <div className="relative w-full md:w-96">
+              <MagnifyingGlassIcon className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+              <input
+                className="w-full pl-10 pr-3 py-2 border rounded-lg bg-gray-50"
+                placeholder="Search ID, Name, Student No..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+          )} {/* <--- THIS CLOSING BRACE WAS MISSING/MISPLACED */}
 
+          {/* 2. FILTERS: These stay visible all the time */}
           <div className="flex items-center gap-2 relative">
             <FunnelIcon className="h-5 w-5 text-gray-500" />
             <select
@@ -214,12 +284,21 @@ const StaffDashboard = () => {
             </select>
           </div>
         </div>
+        
 
         {/* ---------------- TABLE ---------------- */}
         <div className="bg-white rounded-xl shadow border overflow-x-auto">
           <table className="min-w-full divide-y">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-4 w-10 text-center">
+                <input 
+                  type="checkbox" 
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  onChange={handleSelectAll}
+                  checked={currentItems.length > 0 && selectedIds.length === currentItems.length}
+                />
+              </th>
                 <Th>Req ID</Th>
                 <Th>Student</Th>
                 <Th>Document</Th>
@@ -231,7 +310,15 @@ const StaffDashboard = () => {
             </thead>
             <tbody className="divide-y">
               {currentItems.map(req => (
-                <tr key={req.id} className="hover:bg-gray-50">
+                <tr key={req.id} className={`hover:bg-gray-50 ${selectedIds.includes(req.id) ? 'bg-blue-50' : ''}`}>
+                  <td className="px-6 py-4 text-center">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                      checked={selectedIds.includes(req.id)}
+                      onChange={() => handleSelectOne(req.id)}
+                    />
+                  </td>
                   <Td>{req.id}</Td>
                   <Td>
                     <div>
@@ -344,6 +431,13 @@ const StaffDashboard = () => {
       </main>
 
       <RequestDetailsModal request={selectedRequest} onClose={() => setSelectedRequest(null)} />
+      <DeleteConfirmModal
+        open={showDeleteConfirm}
+        count={selectedIds.length}
+        loading={loading}
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteSelected}
+      />
     </div>
   );
 };
