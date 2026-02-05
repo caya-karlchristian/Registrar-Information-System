@@ -1,82 +1,106 @@
-import React, { useState, useEffect } from "react";
-import AlumniNavigation from "./AlumniNavigation.jsx";
-import { Bars3Icon} from '@heroicons/react/24/outline';
-import NotificationSidebar from "./Notifications.jsx";
+import { useState, useEffect } from "react";
+import AlumniNavigation from "../components/AlumniNavigation.jsx";
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
 function AlumniHeaderNav() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Prevent background scrolling when sidebar is active
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth >= 768) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    if (isSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+  }, [isSidebarOpen]);
 
   return (
-    <div className="w-full font-sans">
-      <header className="bg-white w-full shadow-sm relative z-10 border-b-[5px] border-pup-yellow md:border-none ">        
+    <div className="relative w-full font-sans">
+      {/* 1. HEADER SECTION */}
+      <header className="bg-white w-full shadow-sm relative z-20 border-b-[5px] border-pup-yellow">        
         <div className="w-full px-4 py-4 flex justify-between items-center">          
-    
           <div className="flex space-x-4">
             <img
               src="/src/assets/puplogoimage.png"
               alt="PUP Logo"
-              className="w-24 h-20 lg:w-32 lg:h-32"
+              className="w-16 h-16 lg:w-23 lg:h-23"
             />
-            <div className="flex flex-col justify-center relative">
-              <h1 className="text-pup-maroon font-bold text-[14px] uppercase lg:text-[25px] leading-tight font-inter">
-                Polytechnic University of the Philippines - Taguig Campus
+            <div className="flex flex-col justify-center">
+              <h1 className="text-pup-maroon font-bold text-[14px] uppercase lg:text-[22px] leading-tight font-inter">
+                POLYTECHNIC UNIVERSITY OF THE PHILIPPINES - TAGUIG CAMPUS
               </h1>
-              <p className="text-pup-maroon text-[10px] uppercase lg:text-[14px] font-inter mt-2">
-                The Country's 1st Polytechnic
+              <p className="text-pup-maroon text-[10px] uppercase lg:text-[13px] font-inter">
+                THE COUNTRY’S 1ST POLYTECHNIC
               </p>
             </div>
           </div>
 
-          {/* CONDITIONS FOR DESKTOP AND MOBILE */}
-          <div className="flex items-center">
-            <div 
-              className={
-                isMobile 
-                  ? "fixed bottom-6 right-6 z-50 shadow-2xl  round-white max-w-[90vw] bg-white rounded-full w-11 h-10" // Mobile Styles
-                  : "relative block" 
-              }
-            >
-              <NotificationSidebar />
-            </div>
-
-            {isMobile && (
-              <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-                <Bars3Icon className="w-10 h-10 text-pup-maroon" />
-              </button>
-            )}
-            
-          </div>
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <Bars3Icon className="w-10 h-10 text-pup-maroon" />
+          </button>
         </div>
       </header>
 
-      {!isMobile && (
-        <div className="w-full">
-          <div className="bg-pup-maroon w-full border-b-[5px] border-pup-yellow"> 
-            <div className="w-full px-4">
-              <AlumniNavigation mobile={false} />
+      {/* 2. OVERLAY BACKDROP */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* 3. ALUMNI SIDEBAR */}
+      <aside className={`
+        fixed top-0 right-0 h-full bg-pup-maroon z-50 shadow-2xl transition-transform duration-300 ease-in-out
+        w-72 flex flex-col
+        ${isSidebarOpen ? "translate-x-0" : "translate-x-full"}
+      `}>
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-red-900 bg-pup-dark-maroon flex justify-between items-center">
+           <span className="text-white font-bold uppercase tracking-widest text-sm">Alumni Menu</span>
+           <button onClick={() => setIsSidebarOpen(false)}>
+              <XMarkIcon className="w-8 h-8 text-white hover:text-pup-yellow transition-colors" />
+           </button>
+        </div>
+
+        <div className="px-6 py-10 bg-gradient-to-b from-[#700000] to-pup-maroon border-b border-white/10 relative overflow-hidden group">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-pup-yellow/5 rounded-full blur-3xl group-hover:bg-pup-yellow/10 transition-all duration-700" /> 
+          
+          <div className="flex flex-col items-center relative z-10">
+            <div className="relative mb-4">
+              <div className="w-18 h-18 bg-white rounded-2xl flex items-center justify-center border-2 border-pup-yellow shadow-[0_10px_20px_-5px_rgba(0,0,0,0.3)] transform -rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                <span className="text-pup-maroon font-black text-2xl tracking-tighter">AL</span>
+              </div>
+              
+              <div className="absolute -bottom-1 -right-1 flex h-5 w-5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-5 w-5 bg-green-500 border-4 border-[#700000]"></span>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <p className="text-white font-bold text-sm tracking-wide uppercase">
+                Alumni Student 
+              </p>
             </div>
           </div>
         </div>
-      )}
 
-      {isMobile && isMobileMenuOpen && (
-        <div className="absolute left-0 w-full bg-pup-dark-maroon z-50 shadow-xl">
-          <AlumniNavigation mobile={true} />
+        <div className="flex-1 overflow-y-auto">
+          <AlumniNavigation mobile={true} onItemClick={() => setIsSidebarOpen(false)} />
         </div>
-      )}
+
+        {/* Footer */}
+        <div className="p-6 bg-black/20 border-t border-white/5">
+          <div className="flex items-center justify-between opacity-50 text-[9px] text-white uppercase tracking-[0.3em]">
+            <span>v2.0.4</span>
+            <span>© 2026 RIS</span>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }

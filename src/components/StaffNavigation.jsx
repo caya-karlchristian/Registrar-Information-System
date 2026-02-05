@@ -1,40 +1,50 @@
 import React from "react";
-import { Link } from 'react-router-dom'
+import { NavLink } from 'react-router-dom';
+import { 
+  Squares2X2Icon, 
+  ChartBarSquareIcon, 
+  BookOpenIcon, 
+  UserCircleIcon,
+  DocumentArrowDownIcon,
+  ChevronRightIcon
+} from '@heroicons/react/24/outline';
 
-const StaffNavigation = ({ mobile = false }) => {
-  const desktopLink = "flex-1 flex items-center justify-center text-white text-sm font-bold uppercase tracking-wider py-4 hover:bg-[#5a0c0e] transition-colors duration-200 ";
-  const mobileLink = "block text-white text-sm font-bold uppercase tracking-wider py-3 px-6 border-b border-red-900 hover:bg-[#5a0c0e]";
+const StaffNavigation = ({ isCollapsed = false, onItemClick }) => {
+  const navItems = [
+    { name: "Dashboard", to: "dashboard", icon: Squares2X2Icon },
+    { name: "Staff Analytics", to: "analytics", icon: ChartBarSquareIcon },
+    { name: "Staff Logbook", to: "logbook", icon: BookOpenIcon },
+    { name: "Staff Profile", to: "profile", icon: UserCircleIcon },
+  ];
 
   return (
-    <nav className="w-full">
-      <ul className={`flex ${mobile ? "flex-col" : "flex-row"} list-none m-0 p-0 w-full`}>
-        
-        <li className={mobile ? "" : "flex-1"}>
-          <Link to="dashboard" className={mobile ? mobileLink : desktopLink}>
-            Staff Dashboard
-          </Link>
-        </li>
-
-        <li className={mobile ? "" : "flex-1"}>
-          <Link to="analytics" className={mobile ? mobileLink : desktopLink}>
-            Staff Analytics
-          </Link>
-        </li>
-
-        <li className={mobile ? "" : "flex-1"}>
-          <Link to="logbook" className={mobile ? mobileLink : desktopLink}>
-            Staff Logbook
-          </Link>
-        </li>
-
-        <li className={mobile ? "" : "flex-1"}>
-          <Link to="profile" className={mobile ? mobileLink : desktopLink}>
-            Staff Profile
-          </Link>
-        </li>
-
-        {/* ADD GENERATE REPORT */}
-      </ul>
+    <nav className="flex flex-col space-y-1 px-3 gap-4 mt-4">
+      {navItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          onClick={onItemClick}
+          className={({ isActive }) => `
+            group flex items-center justify-between px-4 py-3.5 rounded-xl transition-all duration-300
+            ${isActive 
+              ? "bg-white/15 text-pup-yellow shadow-lg backdrop-blur-md" 
+              : "text-red-100 hover:bg-white/5 hover:translate-x-1"}
+          `}
+        >
+          <div className="flex items-center gap-4">
+            <item.icon className="w-6 h-6 transition-colors" />
+            {!isCollapsed && (
+              <span className="text-sm font-bold uppercase tracking-widest whitespace-nowrap">
+                {item.name}
+              </span>
+            )}
+          </div>
+          
+          {!isCollapsed && (
+            <ChevronRightIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+          )}
+        </NavLink>
+      ))}
     </nav>
   );
 };
