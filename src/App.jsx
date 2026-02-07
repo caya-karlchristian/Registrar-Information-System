@@ -16,7 +16,6 @@ import StaffDashboard from './layouts/StaffDashboard.jsx';
 import Logbook from './layouts/Logbook.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
 
-import AnalyticsSummary from './layouts/AnalyticsSummary.jsx'
 import DashboardHeader from './components/DashboardHeader.jsx';
 import RequestHeader from './components/RequestHeader.jsx';
 import DocumentHeader from './components/DocumentHeader.jsx';
@@ -129,7 +128,6 @@ const App = () => {
           <Route path="analytics" element={
             <>
               <AnalyticsHeader/>
-              <AnalyticsSummary/>
               <AnalyticsDashboard />
             </>
             } />
