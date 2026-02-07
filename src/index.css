@@ -52,4 +52,21 @@
   .bg-pup-maroon-hover:hover {
     background-color: #5a0c0e;
   }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 199, 44, 0.2); /* Transparent PUP Yellow */
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 199, 44, 0.5); /* Brighter on hover */
+  }
 }

@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import Navigation from "../components/Navigation.jsx";
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon} from '@heroicons/react/24/outline';
+import { BellIcon as BellIconSolid } from '@heroicons/react/24/solid';
+import NotificationModal from "../components/NotificationModal.jsx";
 
 function Header() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   // This ensures the body doesn't scroll when the sidebar is open
   useEffect(() => {
@@ -34,14 +37,33 @@ function Header() {
             </div>
           </div>
 
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <Bars3Icon className="w-10 h-10 text-pup-maroon" />
-          </button>
+          <div className="relative flex items-center space-x-2">
+            <button 
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors relative group"
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+            >
+              <BellIconSolid className="w-8 h-8 text-pup-maroon group-hover:scale-110 transition-transform" />
+              
+              <span className="absolute top-2 right-2 flex h-3 w-3">
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-white"></span>
+              </span>
+            </button>
+
+            {/* Sidebar Menu Button */}
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <Bars3Icon className="w-10 h-10 text-pup-maroon" />
+            </button>
+          </div>
         </div>
       </header>
+
+      <NotificationModal 
+        isOpen={isNotifOpen} 
+        onClose={() => setIsNotifOpen(false)} 
+      />
 
       {/* 2. THE OVERLAY BACKDROP (Removes white space/interaction with background) */}
       {isSidebarOpen && (
@@ -84,7 +106,7 @@ function Header() {
 
             <div className="text-center">
               <p className="text-white font-bold text-sm tracking-wide uppercase">
-                Registrar Admin
+                Student pup-t
               </p>
               <div className="flex items-center justify-center gap-2 mt-1">
               </div>
