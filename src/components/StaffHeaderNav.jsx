@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import StaffNavigation from "../components/StaffNavigation.jsx";
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { BellIcon as BellIconSolid } from '@heroicons/react/24/solid';
 
 function StaffHeaderNav() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -35,12 +36,27 @@ function StaffHeaderNav() {
             </div>
           </div>
 
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <Bars3Icon className="w-10 h-10 text-pup-maroon" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button 
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors relative group"
+              onClick={() => console.log("Open Notifications")}
+            >
+              <BellIconSolid className="w-8 h-8 text-pup-maroon group-hover:scale-110 transition-transform" />
+              
+              {/* Notification Badge (Optional) */}
+              <span className="absolute top-2 right-2 flex h-3 w-3">
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-white"></span>
+              </span>
+            </button>
+
+            {/* Sidebar Menu Button */}
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <Bars3Icon className="w-10 h-10 text-pup-maroon" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -89,7 +105,7 @@ function StaffHeaderNav() {
             </div>
           </div>
         </div>
-
+        
         {/* Navigation links */}
         <div className="flex-1 overflow-y-auto">
           <StaffNavigation isCollapsed={false} onItemClick={() => setIsSidebarOpen(false)} />
