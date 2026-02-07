@@ -96,6 +96,13 @@ const StaffDashboard = () => {
               hour12: false,
             })
           : '',
+
+          progress: 
+          r.status?.status_id === 1 ? 25 : 
+          r.status?.status_id === 4 ? 50 : 
+          r.status?.status_id === 2 ? 100 : 
+          r.status?.status_id === 3 ? 100 : 0,
+          
         statusId: r.status?.status_id,
         statusName: r.status?.status_name,
         timestamp: r.requested_at ? new Date(r.requested_at).getTime() : 0,
@@ -216,8 +223,6 @@ const StaffDashboard = () => {
       setLoading(false);
     }
   };
-
-
 
   if (loading) return <div className="p-6 text-center">Loading...</div>;
 
@@ -345,15 +350,7 @@ const StaffDashboard = () => {
                   <Td center><span className="font-semibold text-gray-700">{req.copies}</span><span> ...</span></Td>
                   <Td center>{getStatusBadge(req.statusName)}</Td>
                   <Td center>
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        title="View Details"
-                        onClick={() => setSelectedRequest(rawRequests.find(r => r.request_id === req.id))}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                      >
-                        <EyeIcon className="w-5 h-5" />
-                      </button>
-
+                    <div className="flex items-center justify-end gap-2 min-w-[200px]">
                       {req.statusId === STATUS.PENDING && (
                         <>
                           <button
@@ -393,6 +390,13 @@ const StaffDashboard = () => {
                           <CheckCircleIcon className="w-4 h-4" /> Done
                         </button>
                       )}
+                      <button
+                        title="View Details"
+                        onClick={() => setSelectedRequest(rawRequests.find(r => r.request_id === req.id))}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                      >
+                        <EyeIcon className="w-5 h-5" />
+                      </button>
                     </div>
                   </Td>
                 </tr>
