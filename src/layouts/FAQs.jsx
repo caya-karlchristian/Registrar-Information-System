@@ -3,20 +3,19 @@ import React, { useState } from 'react';
 const FAQPage = () => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [openId, setOpenId] = useState(1); 
+  const [openId, setOpenId] = useState(1);
 
   // --- MOCK DATA ---
   const categories = [
     "All",
-    "Document Requests",
-    "Account & Profile",
-    "Payments",
-    "Transcript Requests",
-    "Contact"
+    "System Overview",
+    "System Usage",
+    "Security & Privacy",
+    "System Features",
+    "Technical Support"
   ];
 
   const faqData = [
-    // Existing FAQs...
     {
       id: 13,
       question: "What is the Registrar Information System (RIS)?",
@@ -54,12 +53,6 @@ const FAQPage = () => {
       category: "System Features"
     },
     {
-      id: 19,
-      question: "Who do I contact for technical issues with RIS?",
-      answer: "For technical problems, use the 'Support' tab in RIS or contact the IT/Registrar Office at PUP Taguig via email or hotline. Include details of your issue and screenshots for faster resolution.",
-      category: "Technical Support"
-    },
-    {
       id: 20,
       question: "Can multiple requests be submitted at once?",
       answer: "Yes, students and alumni can submit multiple document requests in a single session, specifying the type and purpose for each document. Each request will have a unique transaction ID.",
@@ -78,95 +71,122 @@ const FAQPage = () => {
   };
 
   return (
-    <div className="min-h-screen font-sans">
-      
-      <div className="max-w-6xl mx-auto ">
+    <div className="min-h-screen font-sans pb-20">
+      <div className="max-w-7xl mx-auto px-4 pt-10">
         
-        <div className="max-w-2xl mx-auto mb-10 relative">
-          <input
-            type="text"
-            placeholder="Search for answers..."
-            className="w-full p-4 pl-12 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-[#800000] focus:border-transparent outline-none transition-all"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <svg className="w-6 h-6 text-gray-400 absolute left-4 top-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-          </svg>
+        {/* --- SEARCH HEADER --- */}
+        <div className="max-w-2xl mx-auto mb-16 relative">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search for answers..."
+              className="w-full p-5 pl-14 rounded-2xl border-none shadow-lg focus:ring-2 focus:ring-[#800000] outline-none transition-all text-lg"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <svg className="w-6 h-6 text-gray-400 absolute left-5 top-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 ">
+        {/* --- MAIN LAYOUT GRID --- */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
           
-          <div className="col-span-1 bg-white p-6 hidden md:block">
-            <h3 className="text-pup-maroon font-bold text-lg mb-4 border-l-4 border-pup-maroon pl-3">
-              Categories
-            </h3>
-            <ul className="space-y-2">
-              {categories.map((cat) => (
-                <li key={cat}>
-                  <button
-                    onClick={() => setActiveCategory(cat)}
-                    className={`w-full text-left px-3 py-2 rounded-md transition-colors text-sm font-medium ${
-                      activeCategory === cat
-                        ? "bg-red-50 text-pup-maroon font-bold"
-                        : "text-gray-600 hover:text-pup-maroon hover:bg-gray-50"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* --- SIDEBAR: CATEGORIES (Fixed & Bigger on Desktop) --- */}
+          <aside className="hidden md:block md:col-span-3">
+            <div className="sticky top-10">
+              <h3 className="text-[#800000] font-black text-xl uppercase tracking-wider mb-6 border-l-4 border-[#800000] pl-4">
+                Categories
+              </h3>
+              <ul className="space-y-2">
+                {categories.map((cat) => (
+                  <li key={cat}>
+                    <button
+                      onClick={() => setActiveCategory(cat)}
+                      className={`w-full text-left px-5 py-4 rounded-xl transition-all duration-200 text-base font-bold ${
+                        activeCategory === cat
+                          ? "bg-[#800000] text-white shadow-lg transform translate-x-2"
+                          : "text-gray-500 hover:text-[#800000] hover:bg-white hover:shadow-sm"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
 
-          <div className="col-span-1 md:col-span-3 space-y-4">
+          {/* --- CONTENT: FAQ ACCORDION --- */}
+          <main className="col-span-1 md:col-span-9 space-y-4">
             {filteredFAQs.length > 0 ? (
               filteredFAQs.map((faq) => (
                 <div 
                   key={faq.id} 
-                  className={`border rounded-lg overflow-hidden transition-all duration-200 ${
+                  className={`group border rounded-2xl overflow-hidden transition-all duration-300 ${
                     openId === faq.id 
-                      ? "border-pup-maroon shadow-md" 
-                      : "border-gray-200 bg-white hover:border-gray-300"
+                      ? "border-[#800000] shadow-xl ring-1 ring-[#800000]/10" 
+                      : "border-gray-200 bg-white hover:border-gray-300 shadow-sm"
                   }`}
                 >
                   <button
                     onClick={() => toggleAccordion(faq.id)}
-                    className={`w-full flex justify-between items-center p-5 text-left focus:outline-none ${
-                      openId === faq.id ? "bg-red-50" : "bg-white"
+                    className={`w-full flex justify-between items-center p-6 text-left focus:outline-none transition-colors ${
+                      openId === faq.id ? "bg-red-50/50" : "bg-white"
                     }`}
                   >
-                    <span className={`text-lg font-semibold ${
-                      openId === faq.id ? "text-pup-maroon" : "text-gray-800"
+                    <span className={`text-lg font-bold pr-4 ${
+                      openId === faq.id ? "text-[#800000]" : "text-gray-800"
                     }`}>
                       {faq.question}
                     </span>
-                    <span className={`transform transition-transform duration-300 text-pup-maroon ${
-                      openId === faq.id ? "rotate-180" : ""
+                    <span className={`flex-shrink-0 p-2 rounded-full transition-all duration-300 ${
+                      openId === faq.id ? "bg-[#800000] text-white rotate-180" : "bg-gray-100 text-gray-400 group-hover:bg-gray-200"
                     }`}>
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
                       </svg>
                     </span>
                   </button>
 
                   <div
-                    className={`transition-[max-height] duration-300 ease-in-out overflow-hidden ${
-                      openId === faq.id ? "max-h-96" : "max-h-0"
+                    className={`transition-all duration-500 ease-in-out overflow-hidden ${
+                      openId === faq.id ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
                     }`}
                   >
-                    <div className="bg-[#FEF9C3] p-6 text-gray-700 leading-relaxed border-t border-gray-100">
-                      {faq.answer}
+                    <div className="px-6 pb-8 pt-2">
+                      <div className="h-px bg-gray-100 mb-6" />
+                      <p className="text-gray-600 text-lg leading-relaxed">
+                        {faq.answer}
+                      </p>
+                      
+                      {/* Sub-tag for category display */}
+                      <div className="mt-6 inline-flex items-center px-3 py-1 rounded-md bg-gray-100 text-gray-500 text-xs font-bold uppercase tracking-widest">
+                        {faq.category}
+                      </div>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-10 text-gray-500">
-                <p>No questions found matching your search.</p>
+              <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300">
+                <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 9.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">No results found</h3>
+                <p className="text-gray-500 mt-2">Try adjusting your search or category filters.</p>
+                <button 
+                  onClick={() => {setSearchQuery(''); setActiveCategory('All');}}
+                  className="mt-6 text-[#800000] font-bold hover:underline"
+                >
+                  Clear all filters
+                </button>
               </div>
             )}
-          </div>
+          </main>
 
         </div>
       </div>
