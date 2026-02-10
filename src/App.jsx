@@ -16,18 +16,6 @@ import StaffDashboard from './layouts/StaffDashboard.jsx';
 import Logbook from './layouts/Logbook.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
 
-import DashboardHeader from './components/DashboardHeader.jsx';
-import RequestHeader from './components/RequestHeader.jsx';
-import DocumentHeader from './components/DocumentHeader.jsx';
-import FAQsHeader from './components/FAQsHeader.jsx';
-import StaffHeader from './components/StaffHeader.jsx';
-import Footer from './components/Footer.jsx';
-import AnalyticsHeader from './components/AnalyticsHeader.jsx';
-import AlumniHeader from './components/AlumniHeader.jsx'
-import LogbookHeader from './components/LogbookHeader.jsx';
-import StudentProfile from './components/StudentProfile.jsx';
-
-
 const App = () => {
   return (
     <div className="flex flex-col min-h-screen">
@@ -37,118 +25,67 @@ const App = () => {
 
         <Route path="/student" element={<StudentPage />}>
           <Route index element={
-            <>
-              <RequestHeader />
               <RequestForm />
-            </>
             } /> {/* /student */}
           <Route path="home" element={
-            <>
-              <DashboardHeader />
               <StudentDashboard />
-            </>
           } />
           <Route path="request" element={
-            <>
-              <RequestHeader />
-              <RequestForm />
-            </>
+            <RequestForm />
           } />
           <Route path="lists" element={
-            <>
-              <DocumentHeader />
-              <DocumentLists />
-            </>
+            <DocumentLists />
           } />
           <Route path="faqs" element={
-            <>
-              <FAQsHeader />
-              <FAQPage />
-            </>
+            <FAQPage />
           } />
+
           <Route path="profile" element={
-            <>
-              <StudentProfile /> 
-              <ProfilePage userType="student" /> 
-            </>
+            <ProfilePage userType="student" /> 
           } />
+
         </Route>
           <Route path="/alumni" element={<AlumniPage />}>
           <Route index element={
-            <>
-              <AlumniHeader/>
-              <AlumniRequest />
-            </>
+            <AlumniRequest />
             } /> 
           <Route path="home" element={
-            <>
-              <DashboardHeader userType="alumni" />
-              <StudentDashboard />
-            </>
+            <StudentDashboard />
           } />
           <Route path="request" element={
-            <>
-              <AlumniHeader/>
-              <AlumniRequest />
-            </>
+            <AlumniRequest />
             } />
           <Route path="lists" element={
-            <>
-              <DocumentHeader />
-              <DocumentLists />
-            </>
+            <DocumentLists />
           } />
           <Route path="faqs" element={
-            <>
-              <FAQsHeader />
-              <FAQPage />
-            </>
+            <FAQPage />
           } />
           <Route path="profile" element={
-            <>
-              <StudentProfile />
-              <ProfilePage userType="alumni" />
-            </>
+            <ProfilePage userType="alumni" />
           } />
         </Route>
 
         <Route path="/staff" element={<StaffPage />}>
           <Route index element={
-            <>
-              <StaffHeader/>
-              <StaffDashboard />
-            </>
+            <StaffDashboard />
             } /> {/* /staff */}
           <Route path="dashboard" element={
-            <>
-              <StaffHeader/>
-              <StaffDashboard />
-            </>
+            <StaffDashboard />
             } />
           <Route path="analytics" element={
-            <>
-              <AnalyticsHeader/>
-              <AnalyticsDashboard />
-            </>
+            <AnalyticsDashboard />
             } />
           <Route path="logbook" element={
-            <>
-              <LogbookHeader/>
-              <Logbook />
-            </>
+            <Logbook />
             } />
-            <Route path="profile" element={
-            <>
-              <StudentProfile />
-              <ProfilePage userType="staff" />
-            </>
+          <Route path="profile" element={
+            <ProfilePage userType="staff" />
           } />
         </Route>
 
         
       </Routes>
-
-      <Footer />
       
     </div>
   );
