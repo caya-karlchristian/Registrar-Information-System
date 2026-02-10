@@ -3,21 +3,35 @@ import { getDocumentRequests} from "../services/API";
 import { EyeIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
 
-const STATUS_MAP = {
-  1: "Pending",
-  2: "Ready",
-  3: "Completed",
-  4: "Processing",
-  5: "Rejected",
+// ADD: Full Tailwind strings so they are detected by the compiler
+const STATUS_CONFIG = {
+  1: { label: "Pending", classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  2: { label: "Ready", classes: "bg-green-100 text-green-700 border-green-200" },
+  3: { label: "Completed", classes: "bg-gray-100 text-gray-700 border-gray-200" },
+  4: { label: "Processing", classes: "bg-blue-100 text-blue-700 border-blue-200" },
+  5: { label: "Rejected", classes: "bg-red-100 text-red-700 border-red-200" },
 };
 
-const STATUS_CONFIG = {
-  1: { label: "Pending", color: "yellow" },
-  2: { label: "Ready", color: "green" },
-  3: { label: "Completed", color: "gray" },
-  4: { label: "Processing", color: "blue" },
-  5: { label: "Rejected", color: "red" },
-};
+const TABS = [
+  { 
+    label: "Ongoing", 
+    value: "pending", 
+    active: "bg-yellow-50 border-yellow-500 text-yellow-900", 
+    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-yellow-50" 
+  },
+  { 
+    label: "To Claim", 
+    value: "ready", 
+    active: "bg-green-50 border-green-500 text-green-900", 
+    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-green-50" 
+  },
+  { 
+    label: "History", 
+    value: "history", 
+    active: "bg-gray-100 border-gray-500 text-gray-900", 
+    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-gray-50" 
+  },
+];
 
 const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
@@ -77,32 +91,17 @@ const StudentDashboard = () => {
   const filteredRequests = requests.filter((req) => req.type === activeTab);
 
   return (
-    <main className="max-w-6xl mx-auto px-4 relative z-20 mb-5">
-      {/* Tabs */}
-      <div className="grid grid-cols-3 md:grid-cols-3 gap-4 place-items-center mb-8">
-        {[
-          { label: "Ongoing", value: "pending", color: "yellow" },
-          { label: "To Claim", value: "ready", color: "green" },
-          { label: "History", value: "history", color: "gray" },
-        ].map((tab) => (
+    <main className="max-w-6xl mx-auto -mt-1 relative z-20  ">
+      <div className="grid grid-cols-3 gap-4 place-items-center mb-5">
+        {TABS.map((tab) => (
           <div key={tab.value} className="w-full flex justify-center">
             <button
               onClick={() => setActiveTab(tab.value)}
               className={`relative w-full max-w-xs p-4 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-3 group ${
-                activeTab === tab.value
-                  ? `bg-${tab.color}-50 border-${tab.color}-500 shadow-lg scale-105`
-                  : `bg-white border-gray-200 hover:bg-${tab.color}-50 hover:border-${tab.color}-200 hover:shadow-md`
+                activeTab === tab.value ? `${tab.active} shadow-lg scale-105` : `${tab.inactive} hover:shadow-md`
               }`}
             >
-              <span
-                className={`font-bold text-lg ${
-                  activeTab === tab.value
-                    ? `text-${tab.color}-900`
-                    : "text-gray-500"
-                }`}
-              >
-                {tab.label}
-              </span>
+              <span className="font-bold text-lg">{tab.label}</span>
               <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-sm ring-2 ring-white">
                 {requests.filter((req) => req.type === tab.value).length}
               </span>
@@ -137,7 +136,7 @@ const StudentDashboard = () => {
             No records found.
           </div>
         ) : (
-          <div className="divide-y divide-gray-100 overflow-y-auto max-h-[65vh] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+          <div className="divide-y divide-gray-100 overflow-y-auto max-h-[55vh] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
             {filteredRequests.map((req) => (
               <div
                 key={req.request_id}
