@@ -181,7 +181,7 @@ const AlumniRequestForm = () => {
             
             {/* STEP 1: TERMS & CONDITIONS */}
             {currentStep === 1 && (
-              <div className="space-y-6 animate-fadeIn text-[13px] text-justify lg:text-[15px]">
+              <div className="space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px]">
                   <p><strong>A.</strong> In compliance with the Data Privacy Act (DPA) of 2012, and its implementing rules 
                     and regulations (IRR), upon filling up this Google Form, I am hereby providing my 
                     consent and authorization to use my personal data for this request.

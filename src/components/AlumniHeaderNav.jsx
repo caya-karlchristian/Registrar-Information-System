@@ -40,7 +40,7 @@ function AlumniHeaderNav ({ onMenuClick }) {
 
             {/* Burger Button - Visible only on mobile/tablet (hidden on lg) */}
             <button 
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors lg:hidden text-pup-maroon"
+              className="p-2 hover:bg-red-900 rounded-full transition-colors lg:hidden text-pup-maroon"
               onClick={onMenuClick}
             >
               <Bars3Icon className="w-8 h-8 font-bold text-white" />

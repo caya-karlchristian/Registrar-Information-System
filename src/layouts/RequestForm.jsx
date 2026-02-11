@@ -216,7 +216,7 @@ const RequestForm = () => {
     <div className="min-h-screen pb-20">
       {isLoading && <LoadingOverlay />}
       {isSubmitted ? (
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-4xl mx-auto ">
           <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col items-center justify-center text-center px-10">
             <p className="mb-6 text-4xl font-bold text-white">
               Please be patient as we process your requested document.
@@ -233,14 +233,14 @@ const RequestForm = () => {
           </div>
         </div>
       ) : (
-        <div className="max-w-5xl mx-auto mt-5">
+        <div className="max-w-5xl mx-auto -mt-2">
           <form
             ref={formRef}
             className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col relative"
             onSubmit={handleSubmit}
           >
             {/* Step Indicators */}
-            <div className="flex flex-col items-center pt-8 pb-4">
+            <div className="flex flex-col items-center pt-4 pb-4">
               <div className="flex space-x-3 mb-2">
                 {[1, 2, 3, 4].map((step) => (
                   <div
@@ -259,10 +259,10 @@ const RequestForm = () => {
               </h2>
             </div>
 
-            <div className="flex-1 px-10 md:px-20 py-4 text-white ">
+            <div className="flex-1 px-10 md:px-10 py-2 text-white ">
               {/* STEP 1 */}
               {currentStep === 1 && (
-                <div className="space-y-6 animate-fadeIn text-[13px] text-justify lg:text-[15px]">
+                <div className="space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px]">
                   <p><strong>A.</strong> In compliance with the Data Privacy Act (DPA) of 2012, and its implementing rules 
                     and regulations (IRR), upon filling up this Google Form, I am hereby providing my 
                     consent and authorization to use my personal data for this request."
