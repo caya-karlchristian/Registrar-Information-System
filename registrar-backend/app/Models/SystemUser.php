@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Laravel\Sanctum\HasApiTokens;
 
 class SystemUser extends Model
 {
+    use HasApiTokens;
+    
     protected $table = 'system_user';
     protected $primaryKey = 'user_id';
     public $timestamps = false;
