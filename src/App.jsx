@@ -15,14 +15,16 @@ import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx';
 import StaffDashboard from './layouts/StaffDashboard.jsx';
 import Logbook from './layouts/Logbook.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
+import RegistrarContact from './layouts/RegistrarContact.jsx';
 
 const App = () => {
   return (
     <div className="flex flex-col min-h-screen">
       
       <Routes>
+        
         <Route path="/" element={<LandingPage />} />
-
+        
         <Route path="/student" element={<StudentPage />}>
           <Route index element={
               <RequestForm />
@@ -42,6 +44,10 @@ const App = () => {
 
           <Route path="profile" element={
             <ProfilePage userType="student" /> 
+          } />
+
+          <Route path="contact" element={
+            <RegistrarContact />
           } />
 
         </Route>
