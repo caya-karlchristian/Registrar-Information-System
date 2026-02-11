@@ -54,7 +54,7 @@ const StudentDashboard = () => {
           .map((r) => ({
             ...r,
             document_name: "Document Name Here", // Placeholder for document name
-            status: STATUS_MAP[r.status_id] ?? "Unknown",
+            // status: STATUS_MAP[r.status_id] ?? "Unknown",
             config: STATUS_CONFIG[r.status_id] || { label: "Unknown", color: "gray" },
             type:
             r.status_id === 1 || r.status_id === 4
