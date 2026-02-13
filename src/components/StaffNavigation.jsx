@@ -5,6 +5,7 @@ import {
   ChartBarSquareIcon, 
   BookOpenIcon, 
   UserCircleIcon,
+  DocumentCheckIcon,
   ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
 
@@ -12,6 +13,7 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
   const navItems = [
     { name: "Dashboard", to: "dashboard", icon: Squares2X2Icon },
     { name: "Staff Analytics", to: "analytics", icon: ChartBarSquareIcon },
+    { name: "Certification", to: "certification", icon: DocumentCheckIcon },
     { name: "Staff Logbook", to: "logbook", icon: BookOpenIcon },
     { name: "Staff Profile", to: "profile", icon: UserCircleIcon },
   ];
