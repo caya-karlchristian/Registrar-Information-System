@@ -6,7 +6,7 @@ const ErrorToast = ({ message, onClose }) => {
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex items-center w-full max-w-sm p-4 text-white bg-pup-maroon rounded-lg shadow-lg animate-bounce-in">
-      <div className="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-pup-maroon bg-white rounded-lg">
+      <div className="inline-flex items-center justify-center shrink-0 w-8 h-8 text-pup-maroon bg-white rounded-lg">
         <ExclamationCircleIcon className="w-5 h-5" strokeWidth={2} />
       </div>
 
