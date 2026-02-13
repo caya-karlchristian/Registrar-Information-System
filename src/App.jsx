@@ -71,6 +71,9 @@ const App = () => {
           <Route path="profile" element={
             <ProfilePage userType="alumni" />
           } />
+          <Route path="contact" element={
+            <RegistrarContact />
+          } />
         </Route>
 
         <Route path="/staff" element={<StaffPage />}>
@@ -91,6 +94,9 @@ const App = () => {
             } />
           <Route path="profile" element={
             <ProfilePage userType="staff" />
+          } />
+          <Route path="contact" element={
+            <RegistrarContact />
           } />
         </Route>
 
