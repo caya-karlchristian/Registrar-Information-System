@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import StaffHeaderNav from '../components/StaffHeaderNav.jsx';
 import StaffNavigation from '../components/StaffNavigation.jsx';
+import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
 
 const StaffPage = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+  const navigate = useNavigate();
+
     useEffect(() => {
       if (isMobileMenuOpen) {
         document.body.style.overflow = 'hidden';
@@ -36,6 +38,12 @@ const StaffPage = () => {
               <Outlet />
             </div>
           </main>
+          <button
+            onClick={() => navigate('contact')} // This directs the main content to display the email design
+            className="fixed bottom-8 right-8 z-50 bg-pup-dark-maroon p-4 rounded-full shadow-2xl hover:scale-110 transition-all active:scale-95 group border-2 border-white/20"
+            >
+            <ChatBubbleLeftRightIcon className="w-8 h-8 text-white" />
+        </button>
         </div>
       </div>
     );
