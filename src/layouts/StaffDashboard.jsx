@@ -261,7 +261,7 @@ const StaffDashboard = () => {
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
-          )} {/* <--- THIS CLOSING BRACE WAS MISSING/MISPLACED */}
+          )} 
 
           {/* 2. FILTERS: These stay visible all the time */}
           <div className="flex items-center gap-2 relative">

@@ -5,6 +5,7 @@ import {
   ChartBarSquareIcon, 
   BookOpenIcon, 
   UserCircleIcon,
+  DocumentCheckIcon,
   ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
 
@@ -12,6 +13,7 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
   const navItems = [
     { name: "Dashboard", to: "dashboard", icon: Squares2X2Icon },
     { name: "Staff Analytics", to: "analytics", icon: ChartBarSquareIcon },
+    { name: "Certification", to: "certification", icon: DocumentCheckIcon },
     { name: "Staff Logbook", to: "logbook", icon: BookOpenIcon },
     { name: "Staff Profile", to: "profile", icon: UserCircleIcon },
   ];
@@ -20,8 +22,8 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
     <aside 
       className={`
         fixed z-40 w-72      
-        top-30 lg:top-29
-        h-[calc(100vh-140px)] lg:h-[calc(100vh-115px)]
+        top-25 lg:top-29 md:top-25 
+        h-[calc(100vh-100px)] lg:h-[calc(100vh-115px)] md:h-[calc(100vh-100px)]
         lg:left-0 right-0 
         bg-[#E0E0E0] border-l lg:border-r border-gray-300 flex flex-col
         transition-transform duration-300 ease-in-out

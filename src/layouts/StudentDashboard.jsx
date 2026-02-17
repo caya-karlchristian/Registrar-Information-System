@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { getDocumentRequests} from "../services/API"; 
-import { EyeIcon } from '@heroicons/react/24/solid';
+import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
 
-// ADD: Full Tailwind strings so they are detected by the compiler
 const STATUS_CONFIG = {
   1: { label: "Pending", classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
   2: { label: "Ready", classes: "bg-green-100 text-green-700 border-green-200" },
@@ -39,6 +38,8 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // For testing, assume student_profile_id = 1 is the logged-in student
   const currentStudentId = 1;
@@ -51,6 +52,7 @@ const StudentDashboard = () => {
         // Filter requests for the current student
         const studentRequests = res.data
           .filter((r) => r.student_profile_id === currentStudentId)
+<<<<<<< HEAD
           .map((r) => ({
             ...r,
             document_name: "Document Name Here", // Placeholder for document name
@@ -62,23 +64,31 @@ const StudentDashboard = () => {
               : r.status_id === 2
               ? "ready"
               : "history",
+=======
+          .map((r) => {
+>>>>>>> f5862166a05698eb123a59326259055eb6208a57
 
-          progress:
-            r.status_id === 1
-              ? 25
-              : r.status_id === 4
-              ? 50
-              : r.status_id === 2
-              ? 100
-              : r.status_id === 3
-              ? 100
-              : 0, // rejected
+            const config = STATUS_CONFIG[r.status_id] || { 
+              label: "Unknown", 
+              classes: "bg-gray-100 text-gray-400 border-gray-200" 
+            };
 
-          }));
+            let tabCategory = "history"; 
+            if (r.status_id === 1 || r.status_id === 4) tabCategory = "pending";
+            if (r.status_id === 2) tabCategory = "ready";
+
+            const progressMap = { 1: 25, 4: 50, 2: 100, 3: 100, 5: 0 };
+
+            return {
+              ...r,
+              status_label: config.label,
+              config: config,   
+              type: tabCategory, 
+              progress: progressMap[r.status_id] || 0,
+            };
+          });
         setRequests(studentRequests);
-        setError("");
       } catch (err) {
-        console.error("Failed to fetch document requests:", err);
         setError("Failed to fetch document requests.");
       } finally {
         setLoading(false);
@@ -86,9 +96,20 @@ const StudentDashboard = () => {
     };
 
     fetchRequests();
-  }, []);
+  }, [currentStudentId]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
 
   const filteredRequests = requests.filter((req) => req.type === activeTab);
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredRequests.slice(indexOfFirstItem, indexOfLastItem);
+
+  const handlePrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
+  const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages));
 
   return (
     <main className="max-w-6xl mx-auto -mt-1 relative z-20  ">
@@ -111,8 +132,8 @@ const StudentDashboard = () => {
       </div>
 
       {/* Document Requests List */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-[400px]">
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+      <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-[700px]">
+        <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-gray-800 text-lg">
             {activeTab === "pending" && "Processing Documents"}
             {activeTab === "ready" && "Documents Ready for Pickup"}
@@ -122,68 +143,85 @@ const StudentDashboard = () => {
             Showing {filteredRequests.length} records
           </span>
         </div>
-
-        {loading ? (
-          <div className="p-10 text-center text-gray-400 flex justify-center items-center">
-            Loading...
-          </div>
-        ) : error ? (
-          <div className="p-10 text-center text-red-600 font-semibold flex justify-center items-center">
-            {error}
-          </div>
-        ) : filteredRequests.length === 0 ? (
-          <div className="p-10 text-center text-gray-400 flex justify-center items-center">
-            No records found.
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100 overflow-y-auto max-h-[55vh] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-            {filteredRequests.map((req) => (
-              <div
-                key={req.request_id}
-                className="p-5 hover:bg-gray-50 transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`
-                      inline-block px-1 py-0.5 rounded-full text-[11px] font-bold border
-                      bg-${req.config.color}-100 
-                      text-${req.config.color}-700 
-                      border-${req.config.color}-200
-                    `}>
-                      {req.config.label}
-                    </span>
-                    <span className="text-xs text-gray-400  rounded">
-                      #{req.request_id}
-                    
-                    <span className="text-xs text-gray-400 px-0.5 " >
-                      • {new Date(req.requested_at).toLocaleDateString()}
-                    </span>
-                    </span>
+        
+        <div className="flex-1 flex flex-col justify-start divide-y divide-gray-100 overflow-y-auto">
+            {loading ? (
+              <div className="p-10 text-center text-gray-400">Loading...</div>
+            ) : currentItems.length === 0 ? (
+              <div className="p-10 text-center text-gray-400 font-black uppercase tracking-widest">No records found.</div>
+            ) : (
+              currentItems.map((req) => (
+                <div
+                  key={req.request_id}
+                  className="p-5 hover:bg-gray-50 transition flex flex-row justify-between items-center gap-4"
+                >
+                  {/* Item Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${req.config.classes}`}>
+                        {req.config.label}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        #{req.request_id} • {new Date(req.requested_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <h4 className="text-gray-800 font-bold text-base md:text-lg uppercase">
+                      Document name here
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Purpose: {req.purpose_of_request}
+                    </p>
                   </div>
-                  {/* 4. SHOW DOCUMENT NAME AS TITLE */}
-                  <h4 className="text-gray-800 font-bold text-base md:text-lg">
-                    DOCUMENT NAME
-                  </h4>
-                  {/* SHOW PURPOSE AS SUBTITLE */}
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Purpose: {req.purpose_of_request}
-                  </p>
-                </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      title="View Details"
-                      onClick={() => setSelectedRequest(req)}
-                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                    >
+                  {/* Action Icon */}
+                  <div className="shrink-0">
+                    <button onClick={() => setSelectedRequest(req)} className="p-2 text-gray-400 hover:text-gray-600 transition">
                       <EyeIcon className="w-5 h-5" />
-                    </button>     
-                                 
+                    </button>
                   </div>
-              </div>
-            ))}
+                </div>
+              ))
+            )}
           </div>
-        )}
+
+      {/* Paginated Footer */}
+      {!loading && filteredRequests.length > 0 && (
+        <div className="px-6 py-4 bg-gray-50 text-sm text-gray-500 flex justify-between items-center shrink-0">
+          <span>
+            Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredRequests.length)} of {filteredRequests.length} results
+          </span>
+
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              className={`p-1 rounded ${
+                currentPage === 1 
+                  ? 'text-gray-300 cursor-not-allowed' 
+                  : 'text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <ChevronLeftIcon className="w-5 h-5" />
+            </button>
+
+            <span className="text-xs font-semibold mx-2">
+              Page {currentPage} of {totalPages || 1}
+            </span>
+
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className={`p-1 rounded ${
+                currentPage === totalPages || totalPages === 0 
+                  ? 'text-gray-300 cursor-not-allowed' 
+                  : 'text-gray-600 hover:bg-gray-200 '
+              }`}
+            >
+              <ChevronRightIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
       </div>
       <RequestDetailsModal
         request={selectedRequest}
