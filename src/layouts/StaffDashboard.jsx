@@ -36,7 +36,7 @@ const StaffDashboard = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rawRequests, setRawRequests] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortOrder, setSortOrder] = useState('desc'); // desc or asc
+  const [sortOrder, setSortOrder] = useState('desc'); 
   const [selectedIds, setSelectedIds] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 

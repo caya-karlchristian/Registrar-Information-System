@@ -1,213 +1,193 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PrinterIcon } from '@heroicons/react/24/solid';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { PrinterIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import { getDocumentRequests } from "../services/API"; 
+import LoadingOverlay from "../components/LoadingOverlay"; 
 
-// --- REMOVE WHEN BACKEND INTEGRATES ---
-const generateMockData = () => {
-  const sections = ["BSIT 1-A", "BSIT 2-B", "BSCS 3-A", "BSBA 1-C", "Educ 4-A", "Crim 2-B"];
-  const activities = [
-    "Requested Transcript of Records",
-    "Submitted Graduation Clearance",
-    "Inquired about Enrollment Status"
-  ];
-  const names = [
-    "Juan Dela Cruz", "Maria Clara", "Jose Rizal", "Andres Bonifacio", 
-    "Gabriela Silang", "Emilio Aguinaldo", "Melchora Aquino", "Apolinario Mabini"
-  ];
-
-  return Array.from({ length: 45 }).map((_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() - i); 
-    
-    return {
-      id: i + 1,
-      date: date.toLocaleDateString('en-GB'),
-      name: names[i % names.length],
-      activity: activities[i % activities.length],
-      timeIn: "08:30 AM",
-      timeOut: "09:15 AM",
-      section: sections[i % sections.length]
-    };
-  });
+/* ---------------- DOCUMENT TYPE MAPPING ---------------- */
+const documentTypeMap = {
+  1: "Certificate of Good Moral Character",
+  2: "Certification, Authentication, Verification (CAV) / APOSTILE",
+  3: "Authentication/Certified True Copy - Local",
+  4: "Informative Copy of Grades",
+  5: "CAV - CHED",
+  6: "CAV - WES/CES",
+  7: "Cross-enrollment Fee",
+  8: "Re-admission Fee",
+  9: "Admission Fee for Transfer Students (From Private School)",
+  10: "Admission Fee for Transfer Students (From SUCs)",
+  11: "New Copy of Registration Card (With Affidavit of Loss)",
+  12: "Diploma",
+  13: "Accreditation Fee",
+  14: "Completion Fee",
+  15: "Transcript of Records",
+  16: "Correction in Student Information System",
 };
 
 const LogbookRecords = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 10; 
+  const [selectedDocTypeId, setSelectedDocTypeId] = useState("");
+  const rowsPerPage = 8; 
 
   useEffect(() => {
-    setTimeout(() => {
-      setData(generateMockData());
-      setLoading(false);
-    }, 500);
+    const fetchLogbookData = async () => {
+      setLoading(true);
+      try {
+        const res = await getDocumentRequests();
+        setData(res.data);
+      } catch (error) {
+        console.error("Error loading logbook records:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLogbookData();
   }, []);
 
-  const totalPages = Math.ceil(data.length / rowsPerPage);
-  
-  const currentData = useMemo(() => {
-    const start = (currentPage - 1) * rowsPerPage;
-    return data.slice(start, start + rowsPerPage);
-  }, [currentPage, data]);
+  // 2. Filter logic
+  const filteredData = useMemo(() => {
+    if (!selectedDocTypeId) return data;
+    const targetId = parseInt(selectedDocTypeId);
+    return data.filter(item => 
+      item.documents?.some(d => d.document_type_id === targetId) ||
+      item.document_type_id === targetId
+    );
+  }, [selectedDocTypeId, data]);
 
-  const emptyRows = rowsPerPage - currentData.length;
+  // 3. Pagination Logic Helpers
+  const totalPages = Math.ceil(filteredData.length / rowsPerPage) || 1;
+  const indexOfFirstItem = (currentPage - 1) * rowsPerPage;
+  const indexOfLastItem = currentPage * rowsPerPage;
+
+  const currentData = useMemo(() => {
+    return filteredData.slice(indexOfFirstItem, indexOfLastItem);
+  }, [indexOfFirstItem, indexOfLastItem, filteredData]);
+
+  // 4. Dynamic Title Helper
+  const selectedDocLabel = useMemo(() => {
+    return documentTypeMap[selectedDocTypeId] || "[Document Type]";
+  }, [selectedDocTypeId]);
 
   const handlePrint = () => window.print();
 
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) setCurrentPage(page);
-  };
-
-  const getPaginationButtons = () => {
-    const buttons = [];
-    if (totalPages <= 5) {
-      for (let i = 1; i <= totalPages; i++) buttons.push(i);
-    } else {
-      if (currentPage <= 3) {
-        buttons.push(1, 2, 3, '...', totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        buttons.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
-      } else {
-        buttons.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
-      }
-    }
-    return buttons;
-  };
-
-  // Define Columns
-  const columns = [
-    { label: "Date", width: "w-[12%]" },
-    { label: "Name", width: "w-[20%]" },
-    { label: "Activity", width: "w-[25%]" },
-    { label: "Time In", width: "w-[12%]" },
-    { label: "Time Out", width: "w-[12%]" },
-    { label: "Section", width: "w-[19%]" },
-  ];
-
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 font-sans">
+    <div className="min-h-screen font-sans text-left">
+      <LoadingOverlay isVisible={loading} message="Fetching Registrar Records" />
 
-      <div className="w-full max-w-7xl bg-pup-dark-maroon rounded-lg shadow-2xl overflow-hidden relative pb-12 print:max-w-none print:shadow-none">
+      <div className="max-w-350 mx-auto bg-white shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none">
         
-        <div className="absolute top-0 left-0 w-full h-4 bg-[#fbbf24] print:hidden"></div>
-
-        <div className="px-6 py-10 md:px-12 md:pt-14 md:pb-6">
-          
-          <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4 md:gap-0">
-            <h1 className="text-white text-3xl md:text-4xl font-bold tracking-wide text-center md:text-left">
-              Logbook Records
-            </h1>
+        <div className="p-4 sm:p-6 md:p-8 pb-0">
+          <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end mb-6 gap-4 print:hidden">
+            <div className="flex flex-col gap-2 text-left w-full sm:w-auto">
+              <label className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wider">Document/Certification Type</label>
+              <select 
+                className="border border-gray-300 rounded px-3 py-2 w-full sm:w-72 bg-gray-50 text-sm focus:outline-none focus:ring-1 focus:ring-maroon"
+                value={selectedDocTypeId}
+                onChange={(e) => {
+                  setSelectedDocTypeId(e.target.value);
+                  setCurrentPage(1); 
+                }}
+              >
+                <option value="">Please select</option>
+                {Object.entries(documentTypeMap).map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+              </select>
+            </div>
+            
             <button 
               onClick={handlePrint}
-              className="bg-[#fbbf24] hover:bg-[#f59e0b] text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-lg text-base print:hidden w-full md:w-auto justify-center"
+              className="bg-pup-dark-maroon hover:bg-[#3a0000] text-white px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto"
             >
-              <PrinterIcon className="h-6 w-6" />
-              <span>Print</span>
+              <PrinterIcon className="h-4 w-4" />
+              <span>Print Logbook</span>
             </button>
           </div>
 
-          {/* Table Container */}
-          <div className="w-full text-white overflow-x-auto">
-            <div className="min-w-[900px]">
-              
-              {/* Headers */}
-              <div className="flex border-b border-white/30 pb-4 mb-2 text-base font-semibold uppercase tracking-wider text-white/80">
-                {columns.map((col, index) => (
-                  <div key={index} className={`${col.width} px-4`}>
-                    {col.label}
-                  </div>
-                ))}
-              </div>
-
-              {/* Loading State */}
-              {loading && (
-                <div className="py-24 text-center text-white/50 animate-pulse text-lg">
-                  Loading Records...
-                </div>
-              )}
-
-              {/* Data Rows */}
-              {!loading && currentData.length > 0 && currentData.map((row) => (
-                <div 
-                  key={row.id} 
-                  className="flex border-b border-white/20 py-4 text-base text-white/90 hover:bg-white/5 transition-colors items-center"
-                >
-                  <div className={`${columns[0].width} px-4`}>{row.date}</div>
-                  <div className={`${columns[1].width} px-4 font-medium truncate`}>{row.name}</div>
-                  <div className={`${columns[2].width} px-4 truncate`} title={row.activity}>{row.activity}</div>
-                  <div className={`${columns[3].width} px-4`}>{row.timeIn}</div>
-                  <div className={`${columns[4].width} px-4`}>{row.timeOut}</div>
-                  <div className={`${columns[5].width} px-4 text-white/80`}>
-                    {row.section}
-                  </div>
-                </div>
-              ))}
-
-              {/* No Data State */}
-              {!loading && currentData.length === 0 && (
-                <div className="py-12 text-center text-white/40 italic border-b border-white/20">
-                  No records found.
-                </div>
-              )}
-
-              {/* Empty Rows Fillers */}
-              {!loading && Array.from({ length: Math.max(0, emptyRows) }).map((_, i) => (
-                <div 
-                  key={`empty-${i}`} 
-                  className="w-full border-b border-white/20 h-[57px]" 
-                ></div>
-              ))}
-            </div>
+          <div className="w-full text-center border-b border-gray-300 pb-4 mb-0">
+            <h2 className="text-[#4a0000] text-lg sm:text-xl md:text-2xl font-black uppercase tracking-widest leading-tight">
+              Processing of Application for <br className="sm:hidden" /> {selectedDocLabel}
+            </h2>
           </div>
+        </div>
 
-          {/* Pagination */}
-          {!loading && data.length > 0 && (
-            <div className="flex justify-center items-center mt-10 gap-4 text-white/70 text-base font-medium select-none print:hidden">
-              <button 
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="flex items-center gap-2 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed px-3 py-2"
-              >
-                <ChevronLeftIcon className="h-5 w-5" />
-                <span className="hidden md:inline">Previous</span>
-              </button>
+        {/* Table Body */}
+        <div className="flex-1 overflow-x-auto px-4 sm:px-6 md:px-8">
+          <table className="w-full border-collapse min-w-[800px]">
+            <thead>
+              <tr className="border-b-2 border-gray-300 text-gray-400 uppercase text-center">
+                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Requested</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[15%]">Client Name</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Course/Year & Section</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[8%]">Gender</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[18%]">Email Address/Contact</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Processed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[10%]">No. of Minutes Processed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[13%]">Date Claimed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentData.map((row) => (
+                <tr key={row.request_id || row.id} className="border-b border-gray-200 hover:bg-gray-50 text-[11px] sm:text-[12px] text-gray-700 transition-colors">
+                  <td className="p-3 sm:p-4 text-center">
+                    {row.requested_at ? new Date(row.requested_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                  </td>
+                  <td className="p-3 sm:p-4 text-center font-bold uppercase text-left">
+                    {row.student_profile ? `${row.student_profile.first_name} ${row.student_profile.last_name}` : 'N/A'}
+                  </td>
+                  <td className="p-3 sm:p-4 text-center">
+                    {row.academic_record ? `${row.academic_record.course} ${row.academic_record.section || ''}` : 'N/A'}
+                  </td>
+                  <td className="p-3 sm:p-4 text-center">{row.student_profile?.gender || '---'}</td>
+                  <td className="p-3 sm:p-4 text-center lowercase text-blue-600 truncate max-w-[150px]">{row.student_profile?.email || '---'}</td>
+                  <td className="p-3 sm:p-4 text-center">{row.processed_at ? new Date(row.processed_at).toLocaleString() : '---'}</td>
+                  <td className="p-3 sm:p-4 text-center font-mono">{row.processing_minutes || '0'}</td>
+                  <td className="p-3 sm:p-4 text-center italic text-gray-400">{row.claimed_at ? new Date(row.claimed_at).toLocaleDateString() : 'Pending'}</td>
+                </tr>
+              ))}
+              
+              {!loading && Array.from({ length: Math.max(0, rowsPerPage - currentData.length) }).map((_, i) => (
+                <tr key={`empty-${i}`} className="h-[45px] sm:h-[53px] border-b border-gray-100">
+                  <td colSpan="8"></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-              <div className="flex items-center gap-2">
-                <span className="md:hidden text-white px-2">
-                  Page {currentPage} of {totalPages}
-                </span>
+        {/* Pagination Footer */}
+        <div className="px-4 sm:px-8 py-4 bg-gray-50 text-[11px] sm:text-sm text-gray-500 flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t border-gray-200">
+          <span className="text-center sm:text-left">
+            Showing {filteredData.length > 0 ? indexOfFirstItem + 1 : 0} to{" "}
+            {Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} results
+          </span>
 
-                <div className="hidden md:flex items-center gap-2">
-                  {getPaginationButtons().map((btn, index) => {
-                    if (btn === '...') return <span key={index} className="px-2 text-xl">...</span>;
-                    return (
-                      <button
-                        key={index}
-                        onClick={() => handlePageChange(btn)}
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 text-lg
-                          ${currentPage === btn 
-                            ? 'bg-[#fbbf24] text-[#4a1212] font-bold shadow-md scale-110' 
-                            : 'hover:bg-white/10 hover:text-white'
-                          }`}
-                      >
-                        {btn}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          <div className="flex gap-4 items-center">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className={`p-1 rounded transition-colors ${
+                currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <ChevronLeftIcon className="w-5 h-5" />
+            </button>
 
-              <button 
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="flex items-center gap-2 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed px-3 py-2"
-              >
-                <span className="hidden md:inline">Next</span>
-                <ChevronRightIcon className="h-5 w-5" />
-              </button>
-            </div>
-          )}
+            <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+              Page {currentPage} of {totalPages}
+            </span>
+
+            <button
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className={`p-1 rounded transition-colors ${
+                currentPage === totalPages || totalPages === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <ChevronRightIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
