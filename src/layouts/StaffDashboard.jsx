@@ -15,6 +15,7 @@ import { getDocumentRequests,
 } from '../services/API';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import LoadingOverlay from '../components/LoadingOverlay.jsx';
 
 /* ---------------- STATUS IDS ---------------- */
 const STATUS = {
@@ -224,10 +225,9 @@ const StaffDashboard = () => {
     }
   };
 
-  if (loading) return <div className="p-6 text-center">Loading...</div>;
-
   return (
     <div className="min-h-screen pb-10">
+      <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
       <main className="max-w-7xl mx-auto px-6 py-8">
 
         {/* ---------------- CARDS ---------------- */}
