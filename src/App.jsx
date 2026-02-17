@@ -17,6 +17,7 @@ import Logbook from './layouts/Logbook.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx';
 import GenerateCertificate from './layouts/GenerateCertificate.jsx';
+import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
 
 const App = () => {
   return (
@@ -63,7 +64,7 @@ const App = () => {
             <AlumniRequest />
             } />
           <Route path="lists" element={
-            <DocumentLists />
+            <AlumniDocumentList />
           } />
           <Route path="faqs" element={
             <FAQPage />
