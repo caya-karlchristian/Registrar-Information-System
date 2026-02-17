@@ -52,21 +52,7 @@ const StudentDashboard = () => {
         // Filter requests for the current student
         const studentRequests = res.data
           .filter((r) => r.student_profile_id === currentStudentId)
-<<<<<<< HEAD
-          .map((r) => ({
-            ...r,
-            document_name: "Document Name Here", // Placeholder for document name
-            // status: STATUS_MAP[r.status_id] ?? "Unknown",
-            config: STATUS_CONFIG[r.status_id] || { label: "Unknown", color: "gray" },
-            type:
-            r.status_id === 1 || r.status_id === 4
-              ? "pending"
-              : r.status_id === 2
-              ? "ready"
-              : "history",
-=======
           .map((r) => {
->>>>>>> f5862166a05698eb123a59326259055eb6208a57
 
             const config = STATUS_CONFIG[r.status_id] || { 
               label: "Unknown", 
