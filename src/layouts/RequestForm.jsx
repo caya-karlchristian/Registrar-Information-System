@@ -102,14 +102,14 @@ const RequestForm = () => {
   const handleSubmit = async (e) => {
   e.preventDefault();
 
+  if (formData.documentsRequested.length === 0) {
+    setErrorMessage("Please select at least one document before submitting.");
+    return;
+  }
+
   setIsLoading(true);
 
   try {
-    if (formData.documentsRequested.length === 0) {
-      alert("Please select at least one document.");
-      setIsLoading(false);
-      return;
-    }
 
     const certId =
       formData.certification && formData.certification !== "None"
@@ -208,7 +208,7 @@ const RequestForm = () => {
 
   return (
     <div className="min-h-screen pb-20">
-      {isLoading && <LoadingOverlay />}
+      <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
       {isSubmitted ? (
         <div className="max-w-4xl mx-auto ">
           <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col items-center justify-center text-center px-10">
