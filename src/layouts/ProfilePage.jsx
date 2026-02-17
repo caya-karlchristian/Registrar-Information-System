@@ -102,8 +102,8 @@ const ProfilePage = ({ userType = "student" }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-start justify-center font-sans py-10">
-      <div className="w-full max-w-7xl bg-pup-dark-maroon shadow-2xl overflow-hidden flex flex-col relative rounded-sm min-h-[700px]">
+    <div className="min-h-screen flex items-start justify-center font-sans py-2 lg:-mt-5">
+      <div className="w-full max-w-7xl bg-pup-dark-maroon shadow-2xl overflow-hidden flex flex-col relative rounded-sm min-h-[630px]">
         
         <div className="h-3 w-full bg-[#eebc48]"></div>
 
@@ -227,7 +227,7 @@ const ProfilePage = ({ userType = "student" }) => {
           </form>
         </div>
 
-        <div className="px-8 pb-8 pt-4 mt-auto flex justify-between items-center">
+        <div className="px-4 pb-4 mt-auto flex justify-between items-center">
           <button 
             onClick={handleDelete}
             className="bg-[#eebc48] hover:bg-[#d4a53b] text-white font-bold py-2 px-6 rounded shadow-md transition-colors"

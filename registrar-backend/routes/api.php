@@ -11,6 +11,7 @@ use App\Http\Controllers\CertificationTypeController;
 use App\Http\Controllers\DocumentRequestController;
 use App\Http\Controllers\RequestDocumentController;
 use App\Http\Controllers\RequestHistoryController;
+use App\Http\Controllers\AuthController;
 
 /*
 | API Routes
@@ -86,4 +87,11 @@ Route::prefix('request-history')->group(function () {
     Route::post('/', [RequestHistoryController::class, 'store']);
     Route::put('{id}', [RequestHistoryController::class, 'update']);
     Route::delete('{id}', [RequestHistoryController::class, 'destroy']);
+});
+
+Route::post('/login', [AuthController::class, 'login']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/logout', [AuthController::class, 'logout']);
 });
