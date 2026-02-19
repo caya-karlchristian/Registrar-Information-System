@@ -32,7 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::prefix('system-users')->group(function () {
+    Route::middleware('role:1')->prefix('system-users')->group(function () {
         Route::get('/', [SystemUserController::class, 'index']);
         Route::get('{id}', [SystemUserController::class, 'show']);
         Route::post('/', [SystemUserController::class, 'store']);

@@ -12,6 +12,7 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         \Illuminate\Foundation\Http\Middleware\TrimStrings::class,
+        // \Illuminate\Foundation\Http\Middleware\RoleMiddleware::class,
     ];
 
     protected $middlewareGroups = [
@@ -28,5 +29,6 @@ class Kernel extends HttpKernel
 
     protected $routeMiddleware = [
         'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        'role' => \App\Http\Middleware\RoleMiddleware::class,
     ];
 }

@@ -1,12 +1,48 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { loginUser } from "../services/API";
+import { useAuth } from "../context/AuthProvider";
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const { user, login } = useAuth(); 
 
-  const handleLogin = (e) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      if (user.role_id === 1) navigate('/student');
+      else if (user.role_id === 2) navigate('/alumni');
+      else if (user.role_id === 3) navigate('/staff');
+    }
+  }, [user, navigate]);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    navigate('/student'); //REMOVE THIS LATER WHEN IMPLEMENTING AUTHENTICATION LOGIC. THIS IS JUST FOR MAKING SURE THE ROUTING WORKS PROPERLY.
+
+    try {
+      const response = await loginUser({ email, password });
+
+      const token = response.data.token;
+      const userData = response.data.user;
+
+      login(userData, token);
+
+      if (userData.role_id === 1) {
+        navigate('/student');
+      } else if (userData.role_id === 2) {
+        navigate('/alumni');
+      } else if (userData.role_id === 3) {
+        navigate('/staff');
+      } else {
+        navigate('/');
+      }
+
+    } catch (error) {
+      console.error(error);
+      alert("Invalid credentials");
+    }
   };
 
   return (
@@ -52,8 +88,22 @@ const LandingPage = () => {
           </p>
 
           <form onSubmit={handleLogin} className="w-full space-y-5">
-            <InputField type="email" placeholder="Email Address" required />
-            <InputField type="password" placeholder="Password" required />
+            <InputField
+              type="email"
+              placeholder="Email Address"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+
+            <InputField
+              type="password"
+              placeholder="Password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+
 
             <button 
               type="submit"
@@ -78,13 +128,15 @@ const LandingPage = () => {
   );
 };
 
-const InputField = ({ type, placeholder, required }) => (
+const InputField = ({ type, placeholder, required, value, onChange }) => (
   <div className="w-full relative group">
     <input 
       type={type} 
       placeholder={placeholder} 
-      className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#eebc48] focus:bg-white transition-all text-sm text-gray-700 placeholder-gray-400 shadow-sm"
+      value={value}
+      onChange={onChange}
       required={required}
+      className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#eebc48] focus:bg-white transition-all text-sm text-gray-700 placeholder-gray-400 shadow-sm"
     />
   </div>
 );

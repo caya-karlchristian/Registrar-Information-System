@@ -21,6 +21,7 @@ class SystemUser extends Authenticatable
 
     protected $hidden = [
         'password',
+        'remember_token',
     ];
 
     public function studentProfile()
