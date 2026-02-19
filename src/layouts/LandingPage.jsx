@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginUser } from "../services/API";
 import { useAuth } from "../context/AuthProvider";
+import risImage from "../assets/RIS1.png";
+import logoImage from "../assets/puplogoimage.png";
+
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -9,8 +12,7 @@ const LandingPage = () => {
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  console.log("Auth check:", useAuth());
+
   useEffect(() => {
   const token = localStorage.getItem("token");
   if (!token) return;
@@ -53,7 +55,7 @@ const LandingPage = () => {
       
       <div className="hidden md:block flex-1 relative items-center justify-center overflow-hidden">
         <img 
-          src='/src/assets/RIS1.png' 
+          src={risImage} 
           alt="PUP Campus" 
           className="absolute inset-0 w-full h-full object-cover scale-105"
         />
@@ -81,7 +83,7 @@ const LandingPage = () => {
 
         <div className="w-full max-w-sm flex flex-col items-center animate-fadeIn">
           
-          <img src="/src/assets/puplogoimage.png" alt="PUP Logo" className="w-24 h-24 drop-shadow-xl mb-6" />
+          <img src={logoImage} alt="PUP Logo" className="w-24 h-24 drop-shadow-xl mb-6" />
 
           <h1 className="text-3xl font-bold text-pup-dark-maroon mb-2 tracking-wide">
             Welcome Back!
