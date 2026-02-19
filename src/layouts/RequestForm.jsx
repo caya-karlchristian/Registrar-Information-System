@@ -78,7 +78,7 @@ const RequestForm = () => {
       setFormData(prev => ({ ...prev, documentCopies: initialCopies }));
     }
 
-    if (currentStep < 5) setCurrentStep((s) => s + 1);
+    if (currentStep < 4) setCurrentStep((s) => s + 1);
   };
 
   const prevStep = (e) => {
@@ -207,7 +207,7 @@ const RequestForm = () => {
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="relative min-h-screen pb-20 z-20">
       <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
       {isSubmitted ? (
         <div className="max-w-4xl mx-auto ">
@@ -484,19 +484,25 @@ const RequestForm = () => {
                       required
                     />
                   </div>
-                  <div className="bg-white/10 p-4 rounded-lg border border-white/20">
-                    <h3 className="text-pup-yellow font-bold mb-3 uppercase text-sm tracking-wide">
+                  <div className="bg-white/10 p-4 rounded-lg border ">
+                    <h3 className="text-[#FFC72C] font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
                     <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
                       {formData.documentsRequested.map((doc, index) => (
                         <div key={index} className="flex items-center justify-between gap-4">
                            <label className="text-white text-sm flex-1">{doc}</label>
-                           <div className="w-24">
+                           <div className="w-24 ">
                               <input
                                 type="number"
                                 min="1"
-                                className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block"
+                                className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg 
+                                  outline-none transition-all duration-200
+                                  focus:bg-white 
+                                  focus:border-[#FFC72C] 
+                                  focus:ring-2 
+                                  focus:ring-[#FFC72C]/30 
+                                  focus:text-black"        
                                 value={formData.documentCopies[doc] || 1}
                                 onChange={(e) => handleDocCopyChange(doc, e.target.value)}
                               />
@@ -526,7 +532,7 @@ const RequestForm = () => {
                 onClick={currentStep < 4 ? nextStep : undefined}
                 className="font-bold py-2 px-6 rounded shadow-md w-32 ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
               >
-                {currentStep < 5 ? "Next" : "Submit"}
+                {currentStep < 4 ? "Next" : "Submit"}
               </button>
 
             </div>
