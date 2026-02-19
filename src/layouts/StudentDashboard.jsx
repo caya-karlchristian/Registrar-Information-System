@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { getDocumentRequests} from "../services/API"; 
 import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
+import LoadingOverlay from "../components/LoadingOverlay";
+import ErrorToast from "../components/ErrorToast";
 import { useNavigate } from "react-router-dom";
 
 const STATUS_CONFIG = {
@@ -110,6 +112,9 @@ const StudentDashboard = () => {
 
   return (
     <main className="max-w-6xl mx-auto -mt-1 relative z-20  ">
+      <LoadingOverlay isVisible={loading} message="Syncing Requested Documents..." />
+
+      <ErrorToast message={error} onClose={() => setError("")} />
       <div className="grid grid-cols-3 gap-4 place-items-center mb-5">
         {TABS.map((tab) => (
           <div key={tab.value} className="w-full flex justify-center">
