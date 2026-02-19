@@ -11,12 +11,14 @@ const LandingPage = () => {
   const [password, setPassword] = useState('');
 
   useEffect(() => {
-    if (user) {
-      if (user.role_id === 1) navigate('/student');
-      else if (user.role_id === 2) navigate('/alumni');
-      else if (user.role_id === 3) navigate('/staff');
-    }
-  }, [user, navigate]);
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  if (user?.role_id === 1 && token) navigate("/student");
+  else if (user?.role_id === 2 && token) navigate("/alumni");
+  else if (user?.role_id === 3 && token) navigate("/staff");
+}, [user, navigate]);
+
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -29,11 +31,11 @@ const LandingPage = () => {
 
       login(userData, token);
 
-      if (userData.role_id === 1) {
+      if (userData.role_id === 1 && token) {
         navigate('/student');
-      } else if (userData.role_id === 2) {
+      } else if (userData.role_id === 2 && token) {
         navigate('/alumni');
-      } else if (userData.role_id === 3) {
+      } else if (userData.role_id === 3 && token) {
         navigate('/staff');
       } else {
         navigate('/');
