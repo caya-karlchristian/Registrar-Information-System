@@ -2,10 +2,19 @@ import { useState, useContext } from "react";
 import { AuthContext } from "./AuthContext"; 
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
+    const [user, setUser] = useState(() => {
+    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
+
+    if (!token || !storedUser) return null;
+
+    try {
+        return JSON.parse(storedUser);
+    } catch {
+        return null;
+    }
+    });
+
 
   const login = (userData, token) => {
     localStorage.setItem("token", token);
@@ -26,4 +35,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

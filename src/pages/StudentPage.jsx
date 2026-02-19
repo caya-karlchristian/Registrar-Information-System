@@ -40,7 +40,7 @@ const StudentPage = () => {
         </main>
 
         <button
-          onClick={() => navigate('contact')} // This directs the main content to display the email design
+          onClick={() => navigate('/student/contact')} // This directs the main content to display the email design
           className="fixed bottom-8 right-8 z-50 bg-pup-dark-maroon p-4 rounded-full shadow-2xl hover:scale-110 transition-all active:scale-95 group border-2 border-white/20"
           >
           <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
