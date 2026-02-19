@@ -11,6 +11,14 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 //  SYSTEM USERS 
 export const getSystemUsers = () => api.get("/system-users");
 export const getSystemUser = (id) => api.get(`/system-users/${id}`);
@@ -73,5 +81,7 @@ export const getRequestHistoryItem = (id) => api.get(`/request-history/${id}`);
 export const createRequestHistoryItem = (data) => api.post("/request-history", data);
 export const updateRequestHistoryItem = (id, data) => api.put(`/request-history/${id}`, data);
 export const deleteRequestHistoryItem = (id) => api.delete(`/request-history/${id}`);
+
+export const loginUser = (data) => api.post("/login", data);
 
 export default api;

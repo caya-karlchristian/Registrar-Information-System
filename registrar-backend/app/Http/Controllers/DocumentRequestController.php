@@ -4,29 +4,53 @@ namespace App\Http\Controllers;
 // gawa ni aron stephen s. cordova year 2027
 use App\Models\DocumentRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
 
 class DocumentRequestController extends Controller
 {
     public function index()
     {
-        return response()->json(
-            DocumentRequest::with(['user', 'studentProfile', 'academicRecord', 'status', 'certificationType', 'documents'])->get(),
-            200
-        );
+        $user = Auth::user();
+
+        $query = DocumentRequest::with([
+            'user',
+            'studentProfile',
+            'academicRecord',
+            'status',
+            'certificationType',
+            'documents'
+        ]);
+
+        // If NOT registrar staff
+        if ($user->role_id != 3) {
+            $query->where('user_id', $user->user_id);
+        }
+
+        return response()->json($query->get(), 200);
     }
 
-    public function show($id)
-    {
-        $requestDoc = DocumentRequest::with(['user', 'studentProfile', 'academicRecord', 'status', 'certificationType', 'documents'])->find($id);
-        if (!$requestDoc) return response()->json(['message' => 'Request not found'], 404);
 
-        return response()->json($requestDoc, 200);
+    public function show(DocumentRequest $documentRequest)
+    {
+        $this->authorize('view', $documentRequest);
+
+        return response()->json(
+            $documentRequest->load([
+                'user',
+                'studentProfile',
+                'academicRecord',
+                'status',
+                'certificationType',
+                'documents'
+            ]),
+            200
+        );
     }
 
     public function store(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|integer',
             'student_profile_id' => 'required|integer',
             'academic_record_id' => 'required|integer',
             'status_id' => 'required|integer',
@@ -40,25 +64,31 @@ class DocumentRequestController extends Controller
             'honors_dismissal_status' => 'nullable|string|max:50',
         ]);
 
-        $requestDoc = DocumentRequest::create($request->all());
+        $requestDoc = DocumentRequest::create([
+            ...$request->all(),
+            'user_id' => Auth::user()->user_id, // secure
+        ]);
+
         return response()->json($requestDoc, 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, DocumentRequest $documentRequest)
     {
-        $requestDoc = DocumentRequest::find($id);
-        if (!$requestDoc) return response()->json(['message' => 'Request not found'], 404);
+        $this->authorize('update', $documentRequest);
 
-        $requestDoc->update($request->all());
-        return response()->json($requestDoc, 200);
+        $documentRequest->update($request->all());
+
+        return response()->json($documentRequest, 200);
     }
 
-    public function destroy($id)
-    {
-        $requestDoc = DocumentRequest::find($id);
-        if (!$requestDoc) return response()->json(['message' => 'Request not found'], 404);
 
-        $requestDoc->delete();
+    public function destroy(DocumentRequest $documentRequest)
+    {
+        $this->authorize('delete', $documentRequest);
+
+        $documentRequest->delete();
+
         return response()->json(['message' => 'Request deleted'], 200);
     }
+
 }
