@@ -9,8 +9,13 @@ import {
   UserCircleIcon,
   ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthProvider"; 
+
 
 const Navigation = ({ isOpen, onItemClick }) => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const navItems = [
     { name: "Dashboard", to: "home", icon: Squares2X2Icon },
     { name: "Document Lists", to: "lists", icon: TableCellsIcon },
@@ -18,6 +23,11 @@ const Navigation = ({ isOpen, onItemClick }) => {
     { name: "Student Profile", to: "profile", icon: UserGroupIcon },
     { name: "FAQs & Support", to: "faqs", icon: QuestionMarkCircleIcon },
   ];
+
+  const handleLogout = () => {
+    logout();
+    navigate("/", { replace: true });
+  };
 
   return (
     <aside 
@@ -64,9 +74,9 @@ const Navigation = ({ isOpen, onItemClick }) => {
         </nav>
 
         <div className="p-6 mt-auto shrink-0 lg:p-3 lg:px-4">
-          <button className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded shadow-md hover:bg-[#3a0303] transition-all mb-4 w-fit font-bold text-sm uppercase">
+          <button onClick={handleLogout} className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded shadow-md hover:bg-[#3a0303] transition-all mb-4 w-fit font-bold text-sm uppercase">
             <ArrowRightStartOnRectangleIcon className="w-5 h-5" />
-            Logout {/* NEED FUNCTION TO LOG OUT USER */}
+            Logout 
           </button>
           <div className="flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase tracking-widest">
             <span>RIS @ 2026</span>

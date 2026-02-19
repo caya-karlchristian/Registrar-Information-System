@@ -18,6 +18,8 @@ import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx';
 import GenerateCertificate from './layouts/GenerateCertificate.jsx';
 import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
+import ProtectedRoute from './components/ProtectedRoute';
+
 
 const App = () => {
   return (
@@ -27,7 +29,8 @@ const App = () => {
         
         <Route path="/" element={<LandingPage />} />
         
-        <Route path="/student" element={<StudentPage />}>
+        <Route path="/student" element={
+            <ProtectedRoute allowedRoles={[1]}><StudentPage /></ProtectedRoute>}>
           <Route index element={
               <RequestForm />
             } /> {/* /student */}
@@ -53,7 +56,11 @@ const App = () => {
           } />
 
         </Route>
-          <Route path="/alumni" element={<AlumniPage />}>
+          <Route path="/alumni" element={
+            <ProtectedRoute allowedRoles={[2]}>
+              <AlumniPage />
+            </ProtectedRoute>
+            }>
           <Route index element={
             <AlumniRequest />
             } /> 
@@ -77,7 +84,11 @@ const App = () => {
           } />
         </Route>
 
-        <Route path="/staff" element={<StaffPage />}>
+        <Route path="/staff" element={
+          <ProtectedRoute allowedRoles={[3]}>
+            <StaffPage />
+          </ProtectedRoute>
+          }>
           <Route index element={
             <StaffDashboard />
             } /> {/* /staff */}

@@ -1,12 +1,53 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { loginUser } from "../services/API";
+import { useAuth } from "../context/AuthProvider";
+import risImage from "../assets/RIS1.png";
+import logoImage from "../assets/puplogoimage.png";
+
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const { user, login } = useAuth(); 
+  
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleLogin = (e) => {
+  useEffect(() => {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  if (user?.role_id === 1 && token) navigate("/student");
+  else if (user?.role_id === 2 && token) navigate("/alumni");
+  else if (user?.role_id === 3 && token) navigate("/staff");
+}, [user, navigate]);
+
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    navigate('/student'); //REMOVE THIS LATER WHEN IMPLEMENTING AUTHENTICATION LOGIC. THIS IS JUST FOR MAKING SURE THE ROUTING WORKS PROPERLY.
+
+    try {
+      const response = await loginUser({ email, password });
+
+      const token = response.data.token;
+      const userData = response.data.user;
+
+      login(userData, token);
+
+      if (userData.role_id === 1 && token) {
+        navigate('/student');
+      } else if (userData.role_id === 2 && token) {
+        navigate('/alumni');
+      } else if (userData.role_id === 3 && token) {
+        navigate('/staff');
+      } else {
+        navigate('/');
+      }
+
+    } catch (error) {
+      console.error(error);
+      alert("Invalid credentials");
+    }
   };
 
   return (
@@ -14,7 +55,7 @@ const LandingPage = () => {
       
       <div className="hidden md:block flex-1 relative items-center justify-center overflow-hidden">
         <img 
-          src='/src/assets/RIS1.png' 
+          src={risImage} 
           alt="PUP Campus" 
           className="absolute inset-0 w-full h-full object-cover scale-105"
         />
@@ -42,7 +83,7 @@ const LandingPage = () => {
 
         <div className="w-full max-w-sm flex flex-col items-center animate-fadeIn">
           
-          <img src="/src/assets/puplogoimage.png" alt="PUP Logo" className="w-24 h-24 drop-shadow-xl mb-6" />
+          <img src={logoImage} alt="PUP Logo" className="w-24 h-24 drop-shadow-xl mb-6" />
 
           <h1 className="text-3xl font-bold text-pup-dark-maroon mb-2 tracking-wide">
             Welcome Back!
@@ -52,8 +93,22 @@ const LandingPage = () => {
           </p>
 
           <form onSubmit={handleLogin} className="w-full space-y-5">
-            <InputField type="email" placeholder="Email Address" required />
-            <InputField type="password" placeholder="Password" required />
+            <InputField
+              type="email"
+              placeholder="Email Address"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+
+            <InputField
+              type="password"
+              placeholder="Password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+
 
             <button 
               type="submit"
@@ -78,13 +133,15 @@ const LandingPage = () => {
   );
 };
 
-const InputField = ({ type, placeholder, required }) => (
+const InputField = ({ type, placeholder, required, value, onChange }) => (
   <div className="w-full relative group">
     <input 
       type={type} 
       placeholder={placeholder} 
-      className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#eebc48] focus:bg-white transition-all text-sm text-gray-700 placeholder-gray-400 shadow-sm"
+      value={value}
+      onChange={onChange}
       required={required}
+      className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#eebc48] focus:bg-white transition-all text-sm text-gray-700 placeholder-gray-400 shadow-sm"
     />
   </div>
 );

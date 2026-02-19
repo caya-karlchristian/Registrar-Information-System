@@ -4,6 +4,7 @@ import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/
 import RequestDetailsModal from '../components/RequestDetailModal';
 import LoadingOverlay from "../components/LoadingOverlay";
 import ErrorToast from "../components/ErrorToast";
+import { useNavigate } from "react-router-dom";
 
 const STATUS_CONFIG = {
   1: { label: "Pending", classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
@@ -38,13 +39,24 @@ const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  // const [error, setError] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // For testing, assume student_profile_id = 1 is the logged-in student
-  const currentStudentId = 1;
+  // const user = JSON.parse(localStorage.getItem("user"));
+  // const studentProfileId = user?.student_profile_id;
+
+  const navigate = useNavigate();
+
+  useEffect(() => {
+  if (!localStorage.getItem("token")) {
+    navigate("/");
+  }
+}, [navigate]);
+
+
+
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -53,7 +65,6 @@ const StudentDashboard = () => {
         const res = await getDocumentRequests();
         // Filter requests for the current student
         const studentRequests = res.data
-          .filter((r) => r.student_profile_id === currentStudentId)
           .map((r) => {
 
             const config = STATUS_CONFIG[r.status_id] || { 
@@ -84,9 +95,9 @@ const StudentDashboard = () => {
     };
 
     fetchRequests();
-  }, [currentStudentId]);
+  }, []);
 
-  useEffect(() => {
+  useEffect(() => { 
     setCurrentPage(1);
   }, [activeTab]);
 
