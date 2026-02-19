@@ -72,7 +72,7 @@ const LogbookRecords = () => {
   const handlePrint = () => window.print();
 
   return (
-    <div className="min-h-screen font-sans text-left">
+    <div className=" relative min-h-screen font-sans text-left z-20">
       <LoadingOverlay isVisible={loading} message="Fetching Registrar Records" />
 
       <div className="max-w-350 mx-auto bg-white shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none">
