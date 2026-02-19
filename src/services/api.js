@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from "./axiosInstance";
 
 // Base URL of Laravel backend
 const API_BASE_URL = "http://127.0.0.1:8000/api";
@@ -9,6 +9,14 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 //  SYSTEM USERS 
@@ -73,5 +81,7 @@ export const getRequestHistoryItem = (id) => api.get(`/request-history/${id}`);
 export const createRequestHistoryItem = (data) => api.post("/request-history", data);
 export const updateRequestHistoryItem = (id, data) => api.put(`/request-history/${id}`, data);
 export const deleteRequestHistoryItem = (id) => api.delete(`/request-history/${id}`);
+
+export const loginUser = (data) => api.post("/login", data);
 
 export default api;

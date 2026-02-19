@@ -2,14 +2,27 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
-class SystemUser extends Model
+class SystemUser extends Authenticatable
 {
+    use HasApiTokens;
+
     protected $table = 'system_user';
     protected $primaryKey = 'user_id';
     public $timestamps = false;
-    protected $guarded = [];
+
+    protected $fillable = [
+        'name',
+        'email',
+        'password'
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
     public function studentProfile()
     {
