@@ -6,10 +6,11 @@ import { useAuth } from "../context/AuthProvider";
 const LandingPage = () => {
   const navigate = useNavigate();
   const { user, login } = useAuth(); 
-
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
+  
+  console.log("Auth check:", useAuth());
   useEffect(() => {
   const token = localStorage.getItem("token");
   if (!token) return;
