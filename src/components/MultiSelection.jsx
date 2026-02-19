@@ -54,7 +54,7 @@ const MultiSelectDropdown = ({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full bg-white p-2.5 rounded border border-gray-300 cursor-pointer flex justify-between items-center min-h-[40px] focus:outline-none focus:ring-2 focus:ring-pup-yellow focus:border-pup-maroon text-left"
+        className="w-full bg-white p-2.5 rounded border border-gray-300 cursor-pointer flex justify-between items-center min-h-[40px] focus:outline-none focus:ring-2 focus:ring-[#FFC72C] focus:border-pup-maroon text-left"
       >
         <div className="flex flex-wrap gap-1">
           {selectedValues.length === 0 ? (

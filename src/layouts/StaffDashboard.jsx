@@ -226,9 +226,9 @@ const StaffDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen pb-10">
+    <div className="relative min-h-screen pb-10 z-20">
+      <main className="max-w-7xl mx-auto px-6 py-8 ">
       <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
-      <main className="max-w-7xl mx-auto px-6 py-8">
 
         {/* ---------------- CARDS ---------------- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
