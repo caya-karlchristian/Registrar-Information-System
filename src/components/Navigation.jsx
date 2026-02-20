@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavLink, useNavigate  } from 'react-router-dom';
 import { 
   Squares2X2Icon, 
@@ -10,7 +10,7 @@ import {
   ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider"; 
-
+import ConfirmationModal from "../components/ConfirmationModal";
 
 const Navigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
@@ -23,12 +23,31 @@ const Navigation = ({ isOpen, onItemClick }) => {
     { name: "FAQs & Support", to: "faqs", icon: QuestionMarkCircleIcon },
   ];
 
-  const handleLogout = () => {
-    logout();
-    navigate("/", { replace: true });
+const [modal, setModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'default',
+    onConfirm: () => {},
+  });
+
+  const handleLogoutClick = () => {
+    setModal({
+      isOpen: true,
+      title: 'Logout Session',
+      message: 'Are you sure you want to log out? Any unsaved changes in the registrar system may be lost.',
+      type: 'default', 
+      onConfirm: () => {
+        logout();
+        navigate("/", { replace: true });
+      }
+    });
   };
 
+  const closeModal = () => setModal({ ...modal, isOpen: false });
+
   return (
+    <>
     <aside 
       className={`
         fixed z-40 w-72      
@@ -73,7 +92,7 @@ const Navigation = ({ isOpen, onItemClick }) => {
         </nav>
 
         <div className="p-6 mt-auto shrink-0 lg:p-3 lg:px-4">
-          <button onClick={handleLogout} className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded shadow-md hover:bg-[#3a0303] transition-all mb-4 w-fit font-bold text-sm uppercase">
+          <button onClick={handleLogoutClick} className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded shadow-md hover:bg-[#3a0303] transition-all mb-4 w-fit font-bold text-sm uppercase">
             <ArrowRightStartOnRectangleIcon className="w-5 h-5" />
             Logout 
           </button>
@@ -84,6 +103,15 @@ const Navigation = ({ isOpen, onItemClick }) => {
         </div>
       </div>
     </aside>
+    <ConfirmationModal
+        isOpen={modal.isOpen}
+        onClose={closeModal}
+        onConfirm={modal.onConfirm}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+      />
+    </>
   );
 };
 

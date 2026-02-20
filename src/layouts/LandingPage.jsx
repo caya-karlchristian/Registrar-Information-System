@@ -85,7 +85,7 @@ const LandingPage = () => {
           
           <img src={logoImage} alt="PUP Logo" className="w-24 h-24 drop-shadow-xl mb-6" />
 
-          <h1 className="text-3xl font-bold text-pup-dark-maroon mb-2 tracking-wide">
+          <h1 className="text-3xl font-bold text-[#800000] mb-2 tracking-wide">
             Welcome Back!
           </h1>
           <p className="text-sm text-gray-500 mb-8 font-medium">
