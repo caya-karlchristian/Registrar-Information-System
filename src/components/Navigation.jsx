@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate  } from 'react-router-dom';
 import { 
   Squares2X2Icon, 
   TableCellsIcon, 
@@ -9,7 +9,6 @@ import {
   UserCircleIcon,
   ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthProvider"; 
 
 
