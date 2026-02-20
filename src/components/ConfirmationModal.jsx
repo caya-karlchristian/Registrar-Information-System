@@ -7,7 +7,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, type = 
   const isDanger = type === 'danger';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-10000 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="w-100 h-80 bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-between p-7 animate-in fade-in zoom-in duration-200">
         
         <div className={`p-4 rounded-full ${isDanger ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
