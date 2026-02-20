@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink } from 'react-router-dom';
+import { NavLink,  useNavigate  } from 'react-router-dom';
 import { 
   Squares2X2Icon, 
   ChartBarSquareIcon, 
@@ -8,8 +8,12 @@ import {
   DocumentCheckIcon,
   ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
+import { useAuth } from "../context/AuthProvider"; 
+
 
 const StaffNavigation = ({ isOpen, onItemClick }) => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const navItems = [
     { name: "Dashboard", to: "dashboard", icon: Squares2X2Icon },
     { name: "Staff Analytics", to: "analytics", icon: ChartBarSquareIcon },
@@ -17,6 +21,11 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
     { name: "Staff Logbook", to: "logbook", icon: BookOpenIcon },
     { name: "Staff Profile", to: "profile", icon: UserCircleIcon },
   ];
+
+  const handleLogout = () => {
+    logout();
+    navigate("/", { replace: true });
+  };
 
   return (
     <aside 
@@ -63,7 +72,7 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
         </nav>
 
         <div className="p-6 mt-auto shrink-0 lg:p-3 lg:px-4">
-          <button className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded shadow-md hover:bg-[#3a0303] transition-all mb-4 w-fit font-bold text-sm uppercase">
+          <button onClick={handleLogout} className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded shadow-md hover:bg-[#3a0303] transition-all mb-4 w-fit font-bold text-sm uppercase">
             <ArrowRightStartOnRectangleIcon className="w-5 h-5" />
             Logout {/* NEED FUNCTION TO LOG OUT USER */}
           </button>
