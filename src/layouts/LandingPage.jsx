@@ -4,6 +4,7 @@ import { loginUser } from "../services/API";
 import { useAuth } from "../context/AuthProvider";
 import risImage from "../assets/RIS1.png";
 import logoImage from "../assets/puplogoimage.png";
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
 
 
 const LandingPage = () => {
@@ -109,7 +110,6 @@ const LandingPage = () => {
               onChange={(e) => setPassword(e.target.value)}
             />
 
-
             <button 
               type="submit"
               className="w-full py-3.5 px-4 bg-pup-dark-maroon hover:bg-[#600000] text-white font-bold rounded-lg shadow-md transition-all transform active:scale-95"
@@ -121,9 +121,23 @@ const LandingPage = () => {
           <div className="mt-5 text-[10px] text-gray-400 leading-tight text-center">
             <p>
               By using this service, you agree to the PUP Online Services <br />
-              <button className="text-blue-500 hover:underline mx-1">Terms of Use</button> 
-              and 
-              <button className="text-blue-500 hover:underline mx-1">Privacy Statement</button>.
+              <a
+                href="https://www.pup.edu.ph/terms/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline mx-1"
+              >
+                Terms of Use
+              </a>
+              and
+              <a
+                href="https://www.pup.edu.ph/privacy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline mx-1"
+              >
+                Privacy Statement
+              </a>.
             </p>
           </div>
 
@@ -133,17 +147,36 @@ const LandingPage = () => {
   );
 };
 
-const InputField = ({ type, placeholder, required, value, onChange }) => (
-  <div className="w-full relative group">
-    <input 
-      type={type} 
-      placeholder={placeholder} 
-      value={value}
-      onChange={onChange}
-      required={required}
-      className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#eebc48] focus:bg-white transition-all text-sm text-gray-700 placeholder-gray-400 shadow-sm"
-    />
-  </div>
-);
+const InputField = ({ type, placeholder, required, value, onChange }) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === 'password';
+  const inputType = isPassword ? (showPassword ? 'text' : 'password') : type;
 
+  return (
+    <div className="w-full relative group">
+      <input 
+        type={inputType} 
+        placeholder={placeholder} 
+        value={value}
+        onChange={onChange}
+        required={required}
+        className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#eebc48] focus:bg-white transition-all text-sm text-gray-700 placeholder-gray-400 shadow-sm pr-11"
+      />
+      {isPassword && (
+        <button
+          type="button"
+          onClick={() => setShowPassword(prev => !prev)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+          tabIndex={-1}
+        >
+          {showPassword ? (
+            <EyeIcon className="w-5 h-5" />
+          ) : (
+            <EyeSlashIcon className="w-5 h-5" />
+          )}
+        </button>
+      )}
+    </div>
+  );
+};
 export default LandingPage;
