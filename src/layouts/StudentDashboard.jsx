@@ -88,7 +88,7 @@ const StudentDashboard = () => {
           });
         setRequests(studentRequests);
       } catch (err) {
-        setError("Failed to fetch document requests.");
+        console.error("Failed to fetch document requests.", err);
       } finally {
         setLoading(false);
       }
@@ -114,7 +114,7 @@ const StudentDashboard = () => {
     <main className="max-w-6xl mx-auto -mt-1 relative z-20  ">
       <LoadingOverlay isVisible={loading} message="Syncing Requested Documents..." />
 
-      <ErrorToast message={error} onClose={() => setError("")} />
+      {/* <ErrorToast message={error} onClose={() => setError("")} /> */}
       <div className="grid grid-cols-3 gap-4 place-items-center mb-5">
         {TABS.map((tab) => (
           <div key={tab.value} className="w-full flex justify-center">
