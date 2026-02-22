@@ -17,7 +17,7 @@ const Section = ({ title, children }) => {
   const [open, setOpen] = useState(true);
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-lg overflow-hidden ">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -36,6 +36,7 @@ const Section = ({ title, children }) => {
 
 const RequestDetailsModal = ({ request, onClose }) => {
   const [docTypes, setDocTypes] = useState([]);
+  
   useEffect(() => {
     const fetchTypes = async () => {
       try {
@@ -72,8 +73,8 @@ const RequestDetailsModal = ({ request, onClose }) => {
   const displayStatus = request.status?.status_name || request.status || 'N/A';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl lg:max-w-3xl flex flex-col max-h-[90vh] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm ">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl lg:max-w-4xl flex flex-col max-h-[80vh] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none mt-25 ml-65">
 
         {/* Header */}
         <div className="bg-pup-maroon px-6 py-4 flex justify-between items-center shrink-0">

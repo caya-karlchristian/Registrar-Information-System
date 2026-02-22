@@ -3,29 +3,23 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   CheckCircleIcon,
-  XCircleIcon,
   EyeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   TrashIcon,
 } from '@heroicons/react/24/solid';
-import { getDocumentRequests, 
+import { getDocumentRequests,
+  getRequestStatuses, 
+  getDocumentTypes,  
   updateDocumentRequest, 
   deleteDocumentRequest 
 } from '../services/API';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
+import ErrorToast from '../components/ErrorToast.jsx';
 
 /* ---------------- STATUS IDS ---------------- */
-const STATUS = {
-  PENDING: 1,
-  READY: 2,
-  COMPLETED: 3,
-  PROCESSING: 4,
-  REJECTED: 5,
-};
-
 const ITEMS_PER_PAGE = 8;
 
 const StaffDashboard = () => {
@@ -40,31 +34,84 @@ const StaffDashboard = () => {
   const [sortOrder, setSortOrder] = useState('desc'); 
   const [selectedIds, setSelectedIds] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [error, setError] = useState(null);
+  const [statuses, setStatuses] = useState([]);
+  const [statusMap, setStatusMap] = useState({});
+  const [docTypeMap, setDocTypeMap] = useState({});
+
+  const STATUS = React.useMemo(() => ({
+    PENDING: statusMap["Pending"] || null,
+    READY: statusMap["Ready to claim"] || null,
+    COMPLETED: statusMap["Completed"] || null,
+    FORFEITED: statusMap["Forfeited"] || null,
+  }), [statusMap]);
+
+  useEffect(() => {
+  const fetchConfigs = async () => {
+    try {
+
+      const [statusRes, docTypeRes] = await Promise.all([
+        getRequestStatuses(),
+        getDocumentTypes()
+      ]);
+
+      setStatuses(statusRes.data);
+
+      const sMap = statusRes.data.reduce((acc, s) => {
+        acc[s.status_name] = s.status_id;
+        return acc;
+      }, {});
+
+      setStatusMap(sMap);
+
+      setDocTypeMap(
+        docTypeRes.data.reduce((acc, d) => {
+          acc[d.document_type_id] = d.document_name;
+          return acc;
+        }, {})
+      );
+
+    } catch (err) {
+      console.error("Failed to fetch configs", err);
+    }
+  };
+
+  fetchConfigs();
+}, []);
 
   /* ---------------- FETCH DATA ---------------- */
   const fetchData = useCallback(async () => {
-    const documentTypeMap = {
-      1: "Certificate of Good Moral Character",
-      2: "Certification, Authentication, Verification (CAV) / APOSTILE",
-      3: "Authentication/Certified True Copy - Local",
-      4: "Informative Copy of Grades",
-      5: "CAV - CHED",
-      6: "CAV - WES/CES",
-      7: "Cross-enrollment Fee",
-      8: "Re-admission Fee",
-      9: "Admission Fee for Transfer Students (From Private School)",
-      10: "Admission Fee for Transfer Students (From SUCs)",
-      11: "New Copy of Registration Card (With Affidavit of Loss)",
-      12: "Diploma",
-      13: "Accreditation Fee",
-      14: "Completion Fee",
-      15: "Transcript of Records",
-      16: "Correction in Student Information System",
-    };
+    if (Object.keys(statusMap).length === 0) {
+      setLoading(true);
+      return;
+    }
     try {
+      setLoading(true);
       const res = await getDocumentRequests();
 
-      const formatted = res.data.map(r => ({
+      const formatted = res.data.map(r => {
+      const requestDate = r.requested_at ? new Date(r.requested_at) : null;
+      const now = new Date();
+      const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
+
+      let computedStatusId = r.status?.status_id;
+      let computedStatusName = r.status?.status_name;
+
+
+      //UPDATE WHEN FORFEITED IS ADDED IN THE DATABASE
+      const alreadyForfeited = r.status?.status_name === "Forfeited";
+
+      if (!alreadyForfeited &&
+          computedStatusName !== "Completed" &&
+          diffDays >= 90) {
+        computedStatusId = STATUS.FORFEITED;
+        computedStatusName = "Forfeited";
+        updateDocumentRequest(r.request_id, { status_id: STATUS.FORFEITED }).catch(err => {
+          console.error(`Failed to forfeit request ${r.request_id}:`, err);
+        });
+      }
+
+      return {
         id: r.request_id,
         studentName: r.student_profile
           ? `${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`
@@ -76,8 +123,7 @@ const StaffDashboard = () => {
           if (r.certification_type) docs.push(`Certification: ${r.certification_type.cert_name}`);
           if (r.documents && r.documents.length > 0) {
             r.documents.forEach(d => {
-              const name = documentTypeMap[d.document_type_id] || "Unknown Document";
-              docs.push(name);
+            const name = docTypeMap[d.document_type_id] || "Unknown Document";              docs.push(name);
             });
           }
           return docs.length > 0 ? docs.join(', ') : 'N/A';
@@ -98,25 +144,21 @@ const StaffDashboard = () => {
             })
           : '',
 
-          progress: 
-          r.status?.status_id === 1 ? 25 : 
-          r.status?.status_id === 4 ? 50 : 
-          r.status?.status_id === 2 ? 100 : 
-          r.status?.status_id === 3 ? 100 : 0,
-          
-        statusId: r.status?.status_id,
-        statusName: r.status?.status_name,
+        statusId: computedStatusId,
+        statusName: computedStatusName,
         timestamp: r.requested_at ? new Date(r.requested_at).getTime() : 0,
-      }));
+      };
+    });
 
-      setRawRequests(res.data);
-      setRequests(formatted);
-    } catch (error) {
-      console.error('Error fetching document requests:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setRawRequests(res.data);
+    setRequests(formatted);
+  } catch (error) {
+    console.error('Error fetching document requests:', error);
+    setError('Failed to load requests.');
+  } finally {
+    setLoading(false);
+  }
+  }, [statusMap, STATUS, docTypeMap]);
 
   useEffect(() => {
     fetchData();
@@ -141,18 +183,29 @@ const StaffDashboard = () => {
 
   /* ---------------- FILTERED + SORTED DATA ---------------- */
   const filteredData = requests
-    .filter(r => {
-      const matchesStatus =
-        filterStatus === 'All' ||
-        (filterStatus === 'History' && (r.statusId === STATUS.COMPLETED || r.statusId === STATUS.REJECTED)) ||
-        r.statusName === filterStatus;
-      const matchesSearch =
-        r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.id.toString().includes(searchTerm);
-      return matchesStatus && matchesSearch;
-    })
-    .sort((a, b) => (sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp));
+  .filter(r => {
+
+    if (r.statusName === "Processing" || r.statusName === "Rejected") return false;
+
+    const matchesStatus =
+      filterStatus === 'All' ||
+      (filterStatus === 'History' &&
+        (r.statusId === STATUS.COMPLETED ||
+         r.statusId === STATUS.FORFEITED)) ||
+      r.statusName === filterStatus;
+
+    const matchesSearch =
+      r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.id.toString().includes(searchTerm);
+
+    return matchesStatus && matchesSearch;
+  })
+  .sort((a, b) =>
+    sortOrder === 'asc'
+      ? a.timestamp - b.timestamp
+      : b.timestamp - a.timestamp
+  );
 
   /* ---------------- PAGINATION ---------------- */
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
@@ -167,10 +220,9 @@ const StaffDashboard = () => {
   const getStatusBadge = status => {
     const styles = {
       Pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      Processing: 'bg-blue-100 text-blue-700 border-blue-200',
       'Ready to claim': 'bg-green-100 text-green-700 border-green-200',
-      Rejected: 'bg-red-100 text-red-700 border-red-200',
       Completed: 'bg-gray-200 text-gray-700 border-gray-300',
+      Forfeited: 'bg-red-100 text-red-700 border-red-200',
     };
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${styles[status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -226,14 +278,14 @@ const StaffDashboard = () => {
   };
 
   return (
-    <div className="relative min-h-screen pb-10 z-20">
-      <main className="max-w-7xl mx-auto px-6 py-8 ">
+    <div className="relative min-h-screen z-20">
+      <main className="max-w-7xl mx-auto">
       <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
+      <ErrorToast message={error} onClose={() => setError(null)} />
 
         {/* ---------------- CARDS ---------------- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">          
           <StatCard title="New Requests" count={requests.filter(r => r.statusId === STATUS.PENDING).length} color="yellow" />
-          <StatCard title="Processing" count={requests.filter(r => r.statusId === STATUS.PROCESSING).length} color="blue" />
           <StatCard title="Ready for Pickup" count={requests.filter(r => r.statusId === STATUS.READY).length} color="green" />
         </div>
 
@@ -243,7 +295,9 @@ const StaffDashboard = () => {
           {/* 1. TOGGLE: Show "Delete Selected" OR "Search Bar" */}
           {selectedIds.length > 0 ? (
             <div className="flex items-center gap-4 bg-red-50 p-2 rounded-lg border border-red-100">
-              <span className="text-red-700 font-bold text-sm ml-2">{selectedIds.length} Selected</span>
+              <span className="text-red-700 font-bold text-sm ml-2">
+                {selectedIds.length} Selected
+              </span>             
               <button 
                 onClick={handleDeleteSelected}
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
@@ -273,7 +327,6 @@ const StaffDashboard = () => {
             >
               <option value="All">All</option>
               <option value="Pending">Pending</option>
-              <option value="Processing">Processing</option>
               <option value="Ready to claim">Ready to claim</option>
               <option value="History">History</option>
             </select>
@@ -327,7 +380,7 @@ const StaffDashboard = () => {
                   <Td>{req.id}</Td>
                   <Td>
                     <div>
-                      <div className="font-bold">{req.studentName}</div>
+                      <div className="font-bold text-xs">{req.studentName}</div>
                       <div className="text-xs text-gray-400">{req.studentNumber}</div>
                     </div>
                   </Td>
@@ -335,7 +388,7 @@ const StaffDashboard = () => {
                     {req.docType.length > 50 ? (
                       <div className="relative group">
                         <span>{req.docType.slice(0, 50)}...</span>
-                        <div className="absolute left-0 top-full mt-1 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <div className="absolute left-0 top-full mt-1 w-max max-w-xs p-2 bg-gray-700 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           {req.docType}
                         </div>
                       </div>
@@ -350,44 +403,24 @@ const StaffDashboard = () => {
                   <Td center><span className="font-semibold text-gray-700">{req.copies}</span><span> ...</span></Td>
                   <Td center>{getStatusBadge(req.statusName)}</Td>
                   <Td center>
-                    <div className="flex items-center justify-end gap-2 min-w-[200px]">
-                      {req.statusId === STATUS.PENDING && (
-                        <>
-                          <button
-                            disabled={updatingId === req.id}
-                            onClick={() => handleStatusUpdate(req.id, STATUS.PROCESSING)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg shadow disabled:opacity-50"
-                          >
-                            <CheckCircleIcon className="w-4 h-4" /> Approve
-                          </button>
-
-                          <button
-                            disabled={updatingId === req.id}
-                            onClick={() => handleStatusUpdate(req.id, STATUS.REJECTED)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg shadow disabled:opacity-50"
-                          >
-                            <XCircleIcon className="w-4 h-4" /> Reject
-                          </button>
-                        </>
-                      )}
-
-                      {req.statusId === STATUS.PROCESSING && (
+                    <div className="flex items-center justify-end gap-2 min-w-[150px]">                  
+                      {req.statusId === STATUS.PENDING && (                        
                         <button
                           disabled={updatingId === req.id}
-                          onClick={() => handleStatusUpdate(req.id, STATUS.READY)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg shadow disabled:opacity-50"
+                          onClick={() => handleStatusUpdate(req.id, statuses.find(s => s.status_name === "Ready to claim")?.status_id)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95"
                         >
                           <CheckCircleIcon className="w-4 h-4" /> Ready
                         </button>
                       )}
 
-                      {req.statusId === STATUS.READY && (
+                      {req.statusId === STATUS.READY && (                        
                         <button
                           disabled={updatingId === req.id}
-                          onClick={() => handleStatusUpdate(req.id, STATUS.COMPLETED)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold rounded-lg shadow disabled:opacity-50"
+                          onClick={() => handleStatusUpdate(req.id, statuses.find(s => s.status_name === "Completed")?.status_id)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95"
                         >
-                          <CheckCircleIcon className="w-4 h-4" /> Done
+                          <CheckCircleIcon className="w-5 h-4" /> Done
                         </button>
                       )}
                       <button
