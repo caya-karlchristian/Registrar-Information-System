@@ -3,6 +3,7 @@ import { getDocumentRequests} from "../services/API";
 import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import { useNavigate } from "react-router-dom";
+import { useAuth } from '../context/AuthProvider';
 
 const STATUS_CONFIG = {
   1: { label: "Pending", classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
@@ -37,10 +38,11 @@ const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  // const [error, setError] = useState("");
+  const [error, setError] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const { user } = useAuth();
 
   // const user = JSON.parse(localStorage.getItem("user"));
   // const studentProfileId = user?.student_profile_id;
@@ -48,12 +50,10 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-  if (!localStorage.getItem("token")) {
+  if (!user) {
     navigate("/");
   }
-}, [navigate]);
-
-
+}, [user, navigate]);
 
 
   useEffect(() => {
