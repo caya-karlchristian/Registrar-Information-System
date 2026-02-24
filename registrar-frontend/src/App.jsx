@@ -16,7 +16,6 @@ import StaffDashboard from './layouts/StaffDashboard.jsx';
 import Logbook from './layouts/Logbook.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx';
-import GenerateCertificate from './layouts/GenerateCertificate.jsx';
 import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -97,9 +96,6 @@ const App = () => {
             } />
           <Route path="analytics" element={
             <AnalyticsDashboard />
-            } />
-          <Route path="certification" element={
-            <GenerateCertificate/>
             } />
           <Route path="logbook" element={
             <Logbook />
