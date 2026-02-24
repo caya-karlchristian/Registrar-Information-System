@@ -7,19 +7,27 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   TrashIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/solid';
-import { getDocumentRequests,
-  getRequestStatuses, 
-  getDocumentTypes,  
+import { getDocumentRequests, 
   updateDocumentRequest, 
   deleteDocumentRequest 
 } from '../services/API';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
-import ErrorToast from '../components/ErrorToast.jsx';
+import CertificateModal from '../components/CertificateModal.jsx';
 
 /* ---------------- STATUS IDS ---------------- */
+const STATUS = {
+  PENDING: 1,
+  READY: 2,
+  COMPLETED: 3,
+  // PROCESSING: 4,
+  // REJECTED: 5,
+  FORFEITED: 6, // UPDATE THIS ID TO MATCH THE DATABASE
+};
+
 const ITEMS_PER_PAGE = 8;
 
 const StaffDashboard = () => {
@@ -34,131 +42,111 @@ const StaffDashboard = () => {
   const [sortOrder, setSortOrder] = useState('desc'); 
   const [selectedIds, setSelectedIds] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [error, setError] = useState(null);
-  const [statuses, setStatuses] = useState([]);
-  const [statusMap, setStatusMap] = useState({});
-  const [docTypeMap, setDocTypeMap] = useState({});
-
-  const STATUS = React.useMemo(() => ({
-    PENDING: statusMap["Pending"] || null,
-    READY: statusMap["Ready to claim"] || null,
-    COMPLETED: statusMap["Completed"] || null,
-    FORFEITED: statusMap["Forfeited"] || null,
-  }), [statusMap]);
-
-  useEffect(() => {
-  const fetchConfigs = async () => {
-    try {
-
-      const [statusRes, docTypeRes] = await Promise.all([
-        getRequestStatuses(),
-        getDocumentTypes()
-      ]);
-
-      setStatuses(statusRes.data);
-
-      const sMap = statusRes.data.reduce((acc, s) => {
-        acc[s.status_name] = s.status_id;
-        return acc;
-      }, {});
-
-      setStatusMap(sMap);
-
-      setDocTypeMap(
-        docTypeRes.data.reduce((acc, d) => {
-          acc[d.document_type_id] = d.document_name;
-          return acc;
-        }, {})
-      );
-
-    } catch (err) {
-      console.error("Failed to fetch configs", err);
-    }
-  };
-
-  fetchConfigs();
-}, []);
+  const [certRequest, setCertRequest] = useState(null); // ← NEW
 
   /* ---------------- FETCH DATA ---------------- */
   const fetchData = useCallback(async () => {
-    if (Object.keys(statusMap).length === 0) {
-      setLoading(true);
-      return;
-    }
+    const documentTypeMap = {
+      1: "Certificate of Good Moral Character",
+      2: "Certification, Authentication, Verification (CAV) / APOSTILE",
+      3: "Authentication/Certified True Copy - Local",
+      4: "Informative Copy of Grades",
+      5: "CAV - CHED",
+      6: "CAV - WES/CES",
+      7: "Cross-enrollment Fee",
+      8: "Re-admission Fee",
+      9: "Admission Fee for Transfer Students (From Private School)",
+      10: "Admission Fee for Transfer Students (From SUCs)",
+      11: "New Copy of Registration Card (With Affidavit of Loss)",
+      12: "Diploma",
+      13: "Accreditation Fee",
+      14: "Completion Fee",
+      15: "Transcript of Records",
+      16: "Correction in Student Information System",
+    };
     try {
-      setLoading(true);
       const res = await getDocumentRequests();
 
       const formatted = res.data.map(r => {
-      const requestDate = r.requested_at ? new Date(r.requested_at) : null;
-      const now = new Date();
-      const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
+        const requestDate = r.requested_at ? new Date(r.requested_at) : null;
+        const now = new Date();
+        const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
 
-      let computedStatusId = r.status?.status_id;
-      let computedStatusName = r.status?.status_name;
+        let computedStatusId = r.status?.status_id;
+        let computedStatusName = r.status?.status_name;
 
+        // Auto-forfeit if older than 90 days 
+        const alreadyForfeited = r.status?.status_name === "Forfeited";
+        if (!alreadyForfeited && computedStatusName !== "Completed" && diffDays >= 90) {
+          computedStatusId = STATUS.FORFEITED;
+          computedStatusName = "Forfeited";
+          updateDocumentRequest(r.request_id, { status_id: STATUS.FORFEITED }).catch(err => {
+            console.error(`Failed to forfeit request ${r.request_id}:`, err);
+          });
+        }
 
-      //UPDATE WHEN FORFEITED IS ADDED IN THE DATABASE
-      const alreadyForfeited = r.status?.status_name === "Forfeited";
+        return {
+          id: r.request_id,
+          studentName: r.student_profile
+            ? `${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`
+            : 'N/A',
+          studentNumber: r.academic_record?.student_number ?? 'N/A',
+          copies: r.number_of_copies || 1,
+          // Extra fields for cert pre-fill
+          certName: r.certification_type?.cert_name ?? null,
+          course: r.student_profile?.course ?? '',
+          major: r.student_profile?.major ?? '',
+          educationLevel: r.student_profile?.education_level ?? '',
+          syAdmitted: r.academic_record?.sy_admitted ?? '',
+          dateGraduated: r.academic_record?.date_graduated ?? '',
+          diplomaNum: r.academic_record?.diploma_number ?? '',
+          eventTitle: r.event_title ?? '',
+          docType: (() => {
+            const docs = [];
+            if (r.certification_type) docs.push(`Certification: ${r.certification_type.cert_name}`);
+            if (r.documents && r.documents.length > 0) {
+              r.documents.forEach(d => {
+                const name = documentTypeMap[d.document_type_id] || "Unknown Document";
+                docs.push(name);
+              });
+            }
+            return docs.length > 0 ? docs.join(', ') : 'N/A';
+          })(),
+          date: r.requested_at
+            ? new Date(r.requested_at).toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+              })
+            : 'N/A',
+          time: r.requested_at
+            ? new Date(r.requested_at).toLocaleTimeString('en-GB', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+              })
+            : '',
 
-      if (!alreadyForfeited &&
-          computedStatusName !== "Completed" &&
-          diffDays >= 90) {
-        computedStatusId = STATUS.FORFEITED;
-        computedStatusName = "Forfeited";
-        updateDocumentRequest(r.request_id, { status_id: STATUS.FORFEITED }).catch(err => {
-          console.error(`Failed to forfeit request ${r.request_id}:`, err);
-        });
-      }
+          progress:
+            computedStatusId === STATUS.PENDING ? 25 :
+            computedStatusId === STATUS.READY ? 75 :
+            computedStatusId === STATUS.COMPLETED ? 100 : 0,
 
-      return {
-        id: r.request_id,
-        studentName: r.student_profile
-          ? `${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`
-          : 'N/A',
-        studentNumber: r.academic_record?.student_number ?? 'N/A',
-        copies: r.number_of_copies || 1,
-        docType: (() => {
-          const docs = [];
-          if (r.certification_type) docs.push(`Certification: ${r.certification_type.cert_name}`);
-          if (r.documents && r.documents.length > 0) {
-            r.documents.forEach(d => {
-            const name = docTypeMap[d.document_type_id] || "Unknown Document";              docs.push(name);
-            });
-          }
-          return docs.length > 0 ? docs.join(', ') : 'N/A';
-        })(),
-        date: r.requested_at
-          ? new Date(r.requested_at).toLocaleDateString('en-GB', {
-              day: '2-digit',
-              month: 'long',
-              year: 'numeric',
-            })
-          : 'N/A',
-        time: r.requested_at
-          ? new Date(r.requested_at).toLocaleTimeString('en-GB', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: false,
-            })
-          : '',
+          statusId: computedStatusId,
+          statusName: computedStatusName,
+          timestamp: r.requested_at ? new Date(r.requested_at).getTime() : 0,
+        };
+      });
 
-        statusId: computedStatusId,
-        statusName: computedStatusName,
-        timestamp: r.requested_at ? new Date(r.requested_at).getTime() : 0,
-      };
-    });
-
-    setRawRequests(res.data);
-    setRequests(formatted);
-  } catch (error) {
-    console.error('Error fetching document requests:', error);
-    setError('Failed to load requests.');
-  } finally {
-    setLoading(false);
-  }
-  }, [statusMap, STATUS, docTypeMap]);
+      setRawRequests(res.data);
+      setRequests(formatted);
+    } catch (error) {
+      console.error('Error fetching document requests:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -183,29 +171,18 @@ const StaffDashboard = () => {
 
   /* ---------------- FILTERED + SORTED DATA ---------------- */
   const filteredData = requests
-  .filter(r => {
-
-    if (r.statusName === "Processing" || r.statusName === "Rejected") return false;
-
-    const matchesStatus =
-      filterStatus === 'All' ||
-      (filterStatus === 'History' &&
-        (r.statusId === STATUS.COMPLETED ||
-         r.statusId === STATUS.FORFEITED)) ||
-      r.statusName === filterStatus;
-
-    const matchesSearch =
-      r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.id.toString().includes(searchTerm);
-
-    return matchesStatus && matchesSearch;
-  })
-  .sort((a, b) =>
-    sortOrder === 'asc'
-      ? a.timestamp - b.timestamp
-      : b.timestamp - a.timestamp
-  );
+    .filter(r => {
+      const matchesStatus =
+        filterStatus === 'All' ||
+        (filterStatus === 'History' && (r.statusId === STATUS.COMPLETED || r.statusId === STATUS.FORFEITED)) ||
+        r.statusName === filterStatus;
+      const matchesSearch =
+        r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.id.toString().includes(searchTerm);
+      return matchesStatus && matchesSearch;
+    })
+    .sort((a, b) => (sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp));
 
   /* ---------------- PAGINATION ---------------- */
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
@@ -233,7 +210,6 @@ const StaffDashboard = () => {
 
   // ---------------- BULK DELETE HANDLERS ---------------- */
   // NEED BACKEND SUPPORT FOR BULK DELETE ----- IMPORTANT -----
-  // 1. Handle "Select All" checkbox in the header
   const handleSelectAll = (e) => {
     if (e.target.checked) {
       const allIds = currentItems.map(item => item.id);
@@ -243,14 +219,13 @@ const StaffDashboard = () => {
     }
   };
 
-  // 2. Handle individual row checkbox
   const handleSelectOne = (id) => {
     if (selectedIds.includes(id)) {
-        setSelectedIds(selectedIds.filter(itemId => itemId !== id));
-      } else {
-        setSelectedIds([...selectedIds, id]);
-      }
-    };
+      setSelectedIds(selectedIds.filter(itemId => itemId !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
 
   const handleDeleteSelected = () => {
     if (selectedIds.length === 0) return;
@@ -260,31 +235,24 @@ const StaffDashboard = () => {
   const confirmDeleteSelected = async () => {
     try {
       setLoading(true);
-
-      await Promise.all(
-        selectedIds.map(id => deleteDocumentRequest(id))
-      );
-
+      await Promise.all(selectedIds.map(id => deleteDocumentRequest(id)));
       setSelectedIds([]);
       setShowDeleteConfirm(false);
       await fetchData();
-
     } catch (err) {
       console.error("Delete failed", err);
-      setError("Failed to delete selected requests.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="relative min-h-screen z-20">
-      <main className="max-w-7xl mx-auto">
-      <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
-      <ErrorToast message={error} onClose={() => setError(null)} />
+    <div className="relative min-h-screen pb-10 z-20">
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
 
         {/* ---------------- CARDS ---------------- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">          
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <StatCard title="New Requests" count={requests.filter(r => r.statusId === STATUS.PENDING).length} color="yellow" />
           <StatCard title="Ready for Pickup" count={requests.filter(r => r.statusId === STATUS.READY).length} color="green" />
         </div>
@@ -292,12 +260,9 @@ const StaffDashboard = () => {
         {/* ---------------- TOOLBAR ---------------- */}
         <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
           
-          {/* 1. TOGGLE: Show "Delete Selected" OR "Search Bar" */}
           {selectedIds.length > 0 ? (
             <div className="flex items-center gap-4 bg-red-50 p-2 rounded-lg border border-red-100">
-              <span className="text-red-700 font-bold text-sm ml-2">
-                {selectedIds.length} Selected
-              </span>             
+              <span className="text-red-700 font-bold text-sm ml-2">{selectedIds.length} Selected</span>
               <button 
                 onClick={handleDeleteSelected}
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
@@ -317,7 +282,6 @@ const StaffDashboard = () => {
             </div>
           )} 
 
-          {/* 2. FILTERS: These stay visible all the time */}
           <div className="flex items-center gap-2 relative">
             <FunnelIcon className="h-5 w-5 text-gray-500" />
             <select
@@ -331,7 +295,6 @@ const StaffDashboard = () => {
               <option value="History">History</option>
             </select>
 
-            {/* Sort Order */}
             <select
               value={sortOrder}
               onChange={e => setSortOrder(e.target.value)}
@@ -342,7 +305,6 @@ const StaffDashboard = () => {
             </select>
           </div>
         </div>
-        
 
         {/* ---------------- TABLE ---------------- */}
         <div className="bg-white rounded-xl shadow border overflow-x-auto">
@@ -350,13 +312,13 @@ const StaffDashboard = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-4 w-10 text-center">
-                <input 
-                  type="checkbox" 
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                  onChange={handleSelectAll}
-                  checked={currentItems.length > 0 && selectedIds.length === currentItems.length}
-                />
-              </th>
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    onChange={handleSelectAll}
+                    checked={currentItems.length > 0 && selectedIds.length === currentItems.length}
+                  />
+                </th>
                 <Th>Req ID</Th>
                 <Th>Student</Th>
                 <Th>Document</Th>
@@ -380,7 +342,7 @@ const StaffDashboard = () => {
                   <Td>{req.id}</Td>
                   <Td>
                     <div>
-                      <div className="font-bold text-xs">{req.studentName}</div>
+                      <div className="font-bold">{req.studentName}</div>
                       <div className="text-xs text-gray-400">{req.studentNumber}</div>
                     </div>
                   </Td>
@@ -388,7 +350,7 @@ const StaffDashboard = () => {
                     {req.docType.length > 50 ? (
                       <div className="relative group">
                         <span>{req.docType.slice(0, 50)}...</span>
-                        <div className="absolute left-0 top-full mt-1 w-max max-w-xs p-2 bg-gray-700 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <div className="absolute left-0 top-full mt-1 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           {req.docType}
                         </div>
                       </div>
@@ -403,26 +365,39 @@ const StaffDashboard = () => {
                   <Td center><span className="font-semibold text-gray-700">{req.copies}</span><span> ...</span></Td>
                   <Td center>{getStatusBadge(req.statusName)}</Td>
                   <Td center>
-                    <div className="flex items-center justify-end gap-2 min-w-[150px]">                  
-                      {req.statusId === STATUS.PENDING && (                        
+                    <div className="flex items-center justify-end gap-2 min-w-[150px]">
+
+                      {req.statusId === STATUS.PENDING && (
                         <button
                           disabled={updatingId === req.id}
-                          onClick={() => handleStatusUpdate(req.id, statuses.find(s => s.status_name === "Ready to claim")?.status_id)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95"
+                          onClick={() => handleStatusUpdate(req.id, STATUS.READY)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50"
                         >
                           <CheckCircleIcon className="w-4 h-4" /> Ready
                         </button>
                       )}
 
-                      {req.statusId === STATUS.READY && (                        
+                      {req.statusId === STATUS.READY && (
                         <button
                           disabled={updatingId === req.id}
-                          onClick={() => handleStatusUpdate(req.id, statuses.find(s => s.status_name === "Completed")?.status_id)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95"
+                          onClick={() => handleStatusUpdate(req.id, STATUS.COMPLETED)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50"
                         >
-                          <CheckCircleIcon className="w-5 h-4" /> Done
+                          <CheckCircleIcon className="w-4 h-4" /> Done
                         </button>
                       )}
+
+                      {/* ↓ Download icon — only shows for certification requests */}
+                      {req.certName && (
+                        <button
+                          title="Generate Certificate"
+                          onClick={() => setCertRequest(req)}
+                          className="p-2 text-[#4a120e] hover:bg-red-50 rounded-lg transition"
+                        >
+                          <ArrowDownTrayIcon className="w-5 h-5" />
+                        </button>
+                      )}
+
                       <button
                         title="View Details"
                         onClick={() => setSelectedRequest(rawRequests.find(r => r.request_id === req.id))}
@@ -475,6 +450,14 @@ const StaffDashboard = () => {
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDeleteSelected}
       />
+
+      {/* ↓ Certificate slide-in panel */}
+      {certRequest && (
+        <CertificateModal
+          request={certRequest}
+          onClose={() => setCertRequest(null)}
+        />
+      )}
     </div>
   );
 };
