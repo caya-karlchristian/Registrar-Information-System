@@ -9,7 +9,7 @@ import {
   ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider"; 
-import ConfirmationModal from "../components/ConfirmationModal";
+import ConfirmationModal from "../components/ConfirmationModal.jsx";
 
 
 const StaffNavigation = ({ isOpen, onItemClick }) => {
@@ -22,6 +22,28 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
     { name: "Staff Logbook", to: "logbook", icon: BookOpenIcon },
     { name: "Staff Profile", to: "profile", icon: UserCircleIcon },
   ];
+  const [modal, setModal] = useState({
+      isOpen: false,
+      title: '',
+      message: '',
+      type: 'default',
+      onConfirm: () => {},
+    });
+  
+    const handleLogoutClick = () => {
+      setModal({
+        isOpen: true,
+        title: 'Logout Session',
+        message: 'Are you sure you want to log out? Any unsaved changes in the registrar system may be lost.',
+        type: 'default', 
+        onConfirm: () => {
+          logout();
+          navigate("/", { replace: true });
+        }
+      });
+    };
+  
+    const closeModal = () => setModal({ ...modal, isOpen: false });
 
   return (
     <>
@@ -69,7 +91,7 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
         </nav>
 
         <div className="p-6 mt-auto shrink-0 lg:p-3 lg:px-4">
-          <button className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded shadow-md hover:bg-[#3a0303] transition-all mb-4 w-fit font-bold text-sm uppercase">
+          <button onClick={handleLogoutClick} className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded shadow-md hover:bg-[#3a0303] transition-all mb-4 w-fit font-bold text-sm uppercase">
             <ArrowRightStartOnRectangleIcon className="w-5 h-5" />
             Logout 
           </button>
