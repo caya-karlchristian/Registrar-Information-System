@@ -34,7 +34,7 @@ const App = () => {
               <RequestForm />
             } /> {/* /student */}
           <Route path="home" element={
-              <StudentDashboard />
+                <StudentDashboard />
           } />
           <Route path="request" element={
             <RequestForm />

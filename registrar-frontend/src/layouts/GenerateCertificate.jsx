@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect} from "react";
 import InputGroup from "../components/InputGroup.jsx";
-import { PrinterIcon, ChevronDownIcon } from "@heroicons/react/24/solid";
+import { PrinterIcon } from "@heroicons/react/24/solid";
 import SuccessToast from "../components/SuccessToast.jsx";
 import { getAcademicRecords } from "../services/API";
 import { CertHeader, CertFooter } from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
+import DropDown from "../components/DropDown.jsx";
+
 
 const courses = [
   "BS in Electronics Engineering",
@@ -139,12 +141,13 @@ const GenerateCertification = ({ initialData, onClose }) => {
       {/* Header Toolbar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 pb-6 shrink-0">
         <div className="w-full max-w-xs">
-          <SimpleDropdown
+          <DropDown
             label="Certification Type"
             name="docType"
-            selected={formData.docType}
-            onSelect={handleChange}
+            value={formData.docType}
+            onChange={handleChange}
             options={Object.keys(CERT_CONFIG)}
+            labelColor="text-gray-600"
           />
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
@@ -180,13 +183,14 @@ const GenerateCertification = ({ initialData, onClose }) => {
                 if (!shouldShow(name)) return null;
                 if (type === "dropdown") {
                   return (
-                    <SimpleDropdown
+                    <DropDown
                       key={name}
                       label={label}
                       name={name}
-                      selected={formData[name]}
-                      onSelect={handleChange}
+                      value={formData[name]}
+                      onChange={handleChange}
                       options={props.options}
+                      labelColor="text-gray-600"
                     />
                   );
                 }
@@ -198,12 +202,13 @@ const GenerateCertification = ({ initialData, onClose }) => {
                     value={formData[name]}
                     onChange={handleChange}
                     {...props}
+                    labelColor="text-gray-600" 
                   />
                 );
               })}
 
               {/* Date Issued always visible */}
-              <InputGroup label="Date Issued" type="date" name="date" value={formData.date} onChange={handleChange} />
+              <InputGroup label="Date Issued" type="date" name="date" value={formData.date} onChange={handleChange} labelColor="text-gray-600" />
 
               <button
                 type="button"
@@ -237,49 +242,6 @@ const GenerateCertification = ({ initialData, onClose }) => {
       </div>
 
       {showSuccess && <SuccessToast message="Data saved successfully!" onClose={() => setShowSuccess(false)} />}
-    </div>
-  );
-};
-
-// ─── SimpleDropdown ──────────
-
-const SimpleDropdown = ({ label, name, options, selected, onSelect, id }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setIsOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div className="w-full relative text-left" ref={ref}>
-      <label htmlFor={id} className="block text-sm text-gray-700 mb-2 font-medium">{label}</label>
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setIsOpen((o) => !o)}
-          className={`w-full text-left px-4 py-3 bg-white border border-gray-100 rounded-lg text-base transition-all outline-none focus:ring-2 focus:ring-[#FFC72C] ${selected ? "text-gray-700" : "text-gray-300"}`}
-        >
-          {selected || "Please select"}
-        </button>
-        <ChevronDownIcon className={`absolute right-4 top-4 w-5 h-5 text-gray-300 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-      </div>
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-          {options.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => { onSelect({ target: { name, value: option } }); setIsOpen(false); }}
-              className="w-full text-left px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 border-b border-gray-50 last:border-none"
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

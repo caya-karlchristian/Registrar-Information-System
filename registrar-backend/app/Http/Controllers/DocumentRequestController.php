@@ -22,6 +22,11 @@ class DocumentRequestController extends Controller
             'documents'
         ]);
 
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized'
+            ], 401);
+        }
         // If NOT registrar staff
         if ($user->role_id != 3) {
             $query->where('user_id', $user->user_id);
@@ -48,30 +53,43 @@ class DocumentRequestController extends Controller
         );
     }
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'student_profile_id' => 'required|integer',
-            'academic_record_id' => 'required|integer',
-            'status_id' => 'required|integer',
-            'purpose_of_request' => 'required|string|max:255',
-            'number_of_copies' => 'required|integer',
-            'receipt_number' => 'nullable|string|max:100',
-            'receipt_date' => 'nullable|date',
-            'additional_notes' => 'nullable|string',
-            'cert_type_id' => 'nullable|integer',
-            'certification_detail' => 'nullable|string',
-            'honors_dismissal_status' => 'nullable|string|max:50',
-        ]);
+   public function store(Request $request)
+{
+    $request->validate([
+        'purpose_of_request' => 'required|string|max:255',
+        'receipt_number' => 'nullable|string|max:100',
+        'receipt_date' => 'nullable|date',
+        'cert_type_id' => 'nullable|integer',
+    ]);
 
-        $requestDoc = DocumentRequest::create([
-            ...$request->all(),
-            'user_id' => Auth::user()->user_id, // secure
-        ]);
+    $user = Auth::user();
 
-        return response()->json($requestDoc, 201);
+    // Get linked student profile + academic record safely
+    $studentProfile = $user->studentProfile;
+    $academicRecord = $user->academicRecord;
+
+    if (!$studentProfile || !$academicRecord) {
+        return response()->json([
+            'message' => 'Student profile or academic record not found'
+        ], 400);
     }
 
+    $documentRequest = DocumentRequest::create([
+        'user_id' => $user->user_id,
+        'student_profile_id' => $studentProfile->student_profile_id,
+        'academic_record_id' => $academicRecord->academic_record_id,
+
+        'status_id' => 1,
+        'number_of_copies' => 1,
+
+        'purpose_of_request' => $request->purpose_of_request,
+        'receipt_number' => $request->receipt_number,
+        'receipt_date' => $request->receipt_date,
+        'cert_type_id' => $request->cert_type_id,
+    ]);
+
+    return response()->json($documentRequest, 201);
+}
     public function update(Request $request, DocumentRequest $documentRequest)
     {
         $this->authorize('update', $documentRequest);

@@ -13,7 +13,12 @@ import ConfirmationModal from "../components/ConfirmationModal";
 
 const AlumniNavigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+// this is logic to be replaced
+  const fullName = user?.student_profile
+  ? `${user.student_profile.first_name} ${user.student_profile.last_name}`
+  : "Guest";
+
   const navItems = [
     { name: "Dashboard", to: "home", icon: Squares2X2Icon },
     { name: "Document Lists", to: "lists", icon: TableCellsIcon },
@@ -65,9 +70,12 @@ const [modal, setModal] = useState({
             <UserCircleIcon className="w-14 h-14 lg:w-17 lg:h-17 text-gray-700" />
             <div className="flex flex-col">
               <h2 className="text-pup-maroon font-black text-l leading-tight uppercase">
-                karl caya {/* NEED API TO DISPLAY USER NAME */}
+               {fullName}
               </h2>
-              <span className="text-gray-500 text-xs font-medium">2023-2024</span> {/* NEED API TO DISPLAY YEAR */}
+              <span className="text-gray-500 text-xs font-medium">2023-2024</span> {/* NEED API TO DISPLAY YEAR */
+              // wala tayong record for this, but kindly take note that this 
+              // need fixing 
+              }
             </div>
           </div>
           <hr className="mt-6 border-gray-400" />

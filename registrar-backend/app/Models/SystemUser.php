@@ -26,7 +26,7 @@ class SystemUser extends Authenticatable
 
     public function studentProfile()
     {
-        return $this->hasOne(StudentProfile::class, 'user_id');
+        return $this->hasOne(StudentProfile::class, 'user_id', 'user_id');
     }
 
     public function documentRequests()
@@ -37,5 +37,16 @@ class SystemUser extends Authenticatable
     public function changedRequests()
     {
         return $this->hasMany(RequestHistory::class, 'changed_by');
+    }
+    public function academicRecord()
+    {
+        return $this->hasOneThrough(
+            StudentAcademicRecord::class,
+            StudentProfile::class,
+            'user_id',               // Foreign key on StudentProfile
+            'student_profile_id',    // Foreign key on AcademicRecord
+            'user_id',               // Local key on SystemUser
+            'student_profile_id'     // StudentProfile primary key
+        );
     }
 }

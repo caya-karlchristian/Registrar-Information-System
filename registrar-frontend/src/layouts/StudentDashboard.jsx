@@ -5,6 +5,7 @@ import RequestDetailsModal from '../components/RequestDetailModal';
 import LoadingOverlay from "../components/LoadingOverlay";
 import ErrorToast from "../components/ErrorToast";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from '../context/AuthProvider';
 
 const STATUS_CONFIG = {
   1: { label: "Pending", classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
@@ -35,27 +36,33 @@ const TABS = [
   },
 ];
 
+const TAB_MAP = {
+  1: "pending",
+  4: "pending",
+  2: "ready",
+  3: "history",
+  5: "history"
+};
+
 const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  // const [error, setError] = useState("");
+  const [error, setError] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const { user } = useAuth();
 
-  // const user = JSON.parse(localStorage.getItem("user"));
-  // const studentProfileId = user?.student_profile_id;
+
 
   const navigate = useNavigate();
 
   useEffect(() => {
-  if (!localStorage.getItem("token")) {
+  if (!user) {
     navigate("/");
   }
-}, [navigate]);
-
-
+}, [user, navigate]);
 
 
   useEffect(() => {
@@ -65,6 +72,7 @@ const StudentDashboard = () => {
         const res = await getDocumentRequests();
         // Filter requests for the current student
         const studentRequests = res.data
+        .filter(r => r.user_id === user.user_id)
           .map((r) => {
 
             const config = STATUS_CONFIG[r.status_id] || { 
@@ -72,17 +80,13 @@ const StudentDashboard = () => {
               classes: "bg-gray-100 text-gray-400 border-gray-200" 
             };
 
-            let tabCategory = "history"; 
-            if (r.status_id === 1 || r.status_id === 4) tabCategory = "pending";
-            if (r.status_id === 2) tabCategory = "ready";
-
             const progressMap = { 1: 25, 4: 50, 2: 100, 3: 100, 5: 0 };
 
             return {
               ...r,
               status_label: config.label,
               config: config,   
-              type: tabCategory, 
+              type: TAB_MAP[r.status_id] || "history",
               progress: progressMap[r.status_id] || 0,
             };
           });
