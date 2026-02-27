@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PrinterIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { getDocumentRequests } from "../services/API"; 
 import LoadingOverlay from "../components/LoadingOverlay"; 
+import DropDown from '../components/DropDown';
 
 /* ---------------- DOCUMENT TYPE MAPPING ---------------- */
 const documentTypeMap = {
@@ -80,20 +81,20 @@ const LogbookRecords = () => {
         <div className="p-4 sm:p-6 md:p-8 pb-0">
           <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end mb-6 gap-4 print:hidden">
             <div className="flex flex-col gap-2 text-left w-full sm:w-auto">
-              <label className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wider">Document/Certification Type</label>
-              <select 
-                className="border border-gray-300 rounded px-3 py-2 w-full sm:w-72 bg-gray-50 text-sm focus:outline-none focus:ring-1 focus:ring-maroon"
-                value={selectedDocTypeId}
+              <div className="w-96">
+              <DropDown
+                label="Document/Certification Type"
+                name="docType"
+                value={documentTypeMap[selectedDocTypeId] || ''}
+                labelColor="text-gray-700"
                 onChange={(e) => {
-                  setSelectedDocTypeId(e.target.value);
-                  setCurrentPage(1); 
+                  const id = Object.entries(documentTypeMap).find(([, name]) => name === e.target.value)?.[0] || '';
+                  setSelectedDocTypeId(id);
+                  setCurrentPage(1);
                 }}
-              >
-                <option value="">Please select</option>
-                {Object.entries(documentTypeMap).map(([id, name]) => (
-                  <option key={id} value={id}>{name}</option>
-                ))}
-              </select>
+                options={Object.values(documentTypeMap)}
+              />
+              </div>
             </div>
             
             <button 

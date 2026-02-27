@@ -69,6 +69,11 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 199, 44, 0.5); /* Brighter on hover */
   }
+  
+  .dropdown-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #800000 transparent;
+}
 }
 
 @page {
