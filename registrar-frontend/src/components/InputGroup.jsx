@@ -10,13 +10,14 @@ const InputGroup = ({
   placeholder = "", 
   pattern,
   title,
-  required = false // 1. Add default value for required prop
+  required = false,
+  labelColor = 'text-white'
 }) => {
   return (
     <div className="w-full">
-      <label className="block text-xs md:text-sm mb-1">
+      <label className={`block text-sm ${labelColor} mb-1.5`}>
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-red-400 ml-1">*</span>}
       </label>
 
       <input
@@ -25,16 +26,18 @@ const InputGroup = ({
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        required={required} 
-        pattern={pattern}    
+        required={required}
+        pattern={pattern}
         title={title}
-        className="w-full p-2 rounded text-gray-500 bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]"
+        className="w-full px-3 py-3 bg-white rounded-lg text-sm text-gray-700 shadow-sm
+                   placeholder:text-gray-400
+                   focus:outline-none focus:ring-2 focus:ring-[#FFC72C]
+                   transition-all duration-200"
       />
     </div>
   );
 };
 
-// Prop validation
 InputGroup.propTypes = {
   label: PropTypes.string.isRequired,
   name: PropTypes.string.isRequired,
@@ -42,9 +45,10 @@ InputGroup.propTypes = {
   onChange: PropTypes.func.isRequired,
   type: PropTypes.string,
   placeholder: PropTypes.string,
-  required: PropTypes.bool, 
-  pattern: PropTypes.string,  
+  required: PropTypes.bool,
+  pattern: PropTypes.string,
   title: PropTypes.string,
+  labelColor: PropTypes.string,
 };
 
 export default InputGroup;
