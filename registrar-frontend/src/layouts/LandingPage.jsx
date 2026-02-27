@@ -26,24 +26,22 @@ const LandingPage = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-
     try {
-      const response = await loginUser({ email, password });
+      await login(email, password);
+      // const response = await loginUser({ email, password });
 
-      const token = response.data.token;
-      const userData = response.data.user;
+      // const token = response.data.token;
+      // const userData = response.data.user;
 
-      login(userData, token);
-
-      if (userData.role_id === 1 && token) {
-        navigate('/student');
-      } else if (userData.role_id === 2 && token) {
-        navigate('/alumni');
-      } else if (userData.role_id === 3 && token) {
-        navigate('/staff');
-      } else {
-        navigate('/');
-      }
+      // if (userData.role_id === 1 && token) {
+      //   navigate('/student');
+      // } else if (userData.role_id === 2 && token) {
+      //   navigate('/alumni');
+      // } else if (userData.role_id === 3 && token) {
+      //   navigate('/staff');
+      // } else {
+      //   navigate('/');
+      // }
 
     } catch (error) {
       console.error(error);

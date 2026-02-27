@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FieldGroup from '../components/FieldGroup'; 
 import { UserIcon } from '@heroicons/react/24/solid';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { useAuth } from '../context/AuthProvider';
 
-// CHANGE IF NEEDED: Configuration for different user roles
 const ROLE_CONFIG = {
   student: {
     sectionTitle: "Student Details",
@@ -20,22 +20,57 @@ const ROLE_CONFIG = {
 };
 
 const ProfilePage = ({ userType = "student" }) => {
-  
+
+  const { user } = useAuth();
   const config = ROLE_CONFIG[userType];
 
-  // Initialize Data - NEED BACKEND INTEGRATION
   const [profileData, setProfileData] = useState({
-    firstName: "Juan",
-    middleName: "Dela",
-    lastName: "Cruz",
+    firstName: "",
+    middleName: "",
+    lastName: "",
     suffix: "",
-    studentId: userType === 'staff' ? 'EMP-2023-001' : (userType === 'alumni' ? 'ALU-54321' : '2023-10049-TG-1'),
-    email: "juan.cruz@pup.edu.ph"
+    studentId: "",
+    email: ""
   });
 
-  const closeModal = () => {
-    setModal({ ...modal, isOpen: false });
-  };
+  useEffect(() => {
+    if (!user) return;
+
+    if (user.role_id === 1 && user.student_profile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setProfileData({
+        firstName: user.student_profile.first_name || "",
+        middleName: user.student_profile.middle_name || "",
+        lastName: user.student_profile.last_name || "",
+        suffix: user.student_profile.suffix || "",
+        studentId: user.academic_record.student_number || "",
+        email: user.email || ""
+      });
+    }
+
+    else if (user.role_id === 3) {
+      setProfileData({
+        firstName: "",
+        middleName: "",
+        lastName: "",
+        suffix: "",
+        studentId: "N/A",
+        email: user.email || ""
+      });
+    }
+
+    else if (user.role_id === 2) {
+      setProfileData({
+        firstName: "",
+        middleName: "",
+        lastName: "",
+        suffix: "",
+        studentId: "N/A",
+        email: user.email || ""
+      });
+    }
+
+  }, [user]);
 
   const [modal, setModal] = useState({
     isOpen: false,
@@ -44,6 +79,11 @@ const ProfilePage = ({ userType = "student" }) => {
     type: 'default',
     onConfirm: () => {},
   });
+
+  const closeModal = () => {
+    setModal(prev => ({ ...prev, isOpen: false }));
+  };
+
 
   return (
     <div className="min-h-screen flex items-start justify-center font-sans py-2 lg:-mt-5">

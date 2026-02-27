@@ -11,9 +11,18 @@ class RoleMiddleware
     {
         $user = $request->user();
 
-        if (!$user || !in_array($user->role_id, $roles)) {
+        if (!$user) {
             return response()->json([
                 'message' => 'Unauthorized'
+            ], 401);
+        }
+
+        // Convert roles to array properly
+        $roles = explode(',', implode(',', $roles));
+
+        if (!in_array($user->role_id, $roles)) {
+            return response()->json([
+                'message' => 'Forbidden'
             ], 403);
         }
 
