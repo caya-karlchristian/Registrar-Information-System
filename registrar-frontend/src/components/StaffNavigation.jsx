@@ -8,41 +8,40 @@ import {
   ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider"; 
-import ConfirmationModal from "../components/ConfirmationModal";
+import ConfirmationModal from "../components/ConfirmationModal.jsx";
 
 
 const StaffNavigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navItems = [
     { name: "Dashboard", to: "dashboard", icon: Squares2X2Icon },
     { name: "Staff Analytics", to: "analytics", icon: ChartBarSquareIcon },
     { name: "Staff Logbook", to: "logbook", icon: BookOpenIcon },
     { name: "Staff Profile", to: "profile", icon: UserCircleIcon },
   ];
-
   const [modal, setModal] = useState({
-    isOpen: false,
-    title: '',
-    message: '',
-    type: 'default',
-    onConfirm: () => {},
-  });
-
-  const handleLogoutClick = () => {
-    setModal({
-      isOpen: true,
-      title: 'Logout Session',
-      message: 'Are you sure you want to log out? Any unsaved changes in the registrar system may be lost.',
-      type: 'default', 
-      onConfirm: () => {
-        logout();
-        navigate("/", { replace: true });
-      }
+      isOpen: false,
+      title: '',
+      message: '',
+      type: 'default',
+      onConfirm: () => {},
     });
-  };
-
-  const closeModal = () => setModal({ ...modal, isOpen: false });
+  
+    const handleLogoutClick = () => {
+      setModal({
+        isOpen: true,
+        title: 'Logout Session',
+        message: 'Are you sure you want to log out? Any unsaved changes in the registrar system may be lost.',
+        type: 'default', 
+        onConfirm: () => {
+          logout();
+          navigate("/", { replace: true });
+        }
+      });
+    };
+  
+    const closeModal = () => setModal({ ...modal, isOpen: false });
 
   return (
     <>

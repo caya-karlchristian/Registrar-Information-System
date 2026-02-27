@@ -1,12 +1,13 @@
 import axios from "./axiosInstance";
 
 // Base URL of Laravel backend
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+const API_BASE_URL = "http://localhost:8000/api";
 
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
+    Accept: "application/json",
     "Content-Type": "application/json",
   },
 });
@@ -18,6 +19,17 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("token");
+      window.location.href = "/"; // force logout on token expiry
+    }
+    return Promise.reject(err);
+  }
+);
 
 //  SYSTEM USERS 
 export const getSystemUsers = () => api.get("/system-users");

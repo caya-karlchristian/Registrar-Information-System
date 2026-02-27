@@ -30,7 +30,13 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return $request->user();
+       $user = $request->user();
+
+        if ($user->role_id == 1) { // Student
+            $user->load(['studentProfile', 'academicRecord']);
+        }
+
+        return response()->json($user);
     }
 
     public function logout(Request $request)
