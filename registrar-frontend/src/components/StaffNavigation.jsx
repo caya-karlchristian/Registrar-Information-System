@@ -13,7 +13,7 @@ import ConfirmationModal from "../components/ConfirmationModal.jsx";
 
 const StaffNavigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navItems = [
     { name: "Dashboard", to: "dashboard", icon: Squares2X2Icon },
     { name: "Staff Analytics", to: "analytics", icon: ChartBarSquareIcon },

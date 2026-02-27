@@ -49,13 +49,15 @@ const RequestDetailsModal = ({ request, onClose }) => {
     fetchTypes();
   }, []);
 
-  // NEED UPDATE HERE TO USE FETCHED docTypes PLEASE
   const getDocName = (id) => {
-    if (!docTypes.length) return "Loading...";
-    const found = docTypes.find(t => t.id === id);
-    // Adjust 'name' based on your actual DB column (e.g., name, description, type)
-    return found ? (found.name || found.description || found.type) : "Unknown Document";
-  };
+  if (!docTypes.length) return "Loading...";
+
+  const found = docTypes.find(
+    t => Number(t.document_type_id) === Number(id)
+  );
+
+  return found ? found.document_name : "Unknown Document";
+};
 
   useEffect(() => {
     if (request) {

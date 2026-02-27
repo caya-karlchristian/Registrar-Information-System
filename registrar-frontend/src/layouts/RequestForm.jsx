@@ -135,17 +135,10 @@ const RequestForm = () => {
       "Correction in Student Information System": 16,
     };
 
-    // 1️⃣ Submit main document request
     const requestRes = await axios.post("/document-requests", {
-      user_id: 1,
-      student_profile_id: 1,
-      academic_record_id: 1,
-      status_id: 1,
       purpose_of_request: formData.purposeOfRequest,
       receipt_number: formData.receiptNumber,
       receipt_date: formData.dateOfPayment,
-      number_of_copies: formData.numberOfCopies || 1,
-      additional_notes: "",
       cert_type_id: certId,
     });
 
