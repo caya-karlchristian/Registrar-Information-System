@@ -121,17 +121,29 @@
 
   /* ── Images ── */
   #print-area img {
-    width: 70px !important;
-    height: 70px !important;
+    width: 80px !important;
+    height: 80px !important;
   }
 
-  /* ── Header text ── */
-  #print-area .cert-header p {
-    font-size: 11pt !important;
+  #print-area .footer-accreditation-img {
+    height: 90px !important;    
+    width: auto !important;      
+    max-width: 400px !important; 
+    
+    display: block !important;
+    object-fit: contain !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* ── Footer text ── */
-  #print-area .cert-footer div {
-    font-size: 9pt !important;
+  .footer-accreditation-img {
+    height: 80px;
+    width: auto;
   }
+
+  .txt-certification { 
+    font-size: 8pt !important; 
+    line-height: 1.2 !important; 
+  }
+
 }
