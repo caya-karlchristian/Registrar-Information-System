@@ -18,7 +18,7 @@ import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx';
 import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
 import ProtectedRoute from './components/ProtectedRoute';
-
+import ForbiddenPage from './components/ForbiddenPage';
 
 const App = () => {
   return (
@@ -28,6 +28,8 @@ const App = () => {
         
         <Route path="/" element={<LandingPage />} />
         
+        <Route path="/forbidden" element={<ForbiddenPage />} />
+
         <Route path="/student" element={
             <ProtectedRoute allowedRoles={[1]}><StudentPage /></ProtectedRoute>}>
           <Route index element={
