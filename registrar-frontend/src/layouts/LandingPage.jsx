@@ -44,10 +44,30 @@ const LandingPage = () => {
       // }
 
     } catch (error) {
-      console.error(error);
+    const status = error.response?.status;
+    const message = error.response?.data?.message;
+
+    if (status === 401) {
       alert("Invalid credentials");
+    } else if (status === 403) {
+      navigate("/forbidden", {
+        state: { message, status },
+      });
+    } else if (status === 404) {
+      navigate("/forbidden", {
+        state: { message: "Resource not found.", status },
+      });
+    } else if (status === 500) {
+      navigate("/forbidden", {
+        state: { message: "Server error. Please try again later.", status },
+      });
+    } else {
+      navigate("/forbidden", {
+        state: { message: message || "Something went wrong.", status: status || 500 },
+      });
     }
-  };
+  }
+};
 
   return (
     <div className="flex h-screen w-full font-sans bg-gray-50 overflow-hidden">
