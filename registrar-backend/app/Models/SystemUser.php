@@ -12,6 +12,9 @@ class SystemUser extends Authenticatable
     protected $table = 'system_user';
     protected $primaryKey = 'user_id';
     public $timestamps = false;
+    public const ROLE_STUDENT = 1;
+    public const ROLE_ALUMNI = 2;
+    public const ROLE_STAFF = 3;
 
     protected $fillable = [
         'name',
