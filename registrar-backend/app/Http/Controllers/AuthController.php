@@ -24,7 +24,6 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => $user
         ]);
     }
 
@@ -32,7 +31,7 @@ class AuthController extends Controller
     {
        $user = $request->user();
 
-        if ($user->role_id == 1) { // Student
+        if ($user->role_id == 1) {
             $user->load(['studentProfile', 'academicRecord']);
         }
 

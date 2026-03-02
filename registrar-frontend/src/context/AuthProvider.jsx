@@ -73,60 +73,45 @@ const [user, setUser] = useState(
 
   // Login
   const login = async (email, password) => {
-  try {
-    const res = await api.post("/login", { email, password });
+    try {
+      // Authenticate
+      const res = await api.post("/login", { email, password });
 
-    const tokenFromServer = res.data.token;
-    localStorage.setItem("token", tokenFromServer);
+      const tokenFromServer = res.data.token;
 
-    const userRes = await api.get("/me");
-    const userData = userRes.data;
+      localStorage.setItem("token", tokenFromServer);
+      setToken(tokenFromServer);
 
-    localStorage.setItem("user", JSON.stringify(userData));
+      // Fetch authenticated user (single source of truth)
+      const userRes = await api.get("/me");
+      const userData = userRes.data;
 
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
 
-  localStorage.setItem("token", res.data.token);
+    } catch (error) {
+      const status = error.response?.status;
 
-  setUser(res.data.user);
+      if (status === 401) {
+        alert("Invalid credentials");
+      } else {
+        alert("Login failed. Please try again.");
+      }
 
-    setUser(userData);
-    setToken(tokenFromServer);
-
-    if (userData.role_id === 1) navigate("/student/home");
-    if (userData.role_id === 2) navigate("/alumni/home");
-    if (userData.role_id === 3) navigate("/staff/dashboard");
-
-  } catch (error) {
-    const status = error.response?.status;
-    const message = error.response?.data?.message;
-
-    if (status === 401) {
-      alert("Invalid credentials");
-    } else if (status == 403) {
-      navigate("/forbidden", {
-        state: { message, status },
-      });
-    } else if (status === 404) {
-      navigate("/forbidden", {
-        state: {message: "Resource not found.", status },
-      });
-    } else if (status === 500) {
-       navigate("/forbidden", {
-        state: { message: "Server error. Please try again later.", status },
-       });
-    } else {
-      navigate("/forbidden", {
-        state: { message: message || "Something went wrong.", status: status || 500},
-      });
+      throw error;
     }
-  }
-};
+  };
 
-  const logout = () => {
+  const logout = async () => {
+      try {
+      await api.post("/logout"); // revoke server token
+    } catch (err) {
+      console.error("Logout request failed:", err);
+    }
     localStorage.removeItem("user");
-localStorage.removeItem("token");
-setUser(null);
-setToken(null);
+    localStorage.removeItem("token");
+    setUser(null);
+    setToken(null);
 
     navigate("/", { replace: true });
   };
