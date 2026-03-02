@@ -20,7 +20,7 @@ class RoleMiddleware
         // Convert roles to array properly
         $roles = explode(',', implode(',', $roles));
 
-        if (!in_array($user->role_id, $roles)) {
+        if (!in_array((string)$user->role_id, $roles)) {
             return response()->json([
                 'message' => 'Forbidden'
             ], 403);
