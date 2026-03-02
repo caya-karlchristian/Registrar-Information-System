@@ -26,47 +26,8 @@ const LandingPage = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    try {
       await login(email, password);
-      // const response = await loginUser({ email, password });
-
-      // const token = response.data.token;
-      // const userData = response.data.user;
-
-      // if (userData.role_id === 1 && token) {
-      //   navigate('/student');
-      // } else if (userData.role_id === 2 && token) {
-      //   navigate('/alumni');
-      // } else if (userData.role_id === 3 && token) {
-      //   navigate('/staff');
-      // } else {
-      //   navigate('/');
-      // }
-
-    } catch (error) {
-    const status = error.response?.status;
-    const message = error.response?.data?.message;
-
-    if (status === 401) {
-      alert("Invalid credentials");
-    } else if (status === 403) {
-      navigate("/forbidden", {
-        state: { message, status },
-      });
-    } else if (status === 404) {
-      navigate("/forbidden", {
-        state: { message: "Resource not found.", status },
-      });
-    } else if (status === 500) {
-      navigate("/forbidden", {
-        state: { message: "Server error. Please try again later.", status },
-      });
-    } else {
-      navigate("/forbidden", {
-        state: { message: message || "Something went wrong.", status: status || 500 },
-      });
-    }
-  }
+  
 };
 
   return (

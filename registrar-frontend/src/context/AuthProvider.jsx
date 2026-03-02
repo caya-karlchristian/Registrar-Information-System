@@ -96,8 +96,29 @@ const [user, setUser] = useState(
     if (userData.role_id === 2) navigate("/alumni/home");
     if (userData.role_id === 3) navigate("/staff/dashboard");
 
-  } catch (err) {
-    console.error("Login failed:", err);
+  } catch (error) {
+    const status = error.response?.status;
+    const message = error.response?.data?.message;
+
+    if (status === 401) {
+      alert("Invalid credentials");
+    } else if (status == 403) {
+      navigate("/forbidden", {
+        state: { message, status },
+      });
+    } else if (status === 404) {
+      navigate("/forbidden", {
+        state: {message: "Resource not found.", status },
+      });
+    } else if (status === 500) {
+       navigate("/forbidden", {
+        state: { message: "Server error. Please try again later.", status },
+       });
+    } else {
+      navigate("/forbidden", {
+        state: { message: message || "Something went wrong.", status: status || 500},
+      });
+    }
   }
 };
 
