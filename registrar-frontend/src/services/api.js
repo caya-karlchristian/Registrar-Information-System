@@ -24,8 +24,8 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
+      localStorage.removeItem("user");
       localStorage.removeItem("token");
-      window.location.href = "/"; // force logout on token expiry
     }
     return Promise.reject(err);
   }
