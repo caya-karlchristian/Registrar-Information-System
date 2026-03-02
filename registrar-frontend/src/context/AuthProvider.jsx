@@ -1,51 +1,23 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../services/API";
+import {  loginRequest, 
+          fetchCurrentUser, 
+          logoutRequest } from "../services/authService";
 
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
-
-  // const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  // const [token, setToken] = useState(localStorage.getItem("token"));
 
   const storedToken = localStorage.getItem("token");
-const storedUser = localStorage.getItem("user");
+  const storedUser = localStorage.getItem("user");
 
-const [token, setToken] = useState(storedToken || null);
-const [user, setUser] = useState(
+  const [token, setToken] = useState(storedToken || null);
+  const [user, setUser] = useState(
   storedUser ? JSON.parse(storedUser) : null
 );
-
-  // Fetch user if token exists
-  // useEffect(() => {
-  //   const fetchUser = async () => {
-  //     if (!token) {
-  //       setLoading(false);
-  //       return;
-  //     }
-
-  //     try {
-  //       const res = await api.get("/me");
-  //       setUser(res.data);
-  //     } catch (err) {
-  //       console.error("Auth fetch failed:", err);
-
-  //       setUser(null);
-  //       setToken(null);
-  //       localStorage.removeItem("token");
-
-  //       navigate("/", { replace: true });
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   fetchUser();
-  // }, [token]);
 
   useEffect(() => {
 
@@ -58,10 +30,10 @@ const [user, setUser] = useState(
     }
 
     try {
-      const res = await api.get("/me");
+      const res = await fetchCurrentUser();
       setUser(res.data);
     } catch {
-      logout();
+      logoutRequest();
     }
 
     setLoading(false);
@@ -75,7 +47,7 @@ const [user, setUser] = useState(
   const login = async (email, password) => {
     try {
       // Authenticate
-      const res = await api.post("/login", { email, password });
+      const res = await loginRequest(email, password);
 
       const tokenFromServer = res.data.token;
 
@@ -83,7 +55,7 @@ const [user, setUser] = useState(
       setToken(tokenFromServer);
 
       // Fetch authenticated user (single source of truth)
-      const userRes = await api.get("/me");
+      const userRes = await fetchCurrentUser();
       const userData = userRes.data;
 
       localStorage.setItem("user", JSON.stringify(userData));
@@ -104,7 +76,7 @@ const [user, setUser] = useState(
 
   const logout = async () => {
       try {
-      await api.post("/logout"); // revoke server token
+      await logoutRequest(); // revoke server token
     } catch (err) {
       console.error("Logout request failed:", err);
     }
