@@ -13,8 +13,9 @@ import {
   IssuedLineAforementioned,
   PupLetterhead,
   EndorsementNoteBlock,
-} from "../utils/helpers.jsx";
-import { formatDateFormal, bold, formatDateOrdinal } from "../utils/Formatters.jsx";
+  bold,
+} from "../utils/Helpers.jsx";
+import { formatDateFormal, formatDateOrdinal } from "./formatters.js";
 import puplogoimage from "../assets/puplogoimage.png";
 
 /** "syAdmitted is not yet fully functional - need update" */

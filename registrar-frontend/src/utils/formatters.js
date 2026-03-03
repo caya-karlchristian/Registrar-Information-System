@@ -1,5 +1,3 @@
-export const bold = (text) => <strong>{text}</strong>;
-
 export const formatDateFormal = (date) => {
   if (!date) return "";
   const d = new Date(date);
