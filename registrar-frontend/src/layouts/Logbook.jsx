@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PrinterIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { getDocumentRequests } from "../services/API"; 
 import LoadingOverlay from "../components/LoadingOverlay"; 
 import DropDown from '../components/DropDown';
+import { logbookExcel } from '../utils/logbookExcel.js';
+import pupLogoSrc from '../assets/puplogoimage.png';
+import bpLogoSrc from '../assets/Bagong_Pilipinas_logo.png';
 
 /* ---------------- DOCUMENT TYPE MAPPING ---------------- */
 const documentTypeMap = {
@@ -46,17 +49,16 @@ const LogbookRecords = () => {
     fetchLogbookData();
   }, []);
 
-  // 2. Filter logic
+  // Filter data based on selected document type
   const filteredData = useMemo(() => {
     if (!selectedDocTypeId) return data;
     const targetId = parseInt(selectedDocTypeId);
-    return data.filter(item => 
+    return data.filter(item =>
       item.documents?.some(d => d.document_type_id === targetId) ||
       item.document_type_id === targetId
     );
   }, [selectedDocTypeId, data]);
 
-  // 3. Pagination Logic Helpers
   const totalPages = Math.ceil(filteredData.length / rowsPerPage) || 1;
   const indexOfFirstItem = (currentPage - 1) * rowsPerPage;
   const indexOfLastItem = currentPage * rowsPerPage;
@@ -65,12 +67,11 @@ const LogbookRecords = () => {
     return filteredData.slice(indexOfFirstItem, indexOfLastItem);
   }, [indexOfFirstItem, indexOfLastItem, filteredData]);
 
-  // 4. Dynamic Title Helper
   const selectedDocLabel = useMemo(() => {
     return documentTypeMap[selectedDocTypeId] || "[Document Type]";
   }, [selectedDocTypeId]);
 
-  const handlePrint = () => window.print();
+  const handleExportExcel = () => logbookExcel(filteredData, selectedDocLabel, pupLogoSrc, bpLogoSrc);
 
   return (
     <div className=" relative min-h-screen font-sans text-left z-20">
@@ -96,13 +97,11 @@ const LogbookRecords = () => {
               />
               </div>
             </div>
-            
-            <button 
-              onClick={handlePrint}
-              className="bg-pup-dark-maroon hover:bg-[#3a0000] text-white px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto"
+            <button
+              onClick={handleExportExcel}
+              className="bg-pup-dark-maroon hover:bg-[#4a0000] text-white px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto"
             >
-              <PrinterIcon className="h-4 w-4" />
-              <span>Print Logbook</span>
+              <span>Export to Excel</span>
             </button>
           </div>
 
