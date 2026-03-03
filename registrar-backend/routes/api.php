@@ -11,6 +11,7 @@ use App\Http\Controllers\DocumentRequestController;
 use App\Http\Controllers\RequestDocumentController;
 use App\Http\Controllers\RequestHistoryController;
 use App\Http\Controllers\AuthController;
+use Illuminate\Http\Request;
 
 Route::options('{any}', function () {
     return response()->json([], 200);
@@ -113,4 +114,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
         });
         
     Route::apiResource('document-types', DocumentTypeController::class);
+
+    Route::get('/student/profile', function (Request $request) {
+        $user = $request->user();
+
+        if ($user->role_id !== \App\Models\SystemUser::ROLE_STUDENT) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $user->load(['studentProfile', 'academicRecord']);
+
+        return response()->json($user);
+    });
 });

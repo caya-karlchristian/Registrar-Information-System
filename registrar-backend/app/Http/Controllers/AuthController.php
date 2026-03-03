@@ -27,15 +27,19 @@ class AuthController extends Controller
         ]);
     }
 
+    // public function me(Request $request)
+    // {
+    //    $user = $request->user();
+
+    //     if ($user->role_id == 1) {
+    //         $user->load(['studentProfile', 'academicRecord']);
+    //     }
+
+    //     return response()->json($user);
+    // }
     public function me(Request $request)
     {
-       $user = $request->user();
-
-        if ($user->role_id == 1) {
-            $user->load(['studentProfile', 'academicRecord']);
-        }
-
-        return response()->json($user);
+        return response()->json($request->user());
     }
 
     public function logout(Request $request)
