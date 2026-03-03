@@ -12,12 +12,15 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const storedToken = localStorage.getItem("token");
-  const storedUser = localStorage.getItem("user");
-
+  
   const [token, setToken] = useState(storedToken || null);
-  const [user, setUser] = useState(
-  storedUser ? JSON.parse(storedUser) : null
-);
+
+  // const storedUser = localStorage.getItem("user");
+  // const [user, setUser] = useState(
+  //   storedUser ? JSON.parse(storedUser) : null
+  // );
+
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
 
@@ -33,7 +36,10 @@ export const AuthProvider = ({ children }) => {
       const res = await fetchCurrentUser();
       setUser(res.data);
     } catch {
-      logoutRequest();
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      setUser(null);
+      setToken(null);
     }
 
     setLoading(false);
