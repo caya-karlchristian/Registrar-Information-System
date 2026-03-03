@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\SystemUser;
+use App\Http\Resources\UserResource;
 
 class AuthController extends Controller
 {
@@ -27,19 +28,13 @@ class AuthController extends Controller
         ]);
     }
 
-    // public function me(Request $request)
-    // {
-    //    $user = $request->user();
-
-    //     if ($user->role_id == 1) {
-    //         $user->load(['studentProfile', 'academicRecord']);
-    //     }
-
-    //     return response()->json($user);
-    // }
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        $user = $request->user();
+
+        $user->loadIdentityRelations();
+
+        return new UserResource($user);
     }
 
     public function logout(Request $request)
