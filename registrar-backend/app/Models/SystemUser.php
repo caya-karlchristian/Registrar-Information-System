@@ -52,4 +52,32 @@ class SystemUser extends Authenticatable
             'student_profile_id'     // StudentProfile primary key
         );
     }
+
+    public function isStudent()
+    {
+        return $this->role_id === self::ROLE_STUDENT;
+    }
+
+    public function isAlumni()
+    {
+        return $this->role_id === self::ROLE_ALUMNI;
+    }
+
+    public function isStaff()
+    {
+        return $this->role_id === self::ROLE_STAFF;
+    }
+
+    public function loadIdentityRelations()
+    {
+        if ($this->isStudent()) {
+            $this->load(['studentProfile', 'academicRecord']);
+        }
+
+        // if ($this->isAlumni()) {
+        //     $this->load(['studentProfile']);
+        // }
+
+        // Staff relations can be added later
+    }
 }
