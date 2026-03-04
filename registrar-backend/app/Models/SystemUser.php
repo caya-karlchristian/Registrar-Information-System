@@ -9,7 +9,7 @@ class SystemUser extends Authenticatable
 {
     use HasApiTokens;
 
-    protected $table = 'system_user';
+    protected $table = 'users';
     protected $primaryKey = 'user_id';
     public $timestamps = false;
     public const ROLE_STUDENT = 1;
