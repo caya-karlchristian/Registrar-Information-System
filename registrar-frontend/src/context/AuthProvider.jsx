@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
 
       // Fetch authenticated user (single source of truth)
       const userRes = await fetchCurrentUser();
-      const userData = userRes.data;
+      const userData = userRes.data.data;
 
       localStorage.setItem("user", JSON.stringify(userData));
       setUser(userData);
