@@ -1,112 +1,148 @@
 <?php
 
 namespace App\Http\Controllers;
-// gawa ni aron stephen s. cordova year 2027
+
+// gawa ni aron stephen s. cordova year 2026
 use App\Models\DocumentRequest;
+use App\Models\SystemUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-
 class DocumentRequestController extends Controller
 {
+    // Relations to eager load on every request
+    // Defined once so index() and show() stay in sync
+    private const RELATIONS = [
+        'user',
+        'studentProfile',
+        'academicRecord',
+        'status',
+        'documents',
+    ];
+
+    // -------------------------------------------------------
+    // GET /document-requests
+    // Admin/Super Admin → all requests
+    // Student/Alumni → only their own
+    // -------------------------------------------------------
     public function index()
     {
+        /** @var \App\Models\SystemUser $user */
         $user = Auth::user();
 
-        $query = DocumentRequest::with([
-            'user',
-            'studentProfile',
-            'academicRecord',
-            'status',
-            'certificationType',
-            'documents'
-        ]);
+        $query = DocumentRequest::with(self::RELATIONS);
 
-        if (!$user) {
-            return response()->json([
-                'message' => 'Unauthorized'
-            ], 401);
+        if (!$user instanceof SystemUser) {
+            return response()->json(['message' => 'Unauthorized'], 401);
         }
-        // If NOT registrar staff
-        if ($user->role_id != 3) {
+
+        // Staff (admin + super admin) see everything
+        // Students and alumni only see their own requests
+        if (!$user->isStaff()) {
             $query->where('user_id', $user->user_id);
         }
 
         return response()->json($query->get(), 200);
     }
 
-
+    // -------------------------------------------------------
+    // GET /document-requests/{id}
+    // -------------------------------------------------------
     public function show(DocumentRequest $documentRequest)
     {
         $this->authorize('view', $documentRequest);
 
         return response()->json(
-            $documentRequest->load([
-                'user',
-                'studentProfile',
-                'academicRecord',
-                'status',
-                'certificationType',
-                'documents'
-            ]),
+            $documentRequest->load(self::RELATIONS),
             200
         );
     }
 
-   public function store(Request $request)
-{
-    $request->validate([
-        'purpose_of_request' => 'required|string|max:255',
-        'receipt_number' => 'nullable|string|max:100',
-        'receipt_date' => 'nullable|date',
-        'cert_type_id' => 'nullable|integer',
-    ]);
+    // -------------------------------------------------------
+    // POST /document-requests
+    // Students and alumni only (enforced by route middleware + policy)
+    // -------------------------------------------------------
+    public function store(Request $request)
+    {
+        $this->authorize('create', DocumentRequest::class);
 
-    $user = Auth::user();
+        $validated = $request->validate([
+            'request_purpose_id' => 'required|integer|exists:request_purpose,request_purpose_id',
+            'or_number'          => 'nullable|string|max:50',
+            'receipt_date'       => 'nullable|date',
+            'number_of_copies'   => 'required|integer|min:1|max:100',
+            'document_type_ids'  => 'required|array|min:1',
+            'document_type_ids.*'=> 'integer|exists:document_type,document_type_id',
+        ]);
 
-    // Get linked student profile + academic record safely
-    $studentProfile = $user->studentProfile;
-    $academicRecord = $user->academicRecord;
+        $user = Auth::user();
 
-    if (!$studentProfile || !$academicRecord) {
-        return response()->json([
-            'message' => 'Student profile or academic record not found'
-        ], 400);
+        $studentProfile = $user->studentProfile;
+        $academicRecord = $user->academicRecord;
+
+        if (!$studentProfile || !$academicRecord) {
+            return response()->json([
+                'message' => 'Student profile or academic record not found.'
+            ], 400);
+        }
+
+        $documentRequest = DocumentRequest::create([
+            'user_id'            => $user->user_id,
+            'student_profile_id' => $studentProfile->student_profile_id,
+            'student_academic_id'=> $academicRecord->student_academic_id,
+            'status_id'          => 1, // Pending
+            'request_purpose_id' => $validated['request_purpose_id'],
+            'or_number'          => $validated['or_number'] ?? null,
+            'receipt_date'       => $validated['receipt_date'] ?? null,
+            'number_of_copies'   => $validated['number_of_copies'],
+        ]);
+
+        // Attach the requested document types (many-to-many)
+        foreach ($validated['document_type_ids'] as $documentTypeId) {
+            $documentRequest->documents()->create([
+                'document_type_id' => $documentTypeId,
+            ]);
+        }
+
+        return response()->json(
+            $documentRequest->load(self::RELATIONS),
+            201
+        );
     }
 
-    $documentRequest = DocumentRequest::create([
-        'user_id' => $user->user_id,
-        'student_profile_id' => $studentProfile->student_profile_id,
-        'academic_record_id' => $academicRecord->academic_record_id,
-
-        'status_id' => 1,
-        'number_of_copies' => 1,
-
-        'purpose_of_request' => $request->purpose_of_request,
-        'receipt_number' => $request->receipt_number,
-        'receipt_date' => $request->receipt_date,
-        'cert_type_id' => $request->cert_type_id,
-    ]);
-
-    return response()->json($documentRequest, 201);
-}
+    // -------------------------------------------------------
+    // PUT /document-requests/{id}
+    // Admin/Super Admin only — update status, add notes, etc.
+    // -------------------------------------------------------
     public function update(Request $request, DocumentRequest $documentRequest)
     {
         $this->authorize('update', $documentRequest);
 
-        $documentRequest->update($request->all());
+        $validated = $request->validate([
+            'status_id'        => 'sometimes|integer|exists:request_status,status_id',
+            'or_number'        => 'sometimes|nullable|string|max:50',
+            'receipt_date'     => 'sometimes|nullable|date',
+            'number_of_copies' => 'sometimes|integer|min:1|max:100',
+        ]);
 
-        return response()->json($documentRequest, 200);
+        $documentRequest->update($validated);
+
+        return response()->json(
+            $documentRequest->load(self::RELATIONS),
+            200
+        );
     }
 
-
+    // -------------------------------------------------------
+    // DELETE /document-requests/{id}
+    // Admin/Super Admin only
+    // -------------------------------------------------------
     public function destroy(DocumentRequest $documentRequest)
     {
         $this->authorize('delete', $documentRequest);
 
         $documentRequest->delete();
 
-        return response()->json(['message' => 'Request deleted'], 200);
+        return response()->json(['message' => 'Request deleted successfully'], 200);
     }
-
 }
