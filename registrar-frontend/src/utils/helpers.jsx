@@ -1,12 +1,11 @@
-// helpers.jsx
-import React from "react";
 import puplogoimage from "../assets/puplogoimage.png";
 import Bagong_Pilipinas_Logo from "../assets/Bagong_Pilipinas_logo.png";
 import certificate_footer from "../assets/certificate_footer.png";
-import { formatDateFormal, formatDateOrdinal } from "./Formatters.jsx";
+import { formatDateFormal, formatDateOrdinal } from "./formatters.js";
 
 // --- Reusable UI Components ---
 export const TextBlock = ({ children, className = "" }) => <div className={`mb-4 ${className}`}>{children}</div>;
+export const bold = (text) => <strong>{text}</strong>;
 
 export const CertificateTitle = ({ title }) => (
   <div className="text-center mb-4 print:text-[20pt]">
