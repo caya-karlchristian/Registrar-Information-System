@@ -1,5 +1,5 @@
 import { Outlet, useNavigate } from 'react-router-dom';
-import AlumniHeaderNav from '../components/AlumniHeaderNav.jsx';
+import Header from '../components/Header.jsx';
 import AlumniNavigation from '../components/AlumniNavigation.jsx';
 import { useState, useEffect } from "react";
 import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
@@ -18,7 +18,7 @@ const AlumniPage = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#F5F5F5]">
-        <AlumniHeaderNav onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
+        <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
   
         <div className="flex flex-1 overflow-hidden relative">
           <AlumniNavigation

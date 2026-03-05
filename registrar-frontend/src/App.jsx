@@ -19,13 +19,18 @@ import RegistrarContact from './layouts/RegistrarContact.jsx';
 import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
 import ProtectedRoute from './components/ProtectedRoute';
 import ForbiddenPage from './components/ForbiddenPage';
+import SuperAdminPage from './pages/SuperAdminPage.jsx';
 
 const App = () => {
   return (
     <div className="flex flex-col min-h-screen">
       
       <Routes>
-        
+        {/* /super admin - need to implement */}
+        <Route path="/superadmin" element={<SuperAdminPage />}>
+        <Route path="contact" element={<RegistrarContact />} />  {/* /superadmin/contact */}
+        </Route>
+
         <Route path="/" element={<LandingPage />} />
         
         <Route path="/forbidden" element={<ForbiddenPage />} />
