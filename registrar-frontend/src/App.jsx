@@ -20,6 +20,7 @@ import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
 import ProtectedRoute from './components/ProtectedRoute';
 import ForbiddenPage from './components/ForbiddenPage';
 import SuperAdminPage from './pages/SuperAdminPage.jsx';
+import UserManagement from './layouts/UserManagement.jsx';
 
 const App = () => {
   return (
@@ -29,6 +30,7 @@ const App = () => {
         {/* /super admin - need to implement */}
         <Route path="/superadmin" element={<SuperAdminPage />}>
         <Route path="contact" element={<RegistrarContact />} />  {/* /superadmin/contact */}
+        <Route path="user" element={<UserManagement />} />
         </Route>
 
         <Route path="/" element={<LandingPage />} />
