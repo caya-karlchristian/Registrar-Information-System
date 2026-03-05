@@ -14,7 +14,7 @@ class SystemUser extends Authenticatable
     public $timestamps = false;
     public const ROLE_STUDENT = 1;
     public const ROLE_ALUMNI = 2;
-    public const ROLE_STAFF = 3;
+    public const ROLE_ADMIN = 3;
 
     protected $fillable = [
         'name',
@@ -63,9 +63,9 @@ class SystemUser extends Authenticatable
         return $this->role_id === self::ROLE_ALUMNI;
     }
 
-    public function isStaff()
+    public function isAdmin()
     {
-        return $this->role_id === self::ROLE_STAFF;
+        return $this->role_id === self::ROLE_ADMIN;
     }
 
     public function loadIdentityRelations()

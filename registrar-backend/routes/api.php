@@ -43,7 +43,7 @@ Route::middleware(['auth:sanctum'], 'throttle:10,1')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | DOCUMENT REQUESTS (Students + Alumni + Staff)
+    | DOCUMENT REQUESTS (Students + Alumni + Admin)
     |--------------------------------------------------------------------------
     */
 
@@ -94,7 +94,7 @@ Route::middleware(['auth:sanctum'], 'throttle:10,1')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | STAFF ONLY ROUTES
+    | ADMIN ONLY ROUTES
     |--------------------------------------------------------------------------
     */
 
