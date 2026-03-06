@@ -1,20 +1,38 @@
-import React from "react";
-import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthProvider";
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthProvider';
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
+// -------------------------------------------------------
+// ProtectedRoute
+//
+// Usage:
+//   <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPER_ADMIN]}>
+//     <SomePage />
+//   </ProtectedRoute>
+//
+// allowedRoles: array of role_name strings from ROLES constant
+// e.g. ["admin", "super_admin"]
+// -------------------------------------------------------
+const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user, loading } = useAuth();
 
+  // Still restoring session — don't redirect yet
   if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading user...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-500 text-sm">Loading...</p>
+      </div>
+    );
   }
 
+  // Not logged in
   if (!user) {
-    return null;
+    return <Navigate to="/" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role_id)) {
-    return <div className="p-6 text-center text-red-600 font-bold">Access Denied</div>;
+  // Logged in but wrong role
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role_name)) {
+    return <Navigate to="/forbidden" replace />;
   }
 
   return children;
