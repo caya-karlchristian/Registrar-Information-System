@@ -30,13 +30,23 @@ import RegistrarContact from './layouts/RegistrarContact.jsx';
 import { ROLES } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 import ForbiddenPage from './components/ForbiddenPage';
+import SuperAdminPage from './pages/SuperAdminPage.jsx';
+import UserManagement from './layouts/UserManagement.jsx';
+import DocumentManagement from './layouts/DocumentManagement.jsx';
+import ReportManagement from './layouts/ReportManagement.jsx';
 
 const App = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <Routes>
+        {/* /super admin - need to implement */}
+        <Route path="/superadmin" element={<SuperAdminPage />}>
+        <Route path="contact" element={<RegistrarContact />} />  {/* /superadmin/contact */}
+        <Route path="user" element={<UserManagement />} />
+        <Route path="documents" element={<DocumentManagement />} />
+        <Route path="report" element={<ReportManagement/>} />
+        </Route>
 
-        {/* PUBLIC */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/forbidden" element={<ForbiddenPage />} />
 
