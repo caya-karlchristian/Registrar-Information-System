@@ -34,6 +34,7 @@ import SuperAdminPage from './pages/SuperAdminPage.jsx';
 import UserManagement from './layouts/UserManagement.jsx';
 import DocumentManagement from './layouts/DocumentManagement.jsx';
 import ReportManagement from './layouts/ReportManagement.jsx';
+import SystemSettings from './layouts/SystemSettings.jsx';
 
 const App = () => {
   return (
@@ -45,6 +46,7 @@ const App = () => {
         <Route path="user" element={<UserManagement />} />
         <Route path="documents" element={<DocumentManagement />} />
         <Route path="report" element={<ReportManagement/>} />
+        <Route path="settings" element={<SystemSettings/>} />
         </Route>
 
         <Route path="/" element={<LandingPage />} />
