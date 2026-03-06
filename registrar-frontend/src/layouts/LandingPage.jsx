@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loginUser } from "../services/API";
 import { useAuth } from "../context/AuthProvider";
 import risImage from "../assets/RIS1.png";
 import logoImage from "../assets/puplogoimage.png";
@@ -9,25 +8,32 @@ import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
 
 const LandingPage = () => {
   const navigate = useNavigate();
-  const { user, login } = useAuth(); 
+  const { user, login, error } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState('');
 
   useEffect(() => {
-  const token = localStorage.getItem("token");
-  if (!token) return;
-
-  if (user?.role_id === 1 && token) navigate("/student");
-  else if (user?.role_id === 2 && token) navigate("/alumni");
-  else if (user?.role_id === 3 && token) navigate("/staff");
+  if (!user) return;
+  const destination = {
+    student:     "/student",
+    alumni:      "/alumni",
+    admin:       "/staff",
+    super_admin: "/super-admin",
+  }[user.role_name];
+  if (destination) navigate(destination, { replace: true });
 }, [user, navigate]);
 
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    try {
       await login(email, password);
-  
+    } finally {
+      setLoading(false);
+    }
 };
 
   return (
@@ -88,6 +94,12 @@ const LandingPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+          
+            {error && (
+              <p className="text-red-500 text-sm text-center -mt-2 mb-1">
+                {error}
+              </p>
+            )}
 
             <button 
               type="submit"
