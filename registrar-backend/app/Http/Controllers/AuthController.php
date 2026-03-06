@@ -5,6 +5,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\SystemUser;
 use App\Http\Resources\UserResource;
+use App\Services\AuditLogger;
+use App\Models\AuditLog;
 
 class AuthController extends Controller
 {
@@ -23,6 +25,8 @@ class AuthController extends Controller
 
         $token = $user->createToken('ris_token')->plainTextToken;
 
+        AuditLogger::log($request, $user, AuditLog::ACTION_LOGIN);
+
         return response()->json([
             'token' => $token
         ]);
@@ -39,6 +43,7 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        AuditLogger::log($request, $request->user(), AuditLog::ACTION_LOGOUT);
         $request->user()->tokens()->delete();
         return response()->json(['message' => 'Logged out']);
     }

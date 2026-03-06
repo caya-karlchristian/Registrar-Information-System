@@ -7,6 +7,8 @@ use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
+use App\Services\AuditLogger;
+use App\Models\AuditLog;
 
 class SystemUserController extends Controller
 {
@@ -69,6 +71,8 @@ class SystemUserController extends Controller
             'role_id'  => $validated['role_id'],
         ]);
 
+        AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
+
         return (new UserResource($user))
             ->response()
             ->setStatusCode(201);
@@ -129,6 +133,8 @@ class SystemUserController extends Controller
                 'message' => 'You cannot delete your own account.'
             ], 403);
         }
+
+        AuditLogger::log($request, $request->user(), AuditLog::ACTION_ADMIN_DELETED);
 
         $user->delete();
 
