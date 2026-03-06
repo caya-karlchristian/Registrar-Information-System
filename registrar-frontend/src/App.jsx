@@ -5,7 +5,7 @@ import { Routes, Route } from 'react-router-dom';
 import StudentPage from './pages/StudentPage.jsx';
 import AlumniPage from './pages/AlumniPage.jsx';
 import StaffPage from './pages/StaffPage.jsx';
-import SuperAdminPage from './pages/SuperAdminPage.jsx'; // ← new
+// import SuperAdminPage from './pages/SuperAdminPage.jsx'; // ← new
 
 // Layouts
 import LandingPage from './layouts/LandingPage.jsx';
@@ -22,9 +22,9 @@ import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx';
 
 // Super Admin layouts (frontend dev fills these in)
-import SuperAdminDashboard from './layouts/superadmin/SuperAdminDashboard.jsx';
-import AdminManagement from './layouts/superadmin/AdminManagement.jsx';
-import AuditLogViewer from './layouts/superadmin/AuditLogViewer.jsx';
+// import SuperAdminDashboard from './layouts/superadmin/SuperAdminDashboard.jsx';
+// import AdminManagement from './layouts/superadmin/AdminManagement.jsx';
+// import AuditLogViewer from './layouts/superadmin/AuditLogViewer.jsx';
 
 // Auth
 import { ROLES } from './context/AuthProvider';
@@ -94,7 +94,7 @@ const App = () => {
         </Route>
 
         {/* SUPER ADMIN (role: super_admin) */}
-        <Route
+        {/* <Route
           path="/super-admin"
           element={
             <ProtectedRoute allowedRoles={[ROLES.SUPER_ADMIN]}>
@@ -107,7 +107,7 @@ const App = () => {
           <Route path="admins" element={<AdminManagement />} />
           <Route path="audit-logs" element={<AuditLogViewer />} />
           <Route path="profile" element={<ProfilePage userType="super_admin" />} />
-        </Route>
+        </Route> */}
 
       </Routes>
     </div>
