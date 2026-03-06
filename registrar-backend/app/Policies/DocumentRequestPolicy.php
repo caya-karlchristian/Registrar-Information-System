@@ -7,46 +7,64 @@ use App\Models\SystemUser;
 
 class DocumentRequestPolicy
 {
-    // Who can list requests
-    public function viewAny(SystemUser $user)
+    // -------------------------------------------------------
+    // List all requests
+    // All authenticated roles can access index()
+    // (controller filters results by role)
+    // -------------------------------------------------------
+    public function viewAny(SystemUser $user): bool
     {
-        return in_array($user->role_id, [1,2,3]);
+        return in_array($user->role_id, [
+            SystemUser::ROLE_STUDENT,
+            SystemUser::ROLE_ALUMNI,
+            SystemUser::ROLE_ADMIN,
+            SystemUser::ROLE_SUPER_ADMIN,
+        ]);
     }
 
-    // Who can view specific request
-    public function view(SystemUser $user, DocumentRequest $request)
+    // -------------------------------------------------------
+    // View a specific request
+    // Admin/Super Admin → any request
+    // Student/Alumni → only their own
+    // -------------------------------------------------------
+    public function view(SystemUser $user, DocumentRequest $request): bool
     {
-        // Registrar can view all
-        if ($user->role_id == 3) {
+        if ($user->isStaff()) {
             return true;
         }
 
-        // Student or Alumni can only view their own
-        return $request->user_id == $user->user_id;
+        return (int) $request->user_id === (int) $user->user_id;
     }
 
-    // Who can create
-    public function create(SystemUser $user)
+    // -------------------------------------------------------
+    // Create a request
+    // Only students and alumni can submit document requests
+    // -------------------------------------------------------
+    public function create(SystemUser $user): bool
     {
-        return in_array($user->role_id, [1,2]); // student & alumni
+        return in_array($user->role_id, [
+            SystemUser::ROLE_STUDENT,
+            SystemUser::ROLE_ALUMNI,
+        ]);
     }
 
-    // Who can update
-    public function update(SystemUser $user, DocumentRequest $request)
+    // -------------------------------------------------------
+    // Update a request
+    // Only admin/super admin can update requests.
+    // Students cannot edit their own submitted requests —
+    // once submitted, it enters the registrar's workflow.
+    // -------------------------------------------------------
+    public function update(SystemUser $user, DocumentRequest $request): bool
     {
-        // Registrar can update anything
-        if ($user->role_id == 3) {
-            return true;
-        }
-
-        // Student/Alumni can update their own only
-        return $request->user_id == $user->user_id;
+        return $user->isStaff();
     }
 
-    // Who can delete
-    public function delete(SystemUser $user, DocumentRequest $request)
+    // -------------------------------------------------------
+    // Delete a request
+    // Only admin/super admin can delete requests
+    // -------------------------------------------------------
+    public function delete(SystemUser $user, DocumentRequest $request): bool
     {
-        // Only registrar can delete
-        return $user->role_id == 3;
+        return $user->isStaff();
     }
 }
