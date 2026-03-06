@@ -11,119 +11,138 @@ use App\Http\Controllers\DocumentRequestController;
 use App\Http\Controllers\RequestDocumentController;
 use App\Http\Controllers\RequestHistoryController;
 use App\Http\Controllers\AuthController;
-use Illuminate\Http\Request;
-
-Route::options('{any}', function () {
-    return response()->json([], 200);
-})->where('any', '.*');
-/*
-|--------------------------------------------------------------------------
-| Public Routes
-|--------------------------------------------------------------------------
-*/
-
-Route::post('/login', [AuthController::class, 'login']);
+use App\Http\Controllers\AuditLogController;
 
 /*
 |--------------------------------------------------------------------------
-| Protected Routes (Requires Authentication)
+| PUBLIC ROUTES
+| Throttled to 10 attempts/min to prevent brute force on login
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth:sanctum'], 'throttle:10,1')->group(function () {
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:10,1');
 
-    /*
-    |--------------------------------------------------------------------------
-    | AUTH USER ROUTES
-    |--------------------------------------------------------------------------
-    */
+/*
+|--------------------------------------------------------------------------
+| PROTECTED ROUTES — requires valid Sanctum token
+|--------------------------------------------------------------------------
+*/
 
-    Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
+Route::middleware('auth:sanctum')->group(function () {
+
+    // -------------------------------------------------------
+    // AUTH
+    // -------------------------------------------------------
+    Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | DOCUMENT REQUESTS (Students + Alumni + Admin)
-    |--------------------------------------------------------------------------
-    */
-
+    // -------------------------------------------------------
+    // DOCUMENT REQUESTS
+    // GET    → all roles (controller + policy filters by ownership)
+    // POST   → students + alumni only
+    // PUT    → admin only (approve, update status)
+    // DELETE → admin only
+    // -------------------------------------------------------
     Route::prefix('document-requests')->group(function () {
-
         Route::get('/', [DocumentRequestController::class, 'index']);
-
-        Route::post('/', [DocumentRequestController::class, 'store'])
-            ->middleware([\App\Http\Middleware\RoleMiddleware::class . ':1,2']);
-
         Route::get('{id}', [DocumentRequestController::class, 'show']);
 
+        Route::post('/', [DocumentRequestController::class, 'store'])
+            ->middleware('role:1,2');
+
         Route::put('{id}', [DocumentRequestController::class, 'update'])
-            ->middleware([\App\Http\Middleware\RoleMiddleware::class . ':3']);
+            ->middleware('role:3');
 
         Route::delete('{id}', [DocumentRequestController::class, 'destroy'])
-            ->middleware([\App\Http\Middleware\RoleMiddleware::class . ':3']);
-
+            ->middleware('role:3');
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | REQUEST DOCUMENTS
-    |--------------------------------------------------------------------------
-    */
-
+    // -------------------------------------------------------
+    // REQUEST DOCUMENTS
+    // GET    → all roles (students see their own via policy)
+    // POST   → students + alumni (attach docs to their request)
+    // PUT    → admin only
+    // DELETE → admin only
+    // -------------------------------------------------------
     Route::prefix('request-documents')->group(function () {
         Route::get('/', [RequestDocumentController::class, 'index']);
         Route::get('{id}', [RequestDocumentController::class, 'show']);
-        Route::post('/', [RequestDocumentController::class, 'store']);
-        Route::put('{id}', [RequestDocumentController::class, 'update']);
-        Route::delete('{id}', [RequestDocumentController::class, 'destroy']);
+
+        Route::post('/', [RequestDocumentController::class, 'store'])
+            ->middleware('role:1,2');
+
+        Route::put('{id}', [RequestDocumentController::class, 'update'])
+            ->middleware('role:3');
+
+        Route::delete('{id}', [RequestDocumentController::class, 'destroy'])
+            ->middleware('role:3');
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | REQUEST HISTORY
-    |--------------------------------------------------------------------------
-    */
-
+    // -------------------------------------------------------
+    // REQUEST HISTORY
+    // GET          → all roles (students track their own)
+    // POST/PUT/DELETE → admin only (system audit trail)
+    // -------------------------------------------------------
     Route::prefix('request-history')->group(function () {
         Route::get('/', [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
-        Route::post('/', [RequestHistoryController::class, 'store']);
-        Route::put('{id}', [RequestHistoryController::class, 'update']);
-        Route::delete('{id}', [RequestHistoryController::class, 'destroy']);
+
+        Route::post('/', [RequestHistoryController::class, 'store'])
+            ->middleware('role:3');
+
+        Route::put('{id}', [RequestHistoryController::class, 'update'])
+            ->middleware('role:3');
+
+        Route::delete('{id}', [RequestHistoryController::class, 'destroy'])
+            ->middleware('role:3');
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN ONLY ROUTES
-    |--------------------------------------------------------------------------
-    */
+    // -------------------------------------------------------
+    // READ-ONLY FOR ALL AUTHENTICATED USERS
+    // -------------------------------------------------------
+    Route::get('document-types', [DocumentTypeController::class, 'index']);
+    Route::get('document-types/{id}', [DocumentTypeController::class, 'show']);
 
+    Route::get('certifications', [CertificationTypeController::class, 'index']);
+    Route::get('certifications/{id}', [CertificationTypeController::class, 'show']);
+
+    Route::get('request-statuses', [RequestStatusController::class, 'index']);
+    Route::get('request-statuses/{id}', [RequestStatusController::class, 'show']);
+
+    // -------------------------------------------------------
+    // ADMIN ONLY (role 3)
+    // Super Admin bypasses this automatically via RoleMiddleware
+    // -------------------------------------------------------
     Route::middleware('role:3')->group(function () {
 
-        Route::apiResource('system-users', SystemUserController::class);
+        Route::post('document-types', [DocumentTypeController::class, 'store']);
+        Route::put('document-types/{id}', [DocumentTypeController::class, 'update']);
+        Route::delete('document-types/{id}', [DocumentTypeController::class, 'destroy']);
+
+        Route::post('certifications', [CertificationTypeController::class, 'store']);
+        Route::put('certifications/{id}', [CertificationTypeController::class, 'update']);
+        Route::delete('certifications/{id}', [CertificationTypeController::class, 'destroy']);
+
+        Route::post('request-statuses', [RequestStatusController::class, 'store']);
+        Route::put('request-statuses/{id}', [RequestStatusController::class, 'update']);
+        Route::delete('request-statuses/{id}', [RequestStatusController::class, 'destroy']);
 
         Route::apiResource('students', StudentProfileController::class);
-
         Route::apiResource('academic-records', StudentAcademicRecordController::class);
-
-        Route::apiResource('request-statuses', RequestStatusController::class);
-
-        
-        Route::apiResource('certifications', CertificationTypeController::class);
-        
-        });
-        
-    Route::apiResource('document-types', DocumentTypeController::class);
-
-    Route::get('/student/profile', function (Request $request) {
-        $user = $request->user();
-
-        if ($user->role_id !== \App\Models\SystemUser::ROLE_STUDENT) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
-        $user->load(['studentProfile', 'academicRecord']);
-
-        return response()->json($user);
     });
+
+    // -------------------------------------------------------
+    // SUPER ADMIN ONLY (role 4)
+    // -------------------------------------------------------
+    Route::middleware('role:4')->group(function () {
+
+        // User account management — create/edit/delete admins
+        Route::apiResource('system-users', SystemUserController::class);
+
+        // Audit log viewer
+        Route::get('audit-logs', [AuditLogController::class, 'index']);
+        Route::get('audit-logs/filters', [AuditLogController::class, 'filters']);
+    });
+
 });
