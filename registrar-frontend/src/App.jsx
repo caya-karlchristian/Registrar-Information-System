@@ -1,118 +1,115 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 
+// Pages (role shells)
 import StudentPage from './pages/StudentPage.jsx';
 import AlumniPage from './pages/AlumniPage.jsx';
 import StaffPage from './pages/StaffPage.jsx';
-import LandingPage from './layouts/LandingPage.jsx';
+import SuperAdminPage from './pages/SuperAdminPage.jsx'; // ← new
 
+// Layouts
+import LandingPage from './layouts/LandingPage.jsx';
 import RequestForm from './layouts/RequestForm.jsx';
 import DocumentLists from './layouts/DocumentLists.jsx';
 import StudentDashboard from './layouts/StudentDashboard.jsx';
 import FAQPage from './layouts/FAQs.jsx';
 import AlumniRequest from './layouts/AlumniRequest.jsx';
+import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
 import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx';
 import StaffDashboard from './layouts/StaffDashboard.jsx';
 import Logbook from './layouts/Logbook.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx';
-import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
+
+// Super Admin layouts (frontend dev fills these in)
+import SuperAdminDashboard from './layouts/superadmin/SuperAdminDashboard.jsx';
+import AdminManagement from './layouts/superadmin/AdminManagement.jsx';
+import AuditLogViewer from './layouts/superadmin/AuditLogViewer.jsx';
+
+// Auth
+import { ROLES } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 import ForbiddenPage from './components/ForbiddenPage';
 
 const App = () => {
   return (
     <div className="flex flex-col min-h-screen">
-      
       <Routes>
-        
+
+        {/* PUBLIC */}
         <Route path="/" element={<LandingPage />} />
-        
         <Route path="/forbidden" element={<ForbiddenPage />} />
 
-        <Route path="/student" element={
-            <ProtectedRoute allowedRoles={[1]}><StudentPage /></ProtectedRoute>}>
-          <Route index element={
-              <RequestForm />
-            } /> {/* /student */}
-          <Route path="home" element={
-                <StudentDashboard />
-          } />
-          <Route path="request" element={
-            <RequestForm />
-          } />
-          <Route path="lists" element={
-            <DocumentLists />
-          } />
-          <Route path="faqs" element={
-            <FAQPage />
-          } />
-
-          <Route path="profile" element={
-            <ProfilePage userType="student" /> 
-          } />
-
-          <Route path="contact" element={
-            <RegistrarContact />
-          } />
-
+        {/* STUDENT (role: student) */}
+        <Route
+          path="/student"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
+              <StudentPage />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<RequestForm />} />
+          <Route path="home" element={<StudentDashboard />} />
+          <Route path="request" element={<RequestForm />} />
+          <Route path="lists" element={<DocumentLists />} />
+          <Route path="faqs" element={<FAQPage />} />
+          <Route path="profile" element={<ProfilePage userType="student" />} />
+          <Route path="contact" element={<RegistrarContact />} />
         </Route>
-          <Route path="/alumni" element={
-            <ProtectedRoute allowedRoles={[2]}>
+
+        {/* ALUMNI (role: alumni) */}
+        <Route
+          path="/alumni"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ALUMNI]}>
               <AlumniPage />
             </ProtectedRoute>
-            }>
-          <Route index element={
-            <AlumniRequest />
-            } /> 
-          <Route path="home" element={
-            <StudentDashboard />
-          } />
-          <Route path="request" element={
-            <AlumniRequest />
-            } />
-          <Route path="lists" element={
-            <AlumniDocumentList />
-          } />
-          <Route path="faqs" element={
-            <FAQPage />
-          } />
-          <Route path="profile" element={
-            <ProfilePage userType="alumni" />
-          } />
-          <Route path="contact" element={
-            <RegistrarContact />
-          } />
+          }
+        >
+          <Route index element={<AlumniRequest />} />
+          <Route path="home" element={<StudentDashboard />} />
+          <Route path="request" element={<AlumniRequest />} />
+          <Route path="lists" element={<AlumniDocumentList />} />
+          <Route path="faqs" element={<FAQPage />} />
+          <Route path="profile" element={<ProfilePage userType="alumni" />} />
+          <Route path="contact" element={<RegistrarContact />} />
         </Route>
 
-        <Route path="/staff" element={
-          <ProtectedRoute allowedRoles={[3]}>
-            <StaffPage />
-          </ProtectedRoute>
-          }>
-          <Route index element={
-            <StaffDashboard />
-            } /> {/* /staff */}
-          <Route path="dashboard" element={
-            <StaffDashboard />
-            } />
-          <Route path="analytics" element={
-            <AnalyticsDashboard />
-            } />
-          <Route path="logbook" element={
-            <Logbook />
-            } />
-          <Route path="profile" element={
-            <ProfilePage userType="staff" />
-          } />
-          <Route path="contact" element={
-            <RegistrarContact />
-          } />
+        {/* STAFF / ADMIN (role: admin) */}
+        <Route
+          path="/staff"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <StaffPage />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<StaffDashboard />} />
+          <Route path="dashboard" element={<StaffDashboard />} />
+          <Route path="analytics" element={<AnalyticsDashboard />} />
+          <Route path="logbook" element={<Logbook />} />
+          <Route path="profile" element={<ProfilePage userType="admin" />} />
+          <Route path="contact" element={<RegistrarContact />} />
         </Route>
 
-        
+        {/* SUPER ADMIN (role: super_admin) */}
+        <Route
+          path="/super-admin"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.SUPER_ADMIN]}>
+              <SuperAdminPage />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<SuperAdminDashboard />} />
+          <Route path="dashboard" element={<SuperAdminDashboard />} />
+          <Route path="admins" element={<AdminManagement />} />
+          <Route path="audit-logs" element={<AuditLogViewer />} />
+          <Route path="profile" element={<ProfilePage userType="super_admin" />} />
+        </Route>
+
       </Routes>
-      
     </div>
   );
 };
