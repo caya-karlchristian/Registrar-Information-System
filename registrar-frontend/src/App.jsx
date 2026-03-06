@@ -33,6 +33,7 @@ import ForbiddenPage from './components/ForbiddenPage';
 import SuperAdminPage from './pages/SuperAdminPage.jsx';
 import UserManagement from './layouts/UserManagement.jsx';
 import DocumentManagement from './layouts/DocumentManagement.jsx';
+import ReportManagement from './layouts/ReportManagement.jsx';
 
 const App = () => {
   return (
@@ -43,6 +44,7 @@ const App = () => {
         <Route path="contact" element={<RegistrarContact />} />  {/* /superadmin/contact */}
         <Route path="user" element={<UserManagement />} />
         <Route path="documents" element={<DocumentManagement />} />
+        <Route path="report" element={<ReportManagement/>} />
         </Route>
 
         <Route path="/" element={<LandingPage />} />
