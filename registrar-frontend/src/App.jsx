@@ -5,7 +5,7 @@ import { Routes, Route } from 'react-router-dom';
 import StudentPage from './pages/StudentPage.jsx';
 import AlumniPage from './pages/AlumniPage.jsx';
 import StaffPage from './pages/StaffPage.jsx';
-// import SuperAdminPage from './pages/SuperAdminPage.jsx'; // ← new
+import SuperAdminPage from './pages/SuperAdminPage.jsx';
 
 // Layouts
 import LandingPage from './layouts/LandingPage.jsx';
@@ -22,31 +22,20 @@ import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx';
 
 // Super Admin layouts (frontend dev fills these in)
-// import SuperAdminDashboard from './layouts/superadmin/SuperAdminDashboard.jsx';
-// import AdminManagement from './layouts/superadmin/AdminManagement.jsx';
-// import AuditLogViewer from './layouts/superadmin/AuditLogViewer.jsx';
+import UserManagement from './layouts/UserManagement.jsx';
+import DocumentManagement from './layouts/DocumentManagement.jsx';
+import ReportManagement from './layouts/ReportManagement.jsx';
+import SystemSettings from './layouts/SystemSettings.jsx';
 
 // Auth
 import { ROLES } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 import ForbiddenPage from './components/ForbiddenPage';
-import SuperAdminPage from './pages/SuperAdminPage.jsx';
-import UserManagement from './layouts/UserManagement.jsx';
-import DocumentManagement from './layouts/DocumentManagement.jsx';
-import ReportManagement from './layouts/ReportManagement.jsx';
 
 const App = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <Routes>
-        {/* /super admin - need to implement */}
-        <Route path="/superadmin" element={<SuperAdminPage />}>
-        <Route path="contact" element={<RegistrarContact />} />  {/* /superadmin/contact */}
-        <Route path="user" element={<UserManagement />} />
-        <Route path="documents" element={<DocumentManagement />} />
-        <Route path="report" element={<ReportManagement/>} />
-        </Route>
-
         <Route path="/" element={<LandingPage />} />
         <Route path="/forbidden" element={<ForbiddenPage />} />
 
@@ -104,7 +93,7 @@ const App = () => {
         </Route>
 
         {/* SUPER ADMIN (role: super_admin) */}
-        {/* <Route
+        <Route
           path="/super-admin"
           element={
             <ProtectedRoute allowedRoles={[ROLES.SUPER_ADMIN]}>
@@ -112,12 +101,17 @@ const App = () => {
             </ProtectedRoute>
           }
         >
-          <Route index element={<SuperAdminDashboard />} />
-          <Route path="dashboard" element={<SuperAdminDashboard />} />
-          <Route path="admins" element={<AdminManagement />} />
-          <Route path="audit-logs" element={<AuditLogViewer />} />
-          <Route path="profile" element={<ProfilePage userType="super_admin" />} />
-        </Route> */}
+          {/* <Route index element={<SuperAdminDashboard />} /> */}
+          {/* <Route path="dashboard" element={<SuperAdminDashboard />} /> */}
+          {/* <Route path="admins" element={<AdminManagement />} /> */}
+          {/* <Route path="audit-logs" element={<AuditLogViewer />} /> */}
+          {/* <Route path="profile" element={<ProfilePage userType="super_admin" />} /> */}
+          <Route path="contact" element={<RegistrarContact />} /> 
+          <Route path="user" element={<UserManagement />} />
+          <Route path="documents" element={<DocumentManagement />} />
+          <Route path="report" element={<ReportManagement/>} />
+          <Route path="settings" element={<SystemSettings/>} />
+        </Route>
 
       </Routes>
     </div>

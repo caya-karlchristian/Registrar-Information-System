@@ -164,7 +164,7 @@ const UserManagement = () => {
                   className="rounded border-gray-300 accent-pup-dark-maroon"
                 />
               </th>
-              {["User ID", "Email", "Role", "Joined Date", "Status", "Actions"].map((h) => (
+              {["Email", "Role", "Joined Date", "Status", "Actions"].map((h) => (
                 <th key={h} className="px-4 py-3 text-center text-gray-500 font-medium ">{h}</th>
               ))}
             </tr>
@@ -187,7 +187,7 @@ const UserManagement = () => {
                       className="rounded border-gray-300 accent-pup-dark-maroon"
                     />
                   </td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">{user.user_id}</td>
+                  {/* <td className="px-4 py-3 text-gray-500 font-mono text-xs">{user.user_id}</td> */}
                   <td className="px-4 py-3 text-gray-800">{user.email}</td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-pup-dark-maroon">
