@@ -108,6 +108,8 @@ class SystemUserController extends Controller
 
         $user->update($validated);
 
+        AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_UPDATED);
+
         return new UserResource($user);
     }
 
