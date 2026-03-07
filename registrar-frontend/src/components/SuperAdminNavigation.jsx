@@ -9,9 +9,11 @@ import {
   ArrowRightStartOnRectangleIcon,
 } from '@heroicons/react/24/outline';
 import ConfirmationModal from "../components/ConfirmationModal";
+import { useAuth } from "../context/AuthProvider"; 
 
 const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const fullName = "Super Admin"; // temporary hardcode
 
@@ -38,6 +40,7 @@ const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
       message: 'Are you sure you want to log out? Any unsaved changes in the registrar system may be lost.',
       type: 'default', 
       onConfirm: () => {
+        logout();
         navigate("/", { replace: true });
       }
     });
