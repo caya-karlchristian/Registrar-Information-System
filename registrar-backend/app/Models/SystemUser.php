@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\AdminProfile;
 
 class SystemUser extends Authenticatable
 {
@@ -120,5 +121,10 @@ class SystemUser extends Authenticatable
             // e.g. $this->load(['adminProfile']);
             return;
         }
+    }
+
+    public function adminProfile()
+    {
+        return $this->hasOne(AdminProfile::class, 'user_id', 'user_id');
     }
 }

@@ -32,6 +32,7 @@ class AuditLog extends Model
     public const ACTION_LOGOUT          = 'logout';
     public const ACTION_ADMIN_CREATED   = 'admin_created';
     public const ACTION_ADMIN_DELETED   = 'admin_deleted';
+    public const ACTION_ADMIN_UPDATED   = 'admin_updated';  
     public const ACTION_ROLE_ASSIGNED   = 'role_assigned';
     public const ACTION_REQUEST_STATUS_CHANGED = 'request_status_changed';
 
