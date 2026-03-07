@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use App\Services\AuditLogger;
 use App\Models\AuditLog;
+use App\Models\AdminProfile;
 
 class SystemUserController extends Controller
 {
@@ -29,6 +30,7 @@ class SystemUserController extends Controller
     public function index()
     {
         $users = SystemUser::whereIn('role_id', self::MANAGEABLE_ROLES)
+            ->with('adminProfile')
             ->get();
 
         return UserResource::collection($users);
@@ -204,5 +206,10 @@ class SystemUserController extends Controller
         $user->delete();
 
         return response()->json(['message' => 'User deleted successfully'], 200);
+    }
+
+    public function adminProfile()
+    {
+        return $this->hasOne(AdminProfile::class, 'user_id', 'user_id');
     }
 }
