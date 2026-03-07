@@ -101,11 +101,7 @@ const App = () => {
             </ProtectedRoute>
           }
         >
-          {/* <Route index element={<SuperAdminDashboard />} /> */}
-          {/* <Route path="dashboard" element={<SuperAdminDashboard />} /> */}
-          {/* <Route path="admins" element={<AdminManagement />} /> */}
-          {/* <Route path="audit-logs" element={<AuditLogViewer />} /> */}
-          {/* <Route path="profile" element={<ProfilePage userType="super_admin" />} /> */}
+          <Route index element={<UserManagement />} /> 
           <Route path="contact" element={<RegistrarContact />} /> 
           <Route path="user" element={<UserManagement />} />
           <Route path="documents" element={<DocumentManagement />} />
