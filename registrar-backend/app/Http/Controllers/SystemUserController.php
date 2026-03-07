@@ -10,14 +10,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use App\Services\AuditLogger;
 use App\Models\AuditLog;
-use App\Models\AdminProfile;
 
 class SystemUserController extends Controller
 {
-    // -------------------------------------------------------
-    // Super Admin can only create/manage admin-level accounts.
-    // Students and alumni come from the guidance system (SSO).
-    // -------------------------------------------------------
     private const MANAGEABLE_ROLES = [
         SystemUser::ROLE_ADMIN,
         SystemUser::ROLE_SUPER_ADMIN,
@@ -25,14 +20,10 @@ class SystemUserController extends Controller
 
     // -------------------------------------------------------
     // GET /system-users
-    // List all admin and super admin accounts
     // -------------------------------------------------------
     public function index()
     {
-        $users = SystemUser::whereIn('role_id', self::MANAGEABLE_ROLES)
-            ->with('adminProfile')
-            ->get();
-
+        $users = SystemUser::whereIn('role_id', self::MANAGEABLE_ROLES)->get();
         return UserResource::collection($users);
     }
 
@@ -47,8 +38,6 @@ class SystemUserController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        // Prevent Super Admin from viewing student/alumni accounts
-        // through this endpoint — those have their own routes
         if (!in_array($user->role_id, self::MANAGEABLE_ROLES)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
@@ -58,18 +47,18 @@ class SystemUserController extends Controller
 
     // -------------------------------------------------------
     // POST /system-users
-    // Create a new admin or super admin account
+    // Creates user account + admin_profile in one transaction
     // -------------------------------------------------------
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'email'    => 'required|email|unique:users,email',
-            'password' => ['required', Password::min(8)->mixedCase()->numbers()],
-            'role_id'  => 'required|integer|in:3,4', // only admin or super_admin
-            'first_name' => 'required | string | max:100',
-            'middle_name' => 'nullable | string | max:100',
-            'last_name' => 'required | string | max:100',
-            'suffix' => 'nullable | string | max:20',
+            'email'       => 'required|email|unique:users,email',
+            'password'    => ['required', Password::min(8)->mixedCase()->numbers()],
+            'role_id'     => 'required|integer|in:3,4',
+            'first_name'  => 'required|string|max:100',
+            'middle_name' => 'nullable|string|max:100',
+            'last_name'   => 'required|string|max:100',
+            'suffix'      => 'nullable|string|max:20',
         ]);
 
         DB::beginTransaction();
@@ -78,23 +67,22 @@ class SystemUserController extends Controller
                 'email'    => $validated['email'],
                 'password' => Hash::make($validated['password']),
                 'role_id'  => $validated['role_id'],
-                'status' => 'Activated',
+                'status'   => 'Activated',
             ]);
 
+            // Create admin profile
             DB::table('admin_profile')->insert([
-                'user_id' => $user->user_id,
-                'first_name' => $validated['first_name'],
+                'user_id'     => $user->user_id,
+                'first_name'  => $validated['first_name'],
                 'middle_name' => $validated['middle_name'] ?? null,
-                'last_name' => $validated['last_name'],
-                'suffix' => $validate['suffix'] ?? null,
+                'last_name'   => $validated['last_name'],
+                'suffix'      => $validated['suffix']      ?? null,
             ]);
 
             DB::commit();
-
         } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json(['message' => 'Failed to create user.'], 
-            500);
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to create user.'], 500);
         }
 
         AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
@@ -106,7 +94,6 @@ class SystemUserController extends Controller
 
     // -------------------------------------------------------
     // PUT /system-users/{id}
-    // Update email, password, or role of an admin account
     // -------------------------------------------------------
     public function update(Request $request, $id)
     {
@@ -116,37 +103,35 @@ class SystemUserController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        // Cannot modify student or alumni accounts through this endpoint
         if (!in_array($user->role_id, self::MANAGEABLE_ROLES)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
         $validated = $request->validate([
-            'email'    => 'sometimes|email|unique:users,email,' . $user->user_id . ',user_id',
-            'password' => ['sometimes', Password::min(8)->mixedCase()->numbers()],
-            'role_id'  => 'sometimes|integer|in:3,4',
-            'status' => 'sometimes|in:Activated,Deactivated',
-            'first_name' => 'sometimes|string|max:100',
+            'email'       => 'sometimes|email|unique:users,email,' . $user->user_id . ',user_id',
+            'password'    => ['sometimes', Password::min(8)->mixedCase()->numbers()],
+            'role_id'     => 'sometimes|integer|in:3,4',
+            'status'      => 'sometimes|in:Activated,Deactivated',
+            'first_name'  => 'sometimes|string|max:100',
             'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'sometimes|string|max:100',
-            'suffix' => 'nullable|string|max:20',
+            'last_name'   => 'sometimes|string|max:100',
+            'suffix'      => 'nullable|string|max:20',
         ]);
 
         DB::beginTransaction();
         try {
             $userFields = array_filter([
-                'email' => $validated['email'] ?? null,
-                'password' => isset($validated['password']) ? 
-                    Hash::make($validated['password']) : null,
-                'role_id' => $validated['role_id'] ?? null,
-                'status' => $validated['status'] ?? null,
+                'email'    => $validated['email']    ?? null,
+                'password' => isset($validated['password']) ? Hash::make($validated['password']) : null,
+                'role_id'  => $validated['role_id']  ?? null,
+                'status'   => $validated['status']   ?? null,
             ], fn($v) => $v !== null);
 
             $profileFields = array_filter([
-                'first_name' => $validated['first_name'] ?? null,
+                'first_name'  => $validated['first_name']  ?? null,
                 'middle_name' => $validated['middle_name'] ?? null,
-                'last_name' => $validated['last_name'] ?? null,
-                'suffix' => $validated['suffix'] ?? null,
+                'last_name'   => $validated['last_name']   ?? null,
+                'suffix'      => $validated['suffix']      ?? null,
             ], fn($v) => $v !== null);
 
             if (!empty($userFields)) {
@@ -156,22 +141,14 @@ class SystemUserController extends Controller
             if (!empty($profileFields)) {
                 DB::table('admin_profile')
                     ->where('user_id', $user->user_id)
-                    ->udpate($profileFields);
+                    ->update($profileFields);
             }
 
             DB::commit();
         } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json(['message' => 'Failed to update user.'], 
-            500);
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to update user.'], 500);
         }
-
-        // Hash password only if it's being updated
-        // if (isset($validated['password'])) {
-        //     $validated['password'] = Hash::make($validated['password']);
-        // }
-
-        // $user->update($validated);
 
         AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_UPDATED);
 
@@ -189,12 +166,10 @@ class SystemUserController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        // Cannot delete student or alumni accounts through this endpoint
         if (!in_array($user->role_id, self::MANAGEABLE_ROLES)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        // Prevent Super Admin from deleting their own account
         if ($user->user_id === $request->user()->user_id) {
             return response()->json([
                 'message' => 'You cannot delete your own account.'
@@ -206,10 +181,5 @@ class SystemUserController extends Controller
         $user->delete();
 
         return response()->json(['message' => 'User deleted successfully'], 200);
-    }
-
-    public function adminProfile()
-    {
-        return $this->hasOne(AdminProfile::class, 'user_id', 'user_id');
     }
 }

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class AdminProfile extends Model
 {
+    protected $table = 'admin_profile';
     public $timestamps = false;
     protected $primaryKey = 'admin_profile_id';
     protected $guarded = [];
