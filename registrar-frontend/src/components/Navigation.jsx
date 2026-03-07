@@ -11,10 +11,12 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider"; 
 import ConfirmationModal from "../components/ConfirmationModal";
+import LineLoading from "../components/LineLoading.jsx";
 
 const Navigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const fullName = user?.student_profile
   ? `${user.student_profile.first_name} ${user.student_profile.last_name}`
@@ -42,9 +44,16 @@ const [modal, setModal] = useState({
       title: 'Logout Session',
       message: 'Are you sure you want to log out? Any unsaved changes in the registrar system may be lost.',
       type: 'default', 
-      onConfirm: () => {
-        logout();
-        navigate("/", { replace: true });
+      onConfirm: async () => {
+        setModal(prev => ({ ...prev, isOpen: false })); 
+        setIsLoggingOut(true);                          
+        try {
+          await logout();
+          navigate("/", { replace: true });
+        } catch (err) {
+          console.error("Logout failed:", err);
+          setIsLoggingOut(false);
+        }
       }
     });
   };
@@ -53,6 +62,7 @@ const [modal, setModal] = useState({
 
   return (
     <>
+      <LineLoading isVisible={isLoggingOut} />
     <aside 
       className={`
         fixed z-40 w-72      
