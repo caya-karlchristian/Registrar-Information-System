@@ -9,17 +9,20 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider"; 
 import ConfirmationModal from "../components/ConfirmationModal.jsx";
-
+import LineLoading from "../components/LineLoading.jsx";
 
 const StaffNavigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
   const { logout } = useAuth();
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+  
   const navItems = [
     { name: "Dashboard", to: "dashboard", icon: Squares2X2Icon },
     { name: "Staff Analytics", to: "analytics", icon: ChartBarSquareIcon },
     { name: "Staff Logbook", to: "logbook", icon: BookOpenIcon },
     { name: "Staff Profile", to: "profile", icon: UserCircleIcon },
   ];
+
   const [modal, setModal] = useState({
       isOpen: false,
       title: '',
@@ -34,10 +37,17 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
         title: 'Logout Session',
         message: 'Are you sure you want to log out? Any unsaved changes in the registrar system may be lost.',
         type: 'default', 
-        onConfirm: () => {
-          logout();
+        onConfirm: async () => {
+        setModal(prev => ({ ...prev, isOpen: false })); 
+        setIsLoggingOut(true);                          
+        try {
+          await logout();
           navigate("/", { replace: true });
+        } catch (err) {
+          console.error("Logout failed:", err);
+          setIsLoggingOut(false);
         }
+      }
       });
     };
   
@@ -45,6 +55,7 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
 
   return (
     <>
+        <LineLoading isVisible={isLoggingOut} />
     <aside 
       className={`
         fixed z-40 w-72      
