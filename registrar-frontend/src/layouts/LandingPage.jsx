@@ -4,12 +4,11 @@ import { useAuth } from "../context/AuthProvider";
 import risImage from "../assets/RIS1.png";
 import logoImage from "../assets/puplogoimage.png";
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
-
+import LineLoading from "../components/LineLoading.jsx";
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const { user, login, error } = useAuth();
-  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState('');
@@ -38,7 +37,7 @@ const LandingPage = () => {
 
   return (
     <div className="flex h-screen w-full font-sans bg-gray-50 overflow-hidden">
-      
+      <LineLoading isVisible={loading} />
       <div className="hidden md:block flex-1 relative items-center justify-center overflow-hidden">
         <img 
           src={risImage} 

@@ -74,6 +74,16 @@
   scrollbar-width: thin;
   scrollbar-color: #800000 transparent;
 }
+@keyframes grow-right {
+  0%   { width: 0%; }
+  100% { width: 100%; }
+}
+@keyframes grow-left {
+  0%   { width: 0%; }
+  100% { width: 100%; }
+}
+.bar-right { animation: grow-right 2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.bar-left  { animation: grow-left  2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 }
 
 @page {
