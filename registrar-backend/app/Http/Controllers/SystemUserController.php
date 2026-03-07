@@ -6,6 +6,7 @@ use App\Models\SystemUser;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use App\Services\AuditLogger;
 use App\Models\AuditLog;
@@ -63,13 +64,36 @@ class SystemUserController extends Controller
             'email'    => 'required|email|unique:users,email',
             'password' => ['required', Password::min(8)->mixedCase()->numbers()],
             'role_id'  => 'required|integer|in:3,4', // only admin or super_admin
+            'first_name' => 'required | string | max:100',
+            'middle_name' => 'nullable | string | max:100',
+            'last_name' => 'required | string | max:100',
+            'suffix' => 'nullable | string | max:20',
         ]);
 
-        $user = SystemUser::create([
-            'email'    => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'role_id'  => $validated['role_id'],
-        ]);
+        DB::beginTransaction();
+        try {
+            $user = SystemUser::create([
+                'email'    => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'role_id'  => $validated['role_id'],
+                'status' => 'Activated',
+            ]);
+
+            DB::table('admin_profile')->insert([
+                'user_id' => $user->user_id,
+                'first_name' => $validated['first_name'],
+                'middle_name' => $validated['middle_name'] ?? null,
+                'last_name' => $validated['last_name'],
+                'suffix' => $validate['suffix'] ?? null,
+            ]);
+
+            DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['message' => 'Failed to create user.'], 
+            500);
+        }
 
         AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
 
@@ -99,18 +123,57 @@ class SystemUserController extends Controller
             'email'    => 'sometimes|email|unique:users,email,' . $user->user_id . ',user_id',
             'password' => ['sometimes', Password::min(8)->mixedCase()->numbers()],
             'role_id'  => 'sometimes|integer|in:3,4',
+            'status' => 'sometimes|in:Activated,Deactivated',
+            'first_name' => 'sometimes|string|max:100',
+            'middle_name' => 'nullable|string|max:100',
+            'last_name' => 'sometimes|string|max:100',
+            'suffix' => 'nullable|string|max:20',
         ]);
 
-        // Hash password only if it's being updated
-        if (isset($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
+        DB::beginTransaction();
+        try {
+            $userFields = array_filter([
+                'email' => $validated['email'] ?? null,
+                'password' => isset($validated['password']) ? 
+                    Hash::make($validated['password']) : null,
+                'role_id' => $validated['role_id'] ?? null,
+                'status' => $validated['status'] ?? null,
+            ], fn($v) => $v !== null);
+
+            $profileFields = array_filter([
+                'first_name' => $validated['first_name'] ?? null,
+                'middle_name' => $validated['middle_name'] ?? null,
+                'last_name' => $validated['last_name'] ?? null,
+                'suffix' => $validated['suffix'] ?? null,
+            ], fn($v) => $v !== null);
+
+            if (!empty($userFields)) {
+                $user->update($userFields);
+            }
+
+            if (!empty($profileFields)) {
+                DB::table('admin_profile')
+                    ->where('user_id', $user->user_id)
+                    ->udpate($profileFields);
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['message' => 'Failed to update user.'], 
+            500);
         }
 
-        $user->update($validated);
+        // Hash password only if it's being updated
+        // if (isset($validated['password'])) {
+        //     $validated['password'] = Hash::make($validated['password']);
+        // }
+
+        // $user->update($validated);
 
         AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_UPDATED);
 
-        return new UserResource($user);
+        return new UserResource($user->fresh());
     }
 
     // -------------------------------------------------------
