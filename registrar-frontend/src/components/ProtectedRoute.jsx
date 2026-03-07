@@ -27,7 +27,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
   // Not logged in
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/forbidden" state={{ reason: "unauthenticated" }} replace />;
   }
 
   // Logged in but wrong role
