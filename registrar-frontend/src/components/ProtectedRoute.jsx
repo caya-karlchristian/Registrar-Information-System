@@ -14,8 +14,7 @@ import { useAuth } from '../context/AuthProvider';
 // e.g. ["admin", "super_admin"]
 // -------------------------------------------------------
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  const { user, loading } = useAuth();
-
+const { user, loading, isLoggingOut } = useAuth();
   // Still restoring session — don't redirect yet
   if (loading) {
     return (
@@ -26,9 +25,11 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
 
   // Not logged in
-  if (!user) {
-    return <Navigate to="/forbidden" state={{ reason: "unauthenticated" }} replace />;
-  }
+ if (!user) {
+  return isLoggingOut
+    ? <Navigate to="/" replace />
+    : <Navigate to="/forbidden" state={{ reason: "unauthenticated" }} replace />;
+}
 
   // Logged in but wrong role
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role_name)) {

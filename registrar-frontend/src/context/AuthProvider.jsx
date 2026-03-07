@@ -35,6 +35,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken]     = useState(localStorage.getItem("token") ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null); // replaces alert()
+  const [isLoggingOut, setIsLoggingOut] = useState(false); 
 
   // -------------------------------------------------------
   // On app load — restore session from stored token.
@@ -117,6 +118,7 @@ export const AuthProvider = ({ children }) => {
       // Log but don't block logout — always clear local state
       console.error("Logout request failed:", err);
     } finally {
+      setIsLoggingOut(true);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       setUser(null);
@@ -140,7 +142,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, token, error, login, logout, hasRole, isStaff }}
+      value={{ user, loading, token, error, login, logout, hasRole, isStaff, isLoggingOut  }}
     >
       <ErrorToast              
         message={error}
