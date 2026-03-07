@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginRequest, fetchCurrentUser, logoutRequest } from "../services/authService";
-
+import ErrorToast from "../components/ErrorToast";
 const AuthContext = createContext();
 
 // -------------------------------------------------------
@@ -142,6 +142,10 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider
       value={{ user, loading, token, error, login, logout, hasRole, isStaff }}
     >
+      <ErrorToast              
+        message={error}
+        onClose={() => setError(null)}
+      />
       {children}
     </AuthContext.Provider>
   );

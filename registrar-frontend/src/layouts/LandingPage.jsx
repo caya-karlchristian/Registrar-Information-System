@@ -94,12 +94,6 @@ const LandingPage = () => {
               onChange={(e) => setPassword(e.target.value)}
             />
           
-            {error && (
-              <p className="text-red-500 text-sm text-center -mt-2 mb-1">
-                {error}
-              </p>
-            )}
-
             <button 
               type="submit"
               className="w-full py-3.5 px-4 bg-pup-dark-maroon hover:bg-[#600000] text-white font-bold rounded-lg shadow-md transition-all transform active:scale-95"
