@@ -9,8 +9,8 @@ const ROLE_CONFIG = {
     sectionTitle: "Student Details",
     idLabel: "Student Number ID #",
   },
-  staff: {
-    sectionTitle: "Staff Information",
+  admin : {
+    sectionTitle: "Admin Information",
     idLabel: "Employee Number",
   },
   alumni: {
@@ -48,13 +48,12 @@ const ProfilePage = ({ userType = "student" }) => {
       });
     }
 
-    else if (user.role_id === 3) {
+    else if (user.role_id === 3 && user.admin_profile) {
       setProfileData({
-        firstName: "",
-        middleName: "",
-        lastName: "",
-        suffix: "",
-        studentId: "N/A",
+        firstName: user.admin_profile.first_name || "",
+        middleName: user.admin_profile.middle_name || "",
+        lastName: user.admin_profile.last_name || "",
+        suffix: user.admin_profile.suffix || "",
         email: user.email || ""
       });
     }

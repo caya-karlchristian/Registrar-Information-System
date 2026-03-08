@@ -10,12 +10,16 @@ import {
 } from '@heroicons/react/24/outline';
 import ConfirmationModal from "../components/ConfirmationModal";
 import { useAuth } from "../context/AuthProvider"; 
+import LineLoading from "../components/LineLoading.jsx";
 
 const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const fullName = "Super Admin"; // temporary hardcode
+  const fullName = user?.superadmin_profile
+  ? `${user.superadmin_profile.first_name} ${user.superadmin_profile.last_name}`
+  : "Guest";
 
   const navItems = [
     { name: "User Management", to: "user", icon: Squares2X2Icon },       
@@ -39,9 +43,16 @@ const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
       title: 'Logout Session',
       message: 'Are you sure you want to log out? Any unsaved changes in the registrar system may be lost.',
       type: 'default', 
-      onConfirm: () => {
-        logout();
-        navigate("/", { replace: true });
+      onConfirm: async () => {
+        setModal(prev => ({ ...prev, isOpen: false })); 
+        setIsLoggingOut(true);                          
+        try {
+          await logout();
+          navigate("/", { replace: true });
+        } catch (err) {
+          console.error("Logout failed:", err);
+          setIsLoggingOut(false);
+        }
       }
     });
   };
@@ -50,6 +61,7 @@ const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
 
   return (
     <>
+        <LineLoading isVisible={isLoggingOut} />
       <aside 
         className={`
           fixed z-40 w-72      
@@ -69,7 +81,7 @@ const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
                 <h2 className="text-pup-maroon font-black text-l leading-tight uppercase">
                   {fullName}
                 </h2>
-                <span className="text-gray-500 text-xs font-medium">2023-2024</span>
+                <span className="text-gray-500 text-xs font-medium">{user?.email}</span>
               </div>
             </div>
             <hr className="mt-6 border-gray-400" />
