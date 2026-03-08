@@ -13,14 +13,18 @@ import LineLoading from "../components/LineLoading.jsx";
 
 const StaffNavigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
-    const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { user, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const fullName = user?.admin_profile
+    ? `${user.admin_profile.first_name} ${user.admin_profile.last_name}`
+    : "Guest";
   
   const navItems = [
     { name: "Dashboard", to: "dashboard", icon: Squares2X2Icon },
-    { name: "Staff Analytics", to: "analytics", icon: ChartBarSquareIcon },
-    { name: "Staff Logbook", to: "logbook", icon: BookOpenIcon },
-    { name: "Staff Profile", to: "profile", icon: UserCircleIcon },
+    { name: "Admin Analytics", to: "analytics", icon: ChartBarSquareIcon },
+    { name: "Admin Logbook", to: "logbook", icon: BookOpenIcon },
+    { name: "Admin Profile", to: "profile", icon: UserCircleIcon },
   ];
 
   const [modal, setModal] = useState({
@@ -74,9 +78,9 @@ const StaffNavigation = ({ isOpen, onItemClick }) => {
             <UserCircleIcon className="w-14 h-14 lg:w-17 lg:h-17 text-gray-700" />
             <div className="flex flex-col">
               <h2 className="text-pup-maroon font-black text-l leading-tight uppercase">
-                sir mhel {/* NEED API TO DISPLAY USER NAME */}
+                {fullName}
               </h2>
-              <span className="text-gray-500 text-xs font-medium">mhel@gmail.com</span> {/* NEED API TO DISPLAY EMAIL */}
+              <span className="text-gray-500 text-xs font-medium">{user?.email}</span> 
             </div>
           </div>
           <hr className="mt-6 border-gray-400" />
