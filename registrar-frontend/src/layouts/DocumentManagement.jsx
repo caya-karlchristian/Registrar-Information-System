@@ -1,5 +1,4 @@
-import { useState } from "react";
-import {
+import { useState, useEffect } from "react";import {
   MagnifyingGlassIcon,
   PencilSquareIcon,
   TrashIcon,
@@ -10,19 +9,20 @@ import {
 } from "@heroicons/react/24/outline";
 import DropDown from "../components/DropDown";
 import InputGroup from "../components/InputGroup";
+import { getDocumentTypes, createDocumentType, updateDocumentType, deleteDocumentType } from '../services/API';
 
 //REMOVE THIS LATER, JUST FOR DEMO PURPOSES
 const EXCLUSIVE_FOR = ["All", "Student", "Alumni"];
 const PER_PAGE = 6;
 
-const MOCK_DOCUMENTS = [
-  { document_type_id: 1, document_name: "Transcript of Records",     document_description: "Official academic transcript", document_requirements: "Request form, ID",  document_process_period: "5 days",  exclusive_for: "Student" },
-  { document_type_id: 2, document_name: "Certificate of Enrollment", document_description: "Proof of enrollment",          document_requirements: "Request form",       document_process_period: "3 days",  exclusive_for: "Student" },
-  { document_type_id: 3, document_name: "Honorable Dismissal",       document_description: "Transfer document",            document_requirements: "Clearance, ID",      document_process_period: "7 days",  exclusive_for: "Student" },
-  { document_type_id: 4, document_name: "Diploma",                   document_description: "Graduation certificate",       document_requirements: "Clearance",          document_process_period: "10 days", exclusive_for: "Alumni"  },
-  { document_type_id: 5, document_name: "ICOG",                      document_description: "In Course of Graduation",      document_requirements: "Form, ID",           document_process_period: "3 days",  exclusive_for: "Student" },
-  { document_type_id: 6, document_name: "Good Moral Certificate",    document_description: "Character certificate",        document_requirements: "Request form, ID",   document_process_period: "3 days",  exclusive_for: "Student" },
-];
+// const MOCK_DOCUMENTS = [
+//   { document_type_id: 1, document_name: "Transcript of Records",     document_description: "Official academic transcript", document_requirements: "Request form, ID",  document_process_period: "5 days",  exclusive_for: "Student" },
+//   { document_type_id: 2, document_name: "Certificate of Enrollment", document_description: "Proof of enrollment",          document_requirements: "Request form",       document_process_period: "3 days",  exclusive_for: "Student" },
+//   { document_type_id: 3, document_name: "Honorable Dismissal",       document_description: "Transfer document",            document_requirements: "Clearance, ID",      document_process_period: "7 days",  exclusive_for: "Student" },
+//   { document_type_id: 4, document_name: "Diploma",                   document_description: "Graduation certificate",       document_requirements: "Clearance",          document_process_period: "10 days", exclusive_for: "Alumni"  },
+//   { document_type_id: 5, document_name: "ICOG",                      document_description: "In Course of Graduation",      document_requirements: "Form, ID",           document_process_period: "3 days",  exclusive_for: "Student" },
+//   { document_type_id: 6, document_name: "Good Moral Certificate",    document_description: "Character certificate",        document_requirements: "Request form, ID",   document_process_period: "3 days",  exclusive_for: "Student" },
+// ];
 
 const EMPTY_FORM = {
   document_name:           "",
@@ -33,13 +33,28 @@ const EMPTY_FORM = {
 };
 
 const DocumentManagement = () => {
-  const [documents, setDocuments]     = useState(MOCK_DOCUMENTS);
   const [search, setSearch]           = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selected, setSelected]       = useState(null);
   const [form, setForm]               = useState(EMPTY_FORM);
   const [isAdding, setIsAdding]       = useState(true);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading]     = useState(true);
 
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        setLoading(true);
+        const res = await getDocumentTypes();
+        setDocuments(res.data);
+      } catch (err) {
+        console.error("Failed to fetch documents:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDocuments();
+  }, []);
   const filtered = documents.filter((d) =>
     d.document_name.toLowerCase().includes(search.toLowerCase())
   );
@@ -71,26 +86,37 @@ const DocumentManagement = () => {
     setForm(EMPTY_FORM);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    if (isAdding) {
-      setDocuments((prev) => [...prev, { ...form, document_type_id: Date.now() }]);
-    } else if (selected) {
-      setDocuments((prev) =>
-        prev.map((d) => d.document_type_id === selected.document_type_id ? { ...d, ...form } : d)
-      );
-    }
-    setForm(EMPTY_FORM);
-    setSelected(null);
-    setIsAdding(true);
-  };
-
-  const handleDelete = (id) => {
-    setDocuments((prev) => prev.filter((d) => d.document_type_id !== id));
-    if (selected?.document_type_id === id) {
+    try {
+      if (isAdding) {
+        const res = await createDocumentType(form);
+        setDocuments((prev) => [...prev, res.data]);
+      } else if (selected) {
+        const res = await updateDocumentType(selected.document_type_id, form);
+        setDocuments((prev) =>
+          prev.map((d) => d.document_type_id === selected.document_type_id ? res.data : d)
+        );
+      }
+      setForm(EMPTY_FORM);
       setSelected(null);
       setIsAdding(true);
-      setForm(EMPTY_FORM);
+    } catch (err) {
+      console.error("Failed to save document:", err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteDocumentType(id);
+      setDocuments((prev) => prev.filter((d) => d.document_type_id !== id));
+      if (selected?.document_type_id === id) {
+        setSelected(null);
+        setIsAdding(true);
+        setForm(EMPTY_FORM);
+      }
+    } catch (err) {
+      console.error("Failed to delete document:", err);
     }
   };
 
@@ -144,7 +170,7 @@ const DocumentManagement = () => {
             <hr className="mt-3 border-gray-400" />
           </div>
 
-          <div className="px-6 py-2 mb-2 flex items-center justify-between">
+          <div className="px-3 py-2 mb-2 flex items-center justify-between">
             <span className="font-bold text-gray-800 text-sm">Document Name</span>
             <div className="flex gap-2 text-gray-400">
               <PencilSquareIcon className="w-5 h-5" />
@@ -152,39 +178,40 @@ const DocumentManagement = () => {
             </div>
           </div>
 
-          <div className="flex-1 px-4 pb-2">
-            {paginated.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-8">No documents found.</p>
-            ) : (
-              paginated.map((doc) => (
-                <div
-                  key={doc.document_type_id}
-                  className={`flex items-center justify-between px-2 py-4 rounded-lg mb-1 transition-colors
-                    ${selected?.document_type_id === doc.document_type_id ? "bg-white shadow-sm" : "hover:bg-gray-100"}`}
-                >
-                  <span className="text-sm text-gray-700 font-medium truncate flex-1">{doc.document_name}</span>
-                  <div className="flex gap-2 ml-2">
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(doc)}
-                      className="hover:text-yellow-500 text-gray-400 transition-colors"
-                    >
-                      <PencilSquareIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(doc.document_type_id)}
-                      className="p-1 hover:text-red-600 text-gray-400 transition-colors"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
-                  </div>
+      
+          {loading ? (
+            <p className="text-center text-gray-400 text-sm py-8 animate-pulse">Loading...</p>
+          ) : paginated.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-8">No documents found.</p>
+          ) : (
+            paginated.map((doc) => (
+              <div
+                key={doc.document_type_id}
+                className={`flex items-center justify-between px-3 py-4 rounded-lg mb-1 transition-colors
+                  ${selected?.document_type_id === doc.document_type_id ? "bg-white shadow-sm" : "hover:bg-gray-100"}`}
+              >
+                <span className="text-sm text-gray-700 font-medium truncate flex-1">{doc.document_name}</span>
+                <div className="flex gap-2 ml-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(doc)}
+                    className="hover:text-yellow-500 text-gray-400 transition-colors"
+                  >
+                    <PencilSquareIcon className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(doc.document_type_id)}
+                    className="p-1 hover:text-red-600 text-gray-400 transition-colors"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
                 </div>
-              ))
-            )}
-          </div>
+              </div>
+            ))
+          )}
 
-          <div className="flex items-center justify-center gap-1 px-4 py-3 border-t border-gray-300">
+          <div className="flex items-center justify-center gap-1 px-4 py-3 border-t border-gray-300 mt-auto">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={safePage === 1}
@@ -289,7 +316,7 @@ const DocumentManagement = () => {
             )}
             <button
               type="submit"
-              className="px-6 py-2.5 mt-5 rounded-full text-sm font-bold bg-pup-dark-maroon text-white hover:bg-[#3a0303] transition-all shadow"
+              className="px-6 py-2.5 mt-9 rounded-full text-sm font-bold bg-pup-dark-maroon text-white hover:bg-[#3a0303] transition-all shadow"
             >
               {isAdding ? "Add Document" : "Save Changes"}
             </button>
