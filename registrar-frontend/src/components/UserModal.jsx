@@ -140,7 +140,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
                   name="password"
                   value={form.password}
                   onChange={handleChange}
-                  placeholder={isEdit ? "Leave blank to keep current" : "Min. 8 chars, mixed case + number"}
+                  placeholder={isEdit ? "Leave blank to keep current" : "Enter password"}
                   required={!isEdit}
                   className="w-full px-3 py-3 bg-white rounded-lg text-sm text-gray-700 shadow-sm
                     placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FFC72C]
