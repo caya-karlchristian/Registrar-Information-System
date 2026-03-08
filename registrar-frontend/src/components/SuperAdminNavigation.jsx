@@ -20,7 +20,7 @@ const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
   const navItems = [
     { name: "User Management", to: "user", icon: Squares2X2Icon },       
     { name: "Document Management", to: "documents", icon: TableCellsIcon }, 
-    { name: "Certificate Management", to: "certificates", icon: AcademicCapIcon }, 
+    // { name: "Certificate Management", to: "certificates", icon: AcademicCapIcon }, 
     { name: "Report Management", to: "report", icon: UserCircleIcon },   
     { name: "System Settings", to: "settings", icon: Cog6ToothIcon },   
   ];
