@@ -11,6 +11,8 @@ import DropDown from '../components/DropDown';
 import UserModal from "../components/UserModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { getSystemUsers, createSystemUser, updateSystemUser, deleteSystemUser } from "../services/API";
+import SuccessToast from "../components/SuccessToast.jsx";
+import ErrorToast from "../components/ErrorToast.jsx";
 
 const ROLE_MAP     = { 3: "Admin", 4: "Super Admin" };
 const ROLE_FILTERS = ["All", "Admin", "Super Admin"];
@@ -35,7 +37,8 @@ const UserManagement = () => {
 
   const [users, setUsers]             = useState([]);
   const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState(null);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   const [editUser, setEditUser]       = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,12 +50,12 @@ const UserManagement = () => {
   // -------------------------------------------------------
   const fetchUsers = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setErrorMsg("");
     try {
       const res = await getSystemUsers();
       setUsers(res.data.data);
-    } catch {
-      setError("Failed to load users.");
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Failed to load users.");
     } finally {
       setLoading(false);
     }
@@ -109,15 +112,16 @@ const UserManagement = () => {
     try {
       if (userId) {
         await updateSystemUser(userId, formData);
+        setSuccessMsg("User details updated successfully!");
       } else {
         await createSystemUser(formData);
+        setSuccessMsg("New user has been created!");
       }
       await fetchUsers();
       setIsModalOpen(false);
       setEditUser(null);
     } catch (err) {
-      const msg = err.response?.data?.message || "Failed to save user.";
-      alert(msg);
+      setErrorMsg(err.response?.data?.message || "An unexpected error occurred.");
     } finally {
       setSubmitting(false);
     }
@@ -132,9 +136,9 @@ const UserManagement = () => {
       await deleteSystemUser(deleteTarget.user_id);
       await fetchUsers();
       setSelected((s) => s.filter((id) => id !== deleteTarget.user_id));
+      setSuccessMsg(`User ${deleteTarget.email} has been deleted.`);
     } catch (err) {
-      const msg = err.response?.data?.message || "Failed to delete user.";
-      alert(msg);
+      setErrorMsg(err.response?.data?.message ||"Failed to delete user.");
     } finally {
       setDeleteTarget(null);
     }
@@ -197,8 +201,6 @@ const UserManagement = () => {
           Add User <PlusIcon className="w-4 h-4" />
         </button>
       </div>
-
-      {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
 
       {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -307,6 +309,16 @@ const UserManagement = () => {
         title="Delete User?"
         message={`This will permanently delete ${deleteTarget?.email}. This action cannot be undone.`}
         type="danger"
+      />
+
+      <SuccessToast 
+        message={successMsg} 
+        onClose={() => setSuccessMsg("")} 
+      />
+
+      <ErrorToast 
+        message={errorMsg} 
+        onClose={() => setErrorMsg("")} 
       />
     </div>
   );
