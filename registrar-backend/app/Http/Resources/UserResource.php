@@ -30,6 +30,8 @@ class UserResource extends JsonResource
             // Admin/Super Admin relation — only present if loaded
             // Will return data once admin profile module is built
             'admin_profile'   => $this->whenLoaded('adminProfile'),
+            'status'    => $this->status,   
+            'created_at' => $this->created_at,  
         ];
     }
 

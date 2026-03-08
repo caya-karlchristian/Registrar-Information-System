@@ -23,7 +23,9 @@ class SystemUserController extends Controller
     // -------------------------------------------------------
     public function index()
     {
-        $users = SystemUser::whereIn('role_id', self::MANAGEABLE_ROLES)->get();
+        $users = SystemUser::whereIn('role_id', self::MANAGEABLE_ROLES)
+            ->with('adminProfile')
+            ->get();
         return UserResource::collection($users);
     }
 
