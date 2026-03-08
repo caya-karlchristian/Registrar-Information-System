@@ -10,7 +10,7 @@ import {
 import DropDown from '../components/DropDown';
 import UserModal from "../components/UserModal";
 import ConfirmationModal from "../components/ConfirmationModal";
-import { getSystemUsers, createSystemUser, updateSystemUser, deleteSystemUser } from "../services/api";
+import { getSystemUsers, createSystemUser, updateSystemUser, deleteSystemUser } from "../services/API";
 
 const ROLE_MAP     = { 3: "Admin", 4: "Super Admin" };
 const ROLE_FILTERS = ["All", "Admin", "Super Admin"];
