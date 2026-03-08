@@ -5,6 +5,9 @@ namespace App\Models;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\AdminProfile;
+use App\Models\Alumni;
+use App\Models\AlumniProfile;
+use App\Models\AlumniType;
 
 class SystemUser extends Authenticatable
 {
@@ -61,10 +64,21 @@ class SystemUser extends Authenticatable
         );
     }
 
-    // Alumni profile relationship — ready for when you build it out
     public function alumniProfile()
     {
-        // return $this->hasOne(Alumni::class, 'user_id', 'user_id');
+        return $this->hasOneThrough(
+            AlumniProfile::class,
+            Alumni::class,
+            'user_id',    // FK on alumni → users
+            'alumni_id',  // FK on alumni_profile → alumni
+            'user_id',    // Local key on users
+            'alumni_id'   // Local key on alumni
+        );
+    }
+
+    public function alumni()
+    {
+        return $this->hasOne(Alumni::class, 'user_id', 'user_id');
     }
 
     // -------------------------------------------------------
