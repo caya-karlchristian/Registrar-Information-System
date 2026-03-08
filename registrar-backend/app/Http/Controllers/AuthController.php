@@ -23,6 +23,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
+        if ($user->status === 'Deactivated') {
+            return response()->json([
+                'message' => 'Your account has been deactivated. Please contact the registrar.'
+            ], 403);
+        }
+
         $token = $user->createToken('ris_token')->plainTextToken;
 
         AuditLogger::log($request, $user, AuditLog::ACTION_LOGIN);
