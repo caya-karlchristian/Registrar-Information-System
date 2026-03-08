@@ -128,7 +128,7 @@ const DocumentManagement = () => {
 
         <button
           onClick={handleAdd}
-          className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2.5 rounded-full text-sm font-semibold shadow hover:bg-[#3a0303] transition-all"
+          className="flex items-center mr-20 gap-2 bg-pup-dark-maroon text-white px-5 py-2.5 rounded-full text-sm font-semibold shadow hover:bg-[#3a0303] transition-all"
         >
           Add Document <PlusIcon className="w-4 h-4" />
         </button>
