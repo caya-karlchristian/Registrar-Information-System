@@ -9,6 +9,7 @@ class Alumni extends Model
     public $timestamps = false;
     protected $primaryKey = 'alumni_id';
     protected $guarded = [];
+    protected $table = 'alumni';
 
     // -------------------------------------------------------
     // Alumni belongs to a user account
