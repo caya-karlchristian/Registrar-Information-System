@@ -27,6 +27,7 @@ class SystemUser extends Authenticatable
         'email',
         'password',
         'role_id',   // needed when creating users programmatically
+        'status', 
     ];
 
     protected $hidden = [
@@ -118,7 +119,7 @@ class SystemUser extends Authenticatable
         if ($this->isAdmin() || $this->isSuperAdmin()) {
             // Admin/Super Admin don't have student profiles
             // Load admin-specific relations here when needed
-            // e.g. $this->load(['adminProfile']);
+            $this->load(['adminProfile']);
             return;
         }
     }
