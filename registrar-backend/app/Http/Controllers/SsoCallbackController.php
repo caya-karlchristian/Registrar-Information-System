@@ -74,6 +74,7 @@ class SsoCallbackController extends Controller
         $middleName = $decoded->mn       ?? null;
         $lastName  = $decoded->ln        ?? null;
         $roles     = $decoded->roles     ?? [];
+        $roles      = (array)($decoded->roles ?? []);
 
         if (!$email || empty($roles)) {
             return response()->json(['message' => 'Invalid token payload.'], 422);
