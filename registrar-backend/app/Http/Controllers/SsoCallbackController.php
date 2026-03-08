@@ -55,6 +55,16 @@ class SsoCallbackController extends Controller
             return response()->json(['message' => 'Invalid or expired token.'], 401);
         }
 
+        // Verify issuer
+        if (($decoded->iss ?? null) !== 'pupt-idp') {
+            return response()->json(['message' => 'Invalid token issuer.'], 401);
+        }
+
+        // Verify audience matches our client_id
+        if (!in_array(env('SSO_CLIENT_ID'), (array)($decoded->aud ?? []))) {
+            return response()->json(['message' => 'Invalid token audience.'], 401);
+        }
+
         // -------------------------------------------------------
         // Extract claims from JWT payload
         // Expected: email, name (fn mn ln), roles (array)
