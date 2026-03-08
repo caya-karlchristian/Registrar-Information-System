@@ -17,10 +17,6 @@ const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const fullName = user?.superadmin_profile
-  ? `${user.superadmin_profile.first_name} ${user.superadmin_profile.last_name}`
-  : "Guest";
-
   const navItems = [
     { name: "User Management", to: "user", icon: Squares2X2Icon },       
     { name: "Document Management", to: "documents", icon: TableCellsIcon }, 
@@ -79,7 +75,7 @@ const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
               <UserCircleIcon className="w-14 h-14 lg:w-17 lg:h-17 text-gray-700" />
               <div className="flex flex-col">
                 <h2 className="text-pup-maroon font-black text-l leading-tight uppercase">
-                  {fullName}
+                  SUPER ADMIN
                 </h2>
                 <span className="text-gray-500 text-xs font-medium">{user?.email}</span>
               </div>
