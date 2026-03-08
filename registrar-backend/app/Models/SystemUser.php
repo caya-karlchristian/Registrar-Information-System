@@ -37,6 +37,10 @@ class SystemUser extends Authenticatable
         'password',
     ];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+    ];
+
     // -------------------------------------------------------
     // RELATIONSHIPS
     // -------------------------------------------------------
@@ -126,7 +130,7 @@ class SystemUser extends Authenticatable
 
         if ($this->isAlumni()) {
             // Alumni profile relation ready — uncomment when alumni module is built
-            // $this->load(['alumniProfile']);
+            $this->load(['alumniProfile']);
             return;
         }
 
