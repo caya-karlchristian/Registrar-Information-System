@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getDocumentRequests } from "../services/API"; 
+import { getDocumentRequests} from "../services/api"; 
 import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import LoadingOverlay from "../components/LoadingOverlay";
