@@ -1,45 +1,32 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
-import { getDocumentRequests } from "../services/api"; 
+import { getDocumentRequests, getDocumentTypes } from "../services/api"; 
 import LoadingOverlay from "../components/LoadingOverlay"; 
 import DropDown from '../components/DropDown';
 import { logbookExcel } from '../utils/logbookExcel.js';
 import pupLogoSrc from '../assets/puplogoimage.png';
 import bpLogoSrc from '../assets/Bagong_Pilipinas_logo.png';
-
-/* ---------------- DOCUMENT TYPE MAPPING ---------------- */
-const documentTypeMap = {
-  1: "Certificate of Good Moral Character",
-  2: "Certification, Authentication, Verification (CAV) / APOSTILE",
-  3: "Authentication/Certified True Copy - Local",
-  4: "Informative Copy of Grades",
-  5: "CAV - CHED",
-  6: "CAV - WES/CES",
-  7: "Cross-enrollment Fee",
-  8: "Re-admission Fee",
-  9: "Admission Fee for Transfer Students (From Private School)",
-  10: "Admission Fee for Transfer Students (From SUCs)",
-  11: "New Copy of Registration Card (With Affidavit of Loss)",
-  12: "Diploma",
-  13: "Accreditation Fee",
-  14: "Completion Fee",
-  15: "Transcript of Records",
-  16: "Correction in Student Information System",
-};
+import { DOC_TYPE_MAP } from '../utils/constants';
 
 const LogbookRecords = () => {
   const [data, setData] = useState([]);
+  const [dbDocTypes, setDbDocTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDocTypeId, setSelectedDocTypeId] = useState("");
-  const rowsPerPage = 8; 
+  const rowsPerPage = 8;
 
   useEffect(() => {
     const fetchLogbookData = async () => {
       setLoading(true);
       try {
-        const res = await getDocumentRequests();
-        setData(res.data);
+        const [requestsRes, typesRes] = await Promise.all([
+          getDocumentRequests(),
+          getDocumentTypes()
+        ]);
+        const requests = requestsRes.data || [];
+        setData(requests);
+        setDbDocTypes(typesRes.data || []);
       } catch (error) {
         console.error("Error loading logbook records:", error);
       } finally {
@@ -49,13 +36,20 @@ const LogbookRecords = () => {
     fetchLogbookData();
   }, []);
 
-  // Filter data based on selected document type
+  const activeDocMap = useMemo(() => {
+    if (dbDocTypes.length > 0) {
+      return Object.fromEntries(dbDocTypes.map(t => [t.document_type_id, t.document_name]));
+    }
+    return DOC_TYPE_MAP;
+  }, [dbDocTypes]);
+
+  const docOptions = useMemo(() => Object.values(activeDocMap), [activeDocMap]);
+
   const filteredData = useMemo(() => {
     if (!selectedDocTypeId) return data;
-    const targetId = parseInt(selectedDocTypeId);
+    const targetId = Number(selectedDocTypeId);
     return data.filter(item =>
-      item.documents?.some(d => d.document_type_id === targetId) ||
-      item.document_type_id === targetId
+      item.documents?.some(d => Number(d.document_type_id) === targetId)
     );
   }, [selectedDocTypeId, data]);
 
@@ -68,38 +62,48 @@ const LogbookRecords = () => {
   }, [indexOfFirstItem, indexOfLastItem, filteredData]);
 
   const selectedDocLabel = useMemo(() => {
-    return documentTypeMap[selectedDocTypeId] || "[Document Type]";
-  }, [selectedDocTypeId]);
+    return activeDocMap[selectedDocTypeId] || "[Document Type]";
+  }, [selectedDocTypeId, activeDocMap]);
 
   const handleExportExcel = () => logbookExcel(filteredData, selectedDocLabel, pupLogoSrc, bpLogoSrc);
 
+  const getFullName = (row) => {
+    const p = row.student_profile;
+    if (!p) return 'Walk-in Client';
+    const middle = p.middle_name ? ` ${p.middle_name.charAt(0)}.` : '';
+    return `${p.last_name}, ${p.first_name}${middle}`.trim();
+  };
+
   return (
-    <div className=" relative min-h-screen font-sans text-left z-20">
+    <div className="relative min-h-screen font-sans text-left z-20">
       <LoadingOverlay isVisible={loading} message="Fetching Registrar Records" />
 
       <div className="max-w-350 mx-auto bg-white shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none">
-        
+
         <div className="p-4 sm:p-6 md:p-8 pb-0">
           <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end mb-6 gap-4 print:hidden">
             <div className="flex flex-col gap-2 text-left w-full sm:w-auto">
               <div className="w-96">
-              <DropDown
-                label="Document/Certification Type"
-                name="docType"
-                value={documentTypeMap[selectedDocTypeId] || ''}
-                labelColor="text-gray-700"
-                onChange={(e) => {
-                  const id = Object.entries(documentTypeMap).find(([, name]) => name === e.target.value)?.[0] || '';
-                  setSelectedDocTypeId(id);
-                  setCurrentPage(1);
-                }}
-                options={Object.values(documentTypeMap)}
-              />
+                <DropDown
+                  label="Document/Certification Type"
+                  name="docType"
+                  value={activeDocMap[selectedDocTypeId] || ''}
+                  labelColor="text-gray-700"
+                  onChange={(e) => {
+                    const id = Object.keys(activeDocMap).find(key => activeDocMap[key] === e.target.value) || '';
+                    setSelectedDocTypeId(id);
+                    setCurrentPage(1);
+                  }}
+                  options={docOptions}
+                />
               </div>
             </div>
             <button
               onClick={handleExportExcel}
-              className="bg-pup-dark-maroon hover:bg-[#4a0000] text-white px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto"
+              disabled={!selectedDocTypeId}
+              className={`px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto ${
+                !selectedDocTypeId ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-pup-dark-maroon hover:bg-[#4a0000] text-white'
+              }`}
             >
               <span>Export to Excel</span>
             </button>
@@ -112,16 +116,14 @@ const LogbookRecords = () => {
           </div>
         </div>
 
-        {/* Table Body */}
         <div className="flex-1 overflow-x-auto px-4 sm:px-6 md:px-8">
           <table className="w-full border-collapse min-w-[800px]">
             <thead>
               <tr className="border-b-2 border-gray-300 text-gray-400 uppercase text-center">
                 <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Requested</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[15%]">Client Name</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Course/Year & Section</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[8%]">Gender</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[18%]">Email Address/Contact</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Course</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[18%]">Email</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Processed</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[10%]">No. of Minutes Processed</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[13%]">Date Claimed</th>
@@ -130,26 +132,50 @@ const LogbookRecords = () => {
             <tbody>
               {currentData.map((row) => (
                 <tr key={row.request_id || row.id} className="border-b border-gray-200 hover:bg-gray-50 text-[11px] sm:text-[12px] text-gray-700 transition-colors">
+
+                  {/* Date/Time Requested */}
                   <td className="p-3 sm:p-4 text-center">
-                    {row.requested_at ? new Date(row.requested_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                    {row.requested_at
+                      ? new Date(row.requested_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      : 'N/A'}
                   </td>
-                  <td className="p-3 sm:p-4 text-center font-bold uppercase text-left">
-                    {row.student_profile ? `${row.student_profile.first_name} ${row.student_profile.last_name}` : 'N/A'}
+
+                  {/* Client Name */}
+                  <td className="p-3 sm:p-4 text-center font-bold uppercase">
+                    {getFullName(row)}
                   </td>
+
+                  {/* Course - pending backend eager load of academic_record */}
                   <td className="p-3 sm:p-4 text-center">
-                    {row.academic_record ? `${row.academic_record.course} ${row.academic_record.section || ''}` : 'N/A'}
+                    {row.student_profile?.academic_record?.course || '---'}
                   </td>
-                  <td className="p-3 sm:p-4 text-center">{row.student_profile?.gender || '---'}</td>
-                  <td className="p-3 sm:p-4 text-center lowercase text-blue-600 truncate max-w-[150px]">{row.student_profile?.email || '---'}</td>
-                  <td className="p-3 sm:p-4 text-center">{row.processed_at ? new Date(row.processed_at).toLocaleString() : '---'}</td>
-                  <td className="p-3 sm:p-4 text-center font-mono">{row.processing_minutes || '0'}</td>
-                  <td className="p-3 sm:p-4 text-center italic text-gray-400">{row.claimed_at ? new Date(row.claimed_at).toLocaleDateString() : 'Pending'}</td>
+
+                  {/* Email */}
+                  <td className="p-3 sm:p-4 text-center truncate max-w-[150px]">
+                    {row.user?.email || '---'}
+                  </td>
+
+                  {/* Date/Time Processed */}
+                  <td className="p-3 sm:p-4 text-center">
+                    {row.processed_at ? new Date(row.processed_at).toLocaleString() : '---'}
+                  </td>
+
+                  {/* Minutes Processed */}
+                  <td className="p-3 sm:p-4 text-center font-mono">
+                    {row.processing_minutes ?? '---'}
+                  </td>
+
+                  {/* Date Claimed */}
+                  <td className="p-3 sm:p-4 text-center italic text-gray-400">
+                    {row.claimed_at ? new Date(row.claimed_at).toLocaleDateString() : 'Pending'}
+                  </td>
+
                 </tr>
               ))}
-              
+
               {!loading && Array.from({ length: Math.max(0, rowsPerPage - currentData.length) }).map((_, i) => (
                 <tr key={`empty-${i}`} className="h-[45px] sm:h-[53px] border-b border-gray-100">
-                  <td colSpan="8"></td>
+                  <td colSpan="7"></td>
                 </tr>
               ))}
             </tbody>
