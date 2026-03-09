@@ -34,6 +34,7 @@ api.interceptors.response.use(
     return Promise.reject(err);
   }
 );
+export const ssoCallback = (token) => api.post("/auth/callback", { token });
 
 // -------------------------------------------------------
 // SYSTEM USERS (Super Admin only)

@@ -1,11 +1,12 @@
-import React, { useState, useRef } from "react";
-import axios from "../services/API.js";
+import React, { useState, useRef, useEffect} from "react";
+import axios from "../services/api"
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
 import MultiSelectDropdown from "../components/MultiSelection.jsx";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 
 const RequestForm = () => {
   const formRef = useRef(null);
@@ -13,20 +14,30 @@ const RequestForm = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [availableDocs, setAvailableDocs] = useState([]);
+  const [availableCertifications, setAvailableCertifications] = useState([]);
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const docsRes = await axios.get("/document-types");
+        setAvailableDocs(docsRes.data);
+      } catch (err) {
+        console.warn("Failed to load document types.");
+      }
+
+      try {
+        const certRes = await axios.get("/certifications");
+        setAvailableCertifications(certRes.data);
+      } catch (err) {
+        console.warn("Certification types API unavailable, using constants.");
+      }
+    };
+    loadOptions();
+  }, []);
 
   const [formData, setFormData] = useState({
     termsAgreed: false,
-    firstName: "",
-    middleName: "",
-    surname: "",
-    dob: "",
-    address: "",
-    contactNumber: "",
-    yearAdmitted: "",
-    course: "",
-    yearLevel: "",
-    lastSYAttended: "",
-    studentNumber: "",
     documentsRequested: [],
     purposeOfRequest: "",
     certification: "",
@@ -78,7 +89,7 @@ const RequestForm = () => {
       setFormData(prev => ({ ...prev, documentCopies: initialCopies }));
     }
 
-    if (currentStep < 4) setCurrentStep((s) => s + 1);
+    if (currentStep < 3) setCurrentStep((s) => s + 1);
   };
 
   const prevStep = (e) => {
@@ -86,93 +97,43 @@ const RequestForm = () => {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
-  const certificationMap = {
-    "Certificate of Attendance": 1,
-    "Certificate of Graduation": 2,
-    "Medium of Instruction": 3,
-    "General Weighted Average": 4,
-    "Non-Issuance of Special Order": 5,
-    "Certified True Copy": 6,
-    "Good Moral Character": 7,
-    "Re-Admission Certificate": 8,
-    "Leave of Absence": 9,
-    "Course Accreditation": 10,
-  };
-
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
   e.preventDefault();
-
-  if (formData.documentsRequested.length === 0) {
-    setErrorMessage("Please select at least one document before submitting.");
-    return;
-  }
-
   setIsLoading(true);
 
   try {
+    const purposeId = Object.keys(PURPOSE_MAP).find(
+      key => PURPOSE_MAP[key] === formData.purposeOfRequest
+    );
 
-    const certId =
-      formData.certification && formData.certification !== "None"
-        ? certificationMap[formData.certification]
-        : null;
+    const selectedDocIds = formData.documentsRequested.map(name => {
+      const dbFound = availableDocs.find(d => d.document_name === name)?.document_type_id;
+      if (dbFound) return dbFound;
 
-    const documentTypeMap = {
-      "Certificate of Good Moral Character": 1,
-      "Certification, Authentication, Verification (CAV) / APOSTILE": 2,
-      "Authentication/Certified True Copy - Local": 3,
-      "Informative Copy of Grades": 4,
-      "CAV - CHED": 5,
-      "CAV - WES/CES": 6,
-      "Cross-enrollment Fee": 7,
-      "Re-admission Fee": 8,
-      "Admission Fee for Transfer Students (From Private School)": 9,
-      "Admission Fee for Transfer Students (From SUCs)": 10,
-      "New Copy of Registration Card (With Affidavit of Loss)": 11,
-      "Diploma": 12,
-      "Accreditation Fee": 13,
-      "Completion Fee": 14,
-      "Transcript of Records": 15,
-      "Correction in Student Information System": 16,
+      return Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name);
+    }).filter(Boolean);
+
+    const certId = availableCertifications.find(c => c.cert_name === formData.certification)?.certification_type_id
+            ?? CERTIFICATION_MAP[formData.certification] 
+            ?? null;
+    // 3. Prepare Payload (Matches your Laravel store validation)
+    const payload = {
+      request_purpose_id: purposeId,
+      or_number: formData.receiptNumber,
+      receipt_date: formData.dateOfPayment,
+      document_type_ids: selectedDocIds,
+      cert_type_id: certId,
     };
 
-    const requestRes = await axios.post("/document-requests", {
-      purpose_of_request: formData.purposeOfRequest,
-      receipt_number: formData.receiptNumber,
-      receipt_date: formData.dateOfPayment,
-      cert_type_id: certId,
-    });
+    const response = await axios.post("/document-requests", payload);
 
-    const requestId = requestRes.data.request_id;
-    if (!requestId) {
-      throw new Error("Request ID not returned from backend");
-    }
-
-    console.log("Request created:", requestRes.data);
-
-    await Promise.all(
-      formData.documentsRequested.map((docName) => {
-        const docId = documentTypeMap[docName];
-        // const quantity = formData.documentCopies[docName] || 1; //Added for number of copies per document
-        if (!docId) {
-          console.warn(`No document_type_id mapping for: ${docName}`);
-        }
-        return axios.post("/request-documents", {
-          request_id: requestId,
-          document_type_id: docId,
-          // quantity: quantity, //Added for number of copies per document
-        });
-      })
-    );
-
+    console.log("Submission successful:", response.data);
     setIsSubmitted(true);
   } catch (error) {
-    console.error(
-      "Failed to submit request:",
-      error.response?.data || error
-    );
-    setErrorMessage("Failed to submit request. Please try again.");
-    } finally {
-      setIsLoading(false);
+    console.error("Submission error:", error.response?.data || error);
+    setErrorMessage(error.response?.data?.message || "Submission failed. Please check your data.");
+  } finally {
+    setIsLoading(false);
   }
 };
 
@@ -198,6 +159,15 @@ const RequestForm = () => {
     3: "Student Request",
     4: "Payment Details",
   };
+  const purposeOptions = Object.values(PURPOSE_MAP);
+
+  const certificationOptions = availableCertifications.length > 0
+  ? availableCertifications.map(c => c.cert_name)
+  : Object.values(CERTIFICATION_MAP); 
+
+  const documentOptions = availableDocs.length > 0
+    ? availableDocs.map(d => d.document_name)
+    : Object.values(DOC_TYPE_MAP); 
 
   return (
     <div className="relative min-h-screen pb-20 z-20">
@@ -229,7 +199,7 @@ const RequestForm = () => {
             {/* Step Indicators */}
             <div className="flex flex-col items-center pt-4 pb-4">
               <div className="flex space-x-3 mb-2">
-                {[1, 2, 3, 4].map((step) => (
+                {[1, 2, 3].map((step) => (
                   <div
                     key={step}
                     className={`w-4 h-4 rounded-full border border-pup-yellow ${
@@ -239,7 +209,7 @@ const RequestForm = () => {
                 ))}
               </div>
               <p className="text-pup-yellow font-bold text-sm tracking-wider">
-                {currentStep} of 4
+                {currentStep} of 3
               </p>
               <h2 className="text-white text-xl font-semibold mt-2">
                 {stepProcess[currentStep]}
@@ -284,130 +254,15 @@ const RequestForm = () => {
                   </div>
                   </div>
                 )}             
-
-              {/* STEP 3: Student Records */}
-              {currentStep === 2 && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <DropdownGroup                    
-                      name="yearAdmitted"
-                      label="Admitted in PUP Taguig (S.Y.)"
-                      value={formData.yearAdmitted}
-                      onChange={handleInputChange}
-                      options={[
-                        "2000–2001",
-                        "2001–2002",
-                        "2002–2003",
-                        "2003–2004",
-                        "2004–2005",
-                        "2005–2006",
-                        "2006–2007",
-                        "2007–2008",
-                        "2008–2009",
-                        "2009–2010",
-                        "2010–2011",
-                        "2011–2012",
-                        "2012–2013",
-                        "2013–2014",
-                        "2014–2015",
-                        "2015–2016",
-                        "2016–2017",
-                        "2017–2018",
-                        "2018–2019",
-                        "2019–2020",
-                        "2020–2021",
-                        "2021–2022",
-                        "2022–2023",
-                        "2023–2024",
-                        "2024–2025",
-                        "2025–2026",
-                      ]}
-                      required
-                    />
-                    <DropdownGroup
-                      name="course"
-                      label="Course"
-                      value={formData.course}
-                      onChange={handleInputChange}
-                      required
-                      options={[
-                        "BS in Electronics Engineering (BSECE)",
-                        "BS in Information Technology (BSIT)",
-                        "BS in Information Systems (BSIS)",
-                        "BS in Accountancy (BSA)",
-                        "BS in Business Administration (BSBA)",
-                        "BS in Applied Mathematics (BSAM)",
-                        "BS in Entrepreneurship (BSENTREP)",
-                        "BS in Office Administration (BSOA)",
-                        "Bachelor in Secondary Education (BSED)",
-                        "BS in Hospitality Management (BSHM)",
-                        "BS in Civil Engineering (BSCE)",
-                      ]}
-                    />
-                    
-                    <DropdownGroup
-                      name="yearLevel"
-                      label="Year Level"
-                      value={formData.yearLevel}
-                      onChange={handleInputChange}
-                      options={["1st Year", "2nd Year", "3rd Year", "4th Year"]}
-                      required
-                    />
-                    <InputGroup
-                      name="lastSYAttended"
-                      label="Last S.Y. Attended"
-                      value={formData.lastSYAttended}
-                      onChange={handleInputChange}
-                      placeholder="XXXX"
-                      pattern="^\d{4}"
-                      title="Format must be YYYY"
-                      required
-                    />
-                  </div>
-                  <InputGroup
-                    name="studentNumber"
-                    label="Student Number"
-                    value={formData.studentNumber}
-                    onChange={handleInputChange}
-                    placeholder="e.g 2023-00101-TG-0"
-                    pattern="^\d{4}-\d{5}-TG-\d$"
-                    title="Format must be YYYY-XXXXX-TG-X"
-                    required
-                  />
-                </div>
-                
-              )}
-
+          
               {/* STEP 4: Documents Requested */}
-              {currentStep === 3 && (
+              {currentStep === 2 && (
                 <div className="space-y-6 animate-fadeIn">
                   <MultiSelectDropdown
                     name="documentsRequested"
                     label="Documents Requested"
                     required
-                    options={[
-                      "Certificate of Good Moral Character",
-                      "Authentication - DFA",
-                      "Certification",
-                      "Authentication/Certified True Copy - Local",
-                      "Informative Copy of Grades",
-                      "CAV - CHED",
-                      "CAV - WES/CES",
-                      "Cross-enrollment Fee",
-                      "Re-admission Fee",
-                      "Admission Fee for Transfer Students (From Private School)",
-                      "Admission Fee for Transfer Students (From SUCs)",
-                      "New Copy of Registration Card (With Affidavit of Loss)",
-                      "Diploma",
-                      "Accreditation Fee",
-                      "Completion Fee",
-                      "Transcript of Records",
-                      "Correction in Student Information System",
-                      "Evaluation/Checklist",
-                      "Honorable Dismissal",
-                      "Retrieval Fee",
-                      "Change of Curriculum/Shifting",
-                    ]}
+                    options={documentOptions}
                     selectedValues={formData.documentsRequested}
                     onChange={handleInputChange}
                   />
@@ -419,20 +274,7 @@ const RequestForm = () => {
                       value={formData.certification}
                       onChange={handleInputChange}
                       required
-                      options={[
-                        "Not Applicable",
-                        "Cross-enrollment",
-                        "Graduation",
-                        "English as Medium of Instruction",
-                        "Enrollment",
-                        "General Weighted Average",
-                        "Good Moral Character",
-                        "Grades",
-                        "Registration",
-                        "Curriculum Evaluation (Units)",
-                        "Ladderized Program",
-                      ]}
-
+                      options={certificationOptions}
                     />
                   )}
 
@@ -441,21 +283,14 @@ const RequestForm = () => {
                     label="Purpose of Request"
                     value={formData.purposeOfRequest}
                     onChange={handleInputChange}
-                    options={[
-                      "DFA", 
-                      "Employment - Local", 
-                      "Emploment - Abroad",
-                      "Further Studies",
-                      "Board Exam",
-                      "Scholarship", 
-                      "For Evaluation Purposes/Personal Copy",]}
+                    options={purposeOptions}
                     required
                   />
                 </div>
               )}
 
               {/* STEP 5: Payment & Copies */}
-              {currentStep === 4 && (
+              {currentStep === 3 && (
                 <div className="space-y-6 animate-fadeIn">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <InputGroup
@@ -521,11 +356,11 @@ const RequestForm = () => {
               )}
 
               <button
-                type={currentStep < 4 ? "button" : "submit"}
-                onClick={currentStep < 4 ? nextStep : undefined}
+                type={currentStep < 3 ? "button" : "submit"}
+                onClick={currentStep < 3 ? nextStep : undefined}
                 className="font-bold py-2 px-6 rounded shadow-md w-32 ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
               >
-                {currentStep < 4 ? "Next" : "Submit"}
+                {currentStep < 3 ? "Next" : "Submit"}
               </button>
 
             </div>

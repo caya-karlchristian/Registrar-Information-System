@@ -1,31 +1,43 @@
-import React, { useState,useRef } from 'react';
+import React, { useState,useRef, useEffect } from 'react';
 import InputGroup from '../components/InputGroup.jsx';
 import CheckboxItem from '../components/Checkbox.jsx';
 import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
 import ErrorToast from "../components/ErrorToast.jsx";
+import axios from "../services/api.js";
+import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
+import LoadingOverlay from "../components/LoadingOverlay.jsx";
 
 const AlumniRequestForm = () => {
   const formRef = useRef(null);
   const [currentStep, setCurrentStep] = useState(1);
-  const [showTermsError, setShowTermsError] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  
+  const [availableDocs, setAvailableDocs] = useState([]);
+  const [availableCertifications, setAvailableCertifications] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const docsRes = await axios.get("/document-types");
+        setAvailableDocs(docsRes.data);
+      } catch (err) {
+        console.warn("Failed to load document types.");
+      }
+
+      try {
+        const certRes = await axios.get("/certifications");
+        setAvailableCertifications(certRes.data);
+      } catch (err) {
+        console.warn("Certification types API unavailable, using constants.");
+      }
+    };
+    loadOptions();
+  }, []);
 
   const [formData, setFormData] = useState({
     termsAgreed: false,
-    firstName: '',
-    middleName: '',
-    surname: '',
-    dob: '',
-    address: '',
-    contactNumber: '',
-    yearAdmitted: '',
-    course: '',
-    yearLevel: '',
-    lastSYAttended: '',
-    studentNumber: '',
     documentsRequested: [],
     purposeOfRequest: '',
     certification: '',
@@ -68,6 +80,16 @@ const AlumniRequestForm = () => {
       return;
     }
 
+    if (currentStep === 2 && formData.documentsRequested.length === 0) {
+      setErrorMessage("Please select at least one document to proceed.");
+      return;
+    }
+
+    if (currentStep === 3 && !formData.noRequests && !formData.doneRequest) {
+      setErrorMessage("Please select at least one option to proceed.");
+      return;
+    }
+    
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
@@ -83,7 +105,7 @@ const AlumniRequestForm = () => {
       setFormData(prev => ({ ...prev, documentCopies: initialCopies }));
     }
 
-    if (currentStep < 6) setCurrentStep(currentStep + 1);
+    if (currentStep < 4) setCurrentStep(currentStep + 1);
   };
 
   const prevStep = (e) => {
@@ -91,11 +113,42 @@ const AlumniRequestForm = () => {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Form Submitted with Data:", formData);
-    
-    setIsSubmitted(true);
+    setIsLoading(true);
+
+    try {
+      const purposeId = Object.keys(PURPOSE_MAP).find(
+        key => PURPOSE_MAP[key] === formData.purposeOfRequest
+      );
+
+      const selectedDocIds = formData.documentsRequested.map(name => {
+        const dbFound = availableDocs.find(d => d.document_name === name)?.document_type_id;
+        if (dbFound) return dbFound;
+        return Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name);
+      }).filter(Boolean);
+
+      const certId = availableCertifications.find(c => c.cert_name === formData.certification)?.cert_type_id
+        ?? CERTIFICATION_MAP[formData.certification]
+        ?? null;
+
+      const payload = {
+        request_purpose_id: purposeId,
+        or_number: formData.receiptNumber,
+        receipt_date: formData.dateOfPayment,
+        document_type_ids: selectedDocIds,
+        cert_type_id: certId,
+      };
+
+      const response = await axios.post("/document-requests", payload);
+      console.log("Submission successful:", response.data);
+      setIsSubmitted(true);
+    } catch (error) {
+      console.error("Submission error:", error.response?.data || error);
+      setErrorMessage(error.response?.data?.message || "Submission failed. Please check your data.");
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleConfirm = () => {
@@ -115,15 +168,24 @@ const AlumniRequestForm = () => {
 
   const stepProcess = {
             1: "Terms & Conditions",
-            2: "Alumni Information",
-            3: "Alumni Request",
-            4: "TOR request",
-            5: "Payment Details",
+            // 2: "Alumni Information",
+            2: "Alumni Request",
+            3: "TOR request",
+            4: "Payment Details",
           };
+  const purposeOptions = Object.values(PURPOSE_MAP);
+
+  const certificationOptions = availableCertifications.length > 0
+    ? availableCertifications.map(c => c.cert_name)
+    : Object.values(CERTIFICATION_MAP);
+
+  const documentOptions = availableDocs.length > 0
+    ? availableDocs.map(d => d.document_name)
+    : Object.values(DOC_TYPE_MAP);
 
   return (
     <div className="min-h-screen pb-20 ">
-      
+        <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
     {isSubmitted ? (
       <div className="max-w-5xl mx-auto">
         <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] items-center justify-center text-center px-10 flex flex-col relative ">
@@ -151,7 +213,7 @@ const AlumniRequestForm = () => {
           
           <div className="flex flex-col items-center pt-8 pb-4">
             <div className="flex space-x-3 mb-2">
-              {[1, 2, 3, 4, 5].map((step) => (
+              {[1, 2, 3, 4].map((step) => (
                 <div 
                   key={step}
                   className={`w-4 h-4 rounded-full border border-pup-yellow ${
@@ -161,7 +223,7 @@ const AlumniRequestForm = () => {
               ))}
             </div>
             <p className="text-pup-yellow font-bold text-sm tracking-wider">
-              {currentStep} of 5 
+              {currentStep} of 4 
             </p>
 
           <h2 className="text-white text-xl font-semibold mt-2">
@@ -206,14 +268,10 @@ const AlumniRequestForm = () => {
                       onChange={handleCheckboxChange}
                       text="I have read, understood, and agree to the Terms & Conditions stated above."
                     />
-                    {currentStep === 1 && showTermsError && !formData.termsAgreed && (                    <p className="text-red-400 text-xs font-semibold mt-1">
-                      ⚠️ You must read the Terms & Conditions to proceed.
-                    </p>
-                  )}
                   </div>
                   </div>
                 )}
-
+{/* 
             {currentStep === 2 && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full">
@@ -284,7 +342,7 @@ const AlumniRequestForm = () => {
                     />
 
                     {/* Show Last S.Y. Attended if Yes or No is selected */}
-                    {formData.forgotStudentNo && (
+                    {/* {formData.forgotStudentNo && (
                     <InputGroup
                         name="lastSYAttended"
                         label="Last S.Y. Attended"
@@ -297,7 +355,7 @@ const AlumniRequestForm = () => {
                     />
                     )}
 
-                    {/* Show Student Number ONLY if Yes */}
+                    {/* Show Student Number ONLY if Yes 
                     {formData.forgotStudentNo === "Yes" && (
                     <InputGroup
                         name="studentNumber"
@@ -313,25 +371,17 @@ const AlumniRequestForm = () => {
                     )}
 
                 </div>
-              </div>
-            )}
+              </div> */}
+            
 
-            {(currentStep === 3) && (
+            {currentStep === 2 && (
               <div className="space-y-6 animate-fadeIn ">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
                   <MultiSelectDropdown 
                     name="documentsRequested"
                     label="Documents Requested (You may select multiple)"
                     required
-                    options={[
-                      "Transcript of Records (TOR)",
-                      "Certificate of Good Moral Character",
-                      "Certification, Authentication, Verification (CAV) / APOSTILE",
-                      "Certificates of Attendance, Graduation, Medium of Instruction, General Weighted Average, Non Issuance of Special Order, and Certified True Copy",
-                      "Course/Subject Description",
-                      "Academic Verification Results",
-                      "Student/Alumni Referral and Recommendation Letter"
-                    ]}
+                    options={documentOptions}
                     selectedValues={formData.documentsRequested} 
                     onChange={handleInputChange} 
                   />
@@ -343,15 +393,7 @@ const AlumniRequestForm = () => {
                     value={formData.certification}
                     onChange={handleInputChange}
                     required
-                    options={[
-                      "None",
-                      "Certification of Enrollment",
-                      "Certification of Grades",
-                      "Certification of Academic Standing",
-                      "Certification of No Academic Standing",
-                      "Certification of No Record",
-                      "Other"
-                      ]}
+                    options={certificationOptions}
                     />
                   )}
 
@@ -361,20 +403,14 @@ const AlumniRequestForm = () => {
                     value={formData.purposeOfRequest}
                     onChange={handleInputChange}
                     required
-                    options={[
-                      "For Admission",
-                      "For Employment",
-                      "For Scholarship",
-                      "For Transfer",
-                      "Other"
-                    ]}
+                    options={purposeOptions} 
                   />
 
               </div>
               </div>
             )}
 
-            {(currentStep === 4) && (
+            {currentStep === 3 && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
                   <p className="text-sm text-justify lg:text-[15px]">For TOR request for further studies, 
@@ -390,7 +426,7 @@ const AlumniRequestForm = () => {
                   />
 
                   <CheckboxItem
-                    text="Done Honorable Dismissal Request Done"
+                    text="Done Honorable Dismissal Request"
                     name="doneRequest"
                     checked={formData.doneRequest}
                     onChange={handleCheckboxChange}
@@ -400,7 +436,7 @@ const AlumniRequestForm = () => {
             )}
 
             {/* STEP 6: SUBMIT */}
-            {currentStep === 5 && (
+            {currentStep === 4 && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mt-7">
                   <InputGroup
@@ -473,7 +509,7 @@ const AlumniRequestForm = () => {
               </div>
 
               <div className="w-32">
-                {currentStep < 5 ? (
+                {currentStep < 4 ? (
                   <button
                     onClick={nextStep}
                     type="button"
@@ -495,6 +531,10 @@ const AlumniRequestForm = () => {
         </form>
       </div>
     )} 
+    <ErrorToast 
+    message={errorMessage} 
+    onClose={() => setErrorMessage("")} 
+  />
     </div>
   );
 };

@@ -12,7 +12,7 @@ import {
 import { getDocumentRequests, 
   updateDocumentRequest, 
   deleteDocumentRequest 
-} from '../services/API';
+} from '../services/api';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
