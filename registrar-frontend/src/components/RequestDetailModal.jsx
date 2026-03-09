@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { XCircleIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
-import { getDocumentTypes } from "../services/API";
-import { PURPOSE_MAP, PROGRESS_MAP} from '../utils/constants';
+import { getDocumentTypes } from "../services/api";
+import { DOC_TYPE_MAP, PURPOSE_MAP, PROGRESS_MAP} from '../utils/constants';
 
 const RequestDetailsModal = ({ request, onClose, user }) => {
   const [docTypes, setDocTypes] = useState([]);
@@ -34,10 +34,15 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
     const isAlumni = user?.role_id === 2;
     const progress = PROGRESS_MAP[request.status_id] ?? 0;
 
-  const getDocName = (id) => {
-    const found = docTypes.find(t => Number(t.document_type_id) === Number(id));
-    return found ? found.document_name : "Unknown Document";
-  }; 
+  const getDocName = (doc) => {
+    // 1. Try the eager-loaded name from the backend relationship
+    // 2. Fallback to searching the docTypes state
+    // 3. Final fallback to the constant or "Unknown"
+    return doc.document_type?.document_name ?? 
+          docTypes.find(t => t.document_type_id === doc.document_type_id)?.document_name ?? 
+          DOC_TYPE_MAP[doc.document_type_id] ?? 
+          "Unknown Document";
+  };
 
   const displayStatus = request.status?.status_name || request.status || 'N/A';
 
@@ -130,12 +135,10 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <p>
                 <strong>Date Requested:</strong>{' '}
-                {request.requested_at
-                  ? new Date(request.requested_at).toLocaleDateString()
-                  : 'N/A'}
+                  {request.requested_at ? new Date(request.requested_at).toLocaleDateString() : 'N/A'}
               </p>
               <p><strong>Status:</strong> {displayStatus}</p>
-              <p><strong>Purpose:</strong> {PURPOSE_MAP[request.request_purpose_id] || 'N/A'}</p>
+              <p><strong>Purpose:</strong> {request.request_purpose?.purpose_name ?? PURPOSE_MAP[request.request_purpose_id] ?? 'N/A'}</p>
               {request.certification && (
                 <p><strong>Certification Type:</strong> {request.certification}</p>
               )}
@@ -147,9 +150,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
             <ul className="list-disc ml-5 space-y-1">
               {request.documents?.map(doc => (
                 <li key={doc.request_document_id}>
-                  {/* 5. Use the helper function here instead of the map */}
-                  {getDocName(doc.document_type_id)}
-
+                  {getDocName(doc)}
                   <span className="ml-2 bg-yellow-200 text-xs font-semibold px-2 py-0.5 rounded-full">
                      {doc.quantity || 1} {doc.quantity > 1 ? 'Copies' : 'Copy'}
                   </span>
