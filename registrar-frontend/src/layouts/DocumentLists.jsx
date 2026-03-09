@@ -1,17 +1,37 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect} from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
-import { student_documents } from '../utils/constants';
+import { getDocumentTypes } from '../services/API';
+import LineLoading from '../components/LineLoading.jsx'
 
 const DocumentLists = () => {
   const [openId, setOpenId] = useState(null);
   const contentRefs = useRef({}); 
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+      const fetchDocuments = async () => {
+        try {
+          setLoading(true);
+          const res = await getDocumentTypes();
+          setDocuments(res.data ?? []);
+        } catch (err) {
+          console.error("Failed to fetch documents:", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchDocuments();
+    }, []);
 
   const toggleAccordion = (id) => {
     setOpenId(openId === id ? null : id);
   };
 
+
   return (
     <div className="min-h-screen bg-gray-50/50 font-sans">
+        <LineLoading isVisible={loading} /> 
       <div className="max-w-6xl mx-auto px-4 pt-4 pb-10">
         {/* --- HEADER --- */}
         <div className="mb-8 border-b-2 border-[#4a120e]/10 pb-6">
@@ -22,13 +42,14 @@ const DocumentLists = () => {
 
         {/* --- FIXED GRID LAYOUT --- */}
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {student_documents.map((doc) => {
-            const isOpen = openId === doc.id;
-            const contentHeight = contentRefs.current[doc.id]?.scrollHeight || 0;
+          {documents.map((doc) => {
+            const id = doc.document_type_id;
+            const isOpen = openId === id;
+            const contentHeight = contentRefs.current[id]?.scrollHeight || 0;
 
             return (
               <div
-                key={doc.id}
+                key={doc.document_type_id}
                 className={`transition-all duration-300 bg-white h-fit border rounded-[2rem] overflow-hidden ${
                   isOpen
                     ? 'border-[#4a120e] shadow-xl ring-1 ring-[#4a120e]/10'
@@ -37,7 +58,7 @@ const DocumentLists = () => {
               >
                 <button
                   type="button"
-                  onClick={() => toggleAccordion(doc.id)}
+                  onClick={() => toggleAccordion(id)}
                   className={`w-full flex justify-between items-center p-7 text-left focus:outline-none transition-colors ${
                     isOpen ? 'bg-[#4a120e]/5' : 'bg-white'
                   }`}
@@ -47,7 +68,7 @@ const DocumentLists = () => {
                       isOpen ? 'text-[#4a120e]' : 'text-gray-800'
                     }`}
                   >
-                    {doc.title}
+                    {doc.document_name}
                   </h4>
 
                   <span
@@ -62,7 +83,7 @@ const DocumentLists = () => {
                 </button>
 
                 <div
-                  ref={(el) => (contentRefs.current[doc.id] = el)}
+                  ref={(el) => (contentRefs.current[id] = el)}
                   style={{
                     maxHeight: isOpen ? `${contentHeight}px` : '0px',
                   }}
@@ -76,7 +97,7 @@ const DocumentLists = () => {
                           Description
                         </h5>
                         <p className="text-gray-600 italic text-[13px] leading-relaxed">
-                          {doc.desc}
+                          {doc.document_description}
                         </p>
                       </div>
                       <div className="bg-gray-50 rounded-[1.5rem] p-5 border border-gray-100">
@@ -84,7 +105,7 @@ const DocumentLists = () => {
                           Requirements
                         </h5>
                         <ul className="space-y-3">
-                          {doc.reqs.map((req, i) => (
+                          {(doc.document_requirements || []).map((req, i) => (
                             <li
                               key={i}
                               className="flex items-start gap-3 text-[12px] text-gray-700 font-bold"
