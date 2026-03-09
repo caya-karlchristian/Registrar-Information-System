@@ -6,16 +6,17 @@ import { useAuth } from '../context/AuthProvider';
 
 const ROLE_CONFIG = {
   student: {
-    sectionTitle: "Student Details",
+    sectionTitle: "Student Information",
     idLabel: "Student Number ID #",
+    showId: true
   },
   admin : {
     sectionTitle: "Admin Information",
-    idLabel: "Employee Number",
+    showId: false
   },
   alumni: {
-    sectionTitle: "Alumni Record",
-    idLabel: "Student Number ID #", 
+    sectionTitle: "Alumni Information",
+    showId: false
   }
 };
 
@@ -35,7 +36,7 @@ const ProfilePage = ({ userType = "student" }) => {
 
   useEffect(() => {
     if (!user) return;
-
+console.log(user);
     if (user.role_id === 1 && user.student_profile) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileData({
@@ -58,13 +59,12 @@ const ProfilePage = ({ userType = "student" }) => {
       });
     }
 
-    else if (user.role_id === 2) {
+    else if (user.role_id === 2 && user.alumni_profile) {
       setProfileData({
-        firstName: "",
-        middleName: "",
-        lastName: "",
-        suffix: "",
-        studentId: "N/A",
+        firstName: user.alumni_profile.first_name || "",
+        middleName: user.alumni_profile.middle_name || "",
+        lastName: user.alumni_profile.last_name || "",
+        suffix: user.alumni_profile.suffix || "",
         email: user.email || ""
       });
     }
@@ -156,13 +156,15 @@ const ProfilePage = ({ userType = "student" }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
               
               {/* DYNAMIC FIELD: Label and Validation change based on 'userType' */}
-              <FieldGroup 
-                label={config.idLabel} 
-                name="studentId" 
-                value={profileData.studentId} 
-                isEditing={false} 
-                required
-              />
+              {config.showId && (
+                <FieldGroup 
+                  label={config.idLabel} 
+                  name="studentId" 
+                  value={profileData.studentId} 
+                  isEditing={false} 
+                  required
+                />
+              )}
               
               <FieldGroup 
                 label="Email Address" 
