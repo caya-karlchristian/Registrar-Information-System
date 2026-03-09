@@ -17,6 +17,7 @@ import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
 import CertificateModal from '../components/CertificateModal.jsx';
+import { DOC_TYPE_MAP } from '../utils/constants';
 
 /* ---------------- STATUS IDS ---------------- */
 const STATUS = {
@@ -28,7 +29,7 @@ const STATUS = {
   FORFEITED: 6, // UPDATE THIS ID TO MATCH THE DATABASE
 };
 
-const ITEMS_PER_PAGE = 8;
+const ITEMS_PER_PAGE = 5;
 
 const StaffDashboard = () => {
   const [requests, setRequests] = useState([]);
@@ -45,109 +46,110 @@ const StaffDashboard = () => {
   const [certRequest, setCertRequest] = useState(null); // ← NEW
 
   /* ---------------- FETCH DATA ---------------- */
-  const fetchData = useCallback(async () => {
-    const documentTypeMap = {
-      1: "Certificate of Good Moral Character",
-      2: "Certification, Authentication, Verification (CAV) / APOSTILE",
-      3: "Authentication/Certified True Copy - Local",
-      4: "Informative Copy of Grades",
-      5: "CAV - CHED",
-      6: "CAV - WES/CES",
-      7: "Cross-enrollment Fee",
-      8: "Re-admission Fee",
-      9: "Admission Fee for Transfer Students (From Private School)",
-      10: "Admission Fee for Transfer Students (From SUCs)",
-      11: "New Copy of Registration Card (With Affidavit of Loss)",
-      12: "Diploma",
-      13: "Accreditation Fee",
-      14: "Completion Fee",
-      15: "Transcript of Records",
-      16: "Correction in Student Information System",
-    };
-    try {
-      const res = await getDocumentRequests();
+const fetchData = useCallback(async () => {
+  try {
+    setLoading(true);
+    const res = await getDocumentRequests();
 
-      const formatted = res.data.map(r => {
-        const requestDate = r.requested_at ? new Date(r.requested_at) : null;
-        const now = new Date();
-        const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
+    const formatted = res.data.map(r => {
+      // 1. DATE CALCULATIONS
+      const requestDate = r.requested_at ? new Date(r.requested_at) : null;
+      const now = new Date();
+      const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
 
-        let computedStatusId = r.status?.status_id;
-        let computedStatusName = r.status?.status_name;
+      let computedStatusId = r.status?.status_id;
+      let computedStatusName = r.status?.status_name;
 
-        // Auto-forfeit if older than 90 days 
-        const alreadyForfeited = r.status?.status_name === "Forfeited";
-        if (!alreadyForfeited && computedStatusName !== "Completed" && diffDays >= 90) {
-          computedStatusId = STATUS.FORFEITED;
-          computedStatusName = "Forfeited";
-          updateDocumentRequest(r.request_id, { status_id: STATUS.FORFEITED }).catch(err => {
-            console.error(`Failed to forfeit request ${r.request_id}:`, err);
+      // 2. AUTO-FORFEIT LOGIC
+      const alreadyForfeited = r.status?.status_name === "Forfeited";
+      if (!alreadyForfeited && computedStatusName !== "Completed" && diffDays >= 90) {
+        computedStatusId = STATUS.FORFEITED;
+        computedStatusName = "Forfeited";
+        updateDocumentRequest(r.request_id, { status_id: STATUS.FORFEITED }).catch(err => {
+          console.error(`Failed to forfeit request ${r.request_id}:`, err);
+        });
+      }
+
+      // 3. BULLETPROOF CERT NAME LOGIC
+      // 3. CERTIFICATE DETECTION (FIXED)
+      const finalCertName = r.certification_type?.cert_name || null;
+
+      const isCertificate =
+        !!r.certification_type ||
+        r.documents?.some(d => {
+          const name =
+            d.document_type?.document_name?.toLowerCase() ||
+            DOC_TYPE_MAP[d.document_type_id]?.toLowerCase() ||
+            "";
+
+          return name.includes("cert"); // catches certificate / certification
+        });
+
+      // 4. DYNAMIC COPIES & DOCUMENT NAMES
+      const totalCopies = r.documents?.reduce((sum, d) => sum + (Number(d.quantity) || 1), 0) || 1;
+
+      const documentDetails = (() => {
+        const docs = [];
+        if (r.certification_type) docs.push(`Certification: ${r.certification_type.cert_name}`);
+        
+        if (r.documents && r.documents.length > 0) {
+          r.documents.forEach(d => {
+            const name = d.document_type?.document_name 
+                      || DOC_TYPE_MAP[d.document_type_id] 
+                      || `Unknown Doc (ID: ${d.document_type_id})`;
+            docs.push(`${name}`);
           });
         }
+        return docs.length > 0 ? docs.join(', ') : 'N/A';
+      })();
 
-        return {
-          id: r.request_id,
-          studentName: r.student_profile
-            ? `${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`
-            : 'N/A',
-          studentNumber: r.academic_record?.student_number ?? 'N/A',
-          copies: r.number_of_copies || 1,
-          // Extra fields for cert pre-fill
-          certName: r.certification_type?.cert_name ?? null,
-          course: r.student_profile?.course ?? '',
-          major: r.student_profile?.major ?? '',
-          educationLevel: r.student_profile?.education_level ?? '',
-          syAdmitted: r.academic_record?.sy_admitted ?? '',
-          dateGraduated: r.academic_record?.date_graduated ?? '',
-          diplomaNum: r.academic_record?.diploma_number ?? '',
-          eventTitle: r.event_title ?? '',
-          docType: (() => {
-            const docs = [];
-            if (r.certification_type) docs.push(`Certification: ${r.certification_type.cert_name}`);
-            if (r.documents && r.documents.length > 0) {
-              r.documents.forEach(d => {
-                const name = documentTypeMap[d.document_type_id] || "Unknown Document";
-                docs.push(name);
-              });
-            }
-            return docs.length > 0 ? docs.join(', ') : 'N/A';
-          })(),
-          date: r.requested_at
-            ? new Date(r.requested_at).toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
-              })
-            : 'N/A',
-          time: r.requested_at
-            ? new Date(r.requested_at).toLocaleTimeString('en-GB', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false,
-              })
-            : '',
+      // 5. FINAL OBJECT MAPPING (Strictly Unique Keys)
+      return {
+        id: r.request_id,
+        studentName: r.student_profile
+          ? `${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`
+          : 'N/A',
+        studentNumber: r.academic_record?.student_number ?? 'N/A',
+        certName: finalCertName,
+        isCertificate: isCertificate,
+        copies: totalCopies,
+        docType: documentDetails,
+        
+        // Metadata for Certificate Modal
+        course: r.student_profile?.course ?? '',
+        major: r.student_profile?.major ?? '',
+        educationLevel: r.student_profile?.education_level ?? '',
+        syAdmitted: r.academic_record?.sy_admitted ?? '',
+        dateGraduated: r.academic_record?.date_graduated ?? '',
+        diplomaNum: r.academic_record?.diploma_number ?? '',
+        eventTitle: r.event_title ?? '',
 
-          progress:
-            computedStatusId === STATUS.PENDING ? 25 :
-            computedStatusId === STATUS.READY ? 75 :
-            computedStatusId === STATUS.COMPLETED ? 100 : 0,
+        date: requestDate ? requestDate.toLocaleDateString('en-GB', {
+          day: '2-digit', month: 'long', year: 'numeric',
+        }) : 'N/A',
+        time: requestDate ? requestDate.toLocaleTimeString('en-GB', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+        }) : '',
 
-          statusId: computedStatusId,
-          statusName: computedStatusName,
-          timestamp: r.requested_at ? new Date(r.requested_at).getTime() : 0,
-        };
-      });
+        progress:
+          computedStatusId === STATUS.PENDING ? 25 :
+          computedStatusId === STATUS.READY ? 75 :
+          computedStatusId === STATUS.COMPLETED ? 100 : 0,
 
-      setRawRequests(res.data);
-      setRequests(formatted);
-    } catch (error) {
-      console.error('Error fetching document requests:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        statusId: computedStatusId,
+        statusName: computedStatusName,
+        timestamp: requestDate ? requestDate.getTime() : 0,
+      };
+    });
 
+    setRawRequests(res.data);
+    setRequests(formatted);
+  } catch (error) {
+    console.error('Error fetching document requests:', error);
+  } finally {
+    setLoading(false);
+  }
+}, []);
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -343,13 +345,12 @@ const StaffDashboard = () => {
                   <Td>
                     <div>
                       <div className="font-bold">{req.studentName}</div>
-                      <div className="text-xs text-gray-400">{req.studentNumber}</div>
                     </div>
                   </Td>
                   <Td>
                     {req.docType.length > 50 ? (
                       <div className="relative group">
-                        <span>{req.docType.slice(0, 50)}...</span>
+                        <span>{req.docType.slice(0, 50)}</span>
                         <div className="absolute left-0 top-full mt-1 w-max max-w-xs p-2 bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           {req.docType}
                         </div>
@@ -362,7 +363,7 @@ const StaffDashboard = () => {
                     <div className="text-xs text-gray-400">{req.date}</div>
                     <div className="text-xs text-gray-400">{req.time}</div>
                   </Td>
-                  <Td center><span className="font-semibold text-gray-700">{req.copies}</span><span> ...</span></Td>
+                  <Td center><span className="font-semibold text-gray-700">{req.copies}</span></Td>
                   <Td center>{getStatusBadge(req.statusName)}</Td>
                   <Td center>
                     <div className="flex items-center justify-end gap-2 min-w-[150px]">
@@ -385,19 +386,7 @@ const StaffDashboard = () => {
                         >
                           <CheckCircleIcon className="w-4 h-4" /> Done
                         </button>
-                      )}
-
-                      {/* ↓ Download icon — only shows for certification requests */}
-                      {req.certName && (
-                        <button
-                          title="Generate Certificate"
-                          onClick={() => setCertRequest(req)}
-                          className="p-2 text-[#4a120e] hover:bg-red-50 rounded-lg transition"
-                        >
-                          <ArrowDownTrayIcon className="w-5 h-5" />
-                        </button>
-                      )}
-
+                      )}              
                       <button
                         title="View Details"
                         onClick={() => setSelectedRequest(rawRequests.find(r => r.request_id === req.id))}
@@ -405,6 +394,17 @@ const StaffDashboard = () => {
                       >
                         <EyeIcon className="w-5 h-5" />
                       </button>
+                      {req.isCertificate && (
+                        <button
+                          title="Generate Certificate"
+                          onClick={() => {
+                            setCertRequest(req);
+                          }}
+                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                        >
+                          <ArrowDownTrayIcon className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
                   </Td>
                 </tr>
