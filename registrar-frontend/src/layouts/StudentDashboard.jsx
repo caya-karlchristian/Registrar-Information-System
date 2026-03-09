@@ -197,6 +197,7 @@ fetchRequests();
       <RequestDetailsModal
         request={selectedRequest}
         onClose={() => setSelectedRequest(null)}
+        user={user}
       />
     </main>
   );
