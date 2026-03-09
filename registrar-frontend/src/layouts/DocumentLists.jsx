@@ -1,37 +1,45 @@
-import React, { useState, useRef, useEffect} from 'react';
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronDownIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { getDocumentTypes } from '../services/API';
-import LineLoading from '../components/LineLoading.jsx'
+import LineLoading from '../components/LineLoading.jsx';
 
 const DocumentLists = () => {
   const [openId, setOpenId] = useState(null);
-  const contentRefs = useRef({}); 
+  const contentRefs = useRef({});
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-      const fetchDocuments = async () => {
-        try {
-          setLoading(true);
-          const res = await getDocumentTypes();
-          setDocuments(res.data ?? []);
-        } catch (err) {
-          console.error("Failed to fetch documents:", err);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchDocuments();
-    }, []);
+    const fetchDocuments = async () => {
+      try {
+        setLoading(true);
+        const res = await getDocumentTypes();
+        setDocuments(res.data ?? []);
+      } catch (err) {
+        console.error("Failed to fetch documents:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDocuments();
+  }, []);
 
   const toggleAccordion = (id) => {
     setOpenId(openId === id ? null : id);
   };
 
+  // Helper function to force data into an array format
+  const ensureArray = (data) => {
+    if (Array.isArray(data)) return data; // Already an array
+    if (typeof data === 'string' && data.trim().length > 0) {
+      return data.split(',').map(item => item.trim()); // Convert string to array
+    }
+    return []; // Fallback for null or empty
+  };
 
   return (
     <div className="min-h-screen bg-gray-50/50 font-sans">
-        <LineLoading isVisible={loading} /> 
+      <LineLoading isVisible={loading} />
       <div className="max-w-6xl mx-auto px-4 pt-4 pb-10">
         {/* --- HEADER --- */}
         <div className="mb-8 border-b-2 border-[#4a120e]/10 pb-6">
@@ -46,10 +54,13 @@ const DocumentLists = () => {
             const id = doc.document_type_id;
             const isOpen = openId === id;
             const contentHeight = contentRefs.current[id]?.scrollHeight || 0;
+            
+            // Clean the requirements data before mapping
+            const requirements = ensureArray(doc.document_requirements);
 
             return (
               <div
-                key={doc.document_type_id}
+                key={id}
                 className={`transition-all duration-300 bg-white h-fit border rounded-[2rem] overflow-hidden ${
                   isOpen
                     ? 'border-[#4a120e] shadow-xl ring-1 ring-[#4a120e]/10'
@@ -63,13 +74,17 @@ const DocumentLists = () => {
                     isOpen ? 'bg-[#4a120e]/5' : 'bg-white'
                   }`}
                 >
-                  <h4
-                    className={`text-base font-black tracking-tight leading-tight flex-1 pr-4 ${
-                      isOpen ? 'text-[#4a120e]' : 'text-gray-800'
-                    }`}
-                  >
-                    {doc.document_name}
-                  </h4>
+                  <div className="flex-1 pr-4">
+                    <h4 className={`text-base font-black tracking-tight leading-tight ${isOpen ? 'text-[#4a120e]' : 'text-gray-800'}`}>
+                      {doc.document_name}
+                    </h4>
+                    {/* Compact Processing Period Preview */}
+                    {isOpen && doc.document_process_period && (
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-1">
+                        <ClockIcon className="w-3 h-3" /> {doc.document_process_period} processing day/s
+                      </span>
+                    )}
+                  </div>
 
                   <span
                     className={`p-2 rounded-full transition-all duration-300 shrink-0 ${
@@ -85,7 +100,7 @@ const DocumentLists = () => {
                 <div
                   ref={(el) => (contentRefs.current[id] = el)}
                   style={{
-                    maxHeight: isOpen ? `${contentHeight}px` : '0px',
+                    maxHeight: isOpen ? `${contentHeight + 100}px` : '0px',
                   }}
                   className="transition-all duration-500 ease-in-out overflow-hidden"
                 >
@@ -97,7 +112,7 @@ const DocumentLists = () => {
                           Description
                         </h5>
                         <p className="text-gray-600 italic text-[13px] leading-relaxed">
-                          {doc.document_description}
+                          {doc.document_description || "No description provided."}
                         </p>
                       </div>
                       <div className="bg-gray-50 rounded-[1.5rem] p-5 border border-gray-100">
@@ -105,15 +120,19 @@ const DocumentLists = () => {
                           Requirements
                         </h5>
                         <ul className="space-y-3">
-                          {(doc.document_requirements || []).map((req, i) => (
-                            <li
-                              key={i}
-                              className="flex items-start gap-3 text-[12px] text-gray-700 font-bold"
-                            >
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#4a120e] mt-1.5 shrink-0" />
-                              <span className="flex-1 leading-snug">{req}</span>
-                            </li>
-                          ))}
+                          {requirements.length > 0 ? (
+                            requirements.map((req, i) => (
+                              <li
+                                key={i}
+                                className="flex items-start gap-3 text-[12px] text-gray-700 font-bold"
+                              >
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#4a120e] mt-1.5 shrink-0" />
+                                <span className="flex-1 leading-snug">{req}</span>
+                              </li>
+                            ))
+                          ) : (
+                            <li className="text-[12px] text-gray-400 italic">No specific requirements listed.</li>
+                          )}
                         </ul>
                       </div>
                     </div>
