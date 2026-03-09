@@ -75,3 +75,4 @@ export const PROGRESS_MAP = {
   5: 0,   // Forfeited
   6: 75,  // Ready
 };
+

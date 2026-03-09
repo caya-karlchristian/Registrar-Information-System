@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import axios from "../services/API.js";
+import axios from "../services/api"
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";

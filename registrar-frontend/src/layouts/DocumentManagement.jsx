@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";import {
 } from "@heroicons/react/24/outline";
 import DropDown from "../components/DropDown";
 import InputGroup from "../components/InputGroup";
-import { getDocumentTypes, createDocumentType, updateDocumentType, deleteDocumentType } from '../services/API';
+import { getDocumentTypes, createDocumentType, updateDocumentType, deleteDocumentType } from '../services/api';
 
 //REMOVE THIS LATER, JUST FOR DEMO PURPOSES
 const EXCLUSIVE_FOR = ["All", "Student", "Alumni"];
