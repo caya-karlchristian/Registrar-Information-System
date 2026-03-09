@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
-import { getDocumentTypes } from '../services/api';
+import { getDocumentTypes } from '../services/API';
 import LineLoading from '../components/LineLoading.jsx'
 
 const ALUMNI_IDS = [1, 3, 2, 4, 6, 5]; 
