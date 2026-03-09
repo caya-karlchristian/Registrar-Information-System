@@ -10,7 +10,7 @@ import {
 import DropDown from '../components/DropDown';
 import UserModal from "../components/UserModal";
 import ConfirmationModal from "../components/ConfirmationModal";
-import { getSystemUsers, createSystemUser, updateSystemUser, deleteSystemUser } from "../services/API";
+import { getSystemUsers, createSystemUser, updateSystemUser, deleteSystemUser } from "../services/api";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 

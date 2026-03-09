@@ -1,0 +1,79 @@
+services:
+
+  # -------------------------------------------------------
+  # MySQL Database
+  # -------------------------------------------------------
+  db:
+    image: mysql:8
+    container_name: ris_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ris_db_data:/var/lib/mysql
+    networks:
+      - ris_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------
+  # Laravel Backend
+  # -------------------------------------------------------
+  backend:
+    build:
+      context: ./registrar-backend
+      dockerfile: Dockerfile
+    container_name: ris_backend
+    restart: always
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL}
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SSO_PUBLIC_KEY: ${SSO_PUBLIC_KEY}
+      SSO_CLIENT_ID: ${SSO_CLIENT_ID}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ris_network
+
+  # -------------------------------------------------------
+  # React Frontend
+  # -------------------------------------------------------
+  frontend:
+    build:
+      context: ./registrar-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: ris_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - ris_network
+
+volumes:
+  ris_db_data:
+
+networks:
+  ris_network:
+    driver: bridge
