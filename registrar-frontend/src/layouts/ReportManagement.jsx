@@ -131,7 +131,7 @@ const ReportManagement = () => {
 
         <button
           onClick={() => setShowConfirm(true)}
-          className="mt-12 ml-115 px-5 py-2 rounded-full text-sm font-semibold border border-red-200 text-red-600 bg-white hover:bg-red-50 shadow-sm transition-all"
+          className="mt-12 px-5 py-2 rounded-full text-sm font-semibold border border-red-200 text-red-600 bg-white hover:bg-red-50 shadow-sm transition-all"
         >
           Clear Logs
         </button>
