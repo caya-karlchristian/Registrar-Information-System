@@ -6,7 +6,7 @@ import {
 } from "@heroicons/react/24/outline";
 import DropDown from '../components/DropDown';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { getAuditLogs, getAuditLogFilters } from "../services/API";
+import { getAuditLogs, getAuditLogFilters } from "../services/api";
 import ErrorToast from "../components/ErrorToast";
 
 const PER_PAGE = 10;
