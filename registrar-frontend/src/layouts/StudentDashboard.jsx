@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { getDocumentRequests} from "../services/API"; 
+import { getDocumentRequests } from "../services/api"; 
 import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -35,17 +35,29 @@ const fetchRequests = async () => {
     const studentRequests = res.data
       .filter(r => r.user_id === user.user_id)
       .map(r => {
-        const config = STATUS_CONFIG[r.status_id] || {
+        const baseConfig = STATUS_CONFIG[r.status_id] || {
           label: "Unknown",
           classes: "bg-gray-100 text-gray-400 border-gray-200"
         };
 
-        const docNames = (r.documents ?? [])
-          .map(d => DOC_TYPE_MAP[d.document_type_id] || "Unknown Document");
+        const config = {
+          ...baseConfig,
+          label: r.status?.status_name ?? baseConfig.label
+        };
+
+        const purposeLabel = r.request_purpose?.purpose_name ?? PURPOSE_MAP[r.request_purpose_id] ?? "N/A";
+
+        //Will check first the database, before proceeding to the constant
+        const docNames = r.documents?.map(d => {
+        const dynamicName = d.document_type?.document_name;
+        return dynamicName ?? DOC_TYPE_MAP[d.document_type_id] ?? "Unknown Document";
+      })
+      .filter(Boolean) || [];
 
         return {
           ...r,
           config,
+          purpose_label: purposeLabel,
           type: TAB_MAP[r.status_id] || "history",
           doc_names: docNames,
         };
@@ -140,7 +152,7 @@ fetchRequests();
                       )}
                     </h4>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Purpose: {PURPOSE_MAP[req.request_purpose_id] || 'N/A'}
+                      Purpose: {req.purpose_label}
                     </p>
                   </div>
 
