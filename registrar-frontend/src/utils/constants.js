@@ -76,3 +76,16 @@ export const PROGRESS_MAP = {
   6: 75,  // Ready
 };
 
+export const CERTIFICATION_MAP = {
+    1: "Certificate of Attendance",
+    2: "Certificate of Graduation",
+    3: "Medium of Instruction",
+    4: "General Weighted Average",
+    5: "Non-Issuance of Special Order",
+    6: "Certified True Copy",
+    7: "Good Moral Character",
+    8: "Re-Admission Certificate",
+    9: "Leave of Absence",
+    10: "Course Accreditation",
+};
+
