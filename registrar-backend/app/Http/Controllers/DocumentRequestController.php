@@ -17,7 +17,7 @@ class DocumentRequestController extends Controller
         'studentProfile',
         'academicRecord',
         'status',
-        'documents',
+        'documents.documentType',
     ];
 
     // -------------------------------------------------------
