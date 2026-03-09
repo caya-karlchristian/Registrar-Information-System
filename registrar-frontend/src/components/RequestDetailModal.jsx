@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { XCircleIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
-import { getDocumentTypes } from "../services/API";
+import { getDocumentTypes } from "../services/api";
 
 const getProgressLabel = (progress) => {
   switch (progress) {
