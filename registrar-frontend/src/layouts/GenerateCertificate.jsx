@@ -2,7 +2,7 @@ import React, { useState, useEffect} from "react";
 import InputGroup from "../components/InputGroup.jsx";
 import { PrinterIcon } from "@heroicons/react/24/solid";
 import SuccessToast from "../components/SuccessToast.jsx";
-import { getAcademicRecords } from "../services/API";
+import { getAcademicRecords } from "../services/api";
 import { CertHeader, CertFooter} from "../utils/Helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import DropDown from "../components/DropDown.jsx";

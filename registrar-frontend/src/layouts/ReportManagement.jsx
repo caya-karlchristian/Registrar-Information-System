@@ -6,7 +6,8 @@ import {
 } from "@heroicons/react/24/outline";
 import DropDown from '../components/DropDown';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { getAuditLogs, getAuditLogFilters } from "../services/API";
+import { getAuditLogs, getAuditLogFilters } from "../services/api";
+import ErrorToast from "../components/ErrorToast";
 
 const PER_PAGE = 10;
 
@@ -20,6 +21,7 @@ const ReportManagement = () => {
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState(null);
   const [showConfirm, setShowConfirm]   = useState(false);
+  const [errorMsg, setErrorMsg]         = useState("");
 
   // Filter options populated from API
   const [roleOptions, setRoleOptions]     = useState(["All"]);
@@ -34,8 +36,9 @@ const ReportManagement = () => {
         const res = await getAuditLogFilters();
         setRoleOptions(["All", ...res.data.roles]);
         setActionOptions(["All", ...res.data.actions]);
-      } catch {
+      } catch (err) {
         // Falls back to "All" only if filters fail — non-critical
+        setErrorMsg("Failed to load filter options.");
       }
     };
     loadFilters();
@@ -46,7 +49,6 @@ const ReportManagement = () => {
   // -------------------------------------------------------
   const fetchLogs = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const res = await getAuditLogs({
         search:   search   || undefined,
@@ -57,8 +59,8 @@ const ReportManagement = () => {
       });
       setLogs(res.data.data);
       setTotalPages(res.data.meta.last_page);
-    } catch {
-      setError("Failed to load audit logs.");
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Failed to load audit logs.");
     } finally {
       setLoading(false);
     }
@@ -129,16 +131,11 @@ const ReportManagement = () => {
 
         <button
           onClick={() => setShowConfirm(true)}
-          className="mt-12 ml-65 px-5 py-2 rounded-full text-sm font-semibold border border-red-200 text-red-600 bg-white hover:bg-red-50 shadow-sm transition-all"
+          className="mt-12 px-5 py-2 rounded-full text-sm font-semibold border border-red-200 text-red-600 bg-white hover:bg-red-50 shadow-sm transition-all"
         >
           Clear Logs
         </button>
       </div>
-
-      {/* Error state */}
-      {error && (
-        <p className="text-red-500 text-sm text-center mb-4">{error}</p>
-      )}
 
       {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -222,7 +219,10 @@ const ReportManagement = () => {
         message="This will permanently delete all audit logs. This action cannot be undone."
         type="danger"
       />
-
+      <ErrorToast 
+        message={errorMsg} 
+        onClose={() => setErrorMsg("")} 
+      />
     </div>
   );
 };

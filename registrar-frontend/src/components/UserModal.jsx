@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { XMarkIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import DropDown from "../components/DropDown";
 import InputGroup from "../components/InputGroup";
+import ErrorToast from "./ErrorToast";
+import ConfirmationModal from "./ConfirmationModal";
 
 // Only admin-level roles — Super Admin cannot create students/alumni
 const ROLE_OPTIONS   = ["Admin", "Super Admin"];
@@ -25,6 +27,8 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
   const isEdit = !!editData;
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [localError, setLocalError] = useState("");
+  const [confirmClose, setConfirmClose] = useState(false);
 
   useEffect(() => {
     if (isEdit && editData) {
@@ -53,7 +57,25 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setLocalError("");
 
+    if (isEdit && editData) {
+      const profile = editData.admin_profile || {};
+      const noChanges =
+        form.first_name  === (profile.first_name  || "") &&
+        form.middle_name === (profile.middle_name || "") &&
+        form.last_name   === (profile.last_name   || "") &&
+        form.suffix      === (profile.suffix      || "") &&
+        form.email       === (editData.email      || "") &&
+        form.role        === (ID_TO_ROLE[editData.role_id] || "Admin") &&
+        form.status      === (editData.status     || "Activated") &&
+        !form.password;
+
+      if (noChanges) {
+        setLocalError("No changes were made."); 
+        return;
+      }
+    }
     // Build payload — map role name back to role_id for the API
     const payload = {
       email:       form.email,
@@ -76,14 +98,17 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
   const handleClose = () => {
     setForm(EMPTY_FORM);
     setShowPassword(false);
+    setLocalError("");
+    setConfirmClose(false);
     onClose();
   };
 
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmClose(true)} />
 
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
 
@@ -97,7 +122,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
               {isEdit ? "Update the user details below" : "Fill in the details below"}
             </p>
           </div>
-          <button type="button" onClick={handleClose}
+          <button type="button" onClick={() => setConfirmClose(true)}
             className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white">
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -165,7 +190,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
 
           {/* Footer */}
           <div className="px-6 pb-6 pt-2 flex items-center justify-end gap-3 border-t border-gray-100">
-            <button type="button" onClick={handleClose}
+            <button type="button" onClick={() => setConfirmClose(true)}
               className="px-5 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors">
               Cancel
             </button>
@@ -176,7 +201,17 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
           </div>
         </form>
       </div>
+        <ConfirmationModal
+          isOpen={confirmClose}
+          onClose={() => setConfirmClose(false)}
+          onConfirm={handleClose}
+          title="Discard Changes?"
+          message="Are you sure you want to close? Any unsaved changes will be lost."
+          type="confirm"
+        />
     </div>
+      <ErrorToast message={localError} onClose={() => setLocalError("")} />
+    </>
   );
 };
 

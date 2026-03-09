@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
-import { getDocumentRequests } from "../services/API"; 
+import { getDocumentRequests } from "../services/api"; 
 import LoadingOverlay from "../components/LoadingOverlay"; 
 import DropDown from '../components/DropDown';
 import { logbookExcel } from '../utils/logbookExcel.js';

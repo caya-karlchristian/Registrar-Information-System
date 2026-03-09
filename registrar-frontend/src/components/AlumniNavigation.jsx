@@ -16,9 +16,9 @@ const AlumniNavigation = ({ isOpen, onItemClick }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-// this is logic to be replaced
-  const fullName = user?.student_profile
-  ? `${user.student_profile.first_name} ${user.student_profile.last_name}`
+
+  const fullName = user?.alumni_profile
+  ? `${user.alumni_profile.first_name} ${user.alumni_profile.last_name}`
   : "Guest";
 
   const navItems = [
@@ -82,10 +82,7 @@ const [modal, setModal] = useState({
               <h2 className="text-pup-maroon font-black text-l leading-tight uppercase">
                {fullName}
               </h2>
-              <span className="text-gray-500 text-xs font-medium">2023-2024</span> {/* NEED API TO DISPLAY YEAR */
-              // wala tayong record for this, but kindly take note that this 
-              // need fixing 
-              }
+              <span className="text-gray-500 text-xs font-medium">{user?.email}</span> 
             </div>
           </div>
           <hr className="mt-6 border-gray-400" />
