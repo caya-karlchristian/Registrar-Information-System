@@ -1,42 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { XCircleIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
-import { getDocumentTypes } from "../services/api";
+import { getDocumentTypes } from "../services/API";
+import { PURPOSE_MAP, PROGRESS_MAP} from '../utils/constants';
 
-const getProgressLabel = (progress) => {
-  switch (progress) {
-    case 0: return "Request was rejected";
-    case 25: return "Request received and under review";
-    case 50: return "Your request is being processed";
-    case 75: return "Preparing your document for pickup";
-    case 100: return "Document is ready to claim";
-    default: return "Pending";
-  }
-};
-
-const Section = ({ title, children }) => {
-  const [open, setOpen] = useState(true);
-
-  return (
-    <div className="border rounded-lg overflow-hidden ">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex justify-between items-center px-4 py-3 bg-yellow-50 text-pup-maroon font-bold text-sm"
-      >
-        {title}
-        <ChevronDownIcon
-          className={`w-4 h-4 transition ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {open && <div className="p-4 bg-white text-sm">{children}</div>}
-    </div>
-  );
-};
-
-const RequestDetailsModal = ({ request, onClose }) => {
+const RequestDetailsModal = ({ request, onClose, user }) => {
   const [docTypes, setDocTypes] = useState([]);
-  
+
   useEffect(() => {
     const fetchTypes = async () => {
       try {
@@ -49,16 +18,6 @@ const RequestDetailsModal = ({ request, onClose }) => {
     fetchTypes();
   }, []);
 
-  const getDocName = (id) => {
-  if (!docTypes.length) return "Loading...";
-
-  const found = docTypes.find(
-    t => Number(t.document_type_id) === Number(id)
-  );
-
-  return found ? found.document_name : "Unknown Document";
-};
-
   useEffect(() => {
     if (request) {
       document.body.style.overflow = 'hidden';
@@ -70,7 +29,15 @@ const RequestDetailsModal = ({ request, onClose }) => {
     };
   }, [request]);
 
-  if (!request) return null;
+  if (!request) return null; //To identify the role of the user
+    const isStudent = user?.role_id === 1;
+    const isAlumni = user?.role_id === 2;
+    const progress = PROGRESS_MAP[request.status_id] ?? 0;
+
+  const getDocName = (id) => {
+    const found = docTypes.find(t => Number(t.document_type_id) === Number(id));
+    return found ? found.document_name : "Unknown Document";
+  }; 
 
   const displayStatus = request.status?.status_name || request.status || 'N/A';
 
@@ -102,50 +69,61 @@ const RequestDetailsModal = ({ request, onClose }) => {
               <div className="bg-gray-100 rounded-full h-3 overflow-hidden">
                 <div
                   className="bg-yellow-500 h-3 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${request.progress}%` }}
+                  style={{ width: `${progress}%` }}
                 ></div>
               </div>
                 
               <div className="flex justify-between items-center mt-2">
                 <p className="font-bold text-pup-maroon text-md">
-                    {getProgressLabel(request.progress)}
+                    {getProgressLabel(progress)}
                 </p>
                 <span className="text-sm font-semibold text-gray-500">
-                    {request.progress}%
+                    {progress}%
                 </span>
               </div>
           </div>
           </Section>
           {/* Student Information */}
-          <Section title="Student Information">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              <p>
-                <strong>Full Name:</strong>{' '}
-                {request.student_profile
-                  ? `${request.student_profile.first_name} ${
-                      request.student_profile.middle_name ?? ''
-                    } ${request.student_profile.last_name}`
-                  : 'N/A'}
-              </p>
+          {isStudent && (
+            <Section title="Student Information">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <p>
+                  <strong>Full Name:</strong>{' '}
+                  {`${request.student_profile.first_name} ${request.student_profile.middle_name ?? ''} ${request.student_profile.last_name}`}
+                </p>
+                <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
+                <p><strong>Date of Birth:</strong> {request.student_profile?.date_of_birth ?? 'N/A'}</p>
+                <p><strong>Contact Number:</strong> {request.student_profile?.contact_number ?? 'N/A'}</p>
+                <p className="md:col-span-2"><strong>Address:</strong> {request.student_profile?.permanent_address ?? 'N/A'}</p>
+              </div>
+            </Section>
+          )}
 
-              <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
-              <p><strong>Date of Birth:</strong> {request.student_profile?.date_of_birth ?? 'N/A'}</p>
-              <p><strong>Contact Number:</strong> {request.student_profile?.contact_number ?? 'N/A'}</p>
-              <p className="md:col-span-2">
-                <strong>Address:</strong> {request.student_profile?.permanent_address ?? 'N/A'}
-              </p>
+          {/* Alumni Information*/}
+          {isAlumni && (
+            <Section title="Alumni Information">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <p>
+                  <strong>Full Name:</strong>{' '}
+                  {user?.alumni_profile
+                    ? `${user.alumni_profile.first_name} ${user.alumni_profile.middle_name ?? ''} ${user.alumni_profile.last_name}`
+                    : 'N/A'}
+                </p>
+                <p><strong>Email:</strong> {user?.email ?? 'N/A'}</p>
+              </div>
+            </Section>
+          )}
 
-            </div>
-          </Section>
-
-          {/* Academic Records */}
-          <Section title="Academic Records">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <p><strong>Course:</strong> {request.academic_record?.course ?? 'N/A'}</p>
-              <p><strong>Year Level:</strong> {request.academic_record?.year_level ?? 'N/A'}</p>
-              <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
-            </div>
-          </Section>
+          {/* Academic Records - only for students */}
+          {isStudent && (
+            <Section title="Academic Records">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <p><strong>Course:</strong> {request.academic_record?.course ?? 'N/A'}</p>
+                <p><strong>Year Level:</strong> {request.academic_record?.year_level ?? 'N/A'}</p>
+                <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
+              </div>
+            </Section>
+          )}
 
           {/* Request Information */}
           <Section title="Request Information">
@@ -157,7 +135,7 @@ const RequestDetailsModal = ({ request, onClose }) => {
                   : 'N/A'}
               </p>
               <p><strong>Status:</strong> {displayStatus}</p>
-              <p><strong>Purpose:</strong> {request.purpose_of_request}</p>
+              <p><strong>Purpose:</strong> {PURPOSE_MAP[request.request_purpose_id] || 'N/A'}</p>
               {request.certification && (
                 <p><strong>Certification Type:</strong> {request.certification}</p>
               )}
@@ -184,8 +162,8 @@ const RequestDetailsModal = ({ request, onClose }) => {
           <Section title="Payment Details">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <p>
-                <strong>Receipt Number:</strong>{' '}
-                {request.receipt_number ?? 'N/A'}
+                <strong>OR Number:</strong>{' '}
+                {request.or_number ?? 'N/A'}
               </p>
 
               <p>
@@ -210,6 +188,37 @@ const RequestDetailsModal = ({ request, onClose }) => {
           </button>
         </div>
       </div>
+    </div>
+  );
+};
+
+const getProgressLabel = (progress) => {
+  switch (progress) {
+    case 0:   return "Request was forfeited";
+    case 25:  return "Request received and under review";
+    case 75:  return "Preparing your document for pickup";
+    case 100: return "Document is ready to claim";
+    default:  return "Pending";
+  }
+};
+
+const Section = ({ title, children }) => {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="border rounded-lg overflow-hidden ">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex justify-between items-center px-4 py-3 bg-yellow-50 text-pup-maroon font-bold text-sm"
+      >
+        {title}
+        <ChevronDownIcon
+          className={`w-4 h-4 transition ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {open && <div className="p-4 bg-white text-sm">{children}</div>}
     </div>
   );
 };

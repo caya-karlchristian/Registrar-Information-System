@@ -67,3 +67,12 @@ export const TABS = [
     inactive: "bg-white border-gray-200 text-gray-500 hover:bg-gray-50" 
   },
 ];
+
+export const PROGRESS_MAP = {
+  1: 25,  // Pending
+  2: 75,  // Ready to claim
+  3: 100, // Completed
+  5: 0,   // Forfeited
+  6: 75,  // Ready
+};
+
