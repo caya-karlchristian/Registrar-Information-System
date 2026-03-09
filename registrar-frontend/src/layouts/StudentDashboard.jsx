@@ -1,105 +1,66 @@
 import React, { useState, useEffect } from "react";
-import { getDocumentRequests} from "../services/API"; 
+import { getDocumentRequests } from "../services/API"; 
 import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import LoadingOverlay from "../components/LoadingOverlay";
-import ErrorToast from "../components/ErrorToast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../context/AuthProvider';
-
-const STATUS_CONFIG = {
-  1: { label: "Pending", classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  2: { label: "Ready", classes: "bg-green-100 text-green-700 border-green-200" },
-  3: { label: "Completed", classes: "bg-gray-100 text-gray-700 border-gray-200" },
-  4: { label: "Processing", classes: "bg-blue-100 text-blue-700 border-blue-200" },
-  5: { label: "Rejected", classes: "bg-red-100 text-red-700 border-red-200" },
-};
-
-const TABS = [
-  { 
-    label: "Ongoing", 
-    value: "pending", 
-    active: "bg-yellow-50 border-yellow-500 text-yellow-900", 
-    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-yellow-50" 
-  },
-  { 
-    label: "To Claim", 
-    value: "ready", 
-    active: "bg-green-50 border-green-500 text-green-900", 
-    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-green-50" 
-  },
-  { 
-    label: "History", 
-    value: "history", 
-    active: "bg-gray-100 border-gray-500 text-gray-900", 
-    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-gray-50" 
-  },
-];
-
-const TAB_MAP = {
-  1: "pending",
-  4: "pending",
-  2: "ready",
-  3: "history",
-  5: "history"
-};
+import { DOC_TYPE_MAP, PURPOSE_MAP, STATUS_CONFIG, TAB_MAP, TABS } from '../utils/constants';
 
 const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const { user } = useAuth();
 
-
-
   const navigate = useNavigate();
 
   useEffect(() => {
-  if (!user) {
-    navigate("/");
-  }
-}, [user, navigate]);
-
+    if (!user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
-    const fetchRequests = async () => {
-      try {
-        setLoading(true);
-        const res = await getDocumentRequests();
-        // Filter requests for the current student
-        const studentRequests = res.data
-        .filter(r => r.user_id === user.user_id)
-          .map((r) => {
+    if (!user) return;
 
-            const config = STATUS_CONFIG[r.status_id] || { 
-              label: "Unknown", 
-              classes: "bg-gray-100 text-gray-400 border-gray-200" 
-            };
+const fetchRequests = async () => {
+  try {
+    setLoading(true);
+    const res = await getDocumentRequests();
 
-            const progressMap = { 1: 25, 4: 50, 2: 100, 3: 100, 5: 0 };
+    const studentRequests = res.data
+      .filter(r => r.user_id === user.user_id)
+      .map(r => {
+        const config = STATUS_CONFIG[r.status_id] || {
+          label: "Unknown",
+          classes: "bg-gray-100 text-gray-400 border-gray-200"
+        };
 
-            return {
-              ...r,
-              status_label: config.label,
-              config: config,   
-              type: TAB_MAP[r.status_id] || "history",
-              progress: progressMap[r.status_id] || 0,
-            };
-          });
-        setRequests(studentRequests);
-      } catch (err) {
-        console.error("Failed to fetch document requests.", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+        const docNames = (r.documents ?? [])
+          .map(d => DOC_TYPE_MAP[d.document_type_id] || "Unknown Document");
 
-    fetchRequests();
-  }, []);
+        return {
+          ...r,
+          config,
+          type: TAB_MAP[r.status_id] || "history",
+          doc_names: docNames,
+        };
+      });
+
+    setRequests(studentRequests);
+  } catch (err) {
+    console.error("Failed to fetch requests:", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+fetchRequests();
+}, [user]);
 
   useEffect(() => { 
     setCurrentPage(1);
@@ -118,7 +79,6 @@ const StudentDashboard = () => {
     <main className="max-w-6xl mx-auto -mt-1 relative z-20  ">
       <LoadingOverlay isVisible={loading} message="Syncing Requested Documents..." />
 
-      {/* <ErrorToast message={error} onClose={() => setError("")} /> */}
       <div className="grid grid-cols-3 gap-4 place-items-center mb-5">
         {TABS.map((tab) => (
           <div key={tab.value} className="w-full flex justify-center">
@@ -171,11 +131,16 @@ const StudentDashboard = () => {
                         #{req.request_id} • {new Date(req.requested_at).toLocaleDateString()}
                       </span>
                     </div>
-                    <h4 className="text-gray-800 font-bold text-base md:text-lg uppercase">
-                      Document name here
+                    <h4 className="text-gray-800 font-bold text-base md:text-lg uppercase flex items-center gap-2 flex-wrap">
+                      {req.doc_names?.[0] || 'N/A'}
+                      {req.doc_names?.length > 1 && (
+                        <span className="text-[10px] font-black bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full normal-case">
+                          +{req.doc_names.length - 1} more
+                        </span>
+                      )}
                     </h4>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Purpose: {req.purpose_of_request}
+                      Purpose: {PURPOSE_MAP[req.request_purpose_id] || 'N/A'}
                     </p>
                   </div>
 
