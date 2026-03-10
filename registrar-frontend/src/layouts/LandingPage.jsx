@@ -124,7 +124,11 @@ const LandingPage = () => {
               </a>.
             </p>
           </div>
-
+          <div className="absolute bottom-4 left-0 w-full border-t border-gray-100 pt-5 mt-5">
+            <p className="text-[#800000] text-[9px] font-bold uppercase tracking-[0.2em] text-center">
+              © 1998-{new Date().getFullYear()} Polytechnic University of the Philippines
+            </p>
+        </div>
         </div>
       </div>
     </div>
