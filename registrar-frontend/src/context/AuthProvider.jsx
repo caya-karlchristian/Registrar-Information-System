@@ -36,6 +36,14 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null); // replaces alert()
   const [isLoggingOut, setIsLoggingOut] = useState(false); 
+  const [hasAgreed, setHasAgreed] = useState(
+    () => sessionStorage.getItem("hasAgreed") === "true"
+  );
+
+  const agreeToTerms = () => {
+    sessionStorage.setItem("hasAgreed", "true");
+    setHasAgreed(true);
+  };
 
   // -------------------------------------------------------
   // On app load — restore session from stored token.
@@ -56,6 +64,8 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
       } catch {
         // Token is invalid or expired — clear everything
+        setIsLoggingOut(true);
+        setHasAgreed(false);
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         setUser(null);
@@ -119,6 +129,8 @@ export const AuthProvider = ({ children }) => {
       console.error("Logout request failed:", err);
     } finally {
       setIsLoggingOut(true);
+      setHasAgreed(false);
+      sessionStorage.removeItem("hasAgreed"); 
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       setUser(null);
@@ -142,7 +154,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, token, error, login, logout, hasRole, isStaff, isLoggingOut  }}
+      value={{ user, loading, token, error, login, logout, hasRole, isStaff, isLoggingOut,  hasAgreed, setHasAgreed, agreeToTerms }}
     >
       <ErrorToast              
         message={error}
