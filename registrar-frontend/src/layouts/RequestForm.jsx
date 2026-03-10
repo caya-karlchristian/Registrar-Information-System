@@ -74,6 +74,11 @@ const RequestForm = () => {
       return;
     }
 
+    if (currentStep === 2 && formData.documentsRequested.length === 0) {
+      setErrorMessage("Please select at least one document to proceed.");
+      return;
+    }
+
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
@@ -123,6 +128,7 @@ const RequestForm = () => {
       receipt_date: formData.dateOfPayment,
       document_type_ids: selectedDocIds,
       cert_type_id: certId,
+      number_of_copies: 1,
     };
 
     const response = await axios.post("/document-requests", payload);

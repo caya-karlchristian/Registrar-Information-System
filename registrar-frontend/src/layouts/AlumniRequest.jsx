@@ -138,6 +138,7 @@ const AlumniRequestForm = () => {
         receipt_date: formData.dateOfPayment,
         document_type_ids: selectedDocIds,
         cert_type_id: certId,
+        number_of_copies: 1
       };
 
       const response = await axios.post("/document-requests", payload);
