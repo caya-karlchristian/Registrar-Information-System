@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthProvider';
+import AgreementPage from './AgreementPage';
 
 // -------------------------------------------------------
 // ProtectedRoute
@@ -14,7 +15,7 @@ import { useAuth } from '../context/AuthProvider';
 // e.g. ["admin", "super_admin"]
 // -------------------------------------------------------
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-const { user, loading, isLoggingOut } = useAuth();
+const { user, loading, isLoggingOut, hasAgreed, setHasAgreed } = useAuth();
   // Still restoring session — don't redirect yet
   if (loading) {
     return (
@@ -36,7 +37,16 @@ const { user, loading, isLoggingOut } = useAuth();
     return <Navigate to="/forbidden" replace />;
   }
 
-  return children;
-};
+  // Show agreement page if not yet agreed
+  if (!hasAgreed) {
+    return (
+      <>
+        {children}  {/* renders the page behind */}
+        <AgreementPage />
+      </>
+  );
+  }
+  return children; 
+}
 
 export default ProtectedRoute;
