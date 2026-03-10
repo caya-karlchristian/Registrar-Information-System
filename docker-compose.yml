@@ -16,6 +16,7 @@ services:
       - "3306:3306"
     volumes:
       - ris_db_data:/var/lib/mysql
+      - ./ris_backup.sql:/docker-entrypoint-initdb.d/ris_backup.sql 
     networks:
       - ris_network
     healthcheck:
