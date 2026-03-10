@@ -14,10 +14,11 @@ class DocumentRequestController extends Controller
     // Defined once so index() and show() stay in sync
     private const RELATIONS = [
         'user',
+        'studentProfile.academicRecords',//new
         'studentProfile',
         'academicRecord',
         'status',
-        'documents.documentType',
+        'documents.documentType',//new
     ];
 
     // -------------------------------------------------------

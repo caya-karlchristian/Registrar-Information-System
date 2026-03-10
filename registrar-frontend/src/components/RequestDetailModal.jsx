@@ -30,7 +30,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
   }, [request]);
 
   if (!request) return null; //To identify the role of the user
-    const isStudent = user?.role_id === 1;
+    const isStudent = request.student_profile !== null && request.student_profile !== undefined;
     const isAlumni = user?.role_id === 2;
     const progress = PROGRESS_MAP[request.status_id] ?? 0;
 
@@ -58,12 +58,6 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               Transaction ID: {request.request_id}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/20 text-white"
-          >
-            <XCircleIcon className="w-6 h-6" />
-          </button>
         </div>
 
         {/* Body */}
@@ -94,12 +88,12 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <p>
                   <strong>Full Name:</strong>{' '}
-                  {`${request.student_profile.first_name} ${request.student_profile.middle_name ?? ''} ${request.student_profile.last_name}`}
+                  {`${request.student_profile?.first_name} ${request.student_profile?.middle_name ?? ''} ${request.student_profile?.last_name}`.trim()}
                 </p>
-                <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
+                <p><strong>Student Number:</strong> {request.student_profile?.academic_records?.[0]?.student_number ?? 'N/A'}</p>
                 <p><strong>Date of Birth:</strong> {request.student_profile?.date_of_birth ?? 'N/A'}</p>
-                <p><strong>Contact Number:</strong> {request.student_profile?.contact_number ?? 'N/A'}</p>
-                <p className="md:col-span-2"><strong>Address:</strong> {request.student_profile?.permanent_address ?? 'N/A'}</p>
+                <p><strong>Course:</strong> {request.student_profile?.academic_records?.[0]?.course ?? 'N/A'}</p>
+                <p><strong>Year Level:</strong> {request.student_profile?.academic_records?.[0]?.year_level ?? 'N/A'}</p>
               </div>
             </Section>
           )}
@@ -119,16 +113,17 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
             </Section>
           )}
 
-          {/* Academic Records - only for students */}
+          {/* Academic Records - only for students //NEED FETCHING IN BACKEND IN MODAL FK TO STUDENT ACAD ID
           {isStudent && (
             <Section title="Academic Records">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
                 <p><strong>Course:</strong> {request.academic_record?.course ?? 'N/A'}</p>
                 <p><strong>Year Level:</strong> {request.academic_record?.year_level ?? 'N/A'}</p>
-                <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
+                <p><strong>Section:</strong> {request.academic_record?.section ?? 'N/A'}</p>
               </div>
             </Section>
-          )}
+          )} */}
 
           {/* Request Information */}
           <Section title="Request Information">
