@@ -54,10 +54,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [DocumentRequestController::class, 'store'])
             ->middleware('role:1,2');
 
-        Route::put('{id}', [DocumentRequestController::class, 'update'])
+        Route::put('{documentRequest}', [DocumentRequestController::class, 'update'])
             ->middleware('role:3');
 
-        Route::delete('{id}', [DocumentRequestController::class, 'destroy'])
+        Route::delete('{documentRequest}', [DocumentRequestController::class, 'destroy'])
             ->middleware('role:3');
     });
 

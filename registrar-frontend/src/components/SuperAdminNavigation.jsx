@@ -22,7 +22,7 @@ const SuperAdminNavigation = ({ isOpen, onItemClick }) => {
     { name: "Document Management", to: "documents", icon: TableCellsIcon }, 
     // { name: "Certificate Management", to: "certificates", icon: AcademicCapIcon }, 
     { name: "Report Management", to: "report", icon: UserCircleIcon },   
-    { name: "System Settings", to: "settings", icon: Cog6ToothIcon },   
+    // { name: "System Settings", to: "settings", icon: Cog6ToothIcon },   
   ];
 
   const [modal, setModal] = useState({
