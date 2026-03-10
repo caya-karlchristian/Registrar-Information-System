@@ -14,7 +14,7 @@ import {
   PupLetterhead,
   EndorsementNoteBlock,
   bold,
-} from "../utils/Helpers.jsx";
+} from "../utils/helpers.jsx";
 import { formatDateFormal, formatDateOrdinal } from "./formatters.js";
 import puplogoimage from "../assets/puplogoimage.png";
 
