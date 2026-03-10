@@ -159,17 +159,19 @@ const fetchData = useCallback(async () => {
   }, [filterStatus, searchTerm, sortOrder]);
 
   /* ---------------- STATUS UPDATE ---------------- */
-  const handleStatusUpdate = async (id, newStatusId) => {
+ const handleStatusUpdate = async (id, newStatusId) => {
     try {
-      setUpdatingId(id);
-      await updateDocumentRequest(id, { status_id: newStatusId });
-      await fetchData();
+        setUpdatingId(id);
+        const res = await updateDocumentRequest(id, { status_id: newStatusId });
+        console.log('Update response:', res);  // ADD THIS
+        await fetchData();
     } catch (error) {
-      console.error('Status update failed:', error);
+        console.error('Status update failed:', error);
+        alert('Error: ' + error.message);  // ADD THIS
     } finally {
-      setUpdatingId(null);
+        setUpdatingId(null);
     }
-  };
+};
 
   /* ---------------- FILTERED + SORTED DATA ---------------- */
   const filteredData = requests
