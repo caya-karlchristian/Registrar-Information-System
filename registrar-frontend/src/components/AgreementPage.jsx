@@ -31,11 +31,11 @@ const AgreementPage = () => {
             </p>
             <p>
                 Your information will be handled in accordance with our{" "}
-                <a href="https://privacy.gov.ph/data-privacy-act/?fbclid=IwY2xjawQcy1dleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAEwAAEereiMgQDJtFGCie9VF0aVaGClaRsrzpQ79qnS7YPx56HQoR0geRvGcKe6CuQ_aem_Ii8u2U0Y1pTgyTT5zPAe4Q" target="_blank" rel="noopener noreferrer">
+                <a href="https://www.pup.edu.ph/privacy/" target="_blank" rel="noopener noreferrer">
                     <strong className="text-[#800000]">Privacy Policy</strong>
                 </a>{" "}
                 and in compliance with the{" "}
-                <a href="https://www.pup.edu.ph/privacy/" target="_blank" rel="noopener noreferrer">
+                <a href="https://privacy.gov.ph/data-privacy-act/?fbclid=IwY2xjawQcy1dleHRuA2FlbQIxMQBzcnRjBmFwcF9pZAEwAAEereiMgQDJtFGCie9VF0aVaGClaRsrzpQ79qnS7YPx56HQoR0geRvGcKe6CuQ_aem_Ii8u2U0Y1pTgyTT5zPAe4Q" target="_blank" rel="noopener noreferrer">
                     <strong className="text-[#800000]">Data Privacy Act of 2012</strong>
                 </a>
             </p>
@@ -49,7 +49,10 @@ const AgreementPage = () => {
               className="w-5 h-4 accent-[#800000] cursor-pointer"
             />
             <span className="text-[#800000] font-bold text-sm">
-              I Agree and acknowledge the Terms and Conditions
+              I Agree and acknowledge the 
+              <a href="https://www.pup.edu.ph/terms/" target="_blank" rel="noopener noreferrer"> 
+                    {" "}Terms and Conditions
+                </a>
             </span>
           </label>
         </div>
