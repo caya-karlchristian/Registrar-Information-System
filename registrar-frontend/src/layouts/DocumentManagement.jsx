@@ -10,6 +10,8 @@ import { useState, useEffect } from "react";import {
 import DropDown from "../components/DropDown";
 import InputGroup from "../components/InputGroup";
 import { getDocumentTypes, createDocumentType, updateDocumentType, deleteDocumentType } from '../services/api';
+import SuccessToast from "../components/SuccessToast.jsx";
+import ErrorToast from "../components/ErrorToast.jsx";
 
 //REMOVE THIS LATER, JUST FOR DEMO PURPOSES
 const EXCLUSIVE_FOR = ["All", "Student", "Alumni"];
@@ -40,6 +42,8 @@ const DocumentManagement = () => {
   const [isAdding, setIsAdding]       = useState(true);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading]     = useState(true);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -92,17 +96,19 @@ const DocumentManagement = () => {
       if (isAdding) {
         const res = await createDocumentType(form);
         setDocuments((prev) => [...prev, res.data]);
+        setSuccessMsg("Document added successfully!"); 
       } else if (selected) {
         const res = await updateDocumentType(selected.document_type_id, form);
         setDocuments((prev) =>
           prev.map((d) => d.document_type_id === selected.document_type_id ? res.data : d)
         );
+        setSuccessMsg("Document updated successfully!"); 
       }
       setForm(EMPTY_FORM);
       setSelected(null);
       setIsAdding(true);
     } catch (err) {
-      console.error("Failed to save document:", err);
+      setErrorMsg(err.response?.data?.message || "An unexpected error occurred.");
     }
   };
 
@@ -116,7 +122,7 @@ const DocumentManagement = () => {
         setForm(EMPTY_FORM);
       }
     } catch (err) {
-      console.error("Failed to delete document:", err);
+      setErrorMsg(err.response?.data?.message || "Failed to delete document:");
     }
   };
 
@@ -320,6 +326,14 @@ const DocumentManagement = () => {
             >
               {isAdding ? "Add Document" : "Save Changes"}
             </button>
+            <SuccessToast
+                message={successMsg}
+                onClose={() => setSuccessMsg("")}
+            />
+            <ErrorToast 
+              message={errorMsg} 
+              onClose={() => setErrorMsg("")} 
+            />
           </div>
         </form>
       </div>
