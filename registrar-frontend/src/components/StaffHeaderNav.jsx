@@ -1,6 +1,6 @@
 import React from 'react';
-import { Bars3Icon} from '@heroicons/react/24/outline'; //BellIcon
-// Comment out - Not yet implemented (Notification)
+import { Bars3Icon, BellIcon} from '@heroicons/react/24/outline'; //BellIcon
+import LogoImage from "../assets/puplogoimage.png";
 
 function StaffHeaderNav({ onMenuClick }) { 
   return (
@@ -10,7 +10,7 @@ function StaffHeaderNav({ onMenuClick }) {
         <div className="w-full px-4 py-4 flex justify-between items-center">          
           <div className="flex space-x-4">
             <img
-              src="/src/assets/puplogoimage.png"
+              src={LogoImage}
               alt="PUP Logo"
               className="w-16 h-16 lg:w-20 lg:h-20"
             />
@@ -26,7 +26,7 @@ function StaffHeaderNav({ onMenuClick }) {
 
           <div className="relative flex items-center space-x-2">
             {/* Notification Bell */}
-            {/* <button 
+            <button 
               className="p-2 hover:bg-red-900 rounded-full transition-colors relative group"
               onClick={() => setIsNotifOpen(!isNotifOpen)}
             >
@@ -34,8 +34,7 @@ function StaffHeaderNav({ onMenuClick }) {
               <span className="absolute top-2 right-2 flex h-3 w-3">
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-white"></span>
               </span>
-            </button> */}
-
+            </button>
             {/* Burger Button - Visible only on mobile/tablet (hidden on lg) */}
             <button 
               className="p-2 hover:bg-red-900 rounded-full transition-colors lg:hidden text-pup-maroon"
