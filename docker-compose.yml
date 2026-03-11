@@ -1,4 +1,4 @@
-
+services:
   # -------------------------------------------------------
   # Laravel Backend
   # -------------------------------------------------------
@@ -46,9 +46,10 @@
       - backend
     networks:
       - ris_network
-  volumes:
-    ris_db_data:
 
-  networks:
-    ris_network:
-      driver: bridge
+volumes:
+  ris_db_data:
+
+networks:
+  ris_network:
+    driver: bridge
