@@ -101,7 +101,30 @@ const LandingPage = () => {
               Sign In
             </button>
           </form>
-          <div className="absolute bottom-6 left-0 w-full border-t border-gray-100 pt-5 mt-5">
+
+          <div className="mt-5 text-[10px] text-gray-400 leading-tight text-center">
+            <p>
+              By using this service, you agree to the PUP Online Services <br />
+              <a
+                href="https://www.pup.edu.ph/terms/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline mx-1"
+              >
+                Terms of Use
+              </a>
+              and
+              <a
+                href="https://www.pup.edu.ph/privacy/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline mx-1"
+              >
+                Privacy Statement
+              </a>.
+            </p>
+          </div>
+          <div className="absolute bottom-4 left-0 w-full border-t border-gray-100 pt-5 mt-5">
             <p className="text-[#800000] text-[9px] font-bold uppercase tracking-[0.2em] text-center">
               © 1998-{new Date().getFullYear()} Polytechnic University of the Philippines
             </p>
