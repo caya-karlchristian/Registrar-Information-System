@@ -37,11 +37,11 @@ export const AuthProvider = ({ children }) => {
   const [error, setError]     = useState(null); // replaces alert()
   const [isLoggingOut, setIsLoggingOut] = useState(false); 
   const [hasAgreed, setHasAgreed] = useState(
-    () => sessionStorage.getItem("hasAgreed") === "true"
+    () => localStorage.getItem("hasAgreed") === "true"
   );
 
   const agreeToTerms = () => {
-    sessionStorage.setItem("hasAgreed", "true");
+    localStorage.setItem("hasAgreed", "true");
     setHasAgreed(true);
   };
 
@@ -130,7 +130,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsLoggingOut(true);
       setHasAgreed(false);
-      sessionStorage.removeItem("hasAgreed"); 
+      localStorage.removeItem("hasAgreed");
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       setUser(null);

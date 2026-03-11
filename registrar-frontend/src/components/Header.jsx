@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Bars3Icon, BellIcon } from '@heroicons/react/24/outline'; 
-import NotificationModal from "../components/NotificationModal.jsx";
+// import NotificationModal from "../components/NotificationModal.jsx";
 import LogoImage from "../assets/puplogoimage.png";
+// Comment out - Not yet implemented (Notification)
 
 function Header({ onMenuClick }) { // Receive the toggle function here
-  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  // const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   return (
     <div className="relative w-full font-sans">
@@ -28,7 +29,7 @@ function Header({ onMenuClick }) { // Receive the toggle function here
 
           <div className="relative flex items-center space-x-2">
             {/* Notification Bell */}
-            <button 
+            {/* <button 
               className="p-2 hover:bg-red-900 rounded-full transition-colors relative group"
               onClick={() => setIsNotifOpen(!isNotifOpen)}
             >
@@ -36,7 +37,7 @@ function Header({ onMenuClick }) { // Receive the toggle function here
               <span className="absolute top-2 right-2 flex h-3 w-3">
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-white"></span>
               </span>
-            </button>
+            </button> */}
 
             {/* Burger Button - Visible only on mobile/tablet (hidden on lg) */}
             <button 
@@ -49,10 +50,10 @@ function Header({ onMenuClick }) { // Receive the toggle function here
         </div>
       </header>
 
-      <NotificationModal 
+      {/* <NotificationModal 
         isOpen={isNotifOpen} 
         onClose={() => setIsNotifOpen(false)} 
-      />
+      /> */}
     </div>
   );
 }

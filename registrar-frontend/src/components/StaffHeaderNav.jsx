@@ -1,5 +1,7 @@
 import React from 'react';
-import { Bars3Icon, BellIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon} from '@heroicons/react/24/outline'; //BellIcon
+// Comment out - Not yet implemented (Notification)
+
 function StaffHeaderNav({ onMenuClick }) { 
   return (
     <div className="relative w-full font-sans">
@@ -24,7 +26,7 @@ function StaffHeaderNav({ onMenuClick }) {
 
           <div className="relative flex items-center space-x-2">
             {/* Notification Bell */}
-            <button 
+            {/* <button 
               className="p-2 hover:bg-red-900 rounded-full transition-colors relative group"
               onClick={() => setIsNotifOpen(!isNotifOpen)}
             >
@@ -32,7 +34,7 @@ function StaffHeaderNav({ onMenuClick }) {
               <span className="absolute top-2 right-2 flex h-3 w-3">
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-white"></span>
               </span>
-            </button>
+            </button> */}
 
             {/* Burger Button - Visible only on mobile/tablet (hidden on lg) */}
             <button 
