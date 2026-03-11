@@ -1,12 +1,13 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet} from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import AlumniNavigation from '../components/AlumniNavigation.jsx';
 import { useState, useEffect } from "react";
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
+// import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
+// Comment out - Not yet implemented (Email)
 
 const AlumniPage = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
 
     useEffect(() => {
       if (isMobileMenuOpen) {
@@ -38,12 +39,12 @@ const AlumniPage = () => {
               <Outlet />
             </div>
           </main>
-          <button
+          {/* <button
             onClick={() => navigate('/alumni/contact')} // This directs the main content to display the email design
             className="fixed bottom-8 right-8 z-50 bg-pup-dark-maroon p-4 rounded-full shadow-2xl hover:scale-110 transition-all active:scale-95 group border-2 border-white/20"
             >
             <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
-        </button>
+        </button> */} 
         </div>
       </div>
     );
