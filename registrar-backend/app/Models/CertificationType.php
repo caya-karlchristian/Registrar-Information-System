@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class CertificationType extends Model
 {
     //certificate_type 
-    protected $table = 'certification_types';
+    protected $table = 'certificate_type';
     protected $primaryKey = 'cert_type_id';
     public $timestamps = false;
     protected $guarded = [];
