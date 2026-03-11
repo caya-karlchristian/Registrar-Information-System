@@ -20,13 +20,13 @@ export default function ForbiddenPage() {
         <p className="text-gray-500 text-sm max-w-xs">{message}</p>
 
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/")}
           className="mt-4 px-6 py-2.5 text-sm rounded-lg text-white font-semibold transition-all active:scale-95"
           style={{ backgroundColor: "#800000" }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#600000")}
           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#800000")}
         >
-          Go Back
+          Go to Home
         </button>
 
       </div>
