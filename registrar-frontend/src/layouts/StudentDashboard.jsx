@@ -61,7 +61,8 @@ const fetchRequests = async () => {
           type: TAB_MAP[r.status_id] || "history",
           doc_names: docNames,
         };
-      });
+      })
+      .sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
 
     setRequests(studentRequests);
   } catch (err) {
