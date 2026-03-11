@@ -19,7 +19,7 @@ import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx';
 import StaffDashboard from './layouts/StaffDashboard.jsx';
 import Logbook from './layouts/Logbook.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
-// import RegistrarContact from './layouts/RegistrarContact.jsx'; // Comment out - Not yet implemented
+import RegistrarContact from './layouts/RegistrarContact.jsx'; 
 
 // Super Admin layouts (frontend dev fills these in)
 import UserManagement from './layouts/UserManagement.jsx';
@@ -54,7 +54,7 @@ const App = () => {
           <Route path="lists" element={<DocumentLists />} />
           <Route path="faqs" element={<FAQPage />} />
           <Route path="profile" element={<ProfilePage userType="student" />} />
-          {/* <Route path="contact" element={<RegistrarContact />} /> */}
+          <Route path="contact" element={<RegistrarContact />} />
         </Route>
 
         {/* ALUMNI (role: alumni) */}
@@ -72,7 +72,7 @@ const App = () => {
           <Route path="lists" element={<AlumniDocumentList />} />
           <Route path="faqs" element={<FAQPage />} />
           <Route path="profile" element={<ProfilePage userType="alumni" />} />
-          {/* <Route path="contact" element={<RegistrarContact />} /> */}
+          <Route path="contact" element={<RegistrarContact />} />
         </Route>
 
         {/* STAFF / ADMIN (role: admin) */}
@@ -89,7 +89,7 @@ const App = () => {
           <Route path="analytics" element={<AnalyticsDashboard />} />
           <Route path="logbook" element={<Logbook />} />
           <Route path="profile" element={<ProfilePage userType="admin" />} />
-          {/* <Route path="contact" element={<RegistrarContact />} /> */}
+          <Route path="contact" element={<RegistrarContact />} />
         </Route>
 
         {/* SUPER ADMIN (role: super_admin) */}
@@ -102,7 +102,7 @@ const App = () => {
           }
         >
           <Route index element={<UserManagement />} /> 
-          {/* <Route path="contact" element={<RegistrarContact />} />  */}
+          <Route path="contact" element={<RegistrarContact />} /> 
           <Route path="user" element={<UserManagement />} />
           <Route path="documents" element={<DocumentManagement />} />
           <Route path="report" element={<ReportManagement/>} />
