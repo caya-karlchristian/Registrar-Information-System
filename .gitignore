@@ -1,2 +1,5 @@
 ris_backup.sql
 .env
+.github
+.github/workflows   
+.github/workflows/deploy.yml
