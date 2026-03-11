@@ -2,19 +2,23 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthProvider";
 
 const AgreementPage = () => {
+  const { logout, agreeToTerms, user } = useAuth(); 
   const [agreed, setAgreed] = useState(false);
-  const { logout, agreeToTerms } = useAuth(); 
+  const [neverShow, setNeverShow] = useState(false);
 
   const handleCancel = () => logout();
 
   const handleContinue = () => {
     if (!agreed) return;
-    agreeToTerms(); 
+    if (neverShow) {
+      localStorage.setItem(`neverShowAgreement_${user.user_id}`, "true"); 
+    }
+    agreeToTerms();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 backdrop-blur-[2px]">
-      <div className="w-full max-w-lg bg-white rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden border border-[#800000]/20">
+      <div className="w-full max-w-180 bg-white rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden border border-[#800000]/20">
 
         <div className="bg-[#800000] px-6 py-6 border-b-4 border-[#FFD700]">
           <h2 className="text-white text-2xl font-black tracking-tighter uppercase">
@@ -41,22 +45,34 @@ const AgreementPage = () => {
             </p>
           </div>
 
-          <label className={`flex items-center gap-4 cursor-pointer transition-all duration-300`}>
-            <input
-              type="checkbox"
-              checked={agreed}
-              onChange={e => setAgreed(e.target.checked)}
-              className="w-5 h-4 accent-[#800000] cursor-pointer"
-            />
-            <span className="text-[#800000] font-bold text-sm">
-              I Agree and acknowledge the 
-              <a href="https://www.pup.edu.ph/terms/" target="_blank" rel="noopener noreferrer"> 
-                    {" "}Terms and Conditions
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={e => setAgreed(e.target.checked)}
+                className="w-5 h-4 accent-[#800000] cursor-pointer"
+              />
+              <span className="text-[#800000] font-bold text-sm">
+                I Agree and acknowledge the
+                <a href="https://www.pup.edu.ph/terms/" target="_blank" rel="noopener noreferrer">
+                  {" "}Terms and Conditions
                 </a>
-            </span>
-          </label>
+              </span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer ">
+              <input
+                type="checkbox"
+                checked={neverShow}
+                onChange={e => setNeverShow(e.target.checked)}
+                className="w-4 h-4 accent-[#800000] cursor-pointer"
+              />
+              <span className="text-[#800000] font-bold text-sm">
+                Never show this again
+              </span>
+            </label>
+          </div>
         </div>
-
         <div className="px-8 py-5 bg-gray-50 flex justify-end gap-4">
           <button
             onClick={handleCancel}
