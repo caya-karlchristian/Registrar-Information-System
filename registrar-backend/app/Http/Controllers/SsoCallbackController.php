@@ -18,11 +18,11 @@ class SsoCallbackController extends Controller
     // Role mapping — SSO role names → RIS role_id
     // -------------------------------------------------------
     private const ROLE_MAP = [
-        'registrar:superadmin' => SystemUser::ROLE_SUPER_ADMIN,
-        'registrar:admin'      => SystemUser::ROLE_ADMIN,
-        'registrar:student'    => SystemUser::ROLE_STUDENT,
-        'registrar:alumni_sis'    => SystemUser::ROLE_ALUMNI,
-        'registrar:alumni_nonsis' => SystemUser::ROLE_ALUMNI,
+        'RIS:superadmin' => SystemUser::ROLE_SUPER_ADMIN,
+        'RIS:admin'      => SystemUser::ROLE_ADMIN,
+        'RIS:student'    => SystemUser::ROLE_STUDENT,
+        'RIS:alumni_sis'    => SystemUser::ROLE_ALUMNI,
+        'RIS:alumni_nonsis' => SystemUser::ROLE_ALUMNI,
     ];
 
     // -------------------------------------------------------
