@@ -37,6 +37,10 @@ const { user, loading, isLoggingOut, hasAgreed, setHasAgreed } = useAuth();
     return <Navigate to="/forbidden" replace />;
   }
 
+  if (localStorage.getItem(`neverShowAgreement_${user.user_id}`) === "true") {
+    return children;
+  }
+
   // Show agreement page if not yet agreed
   if (!hasAgreed) {
     return (
