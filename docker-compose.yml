@@ -46,10 +46,9 @@
       - backend
     networks:
       - ris_network
+  volumes:
+    ris_db_data:
 
-volumes:
-  ris_db_data:
-
-networks:
-  ris_network:
-    driver: bridge
+  networks:
+    ris_network:
+      driver: bridge
