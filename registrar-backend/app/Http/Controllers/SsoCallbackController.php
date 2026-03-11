@@ -18,9 +18,9 @@ class SsoCallbackController extends Controller
     // Role mapping — SSO role names → RIS role_id
     // -------------------------------------------------------
     private const ROLE_MAP = [
-        'RIS:superadmin' => SystemUser::ROLE_SUPER_ADMIN,
-        'RIS:admin'      => SystemUser::ROLE_ADMIN,
-        'RIS:student'    => SystemUser::ROLE_STUDENT,
+        'RIS:superadmin'    => SystemUser::ROLE_SUPER_ADMIN,
+        'RIS:admin'         => SystemUser::ROLE_ADMIN,
+        'RIS:student'       => SystemUser::ROLE_STUDENT,
         'RIS:alumni_sis'    => SystemUser::ROLE_ALUMNI,
         'RIS:alumni_nonsis' => SystemUser::ROLE_ALUMNI,
     ];
@@ -56,7 +56,7 @@ class SsoCallbackController extends Controller
         }
 
         // Verify issuer
-        if (($decoded->iss ?? null) !== 'pupt-idp') {
+        if (($decoded->iss ?? null) !== 'unified-access-idp') {
             return response()->json(['message' => 'Invalid token issuer.'], 401);
         }
 
@@ -67,13 +67,12 @@ class SsoCallbackController extends Controller
 
         // -------------------------------------------------------
         // Extract claims from JWT payload
-        // Expected: email, name (fn mn ln), roles (array)
+        // Field names confirmed: firstName, middleName, lastName, email, roles
         // -------------------------------------------------------
-        $email     = $decoded->email     ?? null;
-        $firstName = $decoded->fn        ?? null;
-        $middleName = $decoded->mn       ?? null;
-        $lastName  = $decoded->ln        ?? null;
-        $roles     = $decoded->roles     ?? [];
+        $email      = $decoded->email ?? null;
+        $firstName  = $decoded->firstName  ?? null;
+        $middleName = $decoded->middleName ?? null;
+        $lastName   = $decoded->lastName   ?? null;
         $roles      = (array)($decoded->roles ?? []);
 
         if (!$email || empty($roles)) {
@@ -93,8 +92,8 @@ class SsoCallbackController extends Controller
         // -------------------------------------------------------
         // Determine if this is SIS or NON-SIS alumni
         // -------------------------------------------------------
-        $isSisAlumni    = in_array('registrar:alumni_sis', (array) $roles);
-        $isNonSisAlumni = in_array('registrar:alumni_nonsis', (array) $roles);
+        $isSisAlumni    = in_array('RIS:alumni_sis', $roles);
+        $isNonSisAlumni = in_array('RIS:alumni_nonsis', $roles);
 
         DB::beginTransaction();
         try {
@@ -102,9 +101,9 @@ class SsoCallbackController extends Controller
             $user = SystemUser::firstOrCreate(
                 ['email' => $email],
                 [
-                    'password'  => bcrypt(Str::random(32)), // random — SSO users never use password login
-                    'role_id'   => $roleId,
-                    'status'    => 'Activated',
+                    'password'   => bcrypt(Str::random(32)), // random — SSO users never use password login
+                    'role_id'    => $roleId,
+                    'status'     => 'Activated',
                     'created_at' => now(),
                 ]
             );
@@ -123,10 +122,10 @@ class SsoCallbackController extends Controller
                 $exists = StudentProfile::where('user_id', $user->user_id)->exists();
                 if (!$exists) {
                     StudentProfile::create([
-                        'user_id'    => $user->user_id,
-                        'first_name' => $firstName,
+                        'user_id'     => $user->user_id,
+                        'first_name'  => $firstName,
                         'middle_name' => $middleName,
-                        'last_name'  => $lastName,
+                        'last_name'   => $lastName,
                     ]);
                     $needsOnboarding = true;
                 }
@@ -138,15 +137,15 @@ class SsoCallbackController extends Controller
                     $alumniTypeId = $isNonSisAlumni ? 2 : 1; // 1=SIS, 2=NON-SIS
 
                     $alumni = Alumni::create([
-                        'user_id'       => $user->user_id,
+                        'user_id'        => $user->user_id,
                         'alumni_type_id' => $alumniTypeId,
                     ]);
 
                     AlumniProfile::create([
-                        'alumni_id'  => $alumni->alumni_id,
-                        'first_name' => $firstName,
+                        'alumni_id'   => $alumni->alumni_id,
+                        'first_name'  => $firstName,
                         'middle_name' => $middleName,
-                        'last_name'  => $lastName,
+                        'last_name'   => $lastName,
                     ]);
                     $needsOnboarding = true;
                 }
@@ -158,13 +157,23 @@ class SsoCallbackController extends Controller
             return response()->json(['message' => 'Failed to process SSO login.'], 500);
         }
 
+        // -------------------------------------------------------
+        // Audit log — record SSO login
+        // -------------------------------------------------------
+        \App\Models\AuditLog::create([
+            'user_id'     => $user->user_id,
+            'action'      => \App\Models\AuditLog::ACTION_LOGIN,
+            'description' => "User {$user->email} logged in via SSO.",
+            'created_at'  => now(),
+        ]);
+
         // Issue Sanctum token
         $sanctumToken = $user->createToken('sso')->plainTextToken;
 
         return response()->json([
-            'token'           => $sanctumToken,
+            'token'            => $sanctumToken,
             'needs_onboarding' => $needsOnboarding,
-            'data'            => [
+            'data'             => [
                 'user_id'   => $user->user_id,
                 'email'     => $user->email,
                 'role_id'   => $user->role_id,
@@ -180,11 +189,11 @@ class SsoCallbackController extends Controller
     private function resolveRoleId(array $roles): ?int
     {
         $priority = [
-            'registrar:superadmin'    => 4,
-            'registrar:admin'         => 3,
-            'registrar:student'       => 2,
-            'registrar:alumni_sis'    => 1,
-            'registrar:alumni_nonsis' => 1,
+            'RIS:superadmin'    => 4,
+            'RIS:admin'         => 3,
+            'RIS:student'       => 2,
+            'RIS:alumni_sis'    => 1,
+            'RIS:alumni_nonsis' => 1,
         ];
 
         $resolved = null;
