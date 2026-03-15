@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginRequest, fetchCurrentUser, logoutRequest } from "../services/authService";
+import { loginRequest, fetchCurrentUser, logoutRequest, ssoCallbackRequest } from "../services/authService";
 import ErrorToast from "../components/ErrorToast";
 const AuthContext = createContext();
 
@@ -139,6 +139,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const ssoCallback = async (code) => {  // ← was 'token'
+  try {
+    const res = await ssoCallbackRequest(code);  // ← passes code
+    const sanctumToken = res.data.token;
+    localStorage.setItem('token', sanctumToken);
+    setToken(sanctumToken);
+
+    const userRes = await fetchCurrentUser();
+    const userData = userRes.data.data;
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+
+    const destination = ROLE_HOME[userData.role_name] ?? '/';
+    navigate(destination, { replace: true });
+  } catch (err) {
+    console.error('[SSO] failed:', err.response?.data ?? err.message);
+    setError('SSO login failed. Please try again.');
+  }
+};
+
   // -------------------------------------------------------
   // Helper — check if current user has a given role.
   // Usage: hasRole(ROLES.SUPER_ADMIN)
@@ -153,9 +173,7 @@ export const AuthProvider = ({ children }) => {
     hasRole(ROLES.ADMIN) || hasRole(ROLES.SUPER_ADMIN);
 
   return (
-    <AuthContext.Provider
-      value={{ user, loading, token, error, login, logout, hasRole, isStaff, isLoggingOut,  hasAgreed, setHasAgreed, agreeToTerms }}
-    >
+    <AuthContext.Provider value={{ user, loading, token, error, login, logout, ssoCallback, hasRole, isStaff, isLoggingOut, hasAgreed, setHasAgreed, agreeToTerms }}>
       <ErrorToast              
         message={error}
         onClose={() => setError(null)}
@@ -164,5 +182,6 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
 
 export const useAuth = () => useContext(AuthContext);
