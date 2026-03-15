@@ -21,8 +21,6 @@ use App\Http\Controllers\SsoCallbackController;
 |--------------------------------------------------------------------------
 */
 
-Route::post('/auth/callback', [SsoCallbackController::class, 'handle']);
-
 Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
 

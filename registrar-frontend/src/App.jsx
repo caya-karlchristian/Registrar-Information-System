@@ -5,7 +5,7 @@ import { Routes, Route } from 'react-router-dom';
 import StudentPage from './pages/StudentPage.jsx';
 import AlumniPage from './pages/AlumniPage.jsx';
 import StaffPage from './pages/StaffPage.jsx';
-import SuperAdminPage from './pages/SuperAdminPage.jsx';
+import SuperAdminPage from './pages/SuperAdminPage.jsx'; 
 
 // Layouts
 import LandingPage from './layouts/LandingPage.jsx';
