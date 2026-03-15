@@ -9,13 +9,9 @@ import { useState, useEffect } from "react";import {
 } from "@heroicons/react/24/outline";
 import DropDown from "../components/DropDown";
 import InputGroup from "../components/InputGroup";
-<<<<<<< HEAD
 import { getDocumentTypes, createDocumentType, updateDocumentType, deleteDocumentType } from '../services/api';
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
-=======
-import { getDocumentTypes, createDocumentType, updateDocumentType, deleteDocumentType } from '../services/API';
->>>>>>> 350ffd8b61d02b2498b63703cf5a0d7c4cba297e
 
 //REMOVE THIS LATER, JUST FOR DEMO PURPOSES
 const EXCLUSIVE_FOR = ["All", "Student", "Alumni"];
@@ -46,11 +42,8 @@ const DocumentManagement = () => {
   const [isAdding, setIsAdding]       = useState(true);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading]     = useState(true);
-<<<<<<< HEAD
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-=======
->>>>>>> 350ffd8b61d02b2498b63703cf5a0d7c4cba297e
 
   useEffect(() => {
     const fetchDocuments = async () => {
