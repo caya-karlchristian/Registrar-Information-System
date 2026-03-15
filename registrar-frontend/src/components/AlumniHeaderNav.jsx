@@ -63,6 +63,7 @@ export default AlumniHeaderNav;
 import { useState} from "react";
 import { Bars3Icon, BellIcon} from '@heroicons/react/24/outline';
 import NotificationModal from "../components/NotificationModal.jsx";
+import LogoImage from "../assets/puplogoimage.png";
 
 function AlumniHeaderNav ({ onMenuClick }) { 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -74,7 +75,7 @@ function AlumniHeaderNav ({ onMenuClick }) {
         <div className="w-full px-4 py-4 flex justify-between items-center">          
           <div className="flex space-x-4">
             <img
-              src="/src/assets/puplogoimage.png"
+              src={LogoImage}
               alt="PUP Logo"
               className="w-16 h-16 lg:w-20 lg:h-20"
             />
