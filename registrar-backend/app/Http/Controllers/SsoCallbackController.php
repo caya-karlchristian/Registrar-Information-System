@@ -8,15 +8,11 @@ use App\Models\AlumniProfile;
 use App\Models\StudentProfile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
 
 class SsoCallbackController extends Controller
 {
-    // -------------------------------------------------------
-    // Role mapping — SSO role names → RIS role_id
-    // -------------------------------------------------------
     private const ROLE_MAP = [
         'RIS:superadmin'    => SystemUser::ROLE_SUPER_ADMIN,
         'RIS:admin'         => SystemUser::ROLE_ADMIN,
@@ -25,99 +21,150 @@ class SsoCallbackController extends Controller
         'RIS:alumni_nonsis' => SystemUser::ROLE_ALUMNI,
     ];
 
-    // -------------------------------------------------------
-    // POST /api/auth/callback
-    // Receives JWT from SSO, issues Sanctum token
-    // -------------------------------------------------------
     public function handle(Request $request)
     {
-        // Support both POST body and query string token
-        $token = $request->input('token') ?? $request->query('token');
+        $code = $request->input('code');
 
-        if (!$token) {
-            return response()->json(['message' => 'Token is required.'], 422);
+        if (!$code) {
+            return response()->json(['message' => 'Authorization code is required.'], 422);
         }
 
-        // -------------------------------------------------------
-        // Verify and decode the JWT
-        // Replace SSO_PUBLIC_KEY in .env with the real key
-        // when the role permissions group sends it
-        // -------------------------------------------------------
-        $publicKey = env('SSO_PUBLIC_KEY');
+        $clientId     = env('SSO_CLIENT_ID');
+        $clientSecret = env('SSO_CLIENT_SECRET');
+        $idpBaseUrl   = env('SSO_BASE_URL');
 
-        if (!$publicKey) {
+        if (!$clientId || !$clientSecret || !$idpBaseUrl) {
             return response()->json(['message' => 'SSO not configured.'], 503);
         }
 
-        try {
-            $decoded = JWT::decode($token, new Key($publicKey, 'RS256'));
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Invalid or expired token.'], 401);
+        Log::info('SSO: code received', ['code' => substr($code, 0, 10)]);
+
+        // -------------------------------------------------------
+        // Step 1 — Exchange auth code for access token
+        // -------------------------------------------------------
+        $ch = curl_init("{$idpBaseUrl}/api/v1/auth/token");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode([
+                'client_id'     => $clientId,
+                'client_secret' => $clientSecret,
+                'code'          => $code,
+            ]),
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+        ]);
+
+        $tokenBody = curl_exec($ch);
+        $tokenCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $tokenErr  = curl_error($ch);
+
+        Log::info('SSO: token exchange', [
+            'http_code'  => $tokenCode,
+            'curl_error' => $tokenErr,
+            'body'       => $tokenBody,
+        ]);
+
+        if ($tokenErr || $tokenCode >= 400) {
+            return response()->json([
+                'message' => 'Failed to exchange code with identity provider.',
+                'detail'  => $tokenErr ?: $tokenBody,
+            ], 401);
         }
 
-        // Verify issuer
-        if (($decoded->iss ?? null) !== 'unified-access-idp') {
-            return response()->json(['message' => 'Invalid token issuer.'], 401);
-        }
+        $tokenData   = json_decode($tokenBody, true);
+        $accessToken = $tokenData['access_token'] ?? null;
 
-        // Verify audience matches our client_id
-        if (!in_array(env('SSO_CLIENT_ID'), (array)($decoded->aud ?? []))) {
-            return response()->json(['message' => 'Invalid token audience.'], 401);
+        if (!$accessToken) {
+            return response()->json(['message' => 'No access token returned by identity provider.'], 401);
         }
 
         // -------------------------------------------------------
-        // Extract claims from JWT payload
-        // Field names confirmed: firstName, middleName, lastName, email, roles
+        // Step 2 — Fetch user profile from /me
         // -------------------------------------------------------
-        $email      = $decoded->email ?? null;
-        $firstName  = $decoded->firstName  ?? null;
-        $middleName = $decoded->middleName ?? null;
-        $lastName   = $decoded->lastName   ?? null;
-        $roles      = (array)($decoded->roles ?? []);
+        $meCh = curl_init("{$idpBaseUrl}/api/v1/me");
+        curl_setopt_array($meCh, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $accessToken,
+                'Accept: application/json',
+            ],
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+        ]);
 
-        if (!$email || empty($roles)) {
-            return response()->json(['message' => 'Invalid token payload.'], 422);
+        $meBody = curl_exec($meCh);
+        $meCode = curl_getinfo($meCh, CURLINFO_HTTP_CODE);
+
+        Log::info('SSO: /me response', [
+            'http_code' => $meCode,
+            'body'      => $meBody,
+        ]);
+
+        if ($meCode !== 200) {
+            return response()->json(['message' => 'Failed to fetch user profile from identity provider.'], 401);
+        }
+
+        $profile    = json_decode($meBody, true);
+        $email      = $profile['email']       ?? null;
+        $firstName  = $profile['first_name']  ?? null;
+        $middleName = $profile['middle_name'] ?? null;
+        $lastName   = $profile['last_name']   ?? null;
+        $roles      = $profile['roles']       ?? [];
+
+        if (!$email) {
+            return response()->json(['message' => 'Invalid profile returned by identity provider.'], 422);
         }
 
         // -------------------------------------------------------
-        // Map SSO role to RIS role_id
-        // Use the highest privilege role if multiple are present
+        // Step 3 — Map SSO role to RIS role_id
         // -------------------------------------------------------
         $roleId = $this->resolveRoleId($roles);
 
+        // If no role from IdP, fall back to existing local role
         if (!$roleId) {
-            return response()->json(['message' => 'No recognized role for this system.'], 403);
+            $existing = SystemUser::where('email', $email)->first();
+            if ($existing) {
+                $roleId = $existing->role_id;
+            } else {
+                return response()->json(['message' => 'No recognized role for this system.'], 403);
+            }
         }
 
-        // -------------------------------------------------------
-        // Determine if this is SIS or NON-SIS alumni
-        // -------------------------------------------------------
         $isSisAlumni    = in_array('RIS:alumni_sis', $roles);
         $isNonSisAlumni = in_array('RIS:alumni_nonsis', $roles);
 
+        // -------------------------------------------------------
+        // Step 4 — Find or create user + profile
+        // -------------------------------------------------------
         DB::beginTransaction();
         try {
-            // Find or create the user account
             $user = SystemUser::firstOrCreate(
                 ['email' => $email],
                 [
-                    'password'   => bcrypt(Str::random(32)), // random — SSO users never use password login
+                    'password'   => bcrypt(Str::random(32)),
                     'role_id'    => $roleId,
                     'status'     => 'Activated',
                     'created_at' => now(),
                 ]
             );
 
-            // Update role if it changed on the SSO side
             if ($user->role_id !== $roleId) {
                 $user->update(['role_id' => $roleId]);
             }
 
             $needsOnboarding = false;
 
-            // -------------------------------------------------------
-            // Create profile if first login
-            // -------------------------------------------------------
             if ($roleId === SystemUser::ROLE_STUDENT) {
                 $exists = StudentProfile::where('user_id', $user->user_id)->exists();
                 if (!$exists) {
@@ -134,7 +181,7 @@ class SsoCallbackController extends Controller
             if ($roleId === SystemUser::ROLE_ALUMNI) {
                 $alumni = Alumni::where('user_id', $user->user_id)->first();
                 if (!$alumni) {
-                    $alumniTypeId = $isNonSisAlumni ? 2 : 1; // 1=SIS, 2=NON-SIS
+                    $alumniTypeId = $isNonSisAlumni ? 2 : 1;
 
                     $alumni = Alumni::create([
                         'user_id'        => $user->user_id,
@@ -154,11 +201,12 @@ class SsoCallbackController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('SSO: DB error', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'Failed to process SSO login.'], 500);
         }
 
         // -------------------------------------------------------
-        // Audit log — record SSO login
+        // Audit log
         // -------------------------------------------------------
         \App\Models\AuditLog::create([
             'user_id'     => $user->user_id,
@@ -167,7 +215,6 @@ class SsoCallbackController extends Controller
             'created_at'  => now(),
         ]);
 
-        // Issue Sanctum token
         $sanctumToken = $user->createToken('sso')->plainTextToken;
 
         return response()->json([
@@ -182,10 +229,6 @@ class SsoCallbackController extends Controller
         ]);
     }
 
-    // -------------------------------------------------------
-    // Resolve the highest privilege role from the roles array
-    // Priority: superadmin > admin > student > alumni
-    // -------------------------------------------------------
     private function resolveRoleId(array $roles): ?int
     {
         $priority = [
@@ -209,4 +252,4 @@ class SsoCallbackController extends Controller
 
         return $resolved;
     }
-}
+}   

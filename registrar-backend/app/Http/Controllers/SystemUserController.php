@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
 use App\Services\AuditLogger;
 use App\Models\AuditLog;
+use App\Services\IdpService;
 
 class SystemUserController extends Controller
 {
@@ -49,7 +50,7 @@ class SystemUserController extends Controller
 
     // -------------------------------------------------------
     // POST /system-users
-    // Creates user account + admin_profile in one transaction
+    // Creates user in IdP first, then locally with admin_profile
     // -------------------------------------------------------
     public function store(Request $request)
     {
@@ -63,22 +64,47 @@ class SystemUserController extends Controller
             'suffix'      => 'nullable|string|max:20',
         ]);
 
+        // Map RIS role_id → IdP role name
+        $idpRoleMap = [
+            SystemUser::ROLE_ADMIN       => 'RIS:admin',
+            SystemUser::ROLE_SUPER_ADMIN => 'RIS:superadmin',
+        ];
+        $idpRole = $idpRoleMap[$validated['role_id']];
+
+        // Create in IdP first
+        $idp = new IdpService();
+        $idpResult = $idp->createUser([
+            'email'       => $validated['email'],
+            'first_name'  => $validated['first_name'],
+            'middle_name' => $validated['middle_name'] ?? '',
+            'last_name'   => $validated['last_name'],
+            'password'    => $validated['password'],
+            'roles'       => [$idpRole],
+        ]);
+
+        if (!$idpResult['success']) {
+            return response()->json([
+                'message' => 'Failed to create user in identity provider.',
+                'detail'  => $idpResult['error'],
+            ], 500);
+        }
+
         DB::beginTransaction();
         try {
             $user = SystemUser::create([
-                'email'    => $validated['email'],
-                'password' => Hash::make($validated['password']),
-                'role_id'  => $validated['role_id'],
-                'status'   => 'Activated',
+                'email'       => $validated['email'],
+                'password'    => Hash::make($validated['password']),
+                'role_id'     => $validated['role_id'],
+                'status'      => 'Activated',
+                'idp_user_id' => $idpResult['idp_id'] ?? null,
             ]);
 
-            // Create admin profile
             DB::table('admin_profile')->insert([
                 'user_id'     => $user->user_id,
                 'first_name'  => $validated['first_name'],
                 'middle_name' => $validated['middle_name'] ?? null,
                 'last_name'   => $validated['last_name'],
-                'suffix'      => $validated['suffix']      ?? null,
+                'suffix'      => $validated['suffix'] ?? null,
             ]);
 
             DB::commit();
@@ -89,9 +115,7 @@ class SystemUserController extends Controller
 
         AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
 
-        return (new UserResource($user))
-            ->response()
-            ->setStatusCode(201);
+        return (new UserResource($user))->response()->setStatusCode(201);
     }
 
     // -------------------------------------------------------
@@ -119,6 +143,19 @@ class SystemUserController extends Controller
             'last_name'   => 'sometimes|string|max:100',
             'suffix'      => 'nullable|string|max:20',
         ]);
+
+        $idp = new IdpService();
+
+        // Sync status change to IdP
+        if (isset($validated['status']) && $user->idp_user_id) {
+            $idpStatus = $validated['status'] === 'Activated' ? 'active' : 'disabled';
+            $idp->updateUserStatus($user->idp_user_id, $idpStatus);
+        }
+
+        // Sync password change to IdP
+        if (isset($validated['password']) && $user->idp_user_id) {
+            $idp->updateUserPassword($user->idp_user_id, $validated['password']);
+        }
 
         DB::beginTransaction();
         try {
@@ -176,6 +213,12 @@ class SystemUserController extends Controller
             return response()->json([
                 'message' => 'You cannot delete your own account.'
             ], 403);
+        }
+
+        // Delete from IdP
+        if ($user->idp_user_id) {
+            $idp = new IdpService();
+            $idp->deleteUser($user->idp_user_id);
         }
 
         AuditLogger::log($request, $request->user(), AuditLog::ACTION_ADMIN_DELETED);

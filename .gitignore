@@ -3,3 +3,6 @@ ris_backup.sql
 .github
 .github/workflows   
 .github/workflows/deploy.yml
+docker-compose.yml.env.production
+*.env*
+.env

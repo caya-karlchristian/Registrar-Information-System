@@ -31,6 +31,7 @@ class SystemUser extends Authenticatable
         'password',
         'role_id',   // needed when creating users programmatically
         'status', 
+        'idp_user_id',  // ← ADD
     ];
 
     protected $hidden = [
