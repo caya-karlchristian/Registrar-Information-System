@@ -4,7 +4,9 @@ WORKDIR /app
 
 # Accept build arg for API URL
 ARG VITE_API_URL
+ARG VITE_SSO_LOGIN_URL
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_SSO_LOGIN_URL=$VITE_SSO_LOGIN_URL
 
 # Install dependencies
 COPY package*.json ./
