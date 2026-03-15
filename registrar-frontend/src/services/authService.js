@@ -11,3 +11,6 @@ export const fetchCurrentUser = () => {
 export const logoutRequest = () => {
   return api.post("/logout");
 };
+
+// ← CHANGED: was { token } to /auth/callback
+export const ssoCallbackRequest = (code) => api.post("/auth/callback", { code });
