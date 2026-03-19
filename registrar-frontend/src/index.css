@@ -162,3 +162,11 @@
   }
 
 }
+
+.asw-menu-btn {
+  left: auto !important;
+  right: 25px !important;
+  bottom: 10px !important;
+  width: 50px !important;
+  height: 50px !important;
+}
