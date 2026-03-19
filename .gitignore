@@ -6,3 +6,4 @@ ris_backup.sql
 docker-compose.yml.env.production
 *.env*
 .env
+docker-compose.dev.yml
