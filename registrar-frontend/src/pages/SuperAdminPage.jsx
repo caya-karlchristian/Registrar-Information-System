@@ -1,6 +1,6 @@
 import { Outlet, useNavigate} from 'react-router-dom';
 import { useState, useEffect } from "react";
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
+// import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
 import Header from '../components/Header.jsx';                        
 import SuperAdminNavigation from '../components/SuperAdminNavigation.jsx';
 
@@ -39,12 +39,12 @@ const SuperAdminPage = () => {
           </div>
         </main>
 
-        <button
+        {/* <button
           onClick={() => navigate('/superadmin/contact')}
           className="fixed bottom-2 right-8 z-50 bg-pup-dark-maroon p-4 rounded-full shadow-2xl hover:scale-110 transition-all active:scale-95 group border-2 border-white/20"
         >
           <ChatBubbleLeftRightIcon className="w-4 h-4 text-white" />
-        </button>
+        </button> */}
       </div>
     </div>
   );
