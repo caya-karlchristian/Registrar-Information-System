@@ -7,6 +7,9 @@ import ErrorToast from "../components/ErrorToast.jsx";
 import axios from "../services/api.js";
 import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
+import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
+import { getTodayDate } from "../utils/helpers";
+import qrCode from "../assets/qrcode.png";
 
 const AlumniRequestForm = () => {
   const formRef = useRef(null);
@@ -16,6 +19,8 @@ const AlumniRequestForm = () => {
   const [availableDocs, setAvailableDocs] = useState([]);
   const [availableCertifications, setAvailableCertifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  
 
   useEffect(() => {
     const loadOptions = async () => {
@@ -46,7 +51,6 @@ const AlumniRequestForm = () => {
     receiptNumber: '',
     dateOfPayment: '',
     documentCopies: {},
-    forgotStudentNo: '',
   });
 
   // Helper to update text inputs
@@ -59,6 +63,15 @@ const AlumniRequestForm = () => {
   const handleCheckboxChange = (e) => {
     const { name, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: checked }));
+  };
+
+  const handlePreSubmit = (e) => {
+    e.preventDefault();
+    if (formRef.current && !formRef.current.checkValidity()) {
+      formRef.current.reportValidity();
+      return;
+    }
+    setShowConfirmModal(true);
   };
 
   const handleDocCopyChange = (docName, value) => {
@@ -84,9 +97,9 @@ const AlumniRequestForm = () => {
       setErrorMessage("Please select at least one document to proceed.");
       return;
     }
-
-    if (currentStep === 3 && !formData.noRequests && !formData.doneRequest) {
-      setErrorMessage("Please select at least one option to proceed.");
+    
+    if (currentStep === 2 && hasTOR && !formData.noRequests && !formData.doneRequest) {
+      setErrorMessage("Please select at least one TOR option to proceed.");
       return;
     }
     
@@ -105,7 +118,7 @@ const AlumniRequestForm = () => {
       setFormData(prev => ({ ...prev, documentCopies: initialCopies }));
     }
 
-    if (currentStep < 4) setCurrentStep(currentStep + 1);
+    if (currentStep < 3) setCurrentStep(currentStep + 1);
   };
 
   const prevStep = (e) => {
@@ -128,9 +141,9 @@ const AlumniRequestForm = () => {
         return Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name);
       }).filter(Boolean);
 
-      const certId = availableCertifications.find(c => c.cert_name === formData.certification)?.cert_type_id
-        ?? CERTIFICATION_MAP[formData.certification]
-        ?? null;
+      const certId = availableCertifications.find(
+        (c) => c.certificate_name === formData.certification
+      )?.certificate_type_id ?? null;
 
       const payload = {
         request_purpose_id: purposeId,
@@ -142,6 +155,7 @@ const AlumniRequestForm = () => {
       };
 
       const response = await axios.post("/document-requests", payload);
+
       console.log("Submission successful:", response.data);
       setIsSubmitted(true);
     } catch (error) {
@@ -153,32 +167,44 @@ const AlumniRequestForm = () => {
   };
   
   const handleConfirm = () => {
-    window.location.reload();
+    setIsSubmitted(false);
+    setCurrentStep(1);
+    setFormData({
+      termsAgreed: false,
+      documentsRequested: [],
+      purposeOfRequest: "",
+      certification: "",
+      receiptNumber: "",
+      dateOfPayment: "",
+      documentCopies: {},
+    });
+    setErrorMessage("");
+    setIsLoading(false);
   };
 
-  const certificationDocuments = new Set([
-    "Certificate of Good Moral Character",
-    "Certification, Authentication, Verification (CAV) / APOSTILE",
-    "Certificates of Attendance, Graduation, Medium of Instruction, General Weighted Average, Non Issuance of Special Order, and Certified True Copy"                 
-  ]);
-
-  const showCertificationDropdown = formData.documentsRequested.some(doc =>
-    certificationDocuments.has(doc)
+  const hasTOR = formData.documentsRequested.some(doc =>
+    doc.toLowerCase().includes("tor") || doc.toLowerCase().includes("transcript")
   );
+
+  const showCertificationDropdown = formData.documentsRequested.some((doc) => {
+    const lower = doc.toLowerCase();
+    return (
+      lower.includes("certif") 
+    );
+  });
+
+  const certificationOptions = availableCertifications.length > 0
+      ? availableCertifications.map((c) => c.certificate_name)
+      : Object.values(CERTIFICATION_MAP);
 
 
   const stepProcess = {
             1: "Terms & Conditions",
-            // 2: "Alumni Information",
             2: "Alumni Request",
-            3: "TOR request",
-            4: "Payment Details",
+            3: "Payment and Document Details"
           };
   const purposeOptions = Object.values(PURPOSE_MAP);
 
-  const certificationOptions = availableCertifications.length > 0
-    ? availableCertifications.map(c => c.cert_name)
-    : Object.values(CERTIFICATION_MAP);
 
   const documentOptions = availableDocs.length > 0
     ? availableDocs.map(d => d.document_name)
@@ -189,7 +215,7 @@ const AlumniRequestForm = () => {
         <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
     {isSubmitted ? (
       <div className="max-w-5xl mx-auto">
-        <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] items-center justify-center text-center px-10 flex flex-col relative ">
+        <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 items-center justify-center text-center px-10 flex flex-col relative ">
           <p className="mb-6 text-4xl text-center font-bold text-white mt-35">
             Please be patient as we process your requested document. 
           </p>
@@ -210,11 +236,11 @@ const AlumniRequestForm = () => {
         <form 
         ref={formRef}
         onSubmit={handleSubmit}
-        className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col relative">
+        className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative">
           
           <div className="flex flex-col items-center pt-8 pb-4">
             <div className="flex space-x-3 mb-2">
-              {[1, 2, 3, 4].map((step) => (
+              {[1, 2, 3].map((step) => (
                 <div 
                   key={step}
                   className={`w-4 h-4 rounded-full border border-pup-yellow ${
@@ -224,7 +250,7 @@ const AlumniRequestForm = () => {
               ))}
             </div>
             <p className="text-pup-yellow font-bold text-sm tracking-wider">
-              {currentStep} of 4 
+              {currentStep} of 3
             </p>
 
           <h2 className="text-white text-xl font-semibold mt-2">
@@ -272,109 +298,7 @@ const AlumniRequestForm = () => {
                   </div>
                   </div>
                 )}
-{/* 
-            {currentStep === 2 && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full">
-                    <DropdownGroup                    
-                      name="yearAdmitted"
-                      label="Admitted in PUP Taguig (S.Y.)"
-                      value={formData.yearAdmitted}
-                      onChange={handleInputChange}
-                      options={[
-                        "2000–2001",
-                        "2001–2002",
-                        "2002–2003",
-                        "2003–2004",
-                        "2004–2005",
-                        "2005–2006",
-                        "2006–2007",
-                        "2007–2008",
-                        "2008–2009",
-                        "2009–2010",
-                        "2010–2011",
-                        "2011–2012",
-                        "2012–2013",
-                        "2013–2014",
-                        "2014–2015",
-                        "2015–2016",
-                        "2016–2017",
-                        "2017–2018",
-                        "2018–2019",
-                        "2019–2020",
-                        "2020–2021",
-                        "2021–2022",
-                        "2022–2023",
-                        "2023–2024",
-                        "2024–2025",
-                        "2025–2026",
-                      ]}
-                      required
-                    />
-
-                  <DropdownGroup 
-                    name="course" 
-                    label="Course" 
-                    value={formData.course} 
-                    onChange={handleInputChange} 
-                    required
-                    options={[
-                      "BS in Electronics Engineering (BSECE)",
-                      "BS in Information Technology (BSIT)",
-                      "BS in Information Systems (BSIS)",
-                      "BS in Accountancy (BSA)",
-                      "BS in Business Administration (BSBA)",
-                      "BS in Applied Mathematics (BSAM)",
-                      "BS in Entrepreneurship (BSENTREP)",
-                      "BS in Office Administration (BSOA)",
-                      "Bachelor in Secondary Education (BSED)",
-                      "BS in Hospitality Management (BSHM)",
-                      "BS in Civil Engineering (BSCE)",
-                    ]}
-                  />
-
-                  <DropdownGroup 
-                    name="forgotStudentNo"  
-                    label="Do you still remember your STUDENT NUMBER?"
-                    value={formData.forgotStudentNo}
-                    onChange={handleInputChange}
-                    options={["Yes", "No"]}
-                    required
-                    />
-
-                    {/* Show Last S.Y. Attended if Yes or No is selected */}
-                    {/* {formData.forgotStudentNo && (
-                    <InputGroup
-                        name="lastSYAttended"
-                        label="Last S.Y. Attended"
-                        value={formData.lastSYAttended}
-                        onChange={handleInputChange}
-                        placeholder="XXXX-XXXX"
-                        pattern="^\d{4}-\d{4}$"
-                        title="Format must be YYYY-YYYY"
-                        required
-                    />
-                    )}
-
-                    {/* Show Student Number ONLY if Yes 
-                    {formData.forgotStudentNo === "Yes" && (
-                    <InputGroup
-                        name="studentNumber"
-                        label="Student Number"
-                        value={formData.studentNumber}
-                        onChange={handleInputChange}
-                        className="uppercase"
-                        placeholder="e.g 2023-00101-TG-0"
-                        pattern="^\d{4}-\d{5}-TG-\d$"
-                        title="Format must be YYYY-XXXXX-TG-X"
-                        required
-                    />
-                    )}
-
-                </div>
-              </div> */}
             
-
             {currentStep === 2 && (
               <div className="space-y-6 animate-fadeIn ">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
@@ -406,40 +330,34 @@ const AlumniRequestForm = () => {
                     required
                     options={purposeOptions} 
                   />
-
+                  {hasTOR && (
+                    <div className="space-y-3 bg-white/10 p-4 rounded-lg border">
+                      <p className="text-sm text-justify lg:text-[15px] ">
+                        For TOR request for further studies, please secure an HONORABLE DISMISSAL first. 
+                        Once processed and submitted back to the University, you may request for TOR with copy for remarks.
+                      </p>
+                      <CheckboxItem
+                        text="No Request Yet"
+                        name="noRequests"
+                        checked={formData.noRequests}
+                        onChange={handleCheckboxChange}
+                      />
+                      <CheckboxItem
+                        text="Done Honorable Dismissal Request"
+                        name="doneRequest"
+                        checked={formData.doneRequest}
+                        onChange={handleCheckboxChange}
+                      />
+                    </div>
+                  )}
               </div>
               </div>
             )}
-
+    
+            {/* STEP 6: SUBMIT */}
             {currentStep === 3 && (
               <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
-                  <p className="text-sm text-justify lg:text-[15px]">For TOR request for further studies, 
-                    please secure an HONORABLE DISMISSAL first. Once processed and submitted 
-                    back to the University, you may request for TOR with copy for remarks. 
-                    </p>
-
-                  <CheckboxItem
-                    text="No Request Yet"
-                    name="noRequests"
-                    checked={formData.noRequests}
-                    onChange={handleCheckboxChange}
-                  />
-
-                  <CheckboxItem
-                    text="Done Honorable Dismissal Request"
-                    name="doneRequest"
-                    checked={formData.doneRequest}
-                    onChange={handleCheckboxChange}
-                  />
-              </div>
-              </div>
-            )}
-
-            {/* STEP 6: SUBMIT */}
-            {currentStep === 4 && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mt-7">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full -mt-6">
                   <InputGroup
                     name="receiptNumber"
                     label="Official Receipt Number"
@@ -458,24 +376,38 @@ const AlumniRequestForm = () => {
                     value={formData.dateOfPayment}
                     onChange={handleInputChange}
                     placeholder='e.g 01/01/2024'
+                    min={getTodayDate()}
                     required
                   />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-1 w-full">
-                  <div className="bg-white/10 p-4 rounded-lg border border-white/20">
+                  <div className="grid grid-cols-1 md:grid-cols-1 w-full -mt-2">
+                  <div className="bg-white/10 p-4 rounded-lg border">
                     <h3 className="text-pup-yellow font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
                     <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
                       {formData.documentsRequested.length > 0 ? (
                         formData.documentsRequested.map((doc, index) => (
-                          <div key={index} className="flex items-center justify-between gap-4">
-                              <label className="text-white text-sm flex-1">{doc}</label>
+                          <div key={index} className="flex items-center justify-between gap-2">
+                           <label className="text-white text-sm flex-1">
+                            {doc}
+                              {doc.toLowerCase().includes("certif") && formData.certification && (
+                                <span className="text-[#eebc48] font-semibold ml-1">
+                                  — {formData.certification}
+                                </span>
+                              )}
+                            </label>
                               <div className="w-24">
                                 <input
                                   type="number"
                                   min="1"
-                                  className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block"
+                                  className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg 
+                                  outline-none transition-all duration-200
+                                  focus:bg-white 
+                                  focus:border-[#FFC72C] 
+                                  focus:ring-2 
+                                  focus:ring-[#FFC72C]/30 
+                                  focus:text-black"    
                                   value={formData.documentCopies[doc] || 1}
                                   onChange={(e) => handleDocCopyChange(doc, e.target.value)}
                                 />
@@ -488,15 +420,89 @@ const AlumniRequestForm = () => {
                     </div>
                   </div>
                 </div>
+                <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar -mt-2">
+                  {formData.documentsRequested.map((doc, index) => {
+
+                    const docData = availableDocs.find((d) => d.document_name === doc);
+                    const requirements = docData?.document_requirements
+                      ? (Array.isArray(docData.document_requirements)
+                          ? docData.document_requirements
+                          : docData.document_requirements.split(',').map(r => r.trim()).filter(Boolean))
+                      : [];
+
+                    return (
+                      <div
+                        key={index}
+                        className="bg-white/10 p-4 rounded-lg border  px-4 py-3"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
+                          <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
+                            {doc}
+                            {doc.toLowerCase().includes("certif") && formData.certification && (
+                              <span className="text-white/60 font-normal ml-1 normal-case tracking-normal">
+                                — {formData.certification}
+                              </span>
+                            )}
+                          </h3>
+                        </div>
+
+                        <ul className="flex flex-col gap-1.5 pl-1">
+                          {requirements.length > 0 ? (
+                            requirements.map((req, i) => (
+                              <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
+                                <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
+
+                                <span className="wrap-break-word whitespace-normal">
+                                  {req}
+                                </span>
+                              </li>
+                            ))
+                          ) : (
+                            <li className="text-xs text-white/35 italic">No requirements available</li>
+                          )}
+                        </ul>
+                      </div>
+                      
+                    );
+                  })}
+                </div>
+                  <div className="-mt-9 flex justify-center items-start">
+                    <div className=" p-4 md:mt-4 lg:mt-5 w-full max-w-sm max-h-lg flex flex-col items-center">
+                      <p className="lg:mt-2 text-[10px] text-white/70 text-center leading-relaxed">
+                        <strong>REMINDER</strong>: Your feedback is important to us. Kindly take a moment to share your experience.
+                      </p>
+
+                      <h3 className="text-[#FFC72C]  font-bold text-[10px] md:text-sm lg:text-sm uppercase tracking-wide md:mb-3 text-center">
+                        Scan QR Code
+                      </h3>
+
+                      <img
+                        src={qrCode}
+                        alt="QR Code"
+                        className="w-20 h-20 lg:w-40 lg:h-40 object-contain"
+                      />
+
+                      <a
+                        href="https://pupsinta.freshservice.com/support/home"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="lg:mt-2 lg:text-sm text-[10px] text-[#FFC72C] underline text-center wrap-break-word hover:text-yellow-400 transition"
+                      >
+                        https://pupsinta.freshservice.com/support/home
+                      </a>
+
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
           </div>
 
-          {/* NAVIGATION BUTTONS */}
           <div className="mb-8 px-8 flex flex-col items-center mt-auto space-y-2">
             <div className="flex justify-between items-center w-full">
-              {/* Back Button */}
               <div className="w-32">
                 {currentStep > 1 && (
                   <button
@@ -510,28 +516,29 @@ const AlumniRequestForm = () => {
               </div>
 
               <div className="w-32">
-                {currentStep < 4 ? (
-                  <button
-                    onClick={nextStep}
-                    type="button"
-                    className="font-bold py-2 px-6 rounded shadow-md w-full transition-transform active:scale-95 bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon" 
-                  >
-                    Next
-                  </button>
-              ) : (
                 <button
-                  type="submit"
-                  className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full"
+                  type="button"
+                  onClick={currentStep < 3 ? nextStep : handlePreSubmit}
+                  className="font-bold py-2 px-6 rounded shadow-md w-full ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
                 >
-                  Submit
+                  {currentStep < 3 ? "Next" : "Submit"}
                 </button>
-              )}
+              </div>
             </div>
           </div>
-          </div>   
         </form>
       </div>
     )} 
+    <SubmitConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={() => {
+          setShowConfirmModal(false); 
+          handleSubmit({ preventDefault: () => {} });
+        }}
+        title="Submit Confirmation"
+        message="Are you sure you want to submit your request?"
+      />
     <ErrorToast 
     message={errorMessage} 
     onClose={() => setErrorMessage("")} 
