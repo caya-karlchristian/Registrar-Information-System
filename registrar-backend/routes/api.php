@@ -24,6 +24,8 @@ use App\Http\Controllers\SsoCallbackController;
 Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
 
+Route::post('/auth/callback', [SsoCallbackController::class, 'handle']);
+
 /*
 |--------------------------------------------------------------------------
 | PROTECTED ROUTES — requires valid Sanctum token
