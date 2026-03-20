@@ -194,3 +194,11 @@ export const EndorsementNoteBlock = ({ items }) => (
     </ol>
   </div>
 );
+
+export const getTodayDate = () => {
+  const today = new Date();
+  const localDate = new Date(
+    today.getTime() - today.getTimezoneOffset() * 60000
+  );
+  return localDate.toISOString().split("T")[0];
+};
