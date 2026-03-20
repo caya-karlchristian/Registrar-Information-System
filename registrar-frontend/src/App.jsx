@@ -19,6 +19,7 @@ import StaffDashboard from './layouts/StaffDashboard.jsx';
 import Logbook from './layouts/Logbook.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx'; 
+import MainPage from './layouts/MainPage.jsx';
 
 // Super Admin layouts (frontend dev fills these in)
 import UserManagement from './layouts/UserManagement.jsx';
@@ -36,9 +37,10 @@ const App = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<MainPage />} />
         <Route path="/forbidden" element={<ForbiddenPage />} />
         <Route path="/auth/callback" element={<SsoCallbackPage />} />
+        <Route path="/signup" element={<LandingPage />} />
 
         {/* STUDENT (role: student) */}
         <Route
