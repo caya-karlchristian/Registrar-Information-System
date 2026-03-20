@@ -2,7 +2,7 @@ import { Outlet, useNavigate} from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import Navigation from '../components/Navigation.jsx';
 import React, { useState, useEffect} from 'react'; 
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
+// import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/solid';
 
 const StudentPage = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -38,12 +38,12 @@ const StudentPage = () => {
             <Outlet />
           </div>
         </main>
-        <button
+        {/* <button
           onClick={() => navigate('/student/contact')} // This directs the main content to display the email design
           className="fixed bottom-2 right-8 z-50 bg-pup-dark-maroon p-4 rounded-full shadow-2xl hover:scale-110 transition-all active:scale-95 group border-2 border-white/20"
           >
           <ChatBubbleLeftRightIcon className="w-4 h-4 text-white" />
-        </button>
+        </button> */}
       </div>
     </div>
   );
