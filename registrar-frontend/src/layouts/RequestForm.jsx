@@ -6,7 +6,10 @@ import DropdownGroup from "../components/DropDown.jsx";
 import MultiSelectDropdown from "../components/MultiSelection.jsx";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import { getTodayDate } from "../utils/helpers";
+import qrCode from "../assets/qrcode.png";
 import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
+import ConfirmationModal from "../components/ConfirmationModal.jsx"
 
 const RequestForm = () => {
   const formRef = useRef(null);
@@ -15,6 +18,7 @@ const RequestForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [availableDocs, setAvailableDocs] = useState([]);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [availableCertifications, setAvailableCertifications] = useState([]);
 
   useEffect(() => {
@@ -49,6 +53,15 @@ const RequestForm = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePreSubmit = (e) => {
+    e.preventDefault();
+    if (formRef.current && !formRef.current.checkValidity()) {
+      formRef.current.reportValidity();
+      return;
+    }
+    setShowConfirmModal(true);
   };
 
   const handleDocCopyChange = (docName, value) => {
@@ -118,9 +131,9 @@ const RequestForm = () => {
       return Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name);
     }).filter(Boolean);
 
-    const certId = availableCertifications.find(c => c.cert_name === formData.certification)?.certification_type_id
-            ?? CERTIFICATION_MAP[formData.certification] 
-            ?? null;
+    const certId = availableCertifications.find(
+      (c) => c.certificate_name === formData.certification
+    )?.certificate_type_id ?? null;
     // 3. Prepare Payload (Matches your Laravel store validation)
     const payload = {
       request_purpose_id: purposeId,
@@ -143,39 +156,47 @@ const RequestForm = () => {
   }
 };
 
-  const handleConfirm = () => window.location.reload();
+  const handleConfirm = () => {
+    setIsSubmitted(false);
+    setCurrentStep(1);
+    setFormData({
+      termsAgreed: false,
+      documentsRequested: [],
+      purposeOfRequest: "",
+      certification: "",
+      receiptNumber: "",
+      dateOfPayment: "",
+      documentCopies: {},
+    });
+    setErrorMessage("");
+    setIsLoading(false);
+  };
 
-  /* ---------------- CERTIFICATION VISIBILITY ---------------- */
-
-  const certificationDocuments = new Set([
-    "Certificate of Good Moral Character",
-    "Certification, Authentication, Verification (CAV) / APOSTILE",
-    "Authentication/Certified True Copy - Local",
-    "CAV - CHED",
-    "CAV - WES/CES",
-  ]);
-
-  const showCertificationDropdown = formData.documentsRequested.some((doc) =>
-    certificationDocuments.has(doc)
-  );
+  const showCertificationDropdown = formData.documentsRequested.some((doc) => {
+    const lower = doc.toLowerCase();
+    return (
+      lower.includes("certif") 
+    );
+  });
 
   const stepProcess = {
     1: "Terms & Conditions",
-    2: "Student Information",
-    3: "Student Request",
-    4: "Payment Details",
+    2: "Document Request",
+    3: "Payment and Document Details",
   };
+
   const purposeOptions = Object.values(PURPOSE_MAP);
 
   const certificationOptions = availableCertifications.length > 0
-  ? availableCertifications.map(c => c.cert_name)
-  : Object.values(CERTIFICATION_MAP); 
+    ? availableCertifications.map((c) => c.certificate_name)
+    : Object.values(CERTIFICATION_MAP);
 
   const documentOptions = availableDocs.length > 0
     ? availableDocs.map(d => d.document_name)
     : Object.values(DOC_TYPE_MAP); 
 
   return (
+    <>
     <div className="relative min-h-screen pb-20 z-20">
       <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
       {isSubmitted ? (
@@ -297,7 +318,7 @@ const RequestForm = () => {
 
               {/* STEP 5: Payment & Copies */}
               {currentStep === 3 && (
-                <div className="space-y-6 animate-fadeIn">
+                <div className="space-y-6 animate-fadeIn -mt-1">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <InputGroup
                       name="receiptNumber"
@@ -315,17 +336,25 @@ const RequestForm = () => {
                       type="date"
                       value={formData.dateOfPayment}
                       onChange={handleInputChange}
+                      min={getTodayDate()}
                       required
                     />
                   </div>
-                  <div className="bg-white/10 p-4 rounded-lg border ">
+                  <div className="bg-white/10 p-4 rounded-lg border -mb-1">
                     <h3 className="text-[#FFC72C] font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
                     <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
                       {formData.documentsRequested.map((doc, index) => (
                         <div key={index} className="flex items-center justify-between gap-4">
-                           <label className="text-white text-sm flex-1">{doc}</label>
+                           <label className="text-white text-sm flex-1">
+                            {doc}
+                              {doc.toLowerCase().includes("certif") && formData.certification && (
+                                <span className="text-[#eebc48] font-semibold ml-1">
+                                  — {formData.certification}
+                                </span>
+                              )}
+                            </label>
                            <div className="w-24 ">
                               <input
                                 type="number"
@@ -345,6 +374,82 @@ const RequestForm = () => {
                       ))}
                     </div>
                   </div>
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar">
+                    {formData.documentsRequested.map((doc, index) => {
+
+                      const docData = availableDocs.find((d) => d.document_name === doc);
+                      const requirements = docData?.document_requirements
+                        ? (Array.isArray(docData.document_requirements)
+                            ? docData.document_requirements
+                            : docData.document_requirements.split(',').map(r => r.trim()).filter(Boolean))
+                        : [];
+
+                      return (
+                        <div
+                          key={index}
+                          className="bg-white/10 p-4 rounded-lg border  px-4 py-3"
+                        >
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
+                            <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
+                              {doc}
+                              {doc.toLowerCase().includes("certif") && formData.certification && (
+                                <span className="text-white/60 font-normal ml-1 normal-case tracking-normal">
+                                  — {formData.certification}
+                                </span>
+                              )}
+                            </h3>
+                          </div>
+
+                          <ul className="flex flex-col gap-1.5 pl-1">
+                            {requirements.length > 0 ? (
+                              requirements.map((req, i) => (
+                                <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
+                                  <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
+
+                                  <span className="wrap-break-word whitespace-normal">
+                                    {req}
+                                  </span>
+                                </li>
+                              ))
+                            ) : (
+                              <li className="text-xs text-white/35 italic">No requirements available</li>
+                            )}
+                          </ul>
+                        </div>
+                        
+                      );
+                    })}
+                  </div>
+                    <div className="-mt-9 flex justify-center items-start">
+                      <div className=" p-4 md:mt-4 lg:mt-5 w-full max-w-sm max-h-lg flex flex-col items-center">
+                        <p className="lg:mt-2 text-[10px] text-white/70 text-center leading-relaxed">
+                          <strong>REMINDER</strong>: Your feedback is important to us. Kindly take a moment to share your experience.
+                        </p>
+
+                        <h3 className="text-[#FFC72C]  font-bold text-[10px] md:text-sm lg:text-sm uppercase tracking-wide md:mb-3 text-center">
+                          Scan QR Code
+                        </h3>
+
+                        <img
+                          src={qrCode}
+                          alt="QR Code"
+                          className="w-20 h-20 lg:w-40 lg:h-40 object-contain"
+                        />
+
+                        <a
+                          href="https://pupsinta.freshservice.com/support/home"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="lg:mt-2 lg:text-sm text-[10px] text-[#FFC72C] underline text-center wrap-break-word hover:text-yellow-400 transition"
+                        >
+                          https://pupsinta.freshservice.com/support/home
+                        </a>
+
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -362,8 +467,8 @@ const RequestForm = () => {
               )}
 
               <button
-                type={currentStep < 3 ? "button" : "submit"}
-                onClick={currentStep < 3 ? nextStep : undefined}
+                type="button"
+                onClick={currentStep < 3 ? nextStep : handlePreSubmit}
                 className="font-bold py-2 px-6 rounded shadow-md w-32 ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
               >
                 {currentStep < 3 ? "Next" : "Submit"}
@@ -373,11 +478,20 @@ const RequestForm = () => {
           </form>
         </div>
       )}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={() => handleSubmit({ preventDefault: () => {} })}
+        title="Submit Request"
+        message="Are you sure you want to submit your document request?"
+        type="confirm"
+      />
+    </div>
       <ErrorToast 
         message={errorMessage} 
         onClose={() => setErrorMessage("")} 
       />
-    </div>
+    </>
   );
 };
 
