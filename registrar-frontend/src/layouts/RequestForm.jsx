@@ -9,7 +9,7 @@ import ErrorToast from "../components/ErrorToast.jsx";
 import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
 import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
-import ConfirmationModal from "../components/ConfirmationModal.jsx"
+import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 
 const RequestForm = () => {
   const formRef = useRef(null);
@@ -478,13 +478,15 @@ const RequestForm = () => {
           </form>
         </div>
       )}
-      <ConfirmationModal
+      <SubmitConfirmationModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
-        onConfirm={() => handleSubmit({ preventDefault: () => {} })}
-        title="Submit Request"
-        message="Are you sure you want to submit your document request?"
-        type="confirm"
+        onConfirm={() => {
+          setShowConfirmModal(false); 
+          handleSubmit({ preventDefault: () => {} });
+        }}
+        title="Submit Confirmation"
+        message="Are you sure you want to submit your request?"
       />
     </div>
       <ErrorToast 
