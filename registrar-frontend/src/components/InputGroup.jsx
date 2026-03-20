@@ -11,6 +11,7 @@ const InputGroup = ({
   pattern,
   title,
   required = false,
+  min ,
   labelColor = 'text-white'
 }) => {
   return (
@@ -29,6 +30,7 @@ const InputGroup = ({
         required={required}
         pattern={pattern}
         title={title}
+        min={min} 
         className="w-full px-3 py-3 bg-white rounded-lg text-sm text-gray-700 shadow-sm
                    placeholder:text-gray-400
                    focus:outline-none focus:ring-2 focus:ring-[#FFC72C]
@@ -49,6 +51,7 @@ InputGroup.propTypes = {
   pattern: PropTypes.string,
   title: PropTypes.string,
   labelColor: PropTypes.string,
+  min: PropTypes.string,
 };
 
 export default InputGroup;
