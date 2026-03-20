@@ -25,15 +25,11 @@ const LandingPage = () => {
 }, [user, navigate]);
 
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await login(email, password);
-    } finally {
-      setLoading(false);
-    }
+const handleSsoLogin = () => {
+  window.location.href = import.meta.env.VITE_SSO_LOGIN_URL;
 };
+
+
 
   return (
     <div className="flex h-screen w-full font-sans bg-gray-50 overflow-hidden">
@@ -70,37 +66,15 @@ const LandingPage = () => {
           
           <img src={logoImage} alt="PUP Logo" className="w-24 h-24 drop-shadow-xl mb-6" />
 
-          <h1 className="text-3xl font-bold text-[#800000] mb-2 tracking-wide">
-            Welcome Back!
-          </h1>
-          <p className="text-sm text-gray-500 mb-8 font-medium">
-            Enter your credentials to access your account.
-          </p>
-
-          <form onSubmit={handleLogin} className="w-full space-y-5">
-            <InputField
-              type="email"
-              placeholder="Email Address"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-
-            <InputField
-              type="password"
-              placeholder="Password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          
-            <button 
-              type="submit"
-              className="w-full py-3.5 px-4 bg-pup-dark-maroon hover:bg-[#600000] text-white font-bold rounded-lg shadow-md transition-all transform active:scale-95"
+            <button
+              type="button"
+              onClick={handleSsoLogin}
+              className="w-full py-3.5 px-4 border-2 border-[#800000] text-[#800000] hover:bg-[#800000] hover:text-white font-bold rounded-lg shadow-sm transition-all transform active:scale-95 flex items-center justify-center gap-2"
             >
-              Sign In
+              <img src={logoImage} alt="" className="w-5 h-5" />
+              Sign in with PUP Account
             </button>
-          </form>
+
 
           <div className="mt-5 text-[10px] text-gray-400 leading-tight text-center">
             <p>
