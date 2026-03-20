@@ -208,12 +208,8 @@ class SsoCallbackController extends Controller
         // -------------------------------------------------------
         // Audit log
         // -------------------------------------------------------
-        \App\Models\AuditLog::create([
-            'user_id'     => $user->user_id,
-            'action'      => \App\Models\AuditLog::ACTION_LOGIN,
-            'description' => "User {$user->email} logged in via SSO.",
-            'created_at'  => now(),
-        ]);
+        // Replace the AuditLog::create block with:
+        \App\Services\AuditLogger::log($request, $user, \App\Models\AuditLog::ACTION_LOGIN);
 
         $sanctumToken = $user->createToken('sso')->plainTextToken;
 

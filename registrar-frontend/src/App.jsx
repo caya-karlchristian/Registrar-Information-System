@@ -1,4 +1,3 @@
-import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 // Pages (role shells)
@@ -31,6 +30,7 @@ import SystemSettings from './layouts/SystemSettings.jsx';
 import { ROLES } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 import ForbiddenPage from './components/ForbiddenPage';
+import SsoCallbackPage from './pages/SsoCallbackPage.jsx';
 
 const App = () => {
   return (
@@ -38,6 +38,7 @@ const App = () => {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/forbidden" element={<ForbiddenPage />} />
+        <Route path="/auth/callback" element={<SsoCallbackPage />} />
 
         {/* STUDENT (role: student) */}
         <Route
