@@ -92,6 +92,16 @@ const RequestForm = () => {
       return;
     }
 
+    if (currentStep === 2 && formData.purposeOfRequest.length === 0) {
+      setErrorMessage("Please select a purpose for your request.");
+      return;
+    }
+
+    if (showCertificationDropdown && !formData.certification) {
+      setErrorMessage("Please specify the certification type.");
+      return;
+      }
+
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
@@ -201,7 +211,7 @@ const RequestForm = () => {
       <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
       {isSubmitted ? (
         <div className="max-w-4xl mx-auto ">
-          <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col items-center justify-center text-center px-10">
+          <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col items-center justify-center text-center px-10">
             <p className="mb-6 text-4xl font-bold text-white">
               Please be patient as we process your requested document.
             </p>
@@ -220,7 +230,7 @@ const RequestForm = () => {
         <div className="max-w-5xl mx-auto -mt-2">
           <form
             ref={formRef}
-            className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-[900px] lg:h-[750px] flex flex-col relative"
+            className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative"
             onSubmit={handleSubmit}
           >
             {/* Step Indicators */}
@@ -310,8 +320,8 @@ const RequestForm = () => {
                     label="Purpose of Request"
                     value={formData.purposeOfRequest}
                     onChange={handleInputChange}
-                    options={purposeOptions}
                     required
+                    options={purposeOptions}
                   />
                 </div>
               )}
@@ -329,6 +339,7 @@ const RequestForm = () => {
                       pattern="^\d{7}$"
                       title="Format must be 7 digits"
                       required
+                      voiceEnabled
                     />
                     <InputGroup
                       name="dateOfPayment"
@@ -341,7 +352,7 @@ const RequestForm = () => {
                     />
                   </div>
                   <div className="bg-white/10 p-4 rounded-lg border -mb-1">
-                    <h3 className="text-[#FFC72C] font-bold mb-3 uppercase text-sm tracking-wide">
+                    <h3 className="text-[#d6d1c4] font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
                     <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
