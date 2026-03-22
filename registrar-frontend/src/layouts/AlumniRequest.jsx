@@ -102,6 +102,16 @@ const AlumniRequestForm = () => {
       setErrorMessage("Please select at least one TOR option to proceed.");
       return;
     }
+
+    if (currentStep === 2 && formData.purposeOfRequest.length === 0) {
+      setErrorMessage("Please select a purpose for your request.");
+      return;
+    }
+
+    if (showCertificationDropdown && !formData.certification) {
+      setErrorMessage("Please specify the certification type.");
+      return;
+    }
     
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
@@ -367,6 +377,7 @@ const AlumniRequestForm = () => {
                     pattern="^\d{7}$"
                     title="Format must be 7 digits"
                     required
+                    voiceEnabled
                   />
                   
                   <InputGroup
