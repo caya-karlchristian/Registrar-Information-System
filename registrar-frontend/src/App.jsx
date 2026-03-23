@@ -20,6 +20,7 @@ import Logbook from './layouts/Logbook.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx'; 
 import MainPage from './layouts/MainPage.jsx';
+import InboxCenter from './layouts/InboxCenter.jsx';
 
 // Super Admin layouts (frontend dev fills these in)
 import UserManagement from './layouts/UserManagement.jsx';
@@ -58,6 +59,7 @@ const App = () => {
           <Route path="faqs" element={<FAQPage />} />
           <Route path="profile" element={<ProfilePage userType="student" />} />
           <Route path="contact" element={<RegistrarContact />} />
+          <Route path="inbox" element={<InboxCenter />} />
         </Route>
 
         {/* ALUMNI (role: alumni) */}
@@ -76,6 +78,7 @@ const App = () => {
           <Route path="faqs" element={<FAQPage />} />
           <Route path="profile" element={<ProfilePage userType="alumni" />} />
           <Route path="contact" element={<RegistrarContact />} />
+          <Route path="inbox" element={<InboxCenter />} />
         </Route>
 
         {/* STAFF / ADMIN (role: admin) */}
@@ -93,6 +96,7 @@ const App = () => {
           <Route path="logbook" element={<Logbook />} />
           <Route path="profile" element={<ProfilePage userType="admin" />} />
           <Route path="contact" element={<RegistrarContact />} />
+          <Route path="inbox" element={<InboxCenter />} />
         </Route>
 
         {/* SUPER ADMIN (role: super_admin) */}
@@ -110,6 +114,7 @@ const App = () => {
           <Route path="documents" element={<DocumentManagement />} />
           <Route path="report" element={<ReportManagement/>} />
           <Route path="settings" element={<SystemSettings/>} />
+          <Route path="inbox" element={<InboxCenter />} />
         </Route>
 
       </Routes>
