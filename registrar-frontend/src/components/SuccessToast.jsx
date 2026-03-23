@@ -1,10 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const SuccessToast = ({ message, onClose }) => {
+  const [duration, setDuration] = useState(5000);
+
   useEffect(() => {
     if (message) {
-      const timer = setTimeout(onClose, 5000);
+      const displayTime = message.length > 60 ? 5000 : 3000;
+      setDuration(displayTime);
+
+      const timer = setTimeout(() => {
+        onClose();
+      }, displayTime);
+
       return () => clearTimeout(timer);
     }
   }, [message, onClose]);
@@ -12,14 +20,36 @@ const SuccessToast = ({ message, onClose }) => {
   if (!message) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-[100] flex items-center w-full max-w-sm p-4 text-white bg-green-600 rounded-lg shadow-lg animate-in fade-in slide-in-from-right-5 duration-300">
-      <div className="inline-flex items-center justify-center shrink-0 w-8 h-8 text-green-600 bg-white rounded-lg">
-        <CheckCircleIcon className="w-5 h-5" strokeWidth={2} />
+    <div className="fixed top-30 right-5 z-9999 flex items-center w-auto max-w-sm px-4 py-3 text-white bg-green-600 rounded-lg shadow-xl border border-white/20 animate-slide-in-right">
+      
+      {/* Icon */}
+      <div className="flex items-center justify-center w-9 h-9 text-green-600 bg-white rounded-md">
+        <CheckCircleIcon className="w-6 h-6" strokeWidth={2.5} />
       </div>
-      <div className="ml-3 text-sm font-semibold">{message}</div>
-      <button onClick={onClose} className="ml-auto -mx-1.5 -my-1.5 bg-green-600 text-white hover:bg-green-700 rounded-lg p-1.5 inline-flex h-8 w-8 items-center justify-center transition-colors">
-        <XMarkIcon className="w-5 h-5" strokeWidth={2} />
+
+      {/* Message */}
+      <div className="ml-3 text-sm font-semibold leading-snug">
+        {message}
+      </div>
+
+      {/* Close Button */}
+      <button 
+        onClick={onClose}
+        className="ml-3 p-1.5 rounded-md hover:bg-white/10 transition-colors"
+      >
+        <XMarkIcon className="w-5 h-5" strokeWidth={2.5} />
       </button>
+
+      {/* Progress Bar */}
+      <div className="absolute bottom-0 left-0 h-0.75 bg-white/40 rounded-b-lg overflow-hidden w-full">
+        <div
+          className="h-full bg-white"
+          style={{
+            width: '100%',
+            animation: `shrink ${duration}ms linear forwards`
+          }}
+        />
+      </div>
     </div>
   );
 };
