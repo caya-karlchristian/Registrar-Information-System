@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { MicrophoneIcon, StopIcon } from '@heroicons/react/24/outline';
-import useVoiceRecognition from '../utils/UseVoiceRecognition.js';
+import useVoiceRecognition from '../utils/useVoiceRecognition.js';
 
 const VoiceTextareaInput = ({
   id,
