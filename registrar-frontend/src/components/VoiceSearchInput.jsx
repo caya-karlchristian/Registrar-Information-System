@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { MicrophoneIcon, StopIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import useVoiceRecognition from '../utils/UseVoiceRecognition.js';
+import useVoiceRecognition from '../utils/useVoiceRecognition.js';
 
 const VoiceSearchInput = ({
   value,
@@ -45,15 +45,17 @@ const VoiceSearchInput = ({
         <MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />
       </div>
 
-      <input
-        type="text"
-        placeholder={isListening ? 'Listening...' : placeholder}
-        className={`flex-1 py-4 bg-transparent outline-none text-base placeholder-gray-400 ${
-          isListening ? 'text-[#800000]' : 'text-gray-800'
-        }`}
-        value={displayValue}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <div className="flex w-full md:w-100">
+        <input 
+          type="text"
+          placeholder={isListening ? 'Listening...' : placeholder}
+          className={`w-full py-4 bg-transparent outline-none text-base placeholder-gray-400 ${
+            isListening ? 'text-[#800000]' : 'text-gray-800'
+          }`}
+          value={displayValue}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
 
       {value && !isListening && (
         <>
