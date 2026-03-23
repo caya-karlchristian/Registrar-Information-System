@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Bars3Icon, BellIcon} from '@heroicons/react/24/outline'; //BellIcon
 import LogoImage from "../assets/puplogoimage.png";
+import NotificationModal from "./NotificationModal.jsx";
 
 function StaffHeaderNav({ onMenuClick }) { 
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+
   return (
     <div className="relative w-full font-sans">
       {/* 1. HEADER SECTION */}
@@ -45,6 +48,11 @@ function StaffHeaderNav({ onMenuClick }) {
           </div>
         </div>
       </header>
+
+      <NotificationModal
+        isOpen={isNotifOpen}
+        onClose={() => setIsNotifOpen(false)}
+      />
     </div>
   );
 }

@@ -132,6 +132,7 @@ fetchRequests();
               currentItems.map((req) => (
                 <div
                   key={req.request_id}
+                  onClick={() => setSelectedRequest(req)}
                   className="p-5 hover:bg-gray-50 transition flex flex-row justify-between items-center gap-4"
                 >
                   {/* Item Content */}
