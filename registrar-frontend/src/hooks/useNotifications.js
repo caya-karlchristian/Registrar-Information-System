@@ -1,23 +1,14 @@
-
-mport { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthProvider';
 import echo from '../services/echo';
 import api from '../services/api';
 
-// -------------------------------------------------------
-// useNotifications — manages notification state for the
-// current user. Subscribes to the correct private channel
-// based on role (personal + admin channel for staff).
-// -------------------------------------------------------
 export const useNotifications = () => {
     const { user } = useAuth();
-    const [notifications, setNotifications]   = useState([]);
-    const [unreadCount, setUnreadCount]       = useState(0);
-    const [loading, setLoading]               = useState(true);
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount]     = useState(0);
+    const [loading, setLoading]             = useState(true);
 
-    // -------------------------------------------------------
-    // Fetch existing notifications from REST API on mount
-    // -------------------------------------------------------
     const fetchNotifications = useCallback(async () => {
         try {
             const [notifRes, countRes] = await Promise.all([
@@ -33,9 +24,6 @@ export const useNotifications = () => {
         }
     }, []);
 
-    // -------------------------------------------------------
-    // Mark a single notification as read
-    // -------------------------------------------------------
     const markAsRead = useCallback(async (id) => {
         try {
             await api.post(`/notifications/${id}/read`);
@@ -48,9 +36,6 @@ export const useNotifications = () => {
         }
     }, []);
 
-    // -------------------------------------------------------
-    // Mark all notifications as read
-    // -------------------------------------------------------
     const markAllAsRead = useCallback(async () => {
         try {
             await api.post('/notifications/read-all');
@@ -63,48 +48,44 @@ export const useNotifications = () => {
         }
     }, []);
 
-    // -------------------------------------------------------
-    // Dismiss (soft delete) a notification
-    // -------------------------------------------------------
     const dismiss = useCallback(async (id) => {
         try {
             await api.delete(`/notifications/${id}`);
-            setNotifications(prev => prev.filter(n => n.id !== id));
-            setUnreadCount(prev => {
-                const waUnread = notifications.find(n => n.id === id && !n.read_at);
-                return waUnread ? Math.max(0, prev - 1) : prev;
+            setNotifications(prev => {
+                const target = prev.find(n => n.id === id);
+                if (target && !target.read_at) {
+                    setUnreadCount(c => Math.max(0, c - 1));
+                }
+                return prev.filter(n => n.id !== id);
             });
         } catch (err) {
             console.error('[useNotifications] dismiss failed:', err);
         }
-    }, [notifications]);
+    }, []);
 
-    // -------------------------------------------------------
-    // WebSocket subscriptions
-    // -------------------------------------------------------
     useEffect(() => {
         if (!user) return;
 
         fetchNotifications();
 
-        // Every user gets their own private channel
-        const personalChannel = echo
-            .private(`notifications.${user.user_id}`)
-            .listen('NotificationSent', (e) => {
-                setNotifications(prev => [e.notification, ...prev]);
+        const isStaff = ['admin', 'super_admin'].includes(user.role_name);
+
+        // Personal channel — every user
+        echo.private(`notifications.${user.user_id}`)
+            .listen('.NotificationSent', (e) => {
+                setNotifications(prev => [e, ...prev]);
                 setUnreadCount(prev => prev + 1);
             });
 
-        // Staff also listen on the shared admin channel
-        const isStaff = ['admin', 'super_admin'].includes(user.role_name);
-        const adminChannel = isStaff
-            ? echo.private('admin.notifications').listen('NotificationSent', (e) => {
-                setNotifications(prev => [e.notification, ...prev]);
-                setUnreadCount(prev => prev + 1);
-            })
-            : null;
+        // Admin channel — staff only
+        if (isStaff) {
+            echo.private('admin.notifications')
+                .listen('.NotificationSent', (e) => {
+                    setNotifications(prev => [e, ...prev]);
+                    setUnreadCount(prev => prev + 1);
+                });
+        }
 
-        // Cleanup on unmount or user change
         return () => {
             echo.leave(`notifications.${user.user_id}`);
             if (isStaff) echo.leave('admin.notifications');
