@@ -29,8 +29,6 @@ const handleSsoLogin = () => {
   window.location.href = import.meta.env.VITE_SSO_LOGIN_URL;
 };
 
-
-
   return (
     <div className="flex h-screen w-full font-sans bg-gray-50 overflow-hidden">
       <LineLoading isVisible={loading} />
