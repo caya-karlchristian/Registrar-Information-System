@@ -1,40 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import { 
   DocumentTextIcon, BellAlertIcon, CheckCircleIcon, ClockIcon, 
-  CalendarDaysIcon, ChevronDownIcon, ArrowTrendingUpIcon, 
-  ArrowTrendingDownIcon, FolderOpenIcon
+  ArrowTrendingUpIcon, ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
 import DropdownGroup from '../components/DropDown';
+import { getDocumentTypes } from '../services/api';
 
-  const DOCUMENT_TYPES= [
-    "Certificate of Good Moral Character",
-    "Certification, Authentication, Verification (CAV) / APOSTILE",
-    "Authentication/Certified True Copy - Local",
-    "Informative Copy of Grades",
-    "CAV - CHED",
-    "CAV - WES/CES",
-    "Cross-enrollment Fee",
-    "Re-admission Fee",
-    "Admission Fee for Transfer Students (From Private School)",
-    "Admission Fee for Transfer Students (From SUCs)",
-    "New Copy of Registration Card (With Affidavit of Loss)",
-    "Diploma",
-    "Accreditation Fee",
-    "Completion Fee",
-    "Transcript of Records",
-    "Correction in Student Information System",
-  ];
-
-/* =========================================
-   MAIN COMPONENT: ANALYTICS DASHBOARD
-   ========================================= */
 const AnalyticsDashboard = () => {
   const [dateRange, setDateRange] = useState('This Month');
   const [docType, setDocType] = useState('All Documents');
+  const [documentTypes, setDocumentTypes] = useState([]);
+
+  useEffect(() => {
+    const loadDocumentTypes = async () => {
+      try {
+        const res = await getDocumentTypes();
+        const names = res.data.map(doc => doc.document_name);
+        setDocumentTypes(['All Documents', ...names]);
+      } catch (err) {
+        console.error('Failed to load document types:', err);
+        setDocumentTypes(['All Documents']);
+      }
+    };
+    loadDocumentTypes();
+  }, []);
 
   // Mock Data
   const volumeData = [
@@ -62,7 +55,7 @@ const AnalyticsDashboard = () => {
               name="docType"
               value={docType}
               onChange={(e) => setDocType(e.target.value)}
-              options={DOCUMENT_TYPES}
+              options={documentTypes}
             />
           </div>
 
@@ -105,16 +98,16 @@ const AnalyticsDashboard = () => {
         <StatCard title="Total Requests" value="1,245" trend="+12.5%" status="up" icon={<DocumentTextIcon className="w-6 h-6" />} lightColor="bg-red-50" iconColor="text-maroon-700" />
         <StatCard title="Pending Review" value="1,902" trend="High Volume" status="neutral" icon={<BellAlertIcon className="w-6 h-6" />} lightColor="bg-amber-50" iconColor="text-amber-700" />
         <StatCard title="Claimed Docs" value="90" trend="-5.2%" status="down" icon={<CheckCircleIcon className="w-6 h-6" />} lightColor="bg-blue-50" iconColor="text-blue-700" />
-        <StatCard title="Avg. Processing" value="3.2d" trend="-0.5 days" status="up" icon={<ClockIcon className="w-6 h-6" />} lightColor="bg-emerald-50" iconColor="text-emerald-700" />
+        <StatCard title="Forfeited Requests" value="12345" trend="+12%" status="up" icon={<ClockIcon className="w-6 h-6" />} lightColor="bg-emerald-50" iconColor="text-emerald-700" />
       </div>
 
-      <div className="h-1.5 w-full bg-gradient-to-r from-[#FFD700] via-[#FACC15] to-[#FFD700] rounded-full opacity-40 shadow-sm" />
+      <div className="h-1.5 w-full bg-linear-to-r from-[#FFD700] via-[#FACC15] to-[#FFD700] rounded-full opacity-40 shadow-sm" />
 
       {/* 3. CHARTS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Chart 1: Request Volume */}
-        <div className="border border-slate-200 p-6 rounded-[2rem] bg-white shadow-sm">
+        <div className="border border-slate-200 p-6 rounded-4xl bg-white shadow-sm">
           <h2 className="text-xl font-black text-[#800000] uppercase mb-1 tracking-tight">Request Volume</h2>
           <p className="text-slate-500 mb-6 text-xs font-bold uppercase tracking-widest text-[10px]">Monthly Growth</p>
           <div className="h-64">
@@ -137,7 +130,7 @@ const AnalyticsDashboard = () => {
         </div>
 
         {/* Chart 2: Top Documents */}
-        <div className="border border-slate-200 p-6 rounded-[2rem] bg-white shadow-sm">
+        <div className="border border-slate-200 p-6 rounded-4xl bg-white shadow-sm">
           <h2 className="text-xl font-black text-[#800000] uppercase mb-1 tracking-tight">Top Documents</h2>
           <p className="text-slate-500 mb-6 text-xs font-bold uppercase tracking-widest text-[10px]">Most Requested</p>
           <div className="h-64">
@@ -207,7 +200,7 @@ const StatCard = ({ title, value, trend, status, icon, lightColor, iconColor }) 
   };
 
   return (
-    <div className="relative bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
+    <div className="relative bg-white p-6 rounded-4xl border border-slate-200 shadow-sm">
       <div className="relative flex justify-between items-start">
         <div className="space-y-1">
           <p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.12em]">{title}</p>
