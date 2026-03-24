@@ -1,9 +1,48 @@
 import React, { useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import { useNotifications } from '../hooks/useNotifications';
 
+// -------------------------------------------------------
+// Maps backend trigger_event → display category + color
+// -------------------------------------------------------
+const CATEGORY_MAP = {
+  // Student/Alumni
+  request_submitted:       { category: 'Submitted',   color: 'bg-blue-400' },
+  payment_verified:        { category: 'Payment',     color: 'bg-green-400' },
+  payment_invalid:         { category: 'Payment',     color: 'bg-rose-600' },
+  status_updated:          { category: 'Update',      color: 'bg-blue-400' },
+  request_processing:      { category: 'Processing',  color: 'bg-blue-400' },
+  action_needed:           { category: 'Action',      color: 'bg-rose-600' },
+  ready_to_claim:          { category: 'Ready',       color: 'bg-green-400' },
+  request_completed:       { category: 'Completed',   color: 'bg-green-400' },
+  request_forfeited:       { category: 'Forfeited',   color: 'bg-rose-600' },
+  reminder_claim:          { category: 'Reminder',    color: 'bg-pup-yellow' },
+  reminder_final_warning:  { category: 'Warning',     color: 'bg-rose-600' },
+  request_closed:          { category: 'Closed',      color: 'bg-white/40' },
+  request_auto_archived:   { category: 'Archived',    color: 'bg-white/40' },
+  // Admin
+  admin_new_request:          { category: 'Important', color: 'bg-rose-600' },
+  admin_payment_verification: { category: 'Payment',   color: 'bg-pup-yellow' },
+  admin_incomplete_request:   { category: 'Incomplete',color: 'bg-rose-600' },
+  admin_deadline_warning:     { category: 'Deadline',  color: 'bg-pup-yellow' },
+};
+
+const formatTime = (isoString) => {
+  if (!isoString) return '';
+  const diff = Math.floor((Date.now() - new Date(isoString)) / 1000);
+  if (diff < 60)   return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+};
+
+// -------------------------------------------------------
+// NotificationItem
+// -------------------------------------------------------
 const NotificationItem = ({ notif, onClick }) => {
-  const { isUnread, statusColor, category, time, title, message } = notif;
+  const meta = CATEGORY_MAP[notif.type] ?? { category: 'System', color: 'bg-blue-400' };
+  const isUnread = !notif.read_at;
 
   return (
     <div
@@ -12,11 +51,9 @@ const NotificationItem = ({ notif, onClick }) => {
     >
       {/* Status Dot */}
       <div className="mt-1.5 shrink-0">
-        <div
-          className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ring-4 ring-black/20 sm:w-3 sm:h-3 ${
-            isUnread ? statusColor : 'bg-white/10'
-          }`}
-        />
+        <div className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ring-4 ring-black/20 sm:w-3 sm:h-3 ${
+          isUnread ? meta.color : 'bg-white/10'
+        }`} />
       </div>
 
       {/* Content */}
@@ -25,22 +62,22 @@ const NotificationItem = ({ notif, onClick }) => {
           <span className={`text-[9px] font-black uppercase tracking-[0.15em] transition-colors ${
             isUnread ? 'text-pup-yellow' : 'text-white/20'
           }`}>
-            {category}
+            {meta.category}
           </span>
           <span className="text-[10px] font-bold text-white/20 ml-2 shrink-0 group-hover:text-white/40 transition-colors">
-            {time}
+            {formatTime(notif.created_at)}
           </span>
         </div>
 
         <h3 className={`text-[12px] leading-snug mb-0.5 transition-colors sm:text-[13px] ${
           isUnread ? 'text-white font-bold' : 'text-white/30 font-medium'
         }`}>
-          {title}
+          {notif.title}
         </h3>
         <p className={`text-[11px] leading-normal line-clamp-2 transition-colors sm:text-[12px] ${
           isUnread ? 'text-white/80' : 'text-white/20'
         }`}>
-          {message}
+          {notif.message}
         </p>
       </div>
 
@@ -50,46 +87,44 @@ const NotificationItem = ({ notif, onClick }) => {
   );
 };
 
-
+// -------------------------------------------------------
+// NotificationModal
+// -------------------------------------------------------
 const NotificationModal = ({ isOpen, onClose }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [notifs, setNotifs] = useState([
-    { id: 1, category: 'Important', title: 'Juan Dela Cruz', message: 'Submitted a new Transcript of Records request.', time: '2m ago', isUnread: true, statusColor: 'bg-rose-600' },
-    { id: 2, category: 'Reminder', title: 'Maria Garcia', message: 'Document "Good Moral Certificate" is now overdue.', time: '1h ago', isUnread: true, statusColor: 'bg-pup-yellow' },
-    { id: 3, category: 'System', title: 'System Update', message: 'Weekly analytics report for February is now available.', time: '5h ago', isUnread: false, statusColor: 'bg-blue-400' },
-  ]);
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const [activeTab, setActiveTab] = useState('all');
 
-  const unreadCount = useMemo(() => notifs.filter(n => n.isUnread).length, [notifs]);
+  const {
+    notifications,
+    unreadCount,
+    loading,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications();
+
   const filteredNotifs = useMemo(() => {
-    if (activeTab === 'unread') return notifs.filter(n => n.isUnread);
-    return notifs;
-  }, [activeTab, notifs]);
+    if (activeTab === 'unread') return notifications.filter(n => !n.read_at);
+    return notifications;
+  }, [activeTab, notifications]);
 
   if (!isOpen) return null;
 
-  const handleNotifClick = (id) => {
-    const clickedNotif = notifs.find((n) => n.id === id);
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, isUnread: false } : n));
+  const handleNotifClick = async (notif) => {
+    if (!notif.read_at) await markAsRead(notif.id);
 
-    if (clickedNotif) {
-      const roleRoot = location.pathname.split('/')[1];
-      const validRoleRoots = ['student', 'alumni', 'staff', 'super-admin'];
-      const targetRoleRoot = validRoleRoots.includes(roleRoot) ? roleRoot : 'student';
+    const roleRoot = location.pathname.split('/')[1];
+    const validRoleRoots = ['student', 'alumni', 'staff', 'super-admin'];
+    const targetRoleRoot = validRoleRoots.includes(roleRoot) ? roleRoot : 'student';
 
-      navigate(`/${targetRoleRoot}/inbox`, {
-        state: {
-          selectedNotificationId: clickedNotif.id,
-          notification: clickedNotif,
-        },
-      });
-      onClose();
-    }
+    navigate(`/${targetRoleRoot}/inbox`, {
+      state: { selectedNotificationId: notif.id, notification: notif },
+    });
+    onClose();
   };
 
-  const markAllAsRead = () => {
-    setNotifs(prev => prev.map(n => ({ ...n, isUnread: false })));
+  const handleMarkAllAsRead = async () => {
+    await markAllAsRead();
   };
 
   return (
@@ -105,7 +140,6 @@ const NotificationModal = ({ isOpen, onClose }) => {
         animate-in fade-in slide-in-from-top-3 duration-200
         sm:right-4 sm:w-95 sm:rounded-3xl
       ">
-
         {/* Header */}
         <div className="px-4 py-4 bg-[#510400] border-b border-white/5 sm:p-5">
           <div className="flex justify-between items-center mb-3 sm:mb-4">
@@ -117,25 +151,27 @@ const NotificationModal = ({ isOpen, onClose }) => {
                 </span>
               )}
             </h2>
-            <button onClick={markAllAsRead} title="Mark all as read" className="hover:scale-110 transition-transform">
+            <button onClick={handleMarkAllAsRead} title="Mark all as read" className="hover:scale-110 transition-transform">
               <CheckCircleIcon className="w-4 h-4 text-white hover:text-pup-yellow transition-colors sm:w-5 sm:h-5" />
             </button>
           </div>
 
           <div className="flex gap-2">
-            <TabButton label="All" active={activeTab === 'all'} onClick={() => setActiveTab('all')} />
+            <TabButton label="All"    active={activeTab === 'all'}    onClick={() => setActiveTab('all')} />
             <TabButton label="Unread" active={activeTab === 'unread'} onClick={() => setActiveTab('unread')} />
           </div>
         </div>
 
         {/* List */}
         <div className="max-h-70 overflow-y-auto custom-scrollbar sm:max-h-105">
-          {filteredNotifs.length > 0 ? (
+          {loading ? (
+            <LoadingState />
+          ) : filteredNotifs.length > 0 ? (
             filteredNotifs.map(notif => (
               <NotificationItem
                 key={notif.id}
                 notif={notif}
-                onClick={() => handleNotifClick(notif.id)}
+                onClick={() => handleNotifClick(notif)}
               />
             ))
           ) : (
@@ -144,8 +180,7 @@ const NotificationModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 bg-[#510400] border-t border-white/5 flex justify-center sm:p-4">
-        </div>
+        <div className="px-4 py-3 bg-[#510400] border-t border-white/5 flex justify-center sm:p-4" />
       </div>
     </>
   );
@@ -167,6 +202,12 @@ const TabButton = ({ label, active = false, onClick }) => (
 const EmptyState = () => (
   <div className="p-8 text-center sm:p-10">
     <p className="text-white/20 text-xs font-bold uppercase tracking-widest">No notifications</p>
+  </div>
+);
+
+const LoadingState = () => (
+  <div className="p-8 text-center sm:p-10">
+    <p className="text-white/20 text-xs font-bold uppercase tracking-widest animate-pulse">Loading...</p>
   </div>
 );
 
