@@ -20,6 +20,11 @@ const ROLE_CONFIG = {
   }
 };
 
+const capitalizeWord = (str) => {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
 const ProfilePage = ({ userType = "student" }) => {
 
   const { user } = useAuth();
@@ -36,7 +41,7 @@ const ProfilePage = ({ userType = "student" }) => {
 
   useEffect(() => {
     if (!user) return;
-console.log(user);
+
     if (user.role_id === 1 && user.student_profile) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileData({
@@ -86,7 +91,7 @@ console.log(user);
 
   return (
     <div className="min-h-screen flex items-start justify-center font-sans py-2 lg:-mt-5">
-      <div className="w-full max-w-7xl bg-pup-dark-maroon shadow-2xl overflow-hidden flex flex-col relative rounded-sm min-h-[630px]">
+      <div className="w-full max-w-7xl bg-pup-dark-maroon shadow-2xl overflow-hidden flex flex-col relative rounded-sm min-h-157.5">
         
         <div className="h-3 w-full bg-[#eebc48]"></div>
 
@@ -100,9 +105,9 @@ console.log(user);
 
               <div className="text-white space-y-1 mt-2 text-center md:text-left">
                 <h2 className="text-3xl font-bold tracking-wide flex flex-wrap gap-3 justify-center md:justify-start">
-                  <span>{profileData.firstName}</span>
-                  <span>{profileData.middleName}</span>
-                  <span>{profileData.lastName}</span>
+                  <span>{capitalizeWord(profileData.firstName)}</span>
+                  <span>{capitalizeWord(profileData.middleName)}</span>
+                  <span>{capitalizeWord(profileData.lastName)}</span>
                 </h2>
                 {/* Dynamic ID Display */}
                 <p className="text-sm font-medium opacity-90">{profileData.studentId}</p>
@@ -122,7 +127,7 @@ console.log(user);
             <div className="h-0.5 w-full bg-white"></div>
         </div>
 
-        <div className="p-8 flex-grow flex flex-col">
+        <div className="p-8 grow flex flex-col">
           <h3 className="text-3xl font-bold text-white text-center mb-8 tracking-wide uppercase">
             {config.sectionTitle}
           </h3>
