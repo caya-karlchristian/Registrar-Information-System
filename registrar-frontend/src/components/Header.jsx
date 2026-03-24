@@ -2,9 +2,11 @@ import { useState } from "react";
 import { Bars3Icon, BellIcon } from '@heroicons/react/24/outline'; 
 import NotificationModal from "../components/NotificationModal.jsx";
 import LogoImage from "../assets/puplogoimage.png";
+import { useNotifications } from "../hooks/useNotifications";
 
 function Header({ onMenuClick }) { // Receive the toggle function here
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const { unreadCount } = useNotifications();
 
   return (
     <div className="relative w-full font-sans">
@@ -33,9 +35,11 @@ function Header({ onMenuClick }) { // Receive the toggle function here
               onClick={() => setIsNotifOpen(!isNotifOpen)}
             >
               <BellIcon className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
+              {unreadCount > 0 && (
               <span className="absolute top-2 right-2 flex h-3 w-3">
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-white"></span>
               </span>
+            )}
             </button>
 
             {/* Burger Button - Visible only on mobile/tablet (hidden on lg) */}
