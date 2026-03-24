@@ -2,18 +2,6 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useAuth } from './AuthProvider';
 import echo from '../services/echo';
 
-// -------------------------------------------------------
-// NotificationToastContext
-// -------------------------------------------------------
-// Maintains a lean Echo subscription solely for real-time
-// toast popups. Intentionally separate from useNotifications
-// to avoid refactoring the existing bell/modal flow.
-//
-// Provides:
-//   toasts       — array of active toast objects
-//   dismissToast — (id) => void
-// -------------------------------------------------------
-
 const NotificationToastContext = createContext(null);
 
 const AUTO_DISMISS_MS = 5000;
@@ -22,28 +10,20 @@ const MAX_TOASTS      = 3;
 export const NotificationToastProvider = ({ children }) => {
     const { user } = useAuth();
     const [toasts, setToasts]   = useState([]);
-    const timersRef             = useRef({});  // id → timeoutId
+    const timersRef             = useRef({});
 
-    // --------------------------------------------------
-    // dismissToast — remove one toast by id
-    // Also clears its auto-dismiss timer
-    // --------------------------------------------------
     const dismissToast = useCallback((id) => {
         clearTimeout(timersRef.current[id]);
         delete timersRef.current[id];
         setToasts(prev => prev.filter(t => t.id !== id));
     }, []);
 
-    // --------------------------------------------------
-    // addToast — push a new notification onto the stack
-    // Caps at MAX_TOASTS by dropping the oldest
-    // --------------------------------------------------
     const addToast = useCallback((notification) => {
+        console.log('[Toast] addToast called:', notification); // DEBUG
         const id = notification.id ?? crypto.randomUUID();
 
         setToasts(prev => {
             const next = [{ ...notification, id }, ...prev];
-            // Drop oldest toasts beyond the cap
             const dropped = next.slice(MAX_TOASTS);
             dropped.forEach(t => {
                 clearTimeout(timersRef.current[t.id]);
@@ -52,37 +32,41 @@ export const NotificationToastProvider = ({ children }) => {
             return next.slice(0, MAX_TOASTS);
         });
 
-        // Auto-dismiss after AUTO_DISMISS_MS
         timersRef.current[id] = setTimeout(() => {
             dismissToast(id);
         }, AUTO_DISMISS_MS);
     }, [dismissToast]);
 
-    // --------------------------------------------------
-    // Echo subscription — fires only on new WS events
-    // Does NOT make API calls — purely real-time
-    // --------------------------------------------------
     useEffect(() => {
-        if (!user) return;
+        console.log('[Toast] useEffect fired, user:', user?.user_id, user?.role_name); // DEBUG
+
+        if (!user) {
+            console.log('[Toast] no user, skipping Echo subscription'); // DEBUG
+            return;
+        }
 
         const isStaff = ['admin', 'super_admin'].includes(user.role_name);
+        console.log('[Toast] subscribing to channel: notifications.' + user.user_id); // DEBUG
 
         echo.private(`notifications.${user.user_id}`)
             .listen('.NotificationSent', (e) => {
+                console.log('[Toast] NotificationSent received:', e); // DEBUG
                 addToast(e);
             });
 
         if (isStaff) {
+            console.log('[Toast] subscribing to admin.notifications'); // DEBUG
             echo.private('admin.notifications')
                 .listen('.NotificationSent', (e) => {
+                    console.log('[Toast] admin NotificationSent received:', e); // DEBUG
                     addToast(e);
                 });
         }
 
         return () => {
+            console.log('[Toast] cleanup — leaving channels'); // DEBUG
             echo.leave(`notifications.${user.user_id}`);
             if (isStaff) echo.leave('admin.notifications');
-            // Clear all pending timers on unmount
             Object.values(timersRef.current).forEach(clearTimeout);
             timersRef.current = {};
         };
