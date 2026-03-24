@@ -25,10 +25,16 @@ const LogbookRecords = () => {
           getDocumentTypes()
         ]);
         const requests = requestsRes.data || [];
+        const types = typesRes.data || [];
+        
         setData(requests);
-        setDbDocTypes(typesRes.data || []);
+        setDbDocTypes(types);
+        
+        console.log('Logbook data loaded:', { requests: requests.length, types: types.length });
       } catch (error) {
-        console.error("Error loading logbook records:", error);
+        console.error('Error loading logbook records:', error);
+        setData([]);
+        setDbDocTypes([]);
       } finally {
         setLoading(false);
       }
@@ -47,10 +53,14 @@ const LogbookRecords = () => {
 
   const filteredData = useMemo(() => {
     if (!selectedDocTypeId) return data;
+    
     const targetId = Number(selectedDocTypeId);
-    return data.filter(item =>
+    const filtered = data.filter(item =>
       item.documents?.some(d => Number(d.document_type_id) === targetId)
     );
+    
+    console.log('Filtered data:', { selectedId: targetId, total: data.length, filtered: filtered.length });
+    return filtered;
   }, [selectedDocTypeId, data]);
 
   const totalPages = Math.ceil(filteredData.length / rowsPerPage) || 1;
@@ -72,6 +82,19 @@ const LogbookRecords = () => {
     if (!p) return 'Walk-in Client';
     const middle = p.middle_name ? ` ${p.middle_name.charAt(0)}.` : '';
     return `${p.last_name}, ${p.first_name}${middle}`.trim();
+  };
+
+  const getCourse = (row) => {
+    return (
+      row.student_profile?.academic_records?.[0]?.course ||
+      row.student_profile?.course ||
+      row.academic_record?.course ||
+      '---'
+    );
+  };
+
+  const getEmail = (row) => {
+    return row.user?.email || row.student_profile?.email || '---';
   };
 
   return (
@@ -117,7 +140,7 @@ const LogbookRecords = () => {
         </div>
 
         <div className="flex-1 overflow-x-auto px-4 sm:px-6 md:px-8">
-          <table className="w-full border-collapse min-w-[800px]">
+          <table className="w-full border-collapse min-w-200">
             <thead>
               <tr className="border-b-2 border-gray-300 text-gray-400 uppercase text-center">
                 <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Requested</th>
@@ -147,12 +170,12 @@ const LogbookRecords = () => {
 
                   {/* Course - pending backend eager load of academic_record */}
                   <td className="p-3 sm:p-4 text-center">
-                    {row.student_profile?.academic_record?.course || '---'}
+                    {getCourse(row)}
                   </td>
 
                   {/* Email */}
-                  <td className="p-3 sm:p-4 text-center truncate max-w-[150px]">
-                    {row.user?.email || '---'}
+                  <td className="p-3 sm:p-4 text-center truncate max-w-37.5">
+                    {getEmail(row)}
                   </td>
 
                   {/* Date/Time Processed */}
@@ -174,7 +197,7 @@ const LogbookRecords = () => {
               ))}
 
               {!loading && Array.from({ length: Math.max(0, rowsPerPage - currentData.length) }).map((_, i) => (
-                <tr key={`empty-${i}`} className="h-[45px] sm:h-[53px] border-b border-gray-100">
+                <tr key={`empty-${i}`} className="h-11.25 sm:h-13.25 border-b border-gray-100">
                   <td colSpan="7"></td>
                 </tr>
               ))}

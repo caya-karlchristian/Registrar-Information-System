@@ -100,8 +100,7 @@ const FAQPage = () => {
 
   return (
     <div className="min-h-screen font-sans pb-20">
-      <div className="max-w-7xl mx-auto px-4 pt-10">
-
+      <div className="max-w-lg mx-auto ">
         {/* Search Bar */}
         <div className="max-w-2xl mx-auto mb-16">
           <VoiceSearchInput
