@@ -39,6 +39,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // -------------------------------------------------------
+    // BROADCASTING AUTH
+    // Authenticates private channel subscriptions.
+    // Must be under auth:sanctum so only logged-in users
+    // can subscribe to private channels.
+    // -------------------------------------------------------
+    Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
+        return \Illuminate\Support\Facades\Broadcast::auth($request);
+    });
+
+    // -------------------------------------------------------
     // NOTIFICATIONS
     // All authenticated roles can access their own notifications.
     //
