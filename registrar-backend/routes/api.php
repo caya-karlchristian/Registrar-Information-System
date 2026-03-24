@@ -15,26 +15,59 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\SsoCallbackController;
 use App\Http\Controllers\NotificationController;
 
+/*
+|--------------------------------------------------------------------------
+| PUBLIC ROUTES
+| Throttled to 10 attempts/min to prevent brute force on login
+|--------------------------------------------------------------------------
+*/
 Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
 Route::post('/auth/callback', [SsoCallbackController::class, 'handle']);
 
+/*
+|--------------------------------------------------------------------------
+| PROTECTED ROUTES — requires valid Sanctum token
+|--------------------------------------------------------------------------
+*/
 Route::middleware('auth:sanctum')->group(function () {
 
+    // -------------------------------------------------------
+    // AUTH
+    // -------------------------------------------------------
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // NOTIFICATIONS — all authenticated roles
-    // unread-count and read-all MUST come before {id} routes
-    // or Laravel will match them as an {id} parameter instead
+    // -------------------------------------------------------
+    // NOTIFICATIONS
+    // All authenticated roles can access their own notifications.
+    //
+    // GET    /notifications              → list (paginated, filterable)
+    // GET    /notifications/unread-count → badge count only
+    // POST   /notifications/read-all    → mark all as read
+    // POST   /notifications/{id}/read   → mark one as read
+    // DELETE /notifications/{id}        → dismiss (soft delete)
+    //
+    // IMPORTANT: unread-count and read-all must be defined BEFORE
+    // the {id} routes. Laravel matches routes top-to-bottom, so if
+    // {id} came first, "unread-count" and "read-all" would be
+    // captured as an {id} value instead of their own routes.
+    // -------------------------------------------------------
     Route::prefix('notifications')->group(function () {
-        Route::get('/',            [NotificationController::class, 'index']);
-        Route::get('unread-count', [NotificationController::class, 'unreadCount']);
-        Route::post('read-all',    [NotificationController::class, 'markAllAsRead']);
-        Route::post('{id}/read',   [NotificationController::class, 'markAsRead']);
-        Route::delete('{id}',      [NotificationController::class, 'destroy']);
+        Route::get('/',              [NotificationController::class, 'index']);
+        Route::get('unread-count',   [NotificationController::class, 'unreadCount']);
+        Route::post('read-all',      [NotificationController::class, 'markAllAsRead']);
+        Route::post('{id}/read',     [NotificationController::class, 'markAsRead']);
+        Route::delete('{id}',        [NotificationController::class, 'destroy']);
     });
 
+    // -------------------------------------------------------
+    // DOCUMENT REQUESTS
+    // GET    → all roles (controller + policy filters by ownership)
+    // POST   → students + alumni only
+    // PUT    → admin only (approve, update status)
+    // DELETE → admin only
+    // -------------------------------------------------------
     Route::prefix('document-requests')->group(function () {
         Route::get('/', [DocumentRequestController::class, 'index']);
         Route::get('{id}', [DocumentRequestController::class, 'show']);
@@ -46,6 +79,13 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('role:3');
     });
 
+    // -------------------------------------------------------
+    // REQUEST DOCUMENTS
+    // GET    → all roles (students see their own via policy)
+    // POST   → students + alumni (attach docs to their request)
+    // PUT    → admin only
+    // DELETE → admin only
+    // -------------------------------------------------------
     Route::prefix('request-documents')->group(function () {
         Route::get('/', [RequestDocumentController::class, 'index']);
         Route::get('{id}', [RequestDocumentController::class, 'show']);
@@ -57,6 +97,11 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('role:3');
     });
 
+    // -------------------------------------------------------
+    // REQUEST HISTORY
+    // GET          → all roles (students track their own)
+    // POST/PUT/DELETE → admin only (system audit trail)
+    // -------------------------------------------------------
     Route::prefix('request-history')->group(function () {
         Route::get('/', [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
@@ -68,6 +113,9 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('role:3');
     });
 
+    // -------------------------------------------------------
+    // READ-ONLY FOR ALL AUTHENTICATED USERS
+    // -------------------------------------------------------
     Route::get('document-types', [DocumentTypeController::class, 'index']);
     Route::get('document-types/{id}', [DocumentTypeController::class, 'show']);
     Route::get('certifications', [CertificationTypeController::class, 'index']);
@@ -75,6 +123,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('request-statuses', [RequestStatusController::class, 'index']);
     Route::get('request-statuses/{id}', [RequestStatusController::class, 'show']);
 
+    // -------------------------------------------------------
+    // ADMIN ONLY (role 3)
+    // Super Admin bypasses this automatically via RoleMiddleware
+    // -------------------------------------------------------
     Route::middleware('role:3')->group(function () {
         Route::post('document-types', [DocumentTypeController::class, 'store']);
         Route::put('document-types/{id}', [DocumentTypeController::class, 'update']);
@@ -89,8 +141,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('academic-records', StudentAcademicRecordController::class);
     });
 
+    // -------------------------------------------------------
+    // SUPER ADMIN ONLY (role 4)
+    // -------------------------------------------------------
     Route::middleware('role:4')->group(function () {
+        // User account management — create/edit/delete admins
         Route::apiResource('system-users', SystemUserController::class);
+
+        // Audit log viewer
         Route::get('audit-logs', [AuditLogController::class, 'index']);
         Route::get('audit-logs/filters', [AuditLogController::class, 'filters']);
     });
