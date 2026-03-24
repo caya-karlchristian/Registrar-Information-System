@@ -149,9 +149,8 @@ const RequestForm = () => {
       request_purpose_id: purposeId,
       or_number: formData.receiptNumber,
       receipt_date: formData.dateOfPayment,
-      document_type_ids: selectedDocIds,
+      documents: selectedDocIds.map(id => ({ document_type_id: id, number_of_copies: 1 })),
       cert_type_id: certId,
-      number_of_copies: 1,
     };
 
     const response = await axios.post("/document-requests", payload);
