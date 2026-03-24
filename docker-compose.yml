@@ -55,7 +55,6 @@
 # networks:
 #   ris_network:
 #     driver: bridge
-
 services:
 
   # -------------------------------------------------------
@@ -89,6 +88,7 @@ services:
     build:
       context: ./registrar-backend
       dockerfile: Dockerfile
+    image: ris_backend_image        # ← name the built image so Reverb can reuse it
     container_name: ris_backend
     restart: always
     environment:
@@ -102,15 +102,59 @@ services:
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       SSO_CLIENT_ID: ${SSO_CLIENT_ID}
-      SSO_CLIENT_SECRET: ${SSO_CLIENT_SECRET}  # add this
-      SSO_BASE_URL: ${SSO_BASE_URL}            # add this
+      SSO_CLIENT_SECRET: ${SSO_CLIENT_SECRET}
+      SSO_BASE_URL: ${SSO_BASE_URL}
       SSO_SUPERADMIN_EMAIL: ${SSO_SUPERADMIN_EMAIL}
       SSO_SUPERADMIN_PASSWORD: ${SSO_SUPERADMIN_PASSWORD}
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: ${REVERB_HOST:-0.0.0.0}
+      REVERB_PORT: ${REVERB_PORT:-8080}
+      REVERB_SCHEME: ${REVERB_SCHEME:-http}
+      BROADCAST_CONNECTION: reverb
     ports:
       - "8000:8000"
     volumes:
-      - ./registrar-backend:/var/www/html 
+      - ./registrar-backend:/var/www/html
     depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ris_network
+
+  # -------------------------------------------------------
+  # Laravel Reverb (WebSocket Server)
+  # -------------------------------------------------------
+  reverb:
+    image: ris_backend_image        # ← reuses the image built by backend service
+    container_name: ris_reverb
+    restart: always
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL}
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: 0.0.0.0
+      REVERB_PORT: 8080
+      REVERB_SCHEME: ${REVERB_SCHEME:-http}
+      BROADCAST_CONNECTION: reverb
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./registrar-backend:/var/www/html  # same codebase
+    depends_on:
+      backend:
+        condition: service_started
       db:
         condition: service_healthy
     networks:
@@ -125,7 +169,11 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL}
-        VITE_SSO_LOGIN_URL: ${VITE_SSO_LOGIN_URL}  # add this
+        VITE_SSO_LOGIN_URL: ${VITE_SSO_LOGIN_URL}
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}      # ← NEW: Echo needs this at build time
+        VITE_REVERB_HOST: ${VITE_REVERB_HOST}        # ← NEW: public host for browser to connect
+        VITE_REVERB_PORT: ${REVERB_PORT:-8080}       # ← NEW
+        VITE_REVERB_SCHEME: ${REVERB_SCHEME:-http}   # ← NEW
     container_name: ris_frontend
     restart: always
     ports:

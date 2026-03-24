@@ -11,8 +11,6 @@ use Illuminate\Support\Facades\Auth;
 
 class DocumentRequestController extends Controller
 {
-    // Relations to eager load on every request
-    // Defined once so index() and show() stay in sync
     private const RELATIONS = [
         'user',
         'studentProfile.academicRecords',
@@ -22,42 +20,29 @@ class DocumentRequestController extends Controller
         'documents.documentType',
     ];
 
-    // -------------------------------------------------------
-    // Maps status_id → the trigger_event slug to fire
-    // when an admin changes a request to that status.
-    //
-    // Why a map instead of a switch/if-else?
-    //   Cleaner, easier to extend — adding a new status just
-    //   means adding one line here, no logic changes needed.
-    //
-    // null = no notification fired for that status transition
-    // -------------------------------------------------------
+    // Maps status_id → trigger_event slug for notifications
+    // null = no user-facing notification for that status
     private const STATUS_NOTIFICATION_MAP = [
-        1 => 'request_processing',   // Pending      → being processed
-        2 => 'ready_to_claim',       // Ready to Claim
-        3 => 'request_completed',    // Completed
-        4 => 'request_forfeited',    // Forfeited
-        5 => null,                   // History → no user-facing notification
+        1 => 'request_processing',
+        2 => 'ready_to_claim',
+        3 => 'request_completed',
+        4 => 'request_forfeited',
+        5 => null,
     ];
 
     // -------------------------------------------------------
     // GET /document-requests
-    // Admin/Super Admin → all requests
-    // Student/Alumni → only their own
     // -------------------------------------------------------
     public function index()
     {
         /** @var SystemUser $user */
-        $user = Auth::user();
-
+        $user  = Auth::user();
         $query = DocumentRequest::with(self::RELATIONS);
 
         if (!$user instanceof SystemUser) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        // Staff (admin + super admin) see everything
-        // Students and alumni only see their own requests
         if (!$user->isStaff()) {
             $query->where('user_id', $user->user_id);
         }
@@ -80,26 +65,27 @@ class DocumentRequestController extends Controller
 
     // -------------------------------------------------------
     // POST /document-requests
-    // Students and alumni only (enforced by route middleware + policy)
+    // -------------------------------------------------------
+    // CHANGED: document_type_ids is now an array of objects:
+    //   [{ document_type_id: 1, number_of_copies: 3 }, ...]
     //
-    // NOTIFICATIONS FIRED:
-    //   → Student/Alumni: 'request_submitted'
-    //   → All admins:     'admin_new_request'
-    //
-    // Both fire AFTER the request is successfully saved so we
-    // never send a notification for a request that failed to save.
+    // Each line item carries its own copy count (1–10).
+    // This replaces the old single number_of_copies on the header.
     // -------------------------------------------------------
     public function store(Request $request)
     {
         $this->authorize('create', DocumentRequest::class);
 
         $validated = $request->validate([
-            'request_purpose_id'  => 'required|integer|exists:request_purpose,request_purpose_id',
-            'or_number'           => 'nullable|string|max:50',
-            'receipt_date'        => 'nullable|date',
-            'number_of_copies'    => 'required|integer|min:1|max:100',
-            'document_type_ids'   => 'required|array|min:1',
-            'document_type_ids.*' => 'integer|exists:document_type,document_type_id',
+            'request_purpose_id'              => 'required|integer|exists:request_purpose,request_purpose_id',
+            'or_number'                        => 'nullable|string|max:50',
+            'receipt_date'                     => 'nullable|date',
+
+            // documents is now an array of objects, not a flat array of IDs
+            'documents'                        => 'required|array|min:1',
+            'documents.*.document_type_id'     => 'required|integer|exists:document_type,document_type_id',
+            'documents.*.number_of_copies'     => 'required|integer|min:1|max:10',
+            // documents.*.  means "for every item in the documents array, validate these keys"
         ]);
 
         /** @var SystemUser $user */
@@ -117,23 +103,21 @@ class DocumentRequestController extends Controller
             'user_id'             => $user->user_id,
             'student_profile_id'  => $studentProfile->student_profile_id,
             'student_academic_id' => $academicRecord->student_academic_id,
-            'status_id'           => 1, // Pending
+            'status_id'           => 1,
             'request_purpose_id'  => $validated['request_purpose_id'],
             'or_number'           => $validated['or_number'] ?? null,
             'receipt_date'        => $validated['receipt_date'] ?? null,
-            'number_of_copies'    => $validated['number_of_copies'],
         ]);
 
-        // Attach the requested document types (many-to-many)
-        foreach ($validated['document_type_ids'] as $documentTypeId) {
+        // Each document type gets its own row with its own copy count
+        foreach ($validated['documents'] as $doc) {
             $documentRequest->documents()->create([
-                'document_type_id' => $documentTypeId,
+                'document_type_id' => $doc['document_type_id'],
+                'number_of_copies' => $doc['number_of_copies'],
             ]);
         }
 
-        // -------------------------------------------------------
-        // NOTIFY: Tell the student their request was received
-        // -------------------------------------------------------
+        // Notify student
         NotificationService::send(
             recipient:    $user,
             triggerEvent: 'request_submitted',
@@ -141,9 +125,7 @@ class DocumentRequestController extends Controller
             requestId:    $documentRequest->request_id,
         );
 
-        // -------------------------------------------------------
-        // NOTIFY: Tell all admins a new request needs attention
-        // -------------------------------------------------------
+        // Notify all admins
         NotificationService::sendToAdmins(
             triggerEvent: 'admin_new_request',
             data:         ['request_id' => $documentRequest->request_id],
@@ -158,64 +140,41 @@ class DocumentRequestController extends Controller
 
     // -------------------------------------------------------
     // PUT /document-requests/{id}
-    // Admin/Super Admin only — update status, add notes, etc.
-    //
-    // NOTIFICATIONS FIRED (only when status_id changes):
-    //   → The request owner gets a status-specific notification
-    //     based on STATUS_NOTIFICATION_MAP above.
-    //   → If or_number is being set/changed, admin gets a
-    //     payment verification notification.
-    //
-    // We only fire when status actually CHANGES — not on every
-    // update. This prevents duplicate notifications if an admin
-    // updates only the or_number without touching the status.
+    // Admin/Super Admin only
     // -------------------------------------------------------
     public function update(Request $request, DocumentRequest $documentRequest)
     {
         $this->authorize('update', $documentRequest);
 
         $validated = $request->validate([
-            'status_id'        => 'sometimes|integer|exists:request_status,status_id',
-            'or_number'        => 'sometimes|nullable|string|max:50',
-            'receipt_date'     => 'sometimes|nullable|date',
-            'number_of_copies' => 'sometimes|integer|min:1|max:100',
+            'status_id'    => 'sometimes|integer|exists:request_status,status_id',
+            'or_number'    => 'sometimes|nullable|string|max:50',
+            'receipt_date' => 'sometimes|nullable|date',
         ]);
 
-        // Capture old status BEFORE the update so we can compare
         $oldStatusId = $documentRequest->status_id;
         $oldOrNumber = $documentRequest->or_number;
 
         $documentRequest->update($validated);
 
-        // Load the request owner so we can send them a notification
-        // We use fresh() to get the updated model from DB
         /** @var SystemUser $owner */
         $owner = SystemUser::find($documentRequest->user_id);
 
-        // -------------------------------------------------------
-        // NOTIFY: Status changed → notify the request owner
-        // -------------------------------------------------------
-        $newStatusId = $documentRequest->status_id;
+        // Notify owner if status changed
+        if ($owner && isset($validated['status_id']) && $documentRequest->status_id !== $oldStatusId) {
 
-        if ($owner && isset($validated['status_id']) && $newStatusId !== $oldStatusId) {
-
-            $triggerEvent = self::STATUS_NOTIFICATION_MAP[$newStatusId] ?? null;
+            $triggerEvent = self::STATUS_NOTIFICATION_MAP[$documentRequest->status_id] ?? null;
 
             if ($triggerEvent) {
                 NotificationService::send(
                     recipient:    $owner,
                     triggerEvent: $triggerEvent,
-                    data:         [
-                        'request_id' => $documentRequest->request_id,
-                        'status'     => $documentRequest->status->status_name ?? '',
-                    ],
+                    data:         ['request_id' => $documentRequest->request_id],
                     requestId:    $documentRequest->request_id,
                 );
             }
 
-            // Also fire the general status_updated notification
-            // so the student always gets SOMETHING even if the
-            // specific status has no dedicated notification
+            // Always send the general status_updated as well
             NotificationService::send(
                 recipient:    $owner,
                 triggerEvent: 'status_updated',
@@ -224,15 +183,11 @@ class DocumentRequestController extends Controller
             );
         }
 
-        // -------------------------------------------------------
-        // NOTIFY: OR number set/changed → admin payment verification
-        // -------------------------------------------------------
-        $newOrNumber = $documentRequest->or_number;
-
+        // Notify admins if OR number was added/changed
         if (
             isset($validated['or_number']) &&
-            $newOrNumber !== $oldOrNumber &&
-            !empty($newOrNumber)
+            $documentRequest->or_number !== $oldOrNumber &&
+            !empty($documentRequest->or_number)
         ) {
             NotificationService::sendToAdmins(
                 triggerEvent: 'admin_payment_verification',
@@ -249,7 +204,6 @@ class DocumentRequestController extends Controller
 
     // -------------------------------------------------------
     // DELETE /document-requests/{id}
-    // Admin/Super Admin only
     // -------------------------------------------------------
     public function destroy(DocumentRequest $documentRequest)
     {
