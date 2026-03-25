@@ -57,29 +57,29 @@
 #     driver: bridge
 services:
 
-  # -------------------------------------------------------
-  # MySQL Database
-  # -------------------------------------------------------
-  db:
-    image: mysql:8
-    container_name: ris_db
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_DATABASE}
-      MYSQL_USER: ${DB_USERNAME}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "3306:3306"
-    volumes:
-      - ris_db_data:/var/lib/mysql
-    networks:
-      - ris_network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # # -------------------------------------------------------
+  # # MySQL Database
+  # # -------------------------------------------------------
+  # db:
+  #   image: mysql:8
+  #   container_name: ris_db
+  #   restart: always
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+  #     MYSQL_DATABASE: ${DB_DATABASE}
+  #     MYSQL_USER: ${DB_USERNAME}
+  #     MYSQL_PASSWORD: ${DB_PASSWORD}
+  #   ports:
+  #     - "3306:3306"
+  #   volumes:
+  #     - ris_db_data:/var/lib/mysql
+  #   networks:
+  #     - ris_network
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   # -------------------------------------------------------
   # Laravel Backend
@@ -156,8 +156,6 @@ services:
     depends_on:
       backend:
         condition: service_started
-      db:
-        condition: service_healthy
     networks:
       - ris_network
 
