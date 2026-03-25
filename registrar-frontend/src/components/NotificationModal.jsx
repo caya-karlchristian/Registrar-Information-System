@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
-import { useNotifications } from '../hooks/useNotifications';
+import { useNotificationsContext as useNotifications } from '../context/NotificationsContext';
 
 // -------------------------------------------------------
 // Maps backend trigger_event → display category + color

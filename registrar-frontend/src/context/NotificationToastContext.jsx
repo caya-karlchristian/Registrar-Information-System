@@ -1,16 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from './AuthProvider';
-import echo from '../services/echo';
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
 
 const NotificationToastContext = createContext(null);
-
 const AUTO_DISMISS_MS = 5000;
 const MAX_TOASTS      = 3;
 
 export const NotificationToastProvider = ({ children }) => {
-    const { user } = useAuth();
-    const [toasts, setToasts]   = useState([]);
-    const timersRef             = useRef({});
+    const [toasts, setToasts] = useState([]);
+    const timersRef           = useRef({});
 
     const dismissToast = useCallback((id) => {
         clearTimeout(timersRef.current[id]);
@@ -19,61 +15,30 @@ export const NotificationToastProvider = ({ children }) => {
     }, []);
 
     const addToast = useCallback((notification) => {
-        console.log('[Toast] addToast called:', notification); // DEBUG
-        const id = notification.id ?? crypto.randomUUID();
+    const id = notification.id ?? crypto.randomUUID();
 
-        setToasts(prev => {
-            const next = [{ ...notification, id }, ...prev];
-            const dropped = next.slice(MAX_TOASTS);
-            dropped.forEach(t => {
-                clearTimeout(timersRef.current[t.id]);
-                delete timersRef.current[t.id];
-            });
-            return next.slice(0, MAX_TOASTS);
+    // Ignore if this notification is already in the stack
+    setToasts(prev => {
+        if (prev.some(t => t.id === id)) return prev;
+
+        const next = [{ ...notification, id }, ...prev];
+        const dropped = next.slice(MAX_TOASTS);
+        dropped.forEach(t => {
+            clearTimeout(timersRef.current[t.id]);
+            delete timersRef.current[t.id];
         });
+        return next.slice(0, MAX_TOASTS);
+    });
 
-        timersRef.current[id] = setTimeout(() => {
-            dismissToast(id);
-        }, AUTO_DISMISS_MS);
-    }, [dismissToast]);
+    if (timersRef.current[id]) return; // timer already set, duplicate event
 
-    useEffect(() => {
-        console.log('[Toast] useEffect fired, user:', user?.user_id, user?.role_name); // DEBUG
-
-        if (!user) {
-            console.log('[Toast] no user, skipping Echo subscription'); // DEBUG
-            return;
-        }
-
-        const isStaff = ['admin', 'super_admin'].includes(user.role_name);
-        console.log('[Toast] subscribing to channel: notifications.' + user.user_id); // DEBUG
-
-        echo.private(`notifications.${user.user_id}`)
-            .listen('.NotificationSent', (e) => {
-                console.log('[Toast] NotificationSent received:', e); // DEBUG
-                addToast(e);
-            });
-
-        if (isStaff) {
-            console.log('[Toast] subscribing to admin.notifications'); // DEBUG
-            echo.private('admin.notifications')
-                .listen('.NotificationSent', (e) => {
-                    console.log('[Toast] admin NotificationSent received:', e); // DEBUG
-                    addToast(e);
-                });
-        }
-
-        return () => {
-            console.log('[Toast] cleanup — leaving channels'); // DEBUG
-            echo.leave(`notifications.${user.user_id}`);
-            if (isStaff) echo.leave('admin.notifications');
-            Object.values(timersRef.current).forEach(clearTimeout);
-            timersRef.current = {};
-        };
-    }, [user?.user_id]);
+    timersRef.current[id] = setTimeout(() => {
+        dismissToast(id);
+    }, AUTO_DISMISS_MS);
+}, [dismissToast]);
 
     return (
-        <NotificationToastContext.Provider value={{ toasts, dismissToast }}>
+        <NotificationToastContext.Provider value={{ toasts, addToast, dismissToast }}>
             {children}
         </NotificationToastContext.Provider>
     );

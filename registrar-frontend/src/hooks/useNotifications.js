@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthProvider';
-import echo from '../services/echo';
+import { getEcho } from '../services/echo';
 import api from '../services/api';
 
-export const useNotifications = () => {
+export const useNotifications = (onNewNotification = null) => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount]     = useState(0);
@@ -53,9 +53,7 @@ export const useNotifications = () => {
             await api.delete(`/notifications/${id}`);
             setNotifications(prev => {
                 const target = prev.find(n => n.id === id);
-                if (target && !target.read_at) {
-                    setUnreadCount(c => Math.max(0, c - 1));
-                }
+                if (target && !target.read_at) setUnreadCount(c => Math.max(0, c - 1));
                 return prev.filter(n => n.id !== id);
             });
         } catch (err) {
@@ -65,25 +63,26 @@ export const useNotifications = () => {
 
     useEffect(() => {
         if (!user) return;
-
         fetchNotifications();
 
+        const echo = getEcho();
         const isStaff = ['admin', 'super_admin'].includes(user.role_name);
 
-        // Personal channel — every user
-        echo.private(`notifications.${user.user_id}`)
-            .listen('.NotificationSent', (e) => {
-                setNotifications(prev => [e, ...prev]);
-                setUnreadCount(prev => prev + 1);
-            });
+        const handleNewNotification = (e) => {
+    setNotifications(prev => {
+        if (prev.some(n => n.id === e.id)) return prev; // duplicate, ignore
+        setUnreadCount(c => c + 1); // only increment when it's actually new
+        return [e, ...prev];
+    });
+    if (typeof onNewNotification === 'function') onNewNotification(e);
+};
 
-        // Admin channel — staff only
+        echo.private(`notifications.${user.user_id}`)
+            .listen('.NotificationSent', handleNewNotification);
+
         if (isStaff) {
             echo.private('admin.notifications')
-                .listen('.NotificationSent', (e) => {
-                    setNotifications(prev => [e, ...prev]);
-                    setUnreadCount(prev => prev + 1);
-                });
+                .listen('.NotificationSent', handleNewNotification);
         }
 
         return () => {
@@ -92,13 +91,5 @@ export const useNotifications = () => {
         };
     }, [user?.user_id]);
 
-    return {
-        notifications,
-        unreadCount,
-        loading,
-        markAsRead,
-        markAllAsRead,
-        dismiss,
-        refetch: fetchNotifications,
-    };
+    return { notifications, unreadCount, loading, markAsRead, markAllAsRead, dismiss, refetch: fetchNotifications };
 };
