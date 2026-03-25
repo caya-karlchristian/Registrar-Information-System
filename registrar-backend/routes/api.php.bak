@@ -13,7 +13,6 @@ use App\Http\Controllers\RequestHistoryController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\SsoCallbackController;
-use App\Http\Controllers\NotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,8 +20,10 @@ use App\Http\Controllers\NotificationController;
 | Throttled to 10 attempts/min to prevent brute force on login
 |--------------------------------------------------------------------------
 */
+
 Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
+
 Route::post('/auth/callback', [SsoCallbackController::class, 'handle']);
 
 /*
@@ -30,6 +31,7 @@ Route::post('/auth/callback', [SsoCallbackController::class, 'handle']);
 | PROTECTED ROUTES — requires valid Sanctum token
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('auth:sanctum')->group(function () {
 
     // -------------------------------------------------------
@@ -37,39 +39,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // -------------------------------------------------------
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
-
-    // -------------------------------------------------------
-    // BROADCASTING AUTH
-    // Authenticates private channel subscriptions.
-    // Must be under auth:sanctum so only logged-in users
-    // can subscribe to private channels.
-    // -------------------------------------------------------
-    Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
-        return \Illuminate\Support\Facades\Broadcast::auth($request);
-    });
-
-    // -------------------------------------------------------
-    // NOTIFICATIONS
-    // All authenticated roles can access their own notifications.
-    //
-    // GET    /notifications              → list (paginated, filterable)
-    // GET    /notifications/unread-count → badge count only
-    // POST   /notifications/read-all    → mark all as read
-    // POST   /notifications/{id}/read   → mark one as read
-    // DELETE /notifications/{id}        → dismiss (soft delete)
-    //
-    // IMPORTANT: unread-count and read-all must be defined BEFORE
-    // the {id} routes. Laravel matches routes top-to-bottom, so if
-    // {id} came first, "unread-count" and "read-all" would be
-    // captured as an {id} value instead of their own routes.
-    // -------------------------------------------------------
-    Route::prefix('notifications')->group(function () {
-        Route::get('/',              [NotificationController::class, 'index']);
-        Route::get('unread-count',   [NotificationController::class, 'unreadCount']);
-        Route::post('read-all',      [NotificationController::class, 'markAllAsRead']);
-        Route::post('{id}/read',     [NotificationController::class, 'markAsRead']);
-        Route::delete('{id}',        [NotificationController::class, 'destroy']);
-    });
 
     // -------------------------------------------------------
     // DOCUMENT REQUESTS
@@ -81,10 +50,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('document-requests')->group(function () {
         Route::get('/', [DocumentRequestController::class, 'index']);
         Route::get('{id}', [DocumentRequestController::class, 'show']);
+
         Route::post('/', [DocumentRequestController::class, 'store'])
             ->middleware('role:1,2');
+
         Route::put('{documentRequest}', [DocumentRequestController::class, 'update'])
             ->middleware('role:3');
+
         Route::delete('{documentRequest}', [DocumentRequestController::class, 'destroy'])
             ->middleware('role:3');
     });
@@ -99,10 +71,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('request-documents')->group(function () {
         Route::get('/', [RequestDocumentController::class, 'index']);
         Route::get('{id}', [RequestDocumentController::class, 'show']);
+
         Route::post('/', [RequestDocumentController::class, 'store'])
             ->middleware('role:1,2');
+
         Route::put('{id}', [RequestDocumentController::class, 'update'])
             ->middleware('role:3');
+
         Route::delete('{id}', [RequestDocumentController::class, 'destroy'])
             ->middleware('role:3');
     });
@@ -115,10 +90,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('request-history')->group(function () {
         Route::get('/', [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
+
         Route::post('/', [RequestHistoryController::class, 'store'])
             ->middleware('role:3');
+
         Route::put('{id}', [RequestHistoryController::class, 'update'])
             ->middleware('role:3');
+
         Route::delete('{id}', [RequestHistoryController::class, 'destroy'])
             ->middleware('role:3');
     });
@@ -128,8 +106,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // -------------------------------------------------------
     Route::get('document-types', [DocumentTypeController::class, 'index']);
     Route::get('document-types/{id}', [DocumentTypeController::class, 'show']);
+
     Route::get('certifications', [CertificationTypeController::class, 'index']);
     Route::get('certifications/{id}', [CertificationTypeController::class, 'show']);
+
     Route::get('request-statuses', [RequestStatusController::class, 'index']);
     Route::get('request-statuses/{id}', [RequestStatusController::class, 'show']);
 
@@ -138,15 +118,19 @@ Route::middleware('auth:sanctum')->group(function () {
     // Super Admin bypasses this automatically via RoleMiddleware
     // -------------------------------------------------------
     Route::middleware('role:3')->group(function () {
+
         Route::post('document-types', [DocumentTypeController::class, 'store']);
         Route::put('document-types/{id}', [DocumentTypeController::class, 'update']);
         Route::delete('document-types/{id}', [DocumentTypeController::class, 'destroy']);
+
         Route::post('certifications', [CertificationTypeController::class, 'store']);
         Route::put('certifications/{id}', [CertificationTypeController::class, 'update']);
         Route::delete('certifications/{id}', [CertificationTypeController::class, 'destroy']);
+
         Route::post('request-statuses', [RequestStatusController::class, 'store']);
         Route::put('request-statuses/{id}', [RequestStatusController::class, 'update']);
         Route::delete('request-statuses/{id}', [RequestStatusController::class, 'destroy']);
+
         Route::apiResource('students', StudentProfileController::class);
         Route::apiResource('academic-records', StudentAcademicRecordController::class);
     });
@@ -155,6 +139,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // SUPER ADMIN ONLY (role 4)
     // -------------------------------------------------------
     Route::middleware('role:4')->group(function () {
+
         // User account management — create/edit/delete admins
         Route::apiResource('system-users', SystemUserController::class);
 
@@ -162,4 +147,5 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('audit-logs', [AuditLogController::class, 'index']);
         Route::get('audit-logs/filters', [AuditLogController::class, 'filters']);
     });
+
 });

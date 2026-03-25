@@ -1,14 +1,33 @@
-import { useState } from 'react';
-import LineLoading from "../components/LineLoading.jsx";
+// import LineLoading from "../components/LineLoading.jsx";
 import risImage from "../assets/RIS1.png"; 
 import risLogo from "../assets/ris_logo.png";
 import Tech4wardProfile from "../components/Tech4wardProfile.jsx";
-import { useNavigate } from "react-router-dom";
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthProvider';
+import { useState } from 'react';
+import LineLoading from "../components/LineLoading.jsx";
 
 const MainPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
+  useEffect(() => {
+    if (!user) return;
+    const destination = {
+      student:     "/student",
+      alumni:      "/alumni",
+      admin:       "/staff",
+      super_admin: "/super-admin",
+    }[user.role_name];
+    if (destination) navigate(destination, { replace: true });
+  }, [user, navigate]);
+
+  const handleSsoLogin = () => {
+    setLoading(true);
+    window.location.href = import.meta.env.VITE_SSO_LOGIN_URL;
+  };
   return (
     <>
     <div className="relative min-h-screen w-full overflow-x-hidden bg-[#800000/90]">        
@@ -47,7 +66,7 @@ const MainPage = () => {
             </p>
 
             <button 
-                onClick={() => navigate("/signup")}
+                onClick={handleSsoLogin}
                 className="mt-6 w-30 border border-yellow-400 text-yellow-400 text-xs py-2 font-semibold rounded-lg hover:bg-yellow-400 hover:text-[#800000] transition">
                 Get Started
             </button>
