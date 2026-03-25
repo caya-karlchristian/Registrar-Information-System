@@ -84,11 +84,12 @@ services:
   # -------------------------------------------------------
   # Laravel Backend
   # -------------------------------------------------------
+  services:
   backend:
     build:
       context: ./registrar-backend
       dockerfile: Dockerfile
-    image: ris_backend_image        # ← name the built image so Reverb can reuse it
+    image: ris_backend_image
     container_name: ris_backend
     restart: always
     environment:
@@ -96,7 +97,8 @@ services:
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL}
-      DB_HOST: db
+      DB_CONNECTION: mysql
+      DB_HOST: ${DB_HOST}                            # ← was hardcoded "db", now reads .env
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE}
       DB_USERNAME: ${DB_USERNAME}
@@ -109,7 +111,6 @@ services:
       REVERB_APP_ID: ${REVERB_APP_ID}
       REVERB_APP_KEY: ${REVERB_APP_KEY}
       REVERB_APP_SECRET: ${REVERB_APP_SECRET}
-      # REVERB_HOST: ${REVERB_HOST:-0.0.0.0}
       REVERB_HOST: reverb
       REVERB_PORT: ${REVERB_PORT:-8080}
       REVERB_SCHEME: ${REVERB_SCHEME:-http}
@@ -117,6 +118,8 @@ services:
       AZURE_STORAGE_NAME: ${AZURE_STORAGE_NAME}
       AZURE_STORAGE_KEY: ${AZURE_STORAGE_KEY}
       AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER}
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS}  # ← NEW
+      SESSION_DOMAIN: ${SESSION_DOMAIN}                       # ← NEW
     ports:
       - "8000:8000"
     volumes:
@@ -128,7 +131,7 @@ services:
   # Laravel Reverb (WebSocket Server)
   # -------------------------------------------------------
   reverb:
-    image: ris_backend_image        # ← reuses the image built by backend service
+    image: ris_backend_image
     container_name: ris_reverb
     restart: always
     command: php artisan reverb:start --host=0.0.0.0 --port=8080
@@ -137,7 +140,8 @@ services:
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL}
-      DB_HOST: db
+      DB_CONNECTION: mysql
+      DB_HOST: ${DB_HOST}                            # ← fixed here too
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE}
       DB_USERNAME: ${DB_USERNAME}
@@ -152,7 +156,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./registrar-backend:/var/www/html  # same codebase
+      - ./registrar-backend:/var/www/html
     depends_on:
       backend:
         condition: service_started
@@ -169,10 +173,10 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL}
         VITE_SSO_LOGIN_URL: ${VITE_SSO_LOGIN_URL}
-        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}      # ← NEW: Echo needs this at build time
-        VITE_REVERB_HOST: ${VITE_REVERB_HOST}        # ← NEW: public host for browser to connect
-        VITE_REVERB_PORT: ${REVERB_PORT:-8080}       # ← NEW
-        VITE_REVERB_SCHEME: ${REVERB_SCHEME:-http}   # ← NEW
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}
+        VITE_REVERB_HOST: ${VITE_REVERB_HOST}
+        VITE_REVERB_PORT: ${REVERB_PORT:-8080}
+        VITE_REVERB_SCHEME: ${REVERB_SCHEME:-http}
     container_name: ris_frontend
     restart: always
     ports:
