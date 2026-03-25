@@ -159,9 +159,8 @@ const AlumniRequestForm = () => {
         request_purpose_id: purposeId,
         or_number: formData.receiptNumber,
         receipt_date: formData.dateOfPayment,
-        document_type_ids: selectedDocIds,
+        documents: formData.documentsRequested.map(name => { const dbDoc = availableDocs.find(d => d.document_name === name); const id = dbDoc?.document_type_id ?? Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name); return { document_type_id: id, number_of_copies: parseInt(formData.documentCopies[name]) || 1 }; }).filter(doc => doc.document_type_id),
         cert_type_id: certId,
-        number_of_copies: 1
       };
 
       const response = await axios.post("/document-requests", payload);
