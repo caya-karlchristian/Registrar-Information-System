@@ -120,6 +120,7 @@ services:
       AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER}
       SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS}  # ← NEW
       SESSION_DOMAIN: ${SESSION_DOMAIN}                       # ← NEW
+      MYSQL_ATTR_SSL_CA: ${MYSQL_ATTR_SSL_CA}
     ports:
       - "8000:8000"
     volumes:
