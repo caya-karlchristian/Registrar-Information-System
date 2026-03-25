@@ -84,7 +84,6 @@ services:
   # -------------------------------------------------------
   # Laravel Backend
   # -------------------------------------------------------
-  services:
   backend:
     build:
       context: ./registrar-backend
