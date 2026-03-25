@@ -147,7 +147,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
                 <li key={doc.request_document_id}>
                   {getDocName(doc)}
                   <span className="ml-2 bg-yellow-200 text-xs font-semibold px-2 py-0.5 rounded-full">
-                     {doc.quantity || 1} {doc.quantity > 1 ? 'Copies' : 'Copy'}
+                     {doc.number_of_copies || 1} {doc.number_of_copies > 1 ? 'Copies' : 'Copy'}
                   </span>
                 </li>
               ))}

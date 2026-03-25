@@ -125,7 +125,7 @@ const StaffDashboard = () => {
           DOC_TYPE_MAP[d.document_type_id] ||
           `Unknown Doc (ID: ${d.document_type_id})`;
 
-        const totalCopies = r.documents?.reduce((sum, d) => sum + (Number(d.quantity) || 1), 0) || 1;
+        const totalCopies = r.documents?.reduce((sum, d) => sum + (Number(d.number_of_copies) || 1), 0) || 1;
 
         const documentDetailsArray = (() => {
           const docs = [];
