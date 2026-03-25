@@ -121,9 +121,6 @@ services:
       - "8000:8000"
     volumes:
       - ./registrar-backend:/var/www/html
-    depends_on:
-      db:
-        condition: service_healthy
     networks:
       - ris_network
 
