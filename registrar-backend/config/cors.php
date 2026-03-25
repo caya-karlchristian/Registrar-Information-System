@@ -6,7 +6,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => ['*', 'http://registrar-information-system.southeastasia.cloudapp.azure.com'],
 
     'allowed_origins_patterns' => [],
 
