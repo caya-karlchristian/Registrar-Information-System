@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Pages (role shells)
 import StudentPage from './pages/StudentPage.jsx';
@@ -37,9 +37,13 @@ import SsoCallbackPage from './pages/SsoCallbackPage.jsx';
 import { NotificationToastProvider } from './context/NotificationToastContext.jsx';
 import NotificationToast from './components/NotificationToast.jsx';
 
+import { NotificationsProvider } from './context/NotificationsContext.jsx';
+
+
 const App = () => {
   return (
     <NotificationToastProvider>
+        <NotificationsProvider>
       <div className="flex flex-col min-h-screen">
         <Routes>
           <Route path="/" element={<MainPage />} />
@@ -120,12 +124,14 @@ const App = () => {
             <Route path="inbox" element={<InboxCenter />} />
           </Route>
 
+        <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
         {/* Global toast stack — rendered outside Routes so it persists across navigation */}
         <NotificationToast />
       </div>
-    </NotificationToastProvider>
+    </NotificationsProvider>
+      </NotificationToastProvider>
   );
 };
 

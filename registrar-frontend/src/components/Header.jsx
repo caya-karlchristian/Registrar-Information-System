@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Bars3Icon, BellIcon } from '@heroicons/react/24/outline'; 
 import NotificationModal from "../components/NotificationModal.jsx";
 import LogoImage from "../assets/puplogoimage.png";
-import { useNotifications } from "../hooks/useNotifications";
+import { useNotificationsContext as useNotifications } from "../context/NotificationsContext";
+import { useToast } from "../context/NotificationToastContext.jsx";
 
-function Header({ onMenuClick }) { // Receive the toggle function here
+function Header({ onMenuClick }) {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const { addToast } = useToast();
   const { unreadCount } = useNotifications();
 
   return (
@@ -23,11 +25,10 @@ function Header({ onMenuClick }) { // Receive the toggle function here
                 POLYTECHNIC UNIVERSITY OF THE PHILIPPINES - TAGUIG CAMPUS
               </h1>
               <p className="text-white text-[10px] uppercase lg:text-[13px] font-inter">
-                THE COUNTRY’S 1ST POLYTECHNIC
+                THE COUNTRY'S 1ST POLYTECHNIC
               </p>
             </div>
           </div>
-
           <div className="relative flex items-center space-x-2">
             {/* Notification Bell */}
             <button 
@@ -36,13 +37,12 @@ function Header({ onMenuClick }) { // Receive the toggle function here
             >
               <BellIcon className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
               {unreadCount > 0 && (
-              <span className="absolute top-2 right-2 flex h-3 w-3">
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-white"></span>
-              </span>
-            )}
+                <span className="absolute top-2 right-2 flex h-3 w-3">
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 border-2 border-white"></span>
+                </span>
+              )}
             </button>
-
-            {/* Burger Button - Visible only on mobile/tablet (hidden on lg) */}
+            {/* Burger Button */}
             <button 
               className="p-2 hover:bg-red-900 rounded-full transition-colors lg:hidden text-pup-maroon"
               onClick={onMenuClick}
@@ -52,7 +52,6 @@ function Header({ onMenuClick }) { // Receive the toggle function here
           </div>
         </div>
       </header>
-
       <NotificationModal 
         isOpen={isNotifOpen} 
         onClose={() => setIsNotifOpen(false)} 

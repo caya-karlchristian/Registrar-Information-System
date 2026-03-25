@@ -1,12 +1,31 @@
-import LineLoading from "../components/LineLoading.jsx";
+// import LineLoading from "../components/LineLoading.jsx";
 import risImage from "../assets/RIS1.png"; 
 import risLogo from "../assets/ris_logo.png";
 import Tech4wardProfile from "../components/Tech4wardProfile.jsx";
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthProvider';
+import { useState } from 'react';
+import LineLoading from "../components/LineLoading.jsx";
 
 const MainPage = () => {
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    const destination = {
+      student:     "/student",
+      alumni:      "/alumni",
+      admin:       "/staff",
+      super_admin: "/super-admin",
+    }[user.role_name];
+    if (destination) navigate(destination, { replace: true });
+  }, [user, navigate]);
 
   const handleSsoLogin = () => {
+    setLoading(true);
     window.location.href = import.meta.env.VITE_SSO_LOGIN_URL;
   };
   return (
