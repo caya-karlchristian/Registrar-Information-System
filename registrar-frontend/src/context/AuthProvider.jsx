@@ -135,7 +135,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("user");
       setUser(null);
       setToken(null);
-      navigate("/", { replace: true });
+      // navigate("/", { replace: true });
+      window.location.href = `https://identity-provider.isaxbsit2027.com/api/v1/auth/logout?client_id=58f5b2b3-a5fb-4c63-a5c1-18604c38d0d7`;
     }
   };
 
