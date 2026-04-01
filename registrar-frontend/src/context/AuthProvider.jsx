@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginRequest, fetchCurrentUser, logoutRequest, ssoCallbackRequest } from "../services/authService";
+import { fetchCurrentUser, logoutRequest, ssoCallbackRequest } from "../services/authService";
 import ErrorToast from "../components/ErrorToast";
 const AuthContext = createContext();
 
@@ -79,46 +79,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // -------------------------------------------------------
-  // Login
-  // -------------------------------------------------------
-  const login = async (email, password) => {
-    setError(null);
-
-    try {
-      // Step 1: Authenticate and get token
-      const res = await loginRequest(email, password);
-      const serverToken = res.data.token;
-
-      localStorage.setItem("token", serverToken);
-      setToken(serverToken);
-
-      // Step 2: Fetch user — single source of truth
-      const userRes  = await fetchCurrentUser();
-      const userData = userRes.data.data;
-
-      localStorage.setItem("user", JSON.stringify(userData));
-      setUser(userData);
-
-      // Step 3: Redirect based on role_name
-      const destination = ROLE_HOME[userData.role_name] ?? "/";
-      navigate(destination, { replace: true });
-
-    } catch (err) {
-      const status = err.response?.status;
-
-      if (status === 401) {
-        setError("Invalid email or password.");
-      } else if (status === 429) {
-        setError("Too many login attempts. Please wait a moment.");
-      } else {
-        setError("Login failed. Please try again.");
-      }
-
-      throw err;
-    }
-  };
-
-  // -------------------------------------------------------
   // Logout
   // -------------------------------------------------------
   const logout = async () => {
@@ -128,14 +88,14 @@ export const AuthProvider = ({ children }) => {
       // Log but don't block logout — always clear local state
       console.error("Logout request failed:", err);
     } finally {
-      setIsLoggingOut(true);
-      setHasAgreed(false);
-      localStorage.removeItem("hasAgreed");
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      setUser(null);
-      setToken(null);
-      navigate("/", { replace: true });
+        setIsLoggingOut(true);
+        setHasAgreed(false);
+        localStorage.removeItem("hasAgreed");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setUser(null);
+        setToken(null);
+        navigate("/", { replace: true });
     }
   };
 
@@ -173,7 +133,7 @@ export const AuthProvider = ({ children }) => {
     hasRole(ROLES.ADMIN) || hasRole(ROLES.SUPER_ADMIN);
 
   return (
-    <AuthContext.Provider value={{ user, loading, token, error, login, logout, ssoCallback, hasRole, isStaff, isLoggingOut, hasAgreed, setHasAgreed, agreeToTerms }}>
+    <AuthContext.Provider value={{ user, loading, token, error, logout, ssoCallback, hasRole, isStaff, isLoggingOut, hasAgreed, setHasAgreed, agreeToTerms }}>
       <ErrorToast              
         message={error}
         onClose={() => setError(null)}
