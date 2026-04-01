@@ -252,22 +252,46 @@ private function resolveRoleId(array $roles): ?int
     public function logout(Request $request)
     {
         AuditLogger::log($request, $request->user(), AuditLog::ACTION_LOGOUT);
+
+        // Revoke all Sanctum tokens for this user
         $request->user()->tokens()->delete();
 
-        // Also logout from IdP to clear their session
+        // Call IdP global logout with client_id in body (new spec)
         $idpBaseUrl = env('SSO_BASE_URL');
-        if ($idpBaseUrl) {
+        $clientId   = env('SSO_CLIENT_ID');
+
+        if ($idpBaseUrl && $clientId) {
             $ch = curl_init("{$idpBaseUrl}/api/v1/auth/logout");
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST           => true,
-                CURLOPT_HTTPHEADER     => ['Accept: application/json'],
-                CURLOPT_TIMEOUT        => 5,
+                CURLOPT_POSTFIELDS     => json_encode(['client_id' => $clientId]),
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Accept: application/json',
+                ],
+                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_CONNECTTIMEOUT => 10,
                 CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => false,
             ]);
-            curl_exec($ch);
+            $body = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            Log::info('SSO: logout', ['http_code' => $code, 'body' => $body]);
+
+            // IdP returns a redirect URL — send it to frontend so it can redirect
+            $data = json_decode($body, true);
+            $redirectUrl = $data['redirect_url'] ?? null;
+
+            if ($redirectUrl) {
+                return response()->json([
+                    'message'      => 'Logged out',
+                    'redirect_url' => $redirectUrl,
+                ]);
+            }
         }
 
         return response()->json(['message' => 'Logged out']);
