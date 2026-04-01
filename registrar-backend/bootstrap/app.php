@@ -13,10 +13,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
-        ]);
-        // redirectGuestsTo removed — handled per route
+    $middleware->alias([
+        'role' => \App\Http\Middleware\RoleMiddleware::class,
+    ]);
+
+    // Tell auth middleware to return 401 JSON for API routes
+    $middleware->redirectGuestsTo(function ($request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return null; // return null = throw 401, don't redirect
+            }
+            return '/';
+        });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(function ($request, $e) {
