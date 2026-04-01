@@ -31,6 +31,7 @@ const SsoCallbackPage = () => {
       .then(({ data }) => {
         console.log('[SSO] success:', data);
         localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.data));
         const destination = ROLE_ROUTES[data.data?.role_name] ?? '/';
         navigate(destination, { replace: true });
         window.location.reload();
