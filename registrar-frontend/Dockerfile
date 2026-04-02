@@ -33,7 +33,9 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # React Router fix — all routes go to index.html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY certs /etc/nginx/certs
 
 EXPOSE 80
+EXPOSE 443
 
 CMD ["nginx", "-g", "daemon off;"]
