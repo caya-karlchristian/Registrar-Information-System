@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthProvider';
 import { useState } from 'react';
 import LineLoading from "../components/LineLoading.jsx";
+import tech4ward from "../assets/Tech4ward_Logo.png";
 
 const MainPage = () => {
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,35 @@ const MainPage = () => {
     <div className="relative min-h-screen w-full overflow-x-hidden bg-[#800000/90]">             
         <Tech4wardProfile bgImage={risImage}/>
     </div>
+    <div className="relative z-10 max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-8">
+      <div className="hidden md:block w-1 h-24 bg-yellow-400 rounded-full shrink-0" />
+          <div className="shrink-0">
+          <img 
+            src={tech4ward} 
+            alt="Tech4ward Logo" 
+            className="w-40 md:w-56 h-auto object-contain drop-shadow-xl" 
+          />
+        </div>
+        <div className="w-full text-center md:text-right">            
+          <h2 className="text-3xl md:text-5xl font-black text-[#800000] uppercase leading-tight mb-4">
+            Together, We <br /> Think Forward
+          </h2>
+          <p className="max-w-2xl ml-auto text-[#800000] text-sm leading-relaxed">
+            Tech4ward is a dynamic team of four BSIT students from PUP–Taguig,
+            united by a shared passion for technology and innovation. Together,
+            we aim to create practical, forward-thinking solutions that address
+            real-world problems and showcase our growing expertise in the field
+            of information technology.
+          </p>
+        </div>
+      </div>
+    <footer className="relative w-full bg-[#800000] border-t-4 border-yellow-400 py-3 px-6">
+        <div className="max-w-6xl mx-auto flex flex-col items-center gap-3">
+          <p className="text-white text-[10px] font-bold uppercase tracking-[0.2em] text-center">
+            © 1998–{new Date().getFullYear()} Polytechnic University of the Philippines
+          </p>
+        </div>
+      </footer>
     </>
   );
 };
