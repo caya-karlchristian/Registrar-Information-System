@@ -38,6 +38,7 @@ import { NotificationToastProvider } from './context/NotificationToastContext.js
 import NotificationToast from './components/NotificationToast.jsx';
 
 import { NotificationsProvider } from './context/NotificationsContext.jsx';
+import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
 
 
 const App = () => {
@@ -119,6 +120,7 @@ const App = () => {
             <Route path="contact" element={<RegistrarContact />} /> 
             <Route path="user" element={<UserManagement />} />
             <Route path="documents" element={<DocumentManagement />} />
+            <Route path="certificates" element={<CertificateTemplateManagement />} />
             <Route path="report" element={<ReportManagement/>} />
             <Route path="settings" element={<SystemSettings/>} />
             <Route path="inbox" element={<InboxCenter />} />
