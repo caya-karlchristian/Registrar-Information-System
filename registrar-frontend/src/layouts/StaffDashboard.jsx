@@ -106,7 +106,7 @@ const StaffDashboard = () => {
           });
         }
 
-        const finalCertName = r.certification_type?.cert_name || null;
+        const finalCertName = r.certification_type?.certificate_name || null;
 
         const isCertificate = Boolean(
           r.certification_type ||
@@ -129,7 +129,7 @@ const StaffDashboard = () => {
 
         const documentDetailsArray = (() => {
           const docs = [];
-          if (r.certification_type) docs.push(`Certification: ${r.certification_type.cert_name}`);
+          if (r.certification_type) docs.push(`Certification: ${r.certification_type.certificate_name}`);
           if (r.documents?.length > 0) {
             r.documents.forEach(d => docs.push(getDocName(d)));
           }

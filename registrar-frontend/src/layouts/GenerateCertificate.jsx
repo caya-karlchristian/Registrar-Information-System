@@ -2,10 +2,17 @@ import React, { useState, useEffect} from "react";
 import InputGroup from "../components/InputGroup.jsx";
 import { PrinterIcon } from "@heroicons/react/24/solid";
 import SuccessToast from "../components/SuccessToast.jsx";
-import { getAcademicRecords } from "../services/api";
+import { getAcademicRecords, getCertifications, getCertificationLayouts } from "../services/api";
 import { CertHeader, CertFooter} from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import DropDown from "../components/DropDown.jsx";
+import { DEFAULT_CERTIFICATE_LAYOUT, normalizeCertificateLayout } from "../utils/certificateTemplateSettings.js";
+
+const toCertificateRows = (raw) => {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.data)) return raw.data;
+  return [];
+};
 
 
 const courses = [
@@ -28,7 +35,7 @@ const eduLevels   = ["Undergraduate", "Graduate"];
 const yearNum     = ["2", "3", "4", "5"];
 
 const DEFAULT_FORM = {
-  docType: "Certification of Graduation",
+  docType: "Certificate of Graduation",
   fullName: "", 
   studentNum: "", 
   course: "", 
@@ -93,7 +100,47 @@ const FIELD_CONFIG = [
 const GenerateCertification = ({ initialData, onClose }) => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [certifications, setCertifications] = useState([]);
+  const [layoutsByCertId, setLayoutsByCertId] = useState({});
+  const [docTypeOptions, setDocTypeOptions] = useState(Object.keys(CERT_CONFIG));
   const [formData, setFormData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
+
+  useEffect(() => {
+    const fetchLayoutData = async () => {
+      try {
+        const [certRes, layoutRes] = await Promise.all([getCertifications(), getCertificationLayouts()]);
+        const certs = toCertificateRows(certRes?.data);
+        const layouts = layoutRes?.data ?? [];
+
+        const nextLayouts = {};
+        layouts.forEach((layoutRow) => {
+          nextLayouts[layoutRow.certificate_type_id] = normalizeCertificateLayout(layoutRow);
+        });
+
+        const fetchedNames = certs
+          .map((item) => item?.certificate_name)
+          .filter((name) => typeof name === "string" && name.trim().length > 0);
+        const fetchedDocTypes = Array.from(new Set([...fetchedNames, ...Object.keys(CERT_CONFIG)])).sort((a, b) => a.localeCompare(b));
+
+        setCertifications(
+          [...certs].sort((a, b) => String(a?.certificate_name ?? "").localeCompare(String(b?.certificate_name ?? "")))
+        );
+        setLayoutsByCertId(nextLayouts);
+        setDocTypeOptions(fetchedDocTypes);
+        setFormData((prev) => {
+          if (fetchedDocTypes.includes(prev.docType)) return prev;
+          return {
+            ...prev,
+            docType: fetchedDocTypes[0] ?? prev.docType,
+          };
+        });
+      } catch (err) {
+        console.error("Error fetching certification layouts:", err);
+      }
+    };
+
+    fetchLayoutData();
+  }, []);
 
   useEffect(() => {
     if (formData.course && formData.studentNum) return;
@@ -134,6 +181,10 @@ const GenerateCertification = ({ initialData, onClose }) => {
 
   const certConfig = CERT_CONFIG[formData.docType];
   const shouldShow = (fieldName) => certConfig?.fields.includes(fieldName);
+  const activeCertification = certifications.find((item) => item.certificate_name === formData.docType);
+  const activeLayout = activeCertification
+    ? layoutsByCertId[activeCertification.certificate_type_id] ?? DEFAULT_CERTIFICATE_LAYOUT
+    : DEFAULT_CERTIFICATE_LAYOUT;
 
   return (
     <div className="max-w-7xl mx-auto p-4 mt-10 md:p-6 flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
@@ -146,7 +197,7 @@ const GenerateCertification = ({ initialData, onClose }) => {
             name="docType"
             value={formData.docType}
             onChange={handleChange}
-            options={Object.keys(CERT_CONFIG)}
+            options={docTypeOptions}
             labelColor="text-gray-600"
           />
         </div>
@@ -172,7 +223,7 @@ const GenerateCertification = ({ initialData, onClose }) => {
       <div className="flex flex-col lg:flex-row gap-8 items-start flex-1 min-h-0">
 
         {/* Left Sidebar */}
-        <div className="w-full lg:w-[350px] border-1 border-gray-200 rounded-lg p-3 shrink-0 h-full overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200">
+        <div className="w-full lg:w-87.5 border border-gray-200 rounded-lg p-3 shrink-0 h-full overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200">
           <div className="bg-gray-100 p-6 rounded-2xl border border-gray-200 shadow-sm">
             <h3 className="font-bold text-lg text-gray-800 mb-6 uppercase tracking-tighter">Edit Information</h3>
             <form className={`space-y-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
@@ -222,20 +273,20 @@ const GenerateCertification = ({ initialData, onClose }) => {
         </div>
 
         {/* Certificate Preview */}
-        <div className="flex-1 bg-gray-100 rounded-2xl border border-gray-200 flex flex-col overflow-hidden h-full min-h-[500px] lg:min-h-0">
+        <div className="flex-1 bg-gray-100 rounded-2xl border border-gray-200 flex flex-col overflow-hidden h-full min-h-125 lg:min-h-0">
           <div className="p-4 bg-white border-b border-gray-200 shrink-0">
-            <div className="flex items-center justify-between max-w-[750px] mx-auto w-full">
+            <div className="flex items-center justify-between max-w-187.5 mx-auto w-full">
               <h2 className="text-lg font-bold text-gray-800 uppercase tracking-tight">Certificate Preview</h2>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 sm:p-8 scrollbar-thin scrollbar-thumb-gray-300 print:p-0 print:overflow-visible">
             <div
               id="print-area"
-              className="bg-white shadow-2xl mx-auto w-full max-w-[750px] flex flex-col p-8 sm:p-10 ring-1 ring-black/5 text-gray-800 print:shadow-none print:ring-0 print:p-0"
+              className="bg-white shadow-2xl mx-auto w-full max-w-187.5 flex flex-col p-8 sm:p-10 ring-1 ring-black/5 text-gray-800 print:shadow-none print:ring-0 print:p-0"
             >
-              {!certConfig?.hideHeaderFooter && <CertHeader />}
+              {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
               <div className="flex-1">{certConfig?.renderBody(formData)}</div>
-              {!certConfig?.hideHeaderFooter && <CertFooter />}
+              {!certConfig?.hideHeaderFooter && <CertFooter layout={activeLayout} />}
             </div>
           </div>
         </div>

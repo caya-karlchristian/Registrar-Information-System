@@ -88,6 +88,12 @@ export const getCertification = (id) => api.get(`/certifications/${id}`);
 export const createCertification = (data) => api.post("/certifications", data);
 export const updateCertification = (id, data) => api.put(`/certifications/${id}`, data);
 export const deleteCertification = (id) => api.delete(`/certifications/${id}`);
+export const getCertificationLayouts = () => api.get("/certifications/layouts");
+export const updateCertificationLayout = (id, data) => api.put(`/certifications/${id}/layout`, data);
+export const uploadCertificationLayoutLogo = (id, formData) =>
+  api.post(`/certifications/${id}/layout/logo`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
 
 // -------------------------------------------------------
 // DOCUMENT REQUESTS (read: all | write: Student/Alumni | manage: Admin+)

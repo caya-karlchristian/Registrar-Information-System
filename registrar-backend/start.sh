@@ -1,5 +1,12 @@
 #!/bin/bash
 
+set -e
+
+# Ensure the public storage symlink exists for assets served from /storage
+if [ ! -L public/storage ] && [ ! -e public/storage ]; then
+	php artisan storage:link || true
+fi
+
 # Run migrations
 php artisan migrate --force
 
