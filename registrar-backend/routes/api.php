@@ -129,6 +129,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('document-types', [DocumentTypeController::class, 'index']);
     Route::get('document-types/{id}', [DocumentTypeController::class, 'show']);
     Route::get('certifications', [CertificationTypeController::class, 'index']);
+    Route::get('certifications/layouts', [CertificationTypeController::class, 'layouts']);
     Route::get('certifications/{id}', [CertificationTypeController::class, 'show']);
     Route::get('request-statuses', [RequestStatusController::class, 'index']);
     Route::get('request-statuses/{id}', [RequestStatusController::class, 'show']);
@@ -144,6 +145,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('certifications', [CertificationTypeController::class, 'store']);
         Route::put('certifications/{id}', [CertificationTypeController::class, 'update']);
         Route::delete('certifications/{id}', [CertificationTypeController::class, 'destroy']);
+        Route::put('certifications/{id}/layout', [CertificationTypeController::class, 'updateLayout']);
+        Route::post('certifications/{id}/layout/logo', [CertificationTypeController::class, 'uploadLayoutLogo']);
         Route::post('request-statuses', [RequestStatusController::class, 'store']);
         Route::put('request-statuses/{id}', [RequestStatusController::class, 'update']);
         Route::delete('request-statuses/{id}', [RequestStatusController::class, 'destroy']);
