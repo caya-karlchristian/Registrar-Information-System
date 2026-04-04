@@ -15,7 +15,7 @@ const InputGroup = ({
   required = false,
   min,
   labelColor = "text-white",
-  voiceEnabled = false,
+  voiceEnabled = true,
   language = "en-US",
 }) => {
   const { isListening, transcript, interimTranscript, isSupported, toggle, reset } = useVoiceRecognition({
@@ -33,7 +33,7 @@ const InputGroup = ({
       : transcript;
 
     onChange({ target: { name, value: cleaned } });
-  }, [transcript]);
+  }, [voiceEnabled, transcript, type, pattern, onChange, name]);
 
   const displayValue = voiceEnabled && isListening && interimTranscript
     ? `${value} ${interimTranscript}`.trim()
@@ -46,7 +46,7 @@ const InputGroup = ({
 
   return (
     <div className="w-full">
-      <label className={`block text-sm ${labelColor} mb-1.5`}>
+      <label className={`block text-sm font-medium ${labelColor} mb-1.5`}>
         {label}
         {required && <span className="text-red-400 ml-1">*</span>}
       </label>
@@ -62,8 +62,8 @@ const InputGroup = ({
           pattern={pattern}
           title={title}
           min={min}
-          className={`w-full px-3 py-3 bg-white rounded-lg text-sm text-gray-700 shadow-sm
-                     placeholder:text-gray-400
+          className={`w-full px-3 py-3 bg-white rounded-lg text-sm font-medium text-gray-700 shadow-sm
+                     placeholder:font-normal placeholder:text-gray-400
                      focus:outline-none focus:ring-2 focus:ring-[#FFC72C]
                      transition-all duration-200
                      ${voiceEnabled ? "pr-10" : ""}`}
