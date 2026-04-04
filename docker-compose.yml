@@ -93,8 +93,9 @@ services:
         VITE_SSO_LOGIN_URL: ${VITE_SSO_LOGIN_URL}
         VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}
         VITE_REVERB_HOST: ${VITE_REVERB_HOST}
-        VITE_REVERB_PORT: ${REVERB_PORT:-8080}
-        VITE_REVERB_SCHEME: ${REVERB_SCHEME:-http}
+        VITE_REVERB_PORT: ${VITE_REVERB_PORT:-443}
+        VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-https}
+        VITE_SSO_CLIENT_ID: ${SSO_CLIENT_ID}
     container_name: ris_frontend
     restart: always
     ports:

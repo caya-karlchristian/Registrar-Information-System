@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { getDocumentRequests } from "../services/api"; 
 import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
@@ -6,6 +6,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../context/AuthProvider';
 import { DOC_TYPE_MAP, PURPOSE_MAP, STATUS_CONFIG, TAB_MAP, TABS } from '../utils/constants';
+import { useNotificationsContext } from '../context/NotificationsContext';
 
 const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
@@ -17,6 +18,7 @@ const StudentDashboard = () => {
   const { user } = useAuth();
 
   const navigate = useNavigate();
+  const { notifications } = useNotificationsContext();
 
   useEffect(() => {
     if (!user) {
@@ -24,10 +26,7 @@ const StudentDashboard = () => {
     }
   }, [user, navigate]);
 
-  useEffect(() => {
-    if (!user) return;
-
-const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
   try {
     setLoading(true);
     const res = await getDocumentRequests();
@@ -70,10 +69,18 @@ const fetchRequests = async () => {
   } finally {
     setLoading(false);
   }
-};
+  }, [user]);
 
-fetchRequests();
-}, [user]);
+  useEffect(() => {
+    if (!user) return;
+    fetchRequests();
+  }, [user]);
+
+  // Refetch whenever a new notification arrives (e.g. status update)
+  useEffect(() => {
+    if (!user || notifications.length === 0) return;
+    fetchRequests();
+  }, [notifications.length]);
 
   useEffect(() => { 
     setCurrentPage(1);

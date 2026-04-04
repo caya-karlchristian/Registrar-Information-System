@@ -7,7 +7,6 @@ import { useToast } from "../context/NotificationToastContext.jsx";
 
 function StaffHeaderNav({ onMenuClick }) { 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const { addToast } = useToast();
   const { unreadCount } = useNotifications();
 
   return (
