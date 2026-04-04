@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { getDocumentRequests } from "../services/api"; 
 import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
@@ -69,8 +69,6 @@ const StudentDashboard = () => {
   } finally {
     setLoading(false);
   }
-};
-
   }, [user]);
 
   useEffect(() => {
