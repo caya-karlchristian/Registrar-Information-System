@@ -254,20 +254,23 @@ private function resolveRoleId(array $roles): ?int
         AuditLogger::log($request, $request->user(), AuditLog::ACTION_LOGOUT);
         $request->user()->tokens()->delete();
 
-        // Also logout from IdP to clear their session
         $idpBaseUrl = env('SSO_BASE_URL');
-        if ($idpBaseUrl) {
+        $clientId   = env('SSO_CLIENT_ID');
+
+        if ($idpBaseUrl && $clientId) {
             $ch = curl_init("{$idpBaseUrl}/api/v1/auth/logout");
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST           => true,
-                CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+                CURLOPT_POSTFIELDS     => json_encode(['client_id' => $clientId]), // ← THIS was missing
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
                 CURLOPT_TIMEOUT        => 5,
                 CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => false,
             ]);
             curl_exec($ch);
+            curl_close($ch);
         }
 
         return response()->json(['message' => 'Logged out']);
