@@ -8,13 +8,35 @@ import {
   ArrowTrendingUpIcon, ArrowTrendingDownIcon
 } from '@heroicons/react/24/outline';
 import DropdownGroup from '../components/DropDown';
-import { getDocumentTypes } from '../services/api';
+import {
+  getDocumentTypes,
+  getAnalyticsOverview,
+  getAnalyticsVolumeTrend,
+  getAnalyticsByDocType,
+  getAnalyticsByStatus,
+} from '../services/api';
+
+const RANGE_MAP = {
+  'Today':      'today',
+  'This Week':  'week',
+  'This Month': 'month',
+};
+
+const DOC_COLORS = ['#800000', '#A52A2A', '#D2691E', '#E9967A', '#C04000', '#B03000'];
+
+const PIE_COLORS = ['#800000', '#FFC72C', '#A52A2A', '#E9967A', '#D2691E'];
 
 const AnalyticsDashboard = () => {
   const [dateRange, setDateRange] = useState('This Month');
   const [docType, setDocType] = useState('All Documents');
   const [documentTypes, setDocumentTypes] = useState([]);
 
+  const [overview, setOverview]       = useState(null);
+  const [volumeData, setVolumeData]   = useState([]);
+  const [docTypeData, setDocTypeData] = useState([]);
+  const [statusData, setStatusData]   = useState([]);
+
+  // Load document type dropdown once
   useEffect(() => {
     const loadDocumentTypes = async () => {
       try {
@@ -29,19 +51,31 @@ const AnalyticsDashboard = () => {
     loadDocumentTypes();
   }, []);
 
-  // Mock Data
-  const volumeData = [
-    { name: 'Jan', value: 50 }, { name: 'Feb', value: 60 }, { name: 'Mar', value: 75 },
-    { name: 'Apr', value: 80 }, { name: 'May', value: 100 }, { name: 'Jun', value: 120 },
-    { name: 'Jul', value: 150 }, { name: 'Aug', value: 130 },
-  ];
+  // Reload all charts when date filter changes
+  useEffect(() => {
+    const params = { range: RANGE_MAP[dateRange] ?? 'month' };
 
-  const documentData = [
-    { name: 'TOR', count: 25, color: '#800000' },
-    { name: 'COG', count: 15, color: '#A52A2A' },
-    { name: 'Diploma', count: 20, color: '#D2691E' },
-    { name: 'Good Moral', count: 20, color: '#E9967A' },
-  ];
+    Promise.all([
+      getAnalyticsOverview(params),
+      getAnalyticsVolumeTrend(params),
+      getAnalyticsByDocType(params),
+      getAnalyticsByStatus(params),
+    ])
+      .then(([ovRes, volRes, docRes, statRes]) => {
+        setOverview(ovRes.data);
+        setVolumeData(volRes.data);
+        setDocTypeData(docRes.data);
+        setStatusData(statRes.data);
+      })
+      .catch(err => console.error('Analytics fetch error:', err));
+  }, [dateRange]);
+
+  // Pie chart helpers
+  const pieTotal     = statusData.reduce((s, r) => s + r.total, 0);
+  const completedRow = statusData.find(r => r.status_name?.toLowerCase().includes('complet'));
+  const successPct   = pieTotal > 0 && completedRow
+    ? Math.round((completedRow.total / pieTotal) * 100)
+    : 0;
 
   return (
     <div className="space-y-6 px-4 py-2 min-h-screen font-sans">
@@ -95,10 +129,38 @@ const AnalyticsDashboard = () => {
 
       {/* 2. STAT CARDS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Requests" value="1,245" trend="+12.5%" status="up" icon={<DocumentTextIcon className="w-6 h-6" />} lightColor="bg-red-50" iconColor="text-maroon-700" />
-        <StatCard title="Pending Review" value="1,902" trend="High Volume" status="neutral" icon={<BellAlertIcon className="w-6 h-6" />} lightColor="bg-amber-50" iconColor="text-amber-700" />
-        <StatCard title="Claimed Docs" value="90" trend="-5.2%" status="down" icon={<CheckCircleIcon className="w-6 h-6" />} lightColor="bg-blue-50" iconColor="text-blue-700" />
-        <StatCard title="Forfeited Requests" value="12345" trend="+12%" status="up" icon={<ClockIcon className="w-6 h-6" />} lightColor="bg-emerald-50" iconColor="text-emerald-700" />
+        <StatCard
+          title="Total Requests"
+          value={overview ? overview.total.toLocaleString() : '—'}
+          trend={overview?.volume_change_pct != null ? `${overview.volume_change_pct > 0 ? '+' : ''}${overview.volume_change_pct}%` : '—'}
+          status={overview?.volume_change_pct > 0 ? 'up' : overview?.volume_change_pct < 0 ? 'down' : 'neutral'}
+          icon={<DocumentTextIcon className="w-6 h-6" />}
+          lightColor="bg-red-50" iconColor="text-maroon-700"
+        />
+        <StatCard
+          title="Pending Review"
+          value={overview ? overview.pending.toLocaleString() : '—'}
+          trend="High Volume"
+          status="neutral"
+          icon={<BellAlertIcon className="w-6 h-6" />}
+          lightColor="bg-amber-50" iconColor="text-amber-700"
+        />
+        <StatCard
+          title="Claimed Docs"
+          value={overview ? overview.completed.toLocaleString() : '—'}
+          trend={overview?.completion_rate != null ? `${overview.completion_rate}% rate` : '—'}
+          status="down"
+          icon={<CheckCircleIcon className="w-6 h-6" />}
+          lightColor="bg-blue-50" iconColor="text-blue-700"
+        />
+        <StatCard
+          title="Forfeited Requests"
+          value={overview ? overview.forfeited.toLocaleString() : '—'}
+          trend={overview?.forfeit_rate != null ? `+${overview.forfeit_rate}%` : '—'}
+          status="up"
+          icon={<ClockIcon className="w-6 h-6" />}
+          lightColor="bg-emerald-50" iconColor="text-emerald-700"
+        />
       </div>
 
       <div className="h-1.5 w-full bg-linear-to-r from-[#FFD700] via-[#FACC15] to-[#FFD700] rounded-full opacity-40 shadow-sm" />
@@ -120,10 +182,10 @@ const AnalyticsDashboard = () => {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 600}} axisLine={false} tickLine={false} />
+                <XAxis dataKey="label" tick={{fontSize: 12, fontWeight: 600}} axisLine={false} tickLine={false} />
                 <YAxis tick={{fontSize: 12}} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{borderRadius: '16px', border: 'none'}} />
-                <Area type="monotone" dataKey="value" stroke="#800000" strokeWidth={3} fillOpacity={1} fill="url(#colorMaroon)" />
+                <Area type="monotone" dataKey="total" stroke="#800000" strokeWidth={3} fillOpacity={1} fill="url(#colorMaroon)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -135,14 +197,14 @@ const AnalyticsDashboard = () => {
           <p className="text-slate-500 mb-6 text-xs font-bold uppercase tracking-widest text-[10px]">Most Requested</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={documentData} barSize={40}>
+              <BarChart data={docTypeData.slice(0, 6)} barSize={40}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 700}} /> 
+                <XAxis dataKey="document_name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 700}} />
                 <YAxis tick={{fontSize: 12}} axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: 'transparent'}} />
-                <Bar dataKey="count" radius={[10, 10, 0, 0]}>
-                  {documentData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                <Bar dataKey="total_requests" radius={[10, 10, 0, 0]}>
+                  {docTypeData.slice(0, 6).map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={DOC_COLORS[index % DOC_COLORS.length]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -158,33 +220,33 @@ const AnalyticsDashboard = () => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={[{name: 'Accepted', value: 88}, {name: 'Rejected', value: 12}]}
+                  data={statusData}
+                  dataKey="total"
+                  nameKey="status_name"
                   innerRadius={70}
                   outerRadius={90}
                   paddingAngle={8}
-                  dataKey="value"
                   stroke="none"
                 >
-                  <Cell fill="#800000" cornerRadius={10} />
-                  <Cell fill="#FFC72C" cornerRadius={10} />
+                  {statusData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} cornerRadius={10} />
+                  ))}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-3xl font-black text-slate-800">88%</span>
+              <span className="text-3xl font-black text-slate-800">{successPct}%</span>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Success</span>
             </div>
           </div>
           <div className="mt-4 flex justify-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#800000]"></div>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Accepted</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#FFC72C]"></div>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Rejected</span>
-            </div>
+            {statusData.map((row, index) => (
+              <div key={row.status_id} className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{row.status_name}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
