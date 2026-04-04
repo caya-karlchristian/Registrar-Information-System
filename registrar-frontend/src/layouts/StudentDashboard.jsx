@@ -6,6 +6,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../context/AuthProvider';
 import { DOC_TYPE_MAP, PURPOSE_MAP, STATUS_CONFIG, TAB_MAP, TABS } from '../utils/constants';
+import { useNotificationsContext } from '../context/NotificationsContext';
 
 const StudentDashboard = () => {
   const [activeTab, setActiveTab] = useState("pending");
@@ -17,6 +18,13 @@ const StudentDashboard = () => {
   const { user } = useAuth();
 
   const navigate = useNavigate();
+  const { notifications } = useNotificationsContext();
+
+  // Refetch whenever a new notification arrives (e.g. status update)
+  useEffect(() => {
+    if (!user || notifications.length === 0) return;
+    fetchRequests();
+  }, [notifications.length]);
 
   useEffect(() => {
     if (!user) {
