@@ -83,57 +83,26 @@ export const AuthProvider = ({ children }) => {
   // Logout
   // -------------------------------------------------------
   const logout = async () => {
-    try {
-      await logoutRequest(); // backend handles token revocation + calls IDP server-side
-    } catch (err) {
-      console.error("Logout request failed:", err);
-    } 
-    // finally {
-    //   // Also call IDP logout from the browser to clear their session cookie
-    //   await fetch("https://identity-provider.isaxbsit2027.com/api/v1/auth/logout", {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     credentials: "include", // ← this is the key, sends the IDP browser cookie
-    //     body: JSON.stringify({ client_id: "58f5b2b3-a5fb-4c63-a5c1-18604c38d0d7" }),
-    //   }).catch(() => {}); // silent fail
-
-    //   setIsLoggingOut(true);
-    //   setHasAgreed(false);
-    //   localStorage.removeItem("hasAgreed");
-    //   localStorage.removeItem("token");
-    //   localStorage.removeItem("user");
-    //   document.cookie.split(";").forEach(c =>
-    //     document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
-    //   );
-    //   setUser(null);
-    //   setToken(null);
-    //   navigate("/", { replace: true });
-    // }
-    finally {
+  try {
+    await logoutRequest(); // backend revokes Sanctum token + calls IDP via cURL
+  } catch (err) {
+    console.error("Logout request failed:", err);
+  } finally {
     setIsLoggingOut(true);
     setHasAgreed(false);
     localStorage.removeItem("hasAgreed");
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     document.cookie.split(";").forEach(c =>
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
     );
     setUser(null);
     setToken(null);
-
-    // POST via form so browser sends IDP session cookie with it
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = "https://identity-provider.isaxbsit2027.com/api/v1/auth/logout";
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = "client_id";
-    input.value = "58f5b2b3-a5fb-4c63-a5c1-18604c38d0d7";
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit(); // browser navigates to IDP, clears cookie, IDP redirects back to https://localhost/login
-}
-  };
+    navigate("/", { replace: true }); // stay in your own app
+  }
+};
 
   const ssoCallback = async (code) => {  // ← was 'token'
   try {
