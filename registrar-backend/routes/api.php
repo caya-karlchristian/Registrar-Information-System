@@ -14,6 +14,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\SsoCallbackController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\AnalyticsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -152,6 +153,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('request-statuses/{id}', [RequestStatusController::class, 'destroy']);
         Route::apiResource('students', StudentProfileController::class);
         Route::apiResource('academic-records', StudentAcademicRecordController::class);
+        // Analytics (admin + super admin)
+        Route::prefix('analytics')->group(function () {
+            Route::get('overview',          [AnalyticsController::class, 'overview']);
+            Route::get('volume-trend',      [AnalyticsController::class, 'volumeTrend']);
+            Route::get('by-document-type',  [AnalyticsController::class, 'byDocumentType']);
+            Route::get('by-status',         [AnalyticsController::class, 'byStatus']);
+            Route::get('processing-time',   [AnalyticsController::class, 'processingTime']);
+            Route::get('peak-hours',        [AnalyticsController::class, 'peakHours']);
+            Route::get('by-purpose',        [AnalyticsController::class, 'byPurpose']);
+        });
     });
 
     // -------------------------------------------------------
