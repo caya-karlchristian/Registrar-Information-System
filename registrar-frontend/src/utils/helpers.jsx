@@ -64,10 +64,15 @@ export const ReceiptInfo = ({ officialReceiptNum, date }) => (
   </div>
 );
 
-export const CertHeader = () => (
+export const CertHeader = ({ layout }) => (
   <div className="flex flex-row items-start justify-between border-b-2 border-gray-100 pb-3 mb-3 gap-4 text-left">
     <div className="flex flex-row items-start gap-3">
-      <img src={puplogoimage} alt="PUP Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0" />
+      <img
+        src={layout?.headerLeftUrl || puplogoimage}
+        alt="PUP Logo"
+        className="object-contain shrink-0"
+        style={{ width: `${layout?.headerLogoSize ?? 56}px`, height: `${layout?.headerLogoSize ?? 56}px` }}
+      />
       <div>
         <p className="text-[5px] lg:text-[8px] print:text-[9pt] font-medium font-serif uppercase">Republic of the Philippines</p>
         <p className="text-[9px] lg:text-[10px] print:text-[12pt] font-bold font-serif leading-tight uppercase tracking-tight">
@@ -79,7 +84,12 @@ export const CertHeader = () => (
         <p className="text-[9px] lg:text-[10px] print:text-[12pt] font-bold font-serif">TAGUIG CAMPUS</p>
       </div>
     </div>
-    <img src={Bagong_Pilipinas_Logo} alt="Bagong Pilipinas Logo" className="w-15 h-15 sm:w-14 sm:h-14 object-contain shrink-0" />
+    <img
+      src={layout?.headerRightUrl || Bagong_Pilipinas_Logo}
+      alt="Header Right Logo"
+      className="object-contain shrink-0"
+      style={{ width: `${layout?.headerLogoSize ?? 56}px`, height: `${layout?.headerLogoSize ?? 56}px` }}
+    />
   </div>
 );
 
@@ -95,7 +105,7 @@ export const RegistrarDateTitle = ({ date }) => (
   </>
 );
 
-export const CertFooter = () => (
+export const CertFooter = ({ layout }) => (
   <div className="mt-2 pt-4 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center sm:items-end gap-4 shrink-0">
     <div className="space-y-1 text-left">
       <div className="text-[7px] lg:text-[6.5px] print:text-[8.5pt]">
@@ -105,8 +115,16 @@ export const CertFooter = () => (
       </div>
       <div className="text-[10px] font-serif tracking-tight uppercase print:text-[12pt]">THE COUNTRY'S 1st POLYTECHNIC</div>
     </div>
-    <div className="shrink-0 items-center">
-      <img src={certificate_footer} alt="Certificate Footer" className="footer-accreditation-img h-12 w-auto object-contain" />
+    <div className="shrink-0 items-center flex flex-wrap justify-end gap-2">
+      {(layout?.footerUrls?.length ? layout.footerUrls : [certificate_footer]).map((footerLogoUrl, index) => (
+        <img
+          key={`${footerLogoUrl}-${index}`}
+          src={footerLogoUrl}
+          alt={`Certificate Footer ${index + 1}`}
+          className="footer-accreditation-img w-auto object-contain"
+          style={{ height: `${layout?.footerLogoSize ?? 48}px` }}
+        />
+      ))}
     </div>
   </div>
 );
