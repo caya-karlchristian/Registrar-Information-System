@@ -68,6 +68,7 @@ export const AuthProvider = ({ children }) => {
         setHasAgreed(false);
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        document.cookie.split(";").forEach(c => document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"));
         setUser(null);
         setToken(null);
       } finally {
@@ -82,22 +83,26 @@ export const AuthProvider = ({ children }) => {
   // Logout
   // -------------------------------------------------------
   const logout = async () => {
-    try {
-      await logoutRequest();
-    } catch (err) {
-      // Log but don't block logout — always clear local state
-      console.error("Logout request failed:", err);
-    } finally {
-        setIsLoggingOut(true);
-        setHasAgreed(false);
-        localStorage.removeItem("hasAgreed");
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setUser(null);
-        setToken(null);
-        navigate("/", { replace: true });
-    }
-  };
+  try {
+    await logoutRequest(); // backend revokes Sanctum token + calls IDP via cURL
+  } catch (err) {
+    console.error("Logout request failed:", err);
+  } finally {
+    setIsLoggingOut(true);
+    setHasAgreed(false);
+    localStorage.removeItem("hasAgreed");
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    document.cookie.split(";").forEach(c =>
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+    );
+    setUser(null);
+    setToken(null);
+    navigate("/", { replace: true }); // stay in your own app
+  }
+};
 
   const ssoCallback = async (code) => {  // ← was 'token'
   try {
