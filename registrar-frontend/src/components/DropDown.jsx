@@ -24,7 +24,7 @@ const DropdownGroup = ({ label, name, value, onChange, options, required = false
   return (
     <div className="w-full group" ref={ref}>
       {/* Label */}
-      <label className={`block text-xs md:text-sm ${labelColor} mb-1.5`}>
+      <label className={`block text-sm font-medium ${labelColor} mb-1.5`}>
         {label}
         {required && <span className="text-red-500 ml-1" title="Required">*</span>}
       </label>
@@ -35,14 +35,14 @@ const DropdownGroup = ({ label, name, value, onChange, options, required = false
           type="button"
           onClick={() => setOpen((o) => !o)}
           className={`
-            w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-white rounded-lg text-sm shadow-sm focus:outline-none
+            w-full flex items-center justify-between gap-2 px-3 py-3 bg-white rounded-lg text-sm font-medium shadow-sm focus:outline-none
             ${open
               ? 'focus:ring-2 focus:ring-[#FFC72C]'
               : 'border-transparent hover:border-gray-200'
             }
           `}
         >
-          <span className={displayValue ? 'text-gray-700 truncate' : 'text-gray-400'}>
+          <span className={displayValue ? 'text-gray-700 truncate font-medium' : 'text-gray-400 font-normal'}>
             {displayValue || 'Please Select'}
           </span>
           <ChevronDownIcon
@@ -80,7 +80,7 @@ const DropdownGroup = ({ label, name, value, onChange, options, required = false
             </ul>
 
             {/* Gold bottom accent */}
-            <div className="h-1 w-full bg-gradient-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
+            <div className="h-1 w-full bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
           </div>
         )}
       </div>

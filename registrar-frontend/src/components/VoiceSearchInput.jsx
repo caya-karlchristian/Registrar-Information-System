@@ -39,18 +39,18 @@ const VoiceSearchInput = ({
     : value;
 
   return (
-    <div className="relative flex items-center bg-white rounded-xl shadow-lg border border-gray-200 transition-all duration-300 focus-within:border-[#800000] focus-within:shadow-[0_0_0_4px_rgba(128,0,0,0.08)]">
+    <div className="relative flex items-center bg-white rounded-lg shadow-sm border border-gray-200 transition-all duration-200 focus-within:ring-2 focus-within:ring-[#FFC72C]">
 
-      <div className="pl-5 pr-3 pointer-events-none">
-        <MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />
+      <div className="pl-3 pr-2 pointer-events-none">
+        <MagnifyingGlassIcon className="w-4 h-4 text-gray-400" />
       </div>
 
-      <div className="flex w-full md:w-100">
+      <div className="flex w-full">
         <input 
           type="text"
           placeholder={isListening ? 'Listening...' : placeholder}
-          className={`w-full py-4 bg-transparent outline-none text-base placeholder-gray-400 ${
-            isListening ? 'text-[#800000]' : 'text-gray-800'
+          className={`w-full py-3 bg-transparent outline-none text-sm font-medium placeholder:font-normal placeholder:text-gray-400 ${
+            isListening ? 'text-[#800000]' : 'text-gray-700'
           }`}
           value={displayValue}
           onChange={(e) => onChange(e.target.value)}
@@ -59,10 +59,10 @@ const VoiceSearchInput = ({
 
       {value && !isListening && (
         <>
-          <div className="w-px h-6 bg-gray-200 mx-1" />
+          <div className="w-px h-5 bg-gray-200 mx-1" />
           <button
             onClick={handleReset}
-            className="p-2 mr-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+            className="p-1.5 mr-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
             aria-label="Clear"
           >
             <XMarkIcon className="w-4 h-4" />

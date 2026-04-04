@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  MagnifyingGlassIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import DropDown from '../components/DropDown';
 import ConfirmationModal from '../components/ConfirmationModal';
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import { getAuditLogs, getAuditLogFilters } from "../services/api";
 import ErrorToast from "../components/ErrorToast";
 
@@ -102,18 +102,18 @@ const ReportManagement = () => {
 
       <div className="flex flex-wrap items-center gap-3 mb-6">
 
-        <div className="flex items-center gap-2 mt-12 bg-white border border-gray-200 rounded-full px-4 py-2 shadow-sm flex-1 min-w-[180px] max-w-xs">
-          <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 shrink-0" />
-          <input
-            type="text"
-            placeholder="Search"
+        <div className="mt-12 flex-1 min-w-45 max-w-xs">
+          <VoiceSearchInput
             value={search}
-            onChange={(e) => { setSearch(e.target.value); handleFilterChange(); }}
-            className="outline-none bg-transparent text-sm text-gray-700 w-full placeholder-gray-400"
+            onChange={(value) => {
+              setSearch(value);
+              handleFilterChange();
+            }}
+            placeholder="Search"
           />
         </div>
 
-        <div className="w-40 mt-6">
+        <div className="mt-6 flex-1 min-w-45 max-w-xs">
           <DropDown label="Role" name="roleFilter"
             value={roleFilter === "All" ? "" : roleFilter}
             onChange={(e) => { setRoleFilter(e.target.value || "All"); handleFilterChange(); }}
@@ -121,7 +121,7 @@ const ReportManagement = () => {
           />
         </div>
 
-        <div className="w-44 mt-6">
+        <div className="mt-6 flex-1 min-w-45 max-w-xs">
           <DropDown label="Action" name="actionFilter"
             value={actionFilter === "All" ? "" : actionFilter}
             onChange={(e) => { setActionFilter(e.target.value || "All"); handleFilterChange(); }}
