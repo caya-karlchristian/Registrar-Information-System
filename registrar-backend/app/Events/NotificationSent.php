@@ -57,17 +57,9 @@ class NotificationSent implements ShouldBroadcastNow
     // -------------------------------------------------------
     public function broadcastOn(): array
     {
-        $channels = [
+        return [
             new PrivateChannel('notifications.' . $this->recipient->user_id),
         ];
-
-        // Also push to the shared admin channel so ALL admins
-        // see new-request / payment-verification alerts
-        if ($this->recipient->isStaff()) {
-            $channels[] = new PrivateChannel('admin.notifications');
-        }
-
-        return $channels;
     }
 
     // -------------------------------------------------------
