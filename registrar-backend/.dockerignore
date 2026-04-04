@@ -1,0 +1,5 @@
+public/storage
+public/storage/**
+vendor
+node_modules
+.git

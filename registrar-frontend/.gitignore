@@ -23,3 +23,6 @@ Dockerfile.dev
 *.njsproj
 *.sln
 *.sw?
+registrar-frontend/certs/
+*.pem
+*.key
