@@ -20,22 +20,13 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
   const { notifications } = useNotificationsContext();
 
-  // Refetch whenever a new notification arrives (e.g. status update)
-  useEffect(() => {
-    if (!user || notifications.length === 0) return;
-    fetchRequests();
-  }, [notifications.length]);
-
   useEffect(() => {
     if (!user) {
       navigate("/");
     }
   }, [user, navigate]);
 
-  useEffect(() => {
-    if (!user) return;
-
-const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
   try {
     setLoading(true);
     const res = await getDocumentRequests();
@@ -80,8 +71,18 @@ const fetchRequests = async () => {
   }
 };
 
-fetchRequests();
-}, [user]);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchRequests();
+  }, [user]);
+
+  // Refetch whenever a new notification arrives (e.g. status update)
+  useEffect(() => {
+    if (!user || notifications.length === 0) return;
+    fetchRequests();
+  }, [notifications.length]);
 
   useEffect(() => { 
     setCurrentPage(1);
