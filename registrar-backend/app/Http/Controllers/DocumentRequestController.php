@@ -8,6 +8,7 @@ use App\Models\SystemUser;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\RequestHistory;
 
 class DocumentRequestController extends Controller
 {
@@ -142,6 +143,59 @@ class DocumentRequestController extends Controller
     // PUT /document-requests/{id}
     // Admin/Super Admin only
     // -------------------------------------------------------
+    // public function update(Request $request, DocumentRequest $documentRequest)
+    // {
+    //     $this->authorize('update', $documentRequest);
+
+    //     $validated = $request->validate([
+    //         'status_id'    => 'sometimes|integer|exists:request_status,status_id',
+    //         'or_number'    => 'sometimes|nullable|string|max:50',
+    //         'receipt_date' => 'sometimes|nullable|date',
+    //     ]);
+
+    //     $oldStatusId = $documentRequest->status_id;
+    //     $oldOrNumber = $documentRequest->or_number;
+
+    //     $documentRequest->update($validated);
+
+    //     /** @var SystemUser $owner */
+    //     $owner = SystemUser::find($documentRequest->user_id);
+
+    //     // Notify owner if status changed
+    //     if ($owner && isset($validated['status_id']) && $documentRequest->status_id !== $oldStatusId) {
+
+    //         $triggerEvent = self::STATUS_NOTIFICATION_MAP[$documentRequest->status_id] ?? null;
+
+    //         if ($triggerEvent) {
+    //             NotificationService::send(
+    //                 recipient:    $owner,
+    //                 triggerEvent: $triggerEvent,
+    //                 data:         ['request_id' => $documentRequest->request_id],
+    //                 requestId:    $documentRequest->request_id,
+    //             );
+    //         }
+
+    //         // Specific trigger event above already covers status change
+    //     }
+
+    //     // Notify admins if OR number was added/changed
+    //     if (
+    //         isset($validated['or_number']) &&
+    //         $documentRequest->or_number !== $oldOrNumber &&
+    //         !empty($documentRequest->or_number)
+    //     ) {
+    //         NotificationService::sendToAdmins(
+    //             triggerEvent: 'admin_payment_verification',
+    //             data:         ['request_id' => $documentRequest->request_id],
+    //             requestId:    $documentRequest->request_id,
+    //         );
+    //     }
+
+    //     return response()->json(
+    //         $documentRequest->load(self::RELATIONS),
+    //         200
+    //     );
+    // }
     public function update(Request $request, DocumentRequest $documentRequest)
     {
         $this->authorize('update', $documentRequest);
@@ -160,21 +214,33 @@ class DocumentRequestController extends Controller
         /** @var SystemUser $owner */
         $owner = SystemUser::find($documentRequest->user_id);
 
-        // Notify owner if status changed
-        if ($owner && isset($validated['status_id']) && $documentRequest->status_id !== $oldStatusId) {
+        // Log to request_history + notify owner if status changed
+        if (isset($validated['status_id']) && $documentRequest->status_id !== $oldStatusId) {
 
-            $triggerEvent = self::STATUS_NOTIFICATION_MAP[$documentRequest->status_id] ?? null;
+            $minutesProcessed = (int) $documentRequest->requested_at
+                ->diffInMinutes(now());
 
-            if ($triggerEvent) {
-                NotificationService::send(
-                    recipient:    $owner,
-                    triggerEvent: $triggerEvent,
-                    data:         ['request_id' => $documentRequest->request_id],
-                    requestId:    $documentRequest->request_id,
-                );
+            RequestHistory::create([
+                'request_id'        => $documentRequest->request_id,
+                'old_status_id'     => $oldStatusId,
+                'new_status_id'     => $documentRequest->status_id,
+                'changed_at'        => now(),
+                'processed_by'      => Auth::id(),
+                'minutes_processed' => $minutesProcessed,
+            ]);
+
+            if ($owner) {
+                $triggerEvent = self::STATUS_NOTIFICATION_MAP[$documentRequest->status_id] ?? null;
+
+                if ($triggerEvent) {
+                    NotificationService::send(
+                        recipient:    $owner,
+                        triggerEvent: $triggerEvent,
+                        data:         ['request_id' => $documentRequest->request_id],
+                        requestId:    $documentRequest->request_id,
+                    );
+                }
             }
-
-            // Specific trigger event above already covers status change
         }
 
         // Notify admins if OR number was added/changed
