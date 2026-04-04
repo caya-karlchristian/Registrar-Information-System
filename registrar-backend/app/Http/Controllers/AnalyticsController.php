@@ -85,28 +85,32 @@ class AnalyticsController extends Controller
     // Monthly request counts for the past 12 months
     // Used by the area chart
     // -------------------------------------------------------
-    public function volumeTrend()
+    public function volumeTrend(Request $request)
     {
+        [$from, $to] = $this->dateRange($request);
+
         $rows = DocumentRequest::select(
                 DB::raw("DATE_FORMAT(requested_at, '%Y-%m') as month"),
                 DB::raw('COUNT(*) as total')
             )
-            ->where('requested_at', '>=', now()->subMonths(12)->startOfMonth())
+            ->whereBetween('requested_at', [$from, $to])
             ->groupBy('month')
             ->orderBy('month')
             ->get();
 
-        // Fill in any missing months with 0
+        // Fill in missing months between $from and $to with 0
         $filled = [];
-        for ($i = 11; $i >= 0; $i--) {
-            $key = now()->subMonths($i)->format('Y-m');
-            $label = now()->subMonths($i)->format('M Y');
+        $cursor = $from->copy()->startOfMonth();
+        while ($cursor->lte($to)) {
+            $key   = $cursor->format('Y-m');
+            $label = $cursor->format('M Y');
             $match = $rows->firstWhere('month', $key);
             $filled[] = [
                 'month' => $key,
                 'label' => $label,
                 'total' => $match ? (int) $match->total : 0,
             ];
+            $cursor->addMonth();
         }
 
         return response()->json($filled);
