@@ -7,3 +7,4 @@ docker-compose.yml.env.production
 *.env*
 .env
 docker-compose.dev.yml
+registrar-frontend/certs/

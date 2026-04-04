@@ -174,13 +174,7 @@ class DocumentRequestController extends Controller
                 );
             }
 
-            // Always send the general status_updated as well
-            NotificationService::send(
-                recipient:    $owner,
-                triggerEvent: 'status_updated',
-                data:         ['request_id' => $documentRequest->request_id],
-                requestId:    $documentRequest->request_id,
-            );
+            // Specific trigger event above already covers status change
         }
 
         // Notify admins if OR number was added/changed
