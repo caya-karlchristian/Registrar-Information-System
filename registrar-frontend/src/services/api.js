@@ -128,4 +128,15 @@ export const deleteRequestHistoryItem = (id) => api.delete(`/request-history/${i
 export const getAuditLogs = (params = {}) => api.get("/audit-logs", { params });
 export const getAuditLogFilters = () => api.get("/audit-logs/filters");
 
+// -------------------------------------------------------
+// ANALYTICS (Admin + Super Admin)
+// -------------------------------------------------------
+export const getAnalyticsOverview       = (params = {}) => api.get("/analytics/overview", { params });
+export const getAnalyticsVolumeTrend    = (params = {}) => api.get("/analytics/volume-trend", { params });
+export const getAnalyticsByStatus       = (params = {}) => api.get("/analytics/by-status", { params });
+export const getAnalyticsByDocType      = (params = {}) => api.get("/analytics/by-document-type", { params });
+export const getAnalyticsByPurpose      = (params = {}) => api.get("/analytics/by-purpose", { params });
+export const getAnalyticsPeakHours      = (params = {}) => api.get("/analytics/peak-hours", { params });
+export const getAnalyticsProcessingTime = (params = {}) => api.get("/analytics/processing-time", { params });
+
 export default api;
