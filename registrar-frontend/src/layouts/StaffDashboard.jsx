@@ -19,6 +19,7 @@ import LoadingOverlay from '../components/LoadingOverlay.jsx';
 import CertificateModal from '../components/CertificateModal.jsx';
 import { DOC_TYPE_MAP } from '../utils/constants';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
+import { useNotificationsContext } from '../context/NotificationsContext';
 import DropdownGroup from '../components/DropDown.jsx';
 
 const STATUS_FALLBACK = {
@@ -43,6 +44,8 @@ const StaffDashboard = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [certRequest, setCertRequest] = useState(null);
   const [requestStatuses, setRequestStatuses] = useState([]);
+
+  const { notifications } = useNotificationsContext();
 
   const statusIds = useCallback(() => {
     const lowerNameToId = Object.fromEntries(
@@ -191,6 +194,11 @@ const StaffDashboard = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Refetch whenever a new notification arrives (e.g. new request submitted)
+  useEffect(() => {
+    if (notifications.length > 0) fetchData();
+  }, [notifications.length]);
 
   useEffect(() => {
     setCurrentPage(1);
