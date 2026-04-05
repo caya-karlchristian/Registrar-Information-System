@@ -16,7 +16,7 @@ export const useNotifications = (onNewNotification = null) => {
                 api.get('/notifications/unread-count'),
             ]);
             setNotifications(notifRes.data.data ?? []);
-            setUnreadCount(countRes.data.unread_count ?? 0);
+            setUnreadCount(countRes.data.count ?? 0);
         } catch (err) {
             console.error('[useNotifications] fetch failed:', err);
         } finally {
@@ -72,9 +72,9 @@ export const useNotifications = (onNewNotification = null) => {
     setNotifications(prev => {
         if (prev.some(n => n.id === e.id)) return prev; // duplicate, ignore
         setUnreadCount(c => c + 1); // only increment when it's actually new
+        if (typeof onNewNotification === 'function') onNewNotification(e);
         return [e, ...prev];
     });
-    if (typeof onNewNotification === 'function') onNewNotification(e);
 };
 
         echo.private(`notifications.${user.user_id}`)

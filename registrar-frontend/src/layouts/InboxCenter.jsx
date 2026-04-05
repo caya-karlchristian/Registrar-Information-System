@@ -90,10 +90,10 @@ const InboxCenter = () => {
         id: incomingNotification.id,
         from: incomingNotification.title,
         email: 'no-reply@ris.local',
-        subject: `${incomingNotification.category} Update`,
+        subject: incomingNotification.title,
         preview: incomingNotification.message,
-        category: incomingNotification.category,
-        time: incomingNotification.time,
+        category: incomingNotification.type,
+        time: incomingNotification.created_at,
         unread: false,
         thread: [
           {
