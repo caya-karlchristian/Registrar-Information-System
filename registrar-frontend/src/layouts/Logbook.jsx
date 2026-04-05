@@ -26,10 +26,8 @@ const LogbookRecords = () => {
         ]);
         const requests = requestsRes.data || [];
         const types = typesRes.data || [];
-        
         setData(requests);
         setDbDocTypes(types);
-        
         console.log('Logbook data loaded:', { requests: requests.length, types: types.length });
       } catch (error) {
         console.error('Error loading logbook records:', error);
@@ -53,12 +51,10 @@ const LogbookRecords = () => {
 
   const filteredData = useMemo(() => {
     if (!selectedDocTypeId) return data;
-    
     const targetId = Number(selectedDocTypeId);
     const filtered = data.filter(item =>
       item.documents?.some(d => Number(d.document_type_id) === targetId)
     );
-    
     console.log('Filtered data:', { selectedId: targetId, total: data.length, filtered: filtered.length });
     return filtered;
   }, [selectedDocTypeId, data]);
@@ -95,6 +91,22 @@ const LogbookRecords = () => {
 
   const getEmail = (row) => {
     return row.user?.email || row.student_profile?.email || '---';
+  };
+
+  const getProcessedAt = (row) => {
+    if (!row.history || row.history.length === 0) return null;
+    return row.history[0]?.changed_at || null;
+  };
+
+  const getMinutesProcessed = (row) => {
+    if (!row.history || row.history.length === 0) return null;
+    return row.history[0]?.minutes_processed ?? null;
+  };
+
+  const getClaimedAt = (row) => {
+    if (!row.history || row.history.length === 0) return null;
+    const claimEntry = row.history.find(h => h.new_status_id === 3);
+    return claimEntry?.changed_at || null;
   };
 
   return (
@@ -168,7 +180,7 @@ const LogbookRecords = () => {
                     {getFullName(row)}
                   </td>
 
-                  {/* Course - pending backend eager load of academic_record */}
+                  {/* Course */}
                   <td className="p-3 sm:p-4 text-center">
                     {getCourse(row)}
                   </td>
@@ -180,17 +192,21 @@ const LogbookRecords = () => {
 
                   {/* Date/Time Processed */}
                   <td className="p-3 sm:p-4 text-center">
-                    {row.processed_at ? new Date(row.processed_at).toLocaleString() : '---'}
+                    {getProcessedAt(row)
+                      ? new Date(getProcessedAt(row)).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      : '---'}
                   </td>
 
                   {/* Minutes Processed */}
                   <td className="p-3 sm:p-4 text-center font-mono">
-                    {row.processing_minutes ?? '---'}
+                    {getMinutesProcessed(row) ?? '---'}
                   </td>
 
                   {/* Date Claimed */}
                   <td className="p-3 sm:p-4 text-center italic text-gray-400">
-                    {row.claimed_at ? new Date(row.claimed_at).toLocaleDateString() : 'Pending'}
+                    {getClaimedAt(row)
+                      ? new Date(getClaimedAt(row)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : 'Pending'}
                   </td>
 
                 </tr>
