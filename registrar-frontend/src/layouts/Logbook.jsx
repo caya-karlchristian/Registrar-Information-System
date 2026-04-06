@@ -59,25 +59,49 @@ const LogbookRecords = () => {
     return filtered;
   }, [selectedDocTypeId, data]);
 
-  const totalPages = Math.ceil(filteredData.length / rowsPerPage) || 1;
+  const sortedData = useMemo(() => {
+    return [...filteredData].sort((a, b) => {
+      const aRequestedAt = new Date(a.requested_at || 0).getTime();
+      const bRequestedAt = new Date(b.requested_at || 0).getTime();
+      return bRequestedAt - aRequestedAt;
+    });
+  }, [filteredData]);
+
+  const totalPages = Math.ceil(sortedData.length / rowsPerPage) || 1;
   const indexOfFirstItem = (currentPage - 1) * rowsPerPage;
   const indexOfLastItem = currentPage * rowsPerPage;
 
   const currentData = useMemo(() => {
-    return filteredData.slice(indexOfFirstItem, indexOfLastItem);
-  }, [indexOfFirstItem, indexOfLastItem, filteredData]);
+    return sortedData.slice(indexOfFirstItem, indexOfLastItem);
+  }, [indexOfFirstItem, indexOfLastItem, sortedData]);
 
   const selectedDocLabel = useMemo(() => {
-    return activeDocMap[selectedDocTypeId] || "[Document Type]";
+    return activeDocMap[selectedDocTypeId] || "All Document Types";
   }, [selectedDocTypeId, activeDocMap]);
 
-  const handleExportExcel = () => logbookExcel(filteredData, selectedDocLabel, pupLogoSrc, bpLogoSrc);
+  const handleExportExcel = () => logbookExcel(sortedData, selectedDocLabel, pupLogoSrc, bpLogoSrc);
+
+  const toProperCase = (value = '') => {
+    return value
+      .toString()
+      .trim()
+      .split(/\s+/)
+      .map((token) => {
+        if (/^[IVXLCDM]+$/i.test(token)) return token.toUpperCase();
+        return token
+          .toLowerCase()
+          .replace(/(^|[-'])([a-z])/g, (_, separator, letter) => `${separator}${letter.toUpperCase()}`);
+      })
+      .join(' ');
+  };
 
   const getFullName = (row) => {
     const p = row.student_profile;
     if (!p) return 'Walk-in Client';
-    const middle = p.middle_name ? ` ${p.middle_name.charAt(0)}.` : '';
-    return `${p.last_name}, ${p.first_name}${middle}`.trim();
+    const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
+    const lastName = toProperCase(p.last_name || '');
+    const firstName = toProperCase(p.first_name || '');
+    return `${lastName}, ${firstName}${middle}`.trim();
   };
 
   const getCourse = (row) => {
@@ -93,6 +117,31 @@ const LogbookRecords = () => {
     return row.user?.email || row.student_profile?.email || '---';
   };
 
+  const formatDateLong = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const formatDateTimeLong = (value) => {
+    const datePart = formatDateLong(value);
+    if (!datePart) return null;
+
+    const timePart = new Date(value).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    return `${datePart} ${timePart}`;
+  };
+
   const getProcessedAt = (row) => {
     if (!row.history || row.history.length === 0) return null;
     return row.history[0]?.changed_at || null;
@@ -101,6 +150,24 @@ const LogbookRecords = () => {
   const getMinutesProcessed = (row) => {
     if (!row.history || row.history.length === 0) return null;
     return row.history[0]?.minutes_processed ?? null;
+  };
+
+  const formatMinutesDuration = (minutesValue) => {
+    if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
+
+    const totalMinutes = Number(minutesValue);
+    if (Number.isNaN(totalMinutes) || totalMinutes < 0) return '---';
+
+    const wholeMinutes = Math.floor(totalMinutes);
+    const days = Math.floor(wholeMinutes / 1440);
+    const hours = Math.floor((wholeMinutes % 1440) / 60);
+    const minutes = wholeMinutes % 60;
+    const minuteLabel = minutes === 1 ? 'min' : 'mins';
+
+    if (days > 0) return `${days}day${days > 1 ? 's' : ''} ${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+    if (hours > 0) return `${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+
+    return `${minutes}${minuteLabel}`;
   };
 
   const getClaimedAt = (row) => {
@@ -135,9 +202,9 @@ const LogbookRecords = () => {
             </div>
             <button
               onClick={handleExportExcel}
-              disabled={!selectedDocTypeId}
+              disabled={loading || sortedData.length === 0}
               className={`px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto ${
-                !selectedDocTypeId ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-pup-dark-maroon hover:bg-[#4a0000] text-white'
+                loading || sortedData.length === 0 ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-pup-dark-maroon hover:bg-[#4a0000] text-white'
               }`}
             >
               <span>Export to Excel</span>
@@ -166,50 +233,44 @@ const LogbookRecords = () => {
             </thead>
             <tbody>
               {currentData.map((row) => (
+                (() => {
+                  const processedAt = getProcessedAt(row);
+                  const claimedAt = getClaimedAt(row);
+
+                  return (
                 <tr key={row.request_id || row.id} className="border-b border-gray-200 hover:bg-gray-50 text-[11px] sm:text-[12px] text-gray-700 transition-colors">
 
-                  {/* Date/Time Requested */}
                   <td className="p-3 sm:p-4 text-center">
-                    {row.requested_at
-                      ? new Date(row.requested_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                      : 'N/A'}
+                    {formatDateLong(row.requested_at) || 'N/A'}
                   </td>
 
-                  {/* Client Name */}
-                  <td className="p-3 sm:p-4 text-center font-bold uppercase">
+                  <td className="p-3 sm:p-4 text-center font-bold">
                     {getFullName(row)}
                   </td>
 
-                  {/* Course */}
                   <td className="p-3 sm:p-4 text-center">
                     {getCourse(row)}
                   </td>
 
-                  {/* Email */}
                   <td className="p-3 sm:p-4 text-center truncate max-w-37.5">
                     {getEmail(row)}
                   </td>
 
-                  {/* Date/Time Processed */}
                   <td className="p-3 sm:p-4 text-center">
-                    {getProcessedAt(row)
-                      ? new Date(getProcessedAt(row)).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                      : '---'}
+                    {formatDateTimeLong(processedAt) || '---'}
                   </td>
 
-                  {/* Minutes Processed */}
-                  <td className="p-3 sm:p-4 text-center font-mono">
-                    {getMinutesProcessed(row) ?? '---'}
+                  <td className="p-3 sm:p-4 text-center">
+                    {formatMinutesDuration(getMinutesProcessed(row))}
                   </td>
 
-                  {/* Date Claimed */}
                   <td className="p-3 sm:p-4 text-center italic text-gray-400">
-                    {getClaimedAt(row)
-                      ? new Date(getClaimedAt(row)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-                      : 'Pending'}
+                    {formatDateLong(claimedAt) || 'Pending'}
                   </td>
 
                 </tr>
+                  );
+                })()
               ))}
 
               {!loading && Array.from({ length: Math.max(0, rowsPerPage - currentData.length) }).map((_, i) => (
@@ -224,8 +285,8 @@ const LogbookRecords = () => {
         {/* Pagination Footer */}
         <div className="px-4 sm:px-8 py-4 bg-gray-50 text-[11px] sm:text-sm text-gray-500 flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t border-gray-200">
           <span className="text-center sm:text-left">
-            Showing {filteredData.length > 0 ? indexOfFirstItem + 1 : 0} to{" "}
-            {Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} results
+            Showing {sortedData.length > 0 ? indexOfFirstItem + 1 : 0} to{" "}
+            {Math.min(indexOfLastItem, sortedData.length)} of {sortedData.length} results
           </span>
 
           <div className="flex gap-4 items-center">
