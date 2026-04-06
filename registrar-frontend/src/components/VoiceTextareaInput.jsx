@@ -11,6 +11,7 @@ const VoiceTextareaInput = ({
   placeholder = 'Type your message...',
   language = 'en-US',
   minHeightClass = 'min-h-64',
+  required = false,
 }) => {
   const {
     isListening,
@@ -43,32 +44,36 @@ const VoiceTextareaInput = ({
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}</label>
+      <label htmlFor={id} className="text-sm font-medium text-gray-700">
+        {label}
+        {required && <span className="text-red-400 ml-1">*</span>}
+      </label>
+
+      <div className="relative">
+        <textarea
+          id={id}
+          required={required}
+          value={displayValue}
+          onChange={handleChange}
+          placeholder={isListening ? 'Listening...' : placeholder}
+          className={`${minHeightClass} w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-3 text-sm text-gray-800 outline-none focus:border-gray-500 ${isSupported ? 'pr-10' : ''}`}
+        />
+
         {isSupported && (
           <button
             type="button"
             onClick={toggle}
             aria-label={isListening ? 'Stop listening' : 'Start voice input'}
-            className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold transition-all duration-200 ${
+            className={`absolute right-2.5 top-2.5 p-1 rounded-md transition-all duration-200 ${
               isListening
-                ? 'border-[#800000] text-[#800000] animate-pulse'
-                : 'border-gray-300 text-gray-500 hover:text-[#800000] hover:border-[#800000]'
+                ? 'text-[#800000] animate-pulse'
+                : 'text-gray-400 hover:text-[#800000]'
             }`}
           >
-            {isListening ? <StopIcon className="h-3.5 w-3.5" /> : <MicrophoneIcon className="h-3.5 w-3.5" />}
-            {isListening ? 'Listening' : 'Voice'}
+            {isListening ? <StopIcon className="w-4 h-4" /> : <MicrophoneIcon className="w-4 h-4" />}
           </button>
         )}
       </div>
-
-      <textarea
-        id={id}
-        value={displayValue}
-        onChange={handleChange}
-        placeholder={isListening ? 'Listening...' : placeholder}
-        className={`${minHeightClass} w-full resize-y rounded-md border border-gray-300 bg-white px-3 py-3 text-sm text-gray-800 outline-none focus:border-gray-500`}
-      />
     </div>
   );
 };
@@ -81,6 +86,7 @@ VoiceTextareaInput.propTypes = {
   placeholder: PropTypes.string,
   language: PropTypes.string,
   minHeightClass: PropTypes.string,
+  required: PropTypes.bool,
 };
 
 VoiceTextareaInput.defaultProps = {
