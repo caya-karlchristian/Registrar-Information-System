@@ -3,13 +3,14 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
+import InputGroup from "../components/InputGroup";
+import VoiceTextareaInput from "../components/VoiceTextareaInput.jsx";
 
 const PER_PAGE = 4;
 
 const MOCK_ANNOUNCEMENTS = [
   { id: 1, title: "Enrollment Period",        
     content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.", 
-    audience: ["Student", "Alumni"], 
     enabled: true  
   }
 ];
@@ -17,10 +18,7 @@ const MOCK_ANNOUNCEMENTS = [
 const EMPTY_FORM = {
   title:    "",
   content:  "",
-  audience: [],
 };
-
-const AUDIENCE_OPTIONS = ["Students", "Alumni", "Admin"];
 
 const SystemSettings = () => {
   const [announcements, setAnnouncements] = useState(MOCK_ANNOUNCEMENTS);
@@ -39,25 +37,12 @@ const SystemSettings = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleCheckbox = (option) => {
-    setForm((prev) => {
-      const already = prev.audience.includes(option);
-      return {
-        ...prev,
-        audience: already
-          ? prev.audience.filter((x) => x !== option)
-          : [...prev.audience, option],
-      };
-    });
-  };
-
   const handleCardClick = (ann) => {
     setSelected(ann);
     setIsAdding(false);
     setForm({
       title:    ann.title,
       content:  ann.content,
-      audience: ann.audience,
     });
   };
 
@@ -72,7 +57,7 @@ const SystemSettings = () => {
     if (isAdding) {
       setAnnouncements((prev) => [
         ...prev,
-        { id: Date.now(), title: form.title, content: form.content, audience: form.audience, enabled: true },
+        { id: Date.now(), title: form.title, content: form.content, enabled: true },
       ]);
     } else if (selected) {
       setAnnouncements((prev) =>
@@ -104,18 +89,16 @@ const SystemSettings = () => {
       <div className="flex flex-col lg:flex-row gap-8 items-start">
 
         {/* ── Left Panel ── */}
-        <div className="w-full lg:w-[420px] flex-shrink-0">
+        <div className="w-full lg:w-105 shrink-0">
 
           <div className="mb-4">
-            <label className="block text-sm text-gray-600 mb-1.5">Set Academic Year</label>
-            <input
-              type="text"
-              placeholder="e.g. 2025-2026"
+            <InputGroup
+              label="Set Academic Year"
+              name="academicYear"
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm
-                text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2
-                focus:ring-[#FFC72C] shadow-sm"
+              placeholder="e.g. 2025-2026"
+              labelColor="text-gray-600"
             />
           </div>
 
@@ -203,46 +186,27 @@ const SystemSettings = () => {
             </h2>
 
             <div>
-              <label className="block text-sm text-gray-600 mb-1.5">Announcement Title</label>
-              <input
+              <InputGroup
+                label="Announcement Title"
                 name="title"
                 value={form.title}
                 onChange={handleChange}
                 placeholder="Text"
                 required
-                className="w-full px-4 py-2.5 bg-gray-100 rounded-lg text-sm text-gray-700
-                  placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FFC72C]"
+                labelColor="text-gray-600"
               />
             </div>
 
             <div>
-              <label className="block text-sm text-gray-600 mb-1.5">Announcement Content</label>
-              <textarea
-                name="content"
+              <VoiceTextareaInput
+                id="content"
+                label="Announcement Content"
                 value={form.content}
-                onChange={handleChange}
+                onChange={(value) => setForm((prev) => ({ ...prev, content: value }))}
                 placeholder="Text"
-                rows={8}
-                className="w-full px-4 py-3 bg-gray-100 rounded-lg text-sm text-gray-700
-                  placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FFC72C] resize-none"
+                minHeightClass="min-h-50"
+                required
               />
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-600 mb-2">Target Audience</label>
-              <div className="flex items-center gap-6">
-                {AUDIENCE_OPTIONS.map((opt) => (
-                  <label key={opt} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.audience.includes(opt)}
-                      onChange={() => handleCheckbox(opt)}
-                      className="w-4 h-4 rounded accent-pup-dark-maroon"
-                    />
-                    {opt}
-                  </label>
-                ))}
-              </div>
             </div>
 
             <div className="flex items-center gap-3 pt-1">
