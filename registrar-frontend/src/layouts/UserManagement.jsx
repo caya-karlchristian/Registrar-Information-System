@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  MagnifyingGlassIcon,
   PencilSquareIcon,
   TrashIcon,
   PlusIcon,
@@ -8,6 +7,7 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import DropDown from '../components/DropDown';
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import UserModal from "../components/UserModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { getSystemUsers, createSystemUser, updateSystemUser, deleteSystemUser } from "../services/api";
@@ -159,14 +159,14 @@ const UserManagement = () => {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
 
-        <div className="flex items-center gap-4 mt-6 bg-white border border-gray-200 rounded-full px-4 py-2 shadow-sm flex-1 min-w-[180px] max-w-xs">
-          <MagnifyingGlassIcon className="w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search email or role..."
+        <div className="mt-6 flex-1 min-w-45 max-w-xs">
+          <VoiceSearchInput
             value={search}
-            onChange={(e) => { setSearch(e.target.value); handleFilterChange(); }}
-            className="outline-none bg-transparent text-sm text-gray-700 w-full placeholder-gray-400"
+            onChange={(value) => {
+              setSearch(value);
+              handleFilterChange();
+            }}
+            placeholder="Search email or role..."
           />
         </div>
 

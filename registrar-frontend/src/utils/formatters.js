@@ -1,3 +1,5 @@
+import React from "react";
+
 export const formatDateFormal = (date) => {
   if (!date) return "";
   const d = new Date(date);
@@ -12,8 +14,19 @@ const getOrdinal = (n) => {
 
 export const formatDateOrdinal = (date) => {
   const d = new Date(date);
-  const day = getOrdinal(d.getDate());
-  const month = d.toLocaleString("en-US", { month: "long" }).toLowerCase();
+  const day = d.getDate();
+  const ordinal = getOrdinal(day);
+  const suffix = ordinal.replace(/^\d+/, "");
+  const month = d.toLocaleString("en-US", { month: "long" });
   const year = d.getFullYear();
-  return `${day} day of ${month} ${year}`;
+  return React.createElement(
+    React.Fragment,
+    null,
+    day,
+    React.createElement("sup", null, suffix),
+    " day of ",
+    month,
+    " ",
+    year
+  );
 };
