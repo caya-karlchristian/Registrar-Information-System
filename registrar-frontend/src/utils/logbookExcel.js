@@ -6,6 +6,87 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Logbook Records');
 
+  const getFullName = (row) => {
+    const p = row.student_profile;
+    if (!p) return 'Walk-in Client';
+    const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
+    return `${p.last_name || ''}, ${p.first_name || ''}${middle}`.trim();
+  };
+
+  const getCourse = (row) => {
+    return (
+      row.student_profile?.academic_records?.[0]?.course ||
+      row.student_profile?.course ||
+      row.academic_record?.course ||
+      '---'
+    );
+  };
+
+  const getEmail = (row) => {
+    return row.user?.email || row.student_profile?.email || '---';
+  };
+
+  const getProcessedAt = (row) => {
+    if (!row.history || row.history.length === 0) return null;
+    return row.history[0]?.changed_at || null;
+  };
+
+  const getMinutesProcessed = (row) => {
+    if (!row.history || row.history.length === 0) return null;
+    return row.history[0]?.minutes_processed ?? null;
+  };
+
+  const formatMinutesDuration = (minutesValue) => {
+    if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
+
+    const totalMinutes = Number(minutesValue);
+    if (Number.isNaN(totalMinutes) || totalMinutes < 0) return '---';
+
+    const wholeMinutes = Math.floor(totalMinutes);
+    const days = Math.floor(wholeMinutes / 1440);
+    const hours = Math.floor((wholeMinutes % 1440) / 60);
+    const minutes = wholeMinutes % 60;
+    const minuteLabel = minutes === 1 ? 'min' : 'mins';
+
+    if (days > 0) {
+      return `${days}day${days > 1 ? 's' : ''} ${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+    }
+
+    if (hours > 0) {
+      return `${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+    }
+
+    return `${minutes}${minuteLabel}`;
+  };
+
+  const getClaimedAt = (row) => {
+    if (!row.history || row.history.length === 0) return null;
+    const claimEntry = row.history.find((h) => h.new_status_id === 3);
+    return claimEntry?.changed_at || null;
+  };
+
+  const formatDateLong = (value, includeTime = false) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+
+    const datePart = date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: '2-digit',
+      year: 'numeric',
+    });
+
+    if (!includeTime) return datePart;
+
+    const timePart = date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    return `${datePart} ${timePart}`;
+  };
+
   sheet.pageSetup = {
     orientation: 'landscape',
     paperSize: 9, 
@@ -20,8 +101,8 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
   };
 
   sheet.columns = [
-    { width: 20 }, { width: 30 }, { width: 25 }, { width: 10 }, 
-    { width: 30 }, { width: 18 }, { width: 18 }, { width: 18 }, 
+    { width: 22 }, { width: 30 }, { width: 25 }, { width: 10 }, 
+    { width: 30 }, { width: 24 }, { width: 26 }, { width: 18 }, 
   ];
 
   const centerBold = (cell, value, size = 11) => {
@@ -90,24 +171,24 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
 
   filteredData.forEach((row) => {
     const dataRow = sheet.addRow([
-      row.requested_at ? new Date(row.requested_at).toLocaleDateString() : 'N/A',
-      row.student_profile ? `${row.student_profile.first_name} ${row.student_profile.last_name}` : 'N/A',
-      row.academic_record ? `${row.academic_record.course} ${row.academic_record.section || ''}` : 'N/A',
+      formatDateLong(row.requested_at, false) || 'N/A',
+      getFullName(row),
+      getCourse(row),
       row.student_profile?.gender || '---',
-      row.student_profile?.email || '---',
-      row.processed_at ? new Date(row.processed_at).toLocaleDateString() : '---',
-      row.processing_minutes || '0',
-      row.claimed_at ? new Date(row.claimed_at).toLocaleDateString() : 'Pending',
+      getEmail(row),
+      formatDateLong(getProcessedAt(row), true) || '---',
+      formatMinutesDuration(getMinutesProcessed(row)),
+      formatDateLong(getClaimedAt(row), false) || 'Pending',
     ]);
 
     dataRow.eachCell((cell) => {
-      cell.alignment = { horizontal: 'center', vertical: 'middle', indent: 1 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       cell.border = {
         top: { style: 'thin' }, bottom: { style: 'thin' },
         left: { style: 'thin' }, right: { style: 'thin' },
       };
     });
-    dataRow.height = 25; 
+    dataRow.height = 32; 
   });
 
   sheet.addRow([]); 
