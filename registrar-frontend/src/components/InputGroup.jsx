@@ -14,6 +14,7 @@ const InputGroup = ({
   title,
   required = false,
   min,
+  max,
   labelColor = "text-white",
   voiceEnabled = true,
   language = "en-US",
@@ -62,6 +63,7 @@ const InputGroup = ({
           pattern={pattern}
           title={title}
           min={min}
+          max={max}
           className={`w-full px-3 py-3 bg-white rounded-lg text-sm font-medium text-gray-700 shadow-sm
                      placeholder:font-normal placeholder:text-gray-400
                      focus:outline-none focus:ring-2 focus:ring-[#FFC72C]
@@ -103,6 +105,7 @@ InputGroup.propTypes = {
   title: PropTypes.string,
   labelColor: PropTypes.string,
   min: PropTypes.string,
+  max: PropTypes.string,
   voiceEnabled: PropTypes.bool,
   language: PropTypes.string,
 };

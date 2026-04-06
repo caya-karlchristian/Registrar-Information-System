@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect} from "react";
+import React, { useState, useEffect} from "react";
 import axios from "../services/api"
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
@@ -12,7 +12,6 @@ import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 
 const RequestForm = () => {
-  const formRef = useRef(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -20,6 +19,12 @@ const RequestForm = () => {
   const [availableDocs, setAvailableDocs] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [availableCertifications, setAvailableCertifications] = useState([]);
+
+  const getDateDaysAgo = (days) => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toISOString().split('T')[0];
+  };
 
   useEffect(() => {
     const loadOptions = async () => {
@@ -44,7 +49,7 @@ const RequestForm = () => {
     termsAgreed: false,
     documentsRequested: [],
     purposeOfRequest: "",
-    certification: "",
+    certification: [],
     receiptNumber: "",
     dateOfPayment: "",
     documentCopies: {},
@@ -57,10 +62,37 @@ const RequestForm = () => {
 
   const handlePreSubmit = (e) => {
     e.preventDefault();
-    if (formRef.current && !formRef.current.checkValidity()) {
-      formRef.current.reportValidity();
+
+    if (!(formData.receiptNumber || '').trim()) {
+      setErrorMessage("Please enter the Official Receipt Number.");
       return;
     }
+
+    if (!/^\d{7}$/.test((formData.receiptNumber || '').trim())) {
+      setErrorMessage("Official Receipt Number must be exactly 7 digits.");
+      return;
+    }
+
+    if (!formData.dateOfPayment) {
+      setErrorMessage("Please select the date of payment.");
+      return;
+    }
+
+    if (formData.dateOfPayment < getDateDaysAgo(7) || formData.dateOfPayment > getTodayDate()) {
+      setErrorMessage("Date of payment must be within the last 7 days up to today.");
+      return;
+    }
+
+    const hasInvalidDocCopy = formData.documentsRequested.some((doc) => {
+      const copies = Number(formData.documentCopies[doc] || 1);
+      return !Number.isInteger(copies) || copies < 1 || copies > 10;
+    });
+
+    if (hasInvalidDocCopy) {
+      setErrorMessage("Number of copies must be between 1 and 10.");
+      return;
+    }
+
     setShowConfirmModal(true);
   };
 
@@ -97,25 +129,10 @@ const RequestForm = () => {
       return;
     }
 
-    if (showCertificationDropdown && !formData.certification) {
+    if (showCertificationDropdown && formData.certification.length === 0) {
       setErrorMessage("Please specify the certification type.");
       return;
       }
-
-    if (formRef.current && !formRef.current.checkValidity()) {
-      formRef.current.reportValidity();
-      return;
-    }
-
-    if (currentStep === 3) {
-      const initialCopies = { ...formData.documentCopies };
-      formData.documentsRequested.forEach(doc => {
-        if (!initialCopies[doc]) {
-          initialCopies[doc] = 1;
-        }
-      });
-      setFormData(prev => ({ ...prev, documentCopies: initialCopies }));
-    }
 
     if (currentStep < 3) setCurrentStep((s) => s + 1);
   };
@@ -134,15 +151,9 @@ const RequestForm = () => {
       key => PURPOSE_MAP[key] === formData.purposeOfRequest
     );
 
-    const selectedDocIds = formData.documentsRequested.map(name => {
-      const dbFound = availableDocs.find(d => d.document_name === name)?.document_type_id;
-      if (dbFound) return dbFound;
-
-      return Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name);
-    }).filter(Boolean);
-
+    const selectedCertification = formData.certification[0] || null;
     const certId = availableCertifications.find(
-      (c) => c.certificate_name === formData.certification
+      (c) => c.certificate_name === selectedCertification
     )?.certificate_type_id ?? null;
     // 3. Prepare Payload (Matches your Laravel store validation)
     const payload = {
@@ -172,7 +183,7 @@ const RequestForm = () => {
       termsAgreed: false,
       documentsRequested: [],
       purposeOfRequest: "",
-      certification: "",
+      certification: [],
       receiptNumber: "",
       dateOfPayment: "",
       documentCopies: {},
@@ -204,6 +215,8 @@ const RequestForm = () => {
     ? availableDocs.map(d => d.document_name)
     : Object.values(DOC_TYPE_MAP); 
 
+  const certificationLabel = formData.certification.join(', ');
+
   return (
     <>
     <div className="relative min-h-screen pb-20 z-20">
@@ -228,9 +241,9 @@ const RequestForm = () => {
       ) : (
         <div className="max-w-5xl mx-auto -mt-2">
           <form
-            ref={formRef}
             className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative"
             onSubmit={handleSubmit}
+            noValidate
           >
             {/* Step Indicators */}
             <div className="flex flex-col items-center pt-4 pb-4">
@@ -304,12 +317,11 @@ const RequestForm = () => {
                   />
 
                   {showCertificationDropdown && (
-                    <DropdownGroup
+                    <MultiSelectDropdown
                       name="certification"
                       label="For Certification, please specify"
-                      value={formData.certification}
+                      selectedValues={formData.certification}
                       onChange={handleInputChange}
-                      required
                       options={certificationOptions}
                     />
                   )}
@@ -335,8 +347,6 @@ const RequestForm = () => {
                       value={formData.receiptNumber}
                       onChange={handleInputChange}
                       placeholder='XXXXXXX'
-                      pattern="^\d{7}$"
-                      title="Format must be 7 digits"
                       required
                       voiceEnabled
                     />
@@ -346,12 +356,13 @@ const RequestForm = () => {
                       type="date"
                       value={formData.dateOfPayment}
                       onChange={handleInputChange}
-                      min={getTodayDate()}
+                      min={getDateDaysAgo(7)}
+                      max={getTodayDate()}
                       required
                     />
                   </div>
                   <div className="bg-white/10 p-4 rounded-lg border -mb-1">
-                    <h3 className="text-[#d6d1c4] font-bold mb-3 uppercase text-sm tracking-wide">
+                    <h3 className="text-[#eebc48] font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
                     <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
@@ -359,9 +370,9 @@ const RequestForm = () => {
                         <div key={index} className="flex items-center justify-between gap-4">
                            <label className="text-white text-sm flex-1">
                             {doc}
-                              {doc.toLowerCase().includes("certif") && formData.certification && (
+                              {doc.toLowerCase().includes("certif") && certificationLabel && (
                                 <span className="text-[#eebc48] font-semibold ml-1">
-                                  — {formData.certification}
+                                  — {certificationLabel}
                                 </span>
                               )}
                             </label>
@@ -369,6 +380,7 @@ const RequestForm = () => {
                               <input
                                 type="number"
                                 min="1"
+                                max="10"
                                 className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg 
                                   outline-none transition-all duration-200
                                   focus:bg-white 
@@ -404,9 +416,9 @@ const RequestForm = () => {
                             <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
                             <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
                               {doc}
-                              {doc.toLowerCase().includes("certif") && formData.certification && (
+                              {doc.toLowerCase().includes("certif") && certificationLabel && (
                                 <span className="text-white/60 font-normal ml-1 normal-case tracking-normal">
-                                  — {formData.certification}
+                                  — {certificationLabel}
                                 </span>
                               )}
                             </h3>
