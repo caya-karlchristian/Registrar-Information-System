@@ -5,6 +5,7 @@ import {
   updateCertificationLayout,
   uploadCertificationLayoutLogo,
 } from "../services/api";
+import DropDown from "../components/DropDown";
 import {
   CERT_TEMPLATE_LAYOUT_CHANGED,
   DEFAULT_CERTIFICATE_LAYOUT,
@@ -212,10 +213,20 @@ const CertificateTemplateManagement = () => {
     [dropdownCertifications, selectedCertId]
   );
 
+  const certificateOptions = useMemo(
+    () => dropdownCertifications.map((item) => item.certificate_name),
+    [dropdownCertifications]
+  );
+
+  const selectedCertificateName = selectedCertification?.certificate_name ?? "";
+
   const isPersistedCertification = Boolean(selectedCertification);
 
   const handleCertChange = (event) => {
-    const nextId = event.target.value;
+    const nextName = event.target.value;
+    const nextCertification = dropdownCertifications.find((item) => item.certificate_name === nextName);
+    const nextId = nextCertification ? String(nextCertification.certificate_type_id) : "";
+
     setSelectedCertId(nextId);
 
     setLayout(layoutsByCertId[nextId] ?? layoutsByCertId[Number(nextId)] ?? { ...DEFAULT_CERTIFICATE_LAYOUT });
@@ -368,7 +379,7 @@ const CertificateTemplateManagement = () => {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="text-xl font-bold text-[#4f2018] sm:text-2xl">Certificate Template Editor</h1>
-              <p className="text-sm text-gray-600">Only logos are editable. Layout metadata is saved per certificate type.</p>
+              <p className="text-sm text-gray-600">Only logos are editable.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -397,24 +408,18 @@ const CertificateTemplateManagement = () => {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[350px_1fr]">
           <aside className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <h2 className="mb-3 text-lg font-bold text-[#4f2018]">Logo Editor</h2>
-            <label className="mb-3 block text-sm">
-              <span className="mb-1 block font-semibold text-gray-700">Certificate Type</span>
-              <select
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-                value={selectedCertId}
-                onChange={handleCertChange}
-                disabled={loading || !dropdownCertifications.length}
-              >
-                {!dropdownCertifications.length && <option value="">No certificate types available</option>}
-                {dropdownCertifications.map((item) => (
-                  <option key={item.certificate_type_id} value={item.certificate_type_id}>
-                    {item.certificate_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
             <div className="space-y-3">
+              <div>
+                <DropDown
+                  label="Certificate Type"
+                  name="certificateType"
+                  value={selectedCertificateName}
+                  onChange={handleCertChange}
+                  options={certificateOptions}
+                  labelColor="text-gray-700"
+                />
+              </div>
+
               <UploadDropZone label="Main Logo" onFiles={updateMainLogo} disabled={!selectedCertId} />
               <UploadDropZone label="Header Right Logo" onFiles={updateRightLogo} disabled={!selectedCertId} />
 
@@ -472,7 +477,7 @@ const CertificateTemplateManagement = () => {
 
           <section className="rounded-2xl border border-gray-200 bg-gray-100 p-4 sm:p-8">
             <div className="mb-3 flex items-center justify-between rounded-lg bg-white px-4 py-3">
-              <h2 className="text-lg font-bold text-gray-800">Live Certificate Preview</h2>
+              <h2 className="text-lg font-bold text-gray-800">Certificate Preview</h2>
             </div>
             <CertificatePreviewCanvas layout={layout} certName={selectedCertification?.certificate_name} />
           </section>
