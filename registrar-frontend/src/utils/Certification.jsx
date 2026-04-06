@@ -14,6 +14,7 @@ import {
   PupLetterhead,
   EndorsementNoteBlock,
   bold,
+  fillOrLine,
 } from "../utils/helpers.jsx";
 import { formatDateFormal, formatDateOrdinal } from "./formatters.js";
 import puplogoimage from "../assets/puplogoimage.png";
@@ -25,12 +26,12 @@ export const CERT_CONFIG = {
     renderBody: (data) => (
       <StandardCertLayout date={data.date}>
         <CertParagraph>
-          This is to certify that {bold(data.fullName)} is a {bold(data.educationLevel)} of the
+          This is to certify that {fillOrLine(data.fullName)} is a {fillOrLine(data.educationLevel)} of the
           Polytechnic University of the Philippines Taguig Campus and received the degree of{" "}
-          {bold(data.course)} {bold(data.latinHonors)} on {bold(formatDateFormal(data.dateGraduated))}.
+          {fillOrLine(data.course)} {fillOrLine(data.latinHonors)} on {fillOrLine(formatDateFormal(data.dateGraduated))}.
         </CertParagraph>
         <IssuedLineAforementioned date={data.date} />
-        <RegistrarSignature />
+        <RegistrarSignature signee={data.signee} />
         <FooterInfo className="mt-4" diplomaNum={data.diplomaNum} date={bold(formatDateFormal(data.date))} />
       </StandardCertLayout>
     ),
@@ -41,12 +42,12 @@ export const CERT_CONFIG = {
     renderBody: (data) => (
       <StandardCertLayout date={data.date}>
         <CertParagraph>
-          This is to certify that {bold(data.fullName)} is a {bold(data.educationLevel)} of the
+          This is to certify that {fillOrLine(data.fullName)} is a {fillOrLine(data.educationLevel)} of the
           Polytechnic University of the Philippines Taguig Campus with the degree of{" "}
-          {bold(data.course)} and obtained a General Weighted Average of {bold(data.gwa)}.
+          {fillOrLine(data.course)} and obtained a General Weighted Average of {fillOrLine(data.gwa)}.
         </CertParagraph>
         <IssuedLineAforementioned date={data.date} />
-        <RegistrarSignature />
+        <RegistrarSignature signee={data.signee} />
         <ReceiptInfo officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </StandardCertLayout>
     ),
@@ -57,17 +58,17 @@ export const CERT_CONFIG = {
     renderBody: (data) => (
       <StandardCertLayout date={data.date}>
         <CertParagraph>
-          This is to certify that {bold(data.fullName)} is a {bold(data.educationLevel)} of the
+          This is to certify that {fillOrLine(data.fullName)} is a {fillOrLine(data.educationLevel)} of the
           Polytechnic University of the Philippines Taguig Campus with the degree of{" "}
-          {bold(data.course)} {bold("major in")} {bold(data.major)} {bold(data.latinHonors)}{" "}
-          on {bold(formatDateFormal(data.dateGraduated))}.
+          {fillOrLine(data.course)} {bold("major in")} {fillOrLine(data.major)} {fillOrLine(data.latinHonors)}{" "}
+          on {fillOrLine(formatDateFormal(data.dateGraduated))}.
         </CertParagraph>
         <CertParagraph className="mb-10">
           This certification is issued this {formatDateFormal(data.date)} upon request of the
-          aforementioned individual in support of their application for {bold(data.eligibilityType)}{" "}
+          aforementioned individual in support of their application for {fillOrLine(data.eligibilityType)}{" "}
           conferred by the Civil Service Commission
         </CertParagraph>
-        <RegistrarSignature />
+        <RegistrarSignature signee={data.signee} />
         <ReceiptInfo officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </StandardCertLayout>
     ),
@@ -92,9 +93,9 @@ export const CERT_CONFIG = {
         <CertificateTitle title="Certification of Completed Degree and Special Order" />
         <div className="space-y-3 leading-[1.9] text-justify print:text-[11pt]">
           <p>
-            This is to certify that {bold(data.fullName)} graduated from this University with a
-            degree in {bold(data.course)} {bold("major in")} {bold(data.major)}{" "}
-            on {bold(formatDateFormal(data.dateGraduated))}.
+            This is to certify that {fillOrLine(data.fullName)} graduated from this University with a
+            degree in {fillOrLine(data.course)} {bold("major in")} {fillOrLine(data.major)}{" "}
+            on {fillOrLine(formatDateFormal(data.dateGraduated))}.
           </p>
           <p>
             As a State University, the Polytechnic University of the Philippines does not issue
@@ -106,7 +107,7 @@ export const CERT_CONFIG = {
           </p>
         </div>
         <TextBlock className="mt-6 mb-5 px-27 text-right print:text-[11pt]">Very truly yours,</TextBlock>
-        <DirectorSignature />
+        <DirectorSignature signee={data.signee} />
         <ReceiptInfo officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </div>
     ),
@@ -117,11 +118,11 @@ export const CERT_CONFIG = {
     renderBody: (data) => (
       <StandardCertLayout date={data.date}>
         <CertParagraph>
-          This is to certify that {bold(data.fullName)} is enrolled in this Campus,{" "}
-          {data.semesters} of S.Y {data.syAdmitted}, under our {bold(data.course)} program.
+          This is to certify that {fillOrLine(data.fullName)} is enrolled in this Campus,{" "}
+          {data.semesters} of S.Y {fillOrLine(data.syAdmitted)}, under our {fillOrLine(data.course)} program.
         </CertParagraph>
         <IssuedLine date={data.date} />
-        <RegistrarSignature />
+        <RegistrarSignature signee={data.signee} />
         <ReceiptInfo officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </StandardCertLayout>
     ),
@@ -132,13 +133,13 @@ export const CERT_CONFIG = {
     renderBody: (data) => (
       <StandardCertLayout date={data.date}>
         <CertParagraph>
-          This is to certify that {bold(data.fullName)} was enrolled in this Campus,{" "}
-          {data.semesters} of S.Y {data.syAdmitted}, until {data.lastSemesters} of S.Y{" "}
-          {data.lastSy}, under our {bold(data.course)} with a total of {bold(data.units)}{" "}
-          {bold("units")} for {bold(data.semestersNum)} {bold("semester")}.
+          This is to certify that {fillOrLine(data.fullName)} was enrolled in this Campus,{" "}
+          {data.semesters} of S.Y {fillOrLine(data.syAdmitted)}, until {data.lastSemesters} of S.Y{" "}
+          {fillOrLine(data.lastSy)}, under our {fillOrLine(data.course)} with a total of {fillOrLine(data.units)}{" "}
+          {bold("units")} for {fillOrLine(data.semestersNum)} {bold("semester")}.
         </CertParagraph>
         <IssuedLine date={data.date} />
-        <DirectorSignature />
+        <DirectorSignature signee={data.signee} />
         <ReceiptInfo officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </StandardCertLayout>
     ),
@@ -158,10 +159,10 @@ export const CERT_CONFIG = {
           late received such recommendation.
         </CertParagraph>
         <CertParagraph className="mb-15">
-          Issued this {formatDateOrdinal(data.date)} upon request of {bold(data.fullName)} a{" "}
-          {bold(data.course)} {bold("major in")} {bold(data.major)} graduate of this University.
+          Issued this {formatDateOrdinal(data.date)} upon request of {fillOrLine(data.fullName)} a{" "}
+          {fillOrLine(data.course)} {bold("major in")} {fillOrLine(data.major)} graduate of this University.
         </CertParagraph>
-        <DirectorSignature />
+        <DirectorSignature signee={data.signee} />
         <ReceiptInfo className="mt-4" officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </StandardCertLayout>
     ),
@@ -172,19 +173,19 @@ export const CERT_CONFIG = {
     renderBody: (data) => (
       <StandardCertLayout date={data.date}>
         <CertParagraph className="mb-5">
-          This is to certify that {bold(data.fullName)} is a bonafide student of this University
-          taking up the {bold(data.course)} {bold("major in")} {bold(data.major)}
+          This is to certify that {fillOrLine(data.fullName)} is a bonafide student of this University
+          taking up the {fillOrLine(data.course)} {bold("major in")} {fillOrLine(data.major)}
         </CertParagraph>
         <CertParagraph className="mb-5">
           This also certifies that this course is under a ladderized program. Holders of this
-          program have the opportunity to further their studies to {bold(data.ladderizedDegree)}{" "}
+          program have the opportunity to further their studies to {fillOrLine(data.ladderizedDegree)}{" "}
           when all the requirements have been met.
         </CertParagraph>
         <CertParagraph className="mb-15">
           This certification is being issued this upon request of the aforementioned name for
           whatever legal purpose it may serve.
         </CertParagraph>
-        <RegistrarSignature />
+        <RegistrarSignature signee={data.signee} />
         <ReceiptInfo className="mt-4" officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </StandardCertLayout>
     ),
@@ -207,10 +208,10 @@ export const CERT_CONFIG = {
         </div>
         <p className="mb-6 text-[12px] sm:text-[13px]">Madam:</p>
         <p className="indent-8 text-[12px] sm:text-[13px] leading-relaxed text-justify mb-6">
-          I, <strong className="underline">{data.fullName || "___________________"}</strong>, would
+          I, <strong className="underline">{fillOrLine(data.fullName)}</strong>, would
           like to request your good office, for the authentication of my academic records in{" "}
           <strong className="underline">
-            {data.course || "___________________"}
+            {fillOrLine(data.course)}
             {data.major ? ` major in ${data.major}` : ""}
           </strong>{" "}
           issued by Polytechnic University of the Philippines - Taguig. In this connection, I am
@@ -240,9 +241,9 @@ export const CERT_CONFIG = {
         </p>
         <div className="flex gap-4 mb-1">
           {[
-            [data.fullName || "______________________________", "(Name of Student,"],
-            [data.studentStatus || "______________________________", "Status"],
-            [data.course || "______", "etc.)"],
+            [fillOrLine(data.fullName), "(Name of Student,"],
+            [fillOrLine(data.studentStatus), "Status"],
+            [fillOrLine(data.course), "etc.)"],
           ].map(([value, label], i) => (
             <div key={i} className="flex-1 text-center">
               <p className="font-bold text-[12px] sm:text-[13px] border-b border-gray-800 pb-1">{value}</p>
@@ -288,8 +289,8 @@ export const CERT_CONFIG = {
               <thead className="sr-only"><tr><th>Field</th><th>Sep</th><th>Value</th></tr></thead>
               <tbody>
                 {[
-                  ["Name of Student", <span key="name-of-student" className="font-medium uppercase">{data.fullName || "___________________"}</span>],
-                  ["Degree", <span key="degree" className="font-medium uppercase">{data.course || "___________________"}{data.major ? ` MAJOR IN ${data.major.toUpperCase()}` : ""}</span>],
+                  ["Name of Student", <span key="name-of-student" className="font-medium uppercase">{fillOrLine(data.fullName, 15)}</span>],
+                  ["Degree", <span key="degree" className="font-medium uppercase">{fillOrLine(`${data.course || ""}${data.major ? ` MAJOR IN ${data.major.toUpperCase()}` : ""}`, 20)}</span>],
                   ["Date of Admission/Enrollment", data.syAdmitted ? new Date(data.syAdmitted).getFullYear() : "___"],
                   ["Date of Graduation", data.dateGraduated ? formatDateFormal(data.dateGraduated) : "___________________"],
                   ["Mode of Study", "Conventional"],
@@ -316,11 +317,11 @@ export const CERT_CONFIG = {
           </p>
           <p className="indent-8 text-justify mb-5">
             Issued upon request of{" "}
-            <strong className="uppercase">{data.fullName || "___________________"}</strong>{" "}
+            <strong className="uppercase">{fillOrLine(data.fullName)}</strong>{" "}
             for whatever legal purpose it may serve.
           </p>
         </div>
-        <DirectorSignature />
+        <DirectorSignature signee={data.signee} />
         <div className="text-[7px] sm:text-[8px] space-y-1">
           <p className="font-bold tracking-tight">NOT VALID WITHOUT UNIVERSITY DRY SEAL</p>
           <p className="tracking-tight">OR WITH ERASURE OR ALTERATION</p>
@@ -351,11 +352,11 @@ export const CERT_CONFIG = {
         <div className="space-y-4 text-[12px] sm:text-[13px] leading-relaxed text-justify px-2 sm:px-4 print:text-[12pt]">
           <TextBlock>To Whom It May Concern:</TextBlock>
           <CertParagraph>
-            This is to certify that {bold(data.fullName || "___________________")} has completed{" "}
+            This is to certify that {fillOrLine(data.fullName)} has completed{" "}
             {bold("NSTP CWTS")} in the {data.semesters || "___________________"}, S.Y.{" "}
             {data.syAdmitted ? new Date(data.syAdmitted).getFullYear() : "____"}-
             {data.syAdmitted ? new Date(data.syAdmitted).getFullYear() + 1 : "____"} in this
-            University with Serial Number {bold(data.nstpSerialNum || "___________________")} in
+            University with Serial Number {fillOrLine(data.nstpSerialNum)} in
             compliance with RA 9163.
           </CertParagraph>
           <CertParagraph className="mb-15">
@@ -363,7 +364,7 @@ export const CERT_CONFIG = {
             whatever legal purpose it may serve.
           </CertParagraph>
         </div>
-        <RegistrarSignature />
+        <RegistrarSignature signee={data.signee} />
         <ReceiptInfo officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </>
     ),
@@ -378,9 +379,9 @@ export const CERT_CONFIG = {
         <div className="space-y-4 text-[12px] sm:text-[13px] leading-relaxed text-justify px-2 sm:px-4 print:text-[12pt]">
           <TextBlock>To Whom It May Concern:</TextBlock>
           <CertParagraph>
-            This is to certify that {bold(data.fullName || "___________________")} has attended
+            This is to certify that {fillOrLine(data.fullName)} has attended
             tertiary education in this institution with a degree in{" "}
-            {bold(`${data.course || "___________________"}${data.dateGraduated ? ` — Batch ${new Date(data.dateGraduated).getFullYear()} graduate` : ""}`)}.
+            {fillOrLine(`${data.course || ""}${data.dateGraduated ? ` — Batch ${new Date(data.dateGraduated).getFullYear()} graduate` : ""}`)}.
           </CertParagraph>
           <CertParagraph>
             This certifies further that {bold("English language")} is the{" "}
@@ -391,7 +392,7 @@ export const CERT_CONFIG = {
             the aforementioned name for whatever purpose it may serve.
           </CertParagraph>
         </div>
-        <DirectorSignature />
+        <DirectorSignature signee={data.signee} />
         <ReceiptInfo officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </>
     ),
@@ -413,10 +414,10 @@ export const CERT_CONFIG = {
         </div>
         <p className="mb-6 text-[12px] sm:text-[13px]">Dear Sir/Madame:</p>
         <p className="indent-6 text-[12px] sm:text-[13px] leading-relaxed text-justify mb-6">
-          I, <strong className="underline">{data.fullName || "___________________"}</strong>, would
+          I, <strong className="underline">{fillOrLine(data.fullName)}</strong>, would
           like to request your good office, for the authentication of my academic records in{" "}
           <strong className="underline">
-            {data.course || "___________________"}
+            {fillOrLine(data.course)}
             {data.major ? ` major in ${data.major}` : ""}
           </strong>{" "}
           issued by Polytechnic University of the Philippines - Taguig. In this connection, I am
@@ -434,7 +435,7 @@ export const CERT_CONFIG = {
           <div className="text-center w-56">
             <p className="text-[12px] sm:text-[13px]">Respectfully yours,</p>
             <div className="mt-8 border-b border-gray-800 w-full" />
-            <p className="text-[11px] sm:text-[12px] mt-1">{data.fullName || "___________________"}</p>
+            <p className="text-[11px] sm:text-[12px] mt-1">{fillOrLine(data.fullName)}</p>
           </div>
         </div>
         <div className="border-t-2 border-gray-800 text-center py-1 my-4">
@@ -443,7 +444,7 @@ export const CERT_CONFIG = {
         <PupLetterhead date={data.date} />
         <p className="indent-6 text-[12px] sm:text-[13px] leading-relaxed text-justify mb-4">
           Respectfully forwarded to the Director, Authentication Department Region, the request of{" "}
-          {data.fullName || "______________"} {bold("GRADUATED -")} {bold(data.course)} for the
+          {fillOrLine(data.fullName)} {bold("GRADUATED -")} {fillOrLine(data.course)} for the
           Authentication of her record, recommending approval, with the certification that the
           documents forwarded herewith are true and authentic copies of the documents issued and/or
           kept by this institution
@@ -493,7 +494,7 @@ export const CERT_CONFIG = {
           <div className="text-right font-bold mb-2">{formatDateFormal(data.date)}</div>
           <p className="font-bold">TO WHOM IT MAY CONCERN:</p>
           <CertParagraph>
-            This is to certify that {bold(data.fullName || "___________________")} is hereby granted{" "}
+            This is to certify that {fillOrLine(data.fullName)} is hereby granted{" "}
             {bold("CERTIFICATE OF ELIGIBILITY TO TRANSFER CREDENTIAL/HONORABLE DISMISSAL")} from
             this University effective {bold(formatDateFormal(data.date))}.
           </CertParagraph>
@@ -530,7 +531,7 @@ export const CERT_CONFIG = {
           <p className="font-bold">Sir/Madam:</p>
           <p className="indent-8 text-justify">
             I have the honor to request to send us the Transcript of Records of Mr./Ms.{" "}
-            <strong>{data.fullName || "___________________"}</strong>, who has been temporarily
+            <strong>{fillOrLine(data.fullName)}</strong>, who has been temporarily
             enrolled in this school for the _____________ semester/summer, _____________ upon
             presentation of his/her Certificate of Eligibility to Transfer/Honorable Dismissal.
           </p>
@@ -564,14 +565,14 @@ export const CERT_CONFIG = {
         <div className="space-y-4 text-[12px] sm:text-[13px] leading-relaxed text-justify px-2 sm:px-4 print:text-[12pt]">
           <TextBlock>To Whom It May Concern:</TextBlock>
           <CertParagraph>
-            This is to certify that {bold(data.fullName || "___________________")} has attended
+            This is to certify that {fillOrLine(data.fullName)} has attended
             tertiary education in this institution with a degree in{" "}
-            {bold(`${data.course || "___________________"}${data.dateGraduated ? ` — Batch ${new Date(data.dateGraduated).getFullYear()} graduate` : ""}`)}.
+            {fillOrLine(`${data.course || ""}${data.dateGraduated ? ` — Batch ${new Date(data.dateGraduated).getFullYear()} graduate` : ""}`)}.
           </CertParagraph>
           <CertParagraph>
-            The {bold(data.course || "___________________")} is a{" "}
-            {bold(`${data.semestersNum || "___"}-year degree program`)} with a total of{" "}
-            {bold(`${data.units || "___"} academic units`)}.
+            The {fillOrLine(data.course)} is a{" "}
+            {fillOrLine(`${data.semestersNum || ""}-year degree program`)} with a total of{" "}
+            {fillOrLine(`${data.units || ""} academic units`)}.
           </CertParagraph>
           <CertParagraph>
             This certifies further that {bold("English language")} is the{" "}
@@ -582,7 +583,7 @@ export const CERT_CONFIG = {
             the aforementioned name for whatever purpose it may serve.
           </CertParagraph>
         </div>
-        <DirectorSignature />
+        <DirectorSignature signee={data.signee} />
         <ReceiptInfo officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
       </>
     ),

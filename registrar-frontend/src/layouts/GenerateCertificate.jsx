@@ -1,14 +1,19 @@
-import React, { useState, useEffect} from "react";
+import React, { useEffect, useState } from "react";
 import InputGroup from "../components/InputGroup.jsx";
 import { PrinterIcon } from "@heroicons/react/24/solid";
-import SuccessToast from "../components/SuccessToast.jsx";
-import { getAcademicRecords, getCertifications, getCertificationLayouts } from "../services/api";
-import { CertHeader, CertFooter} from "../utils/helpers.jsx";
+import { getAcademicRecords, getCertifications, getCertificationLayouts, getDocumentTypes } from "../services/api";
+import { CertHeader, CertFooter, getTodayDate } from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import DropDown from "../components/DropDown.jsx";
 import { DEFAULT_CERTIFICATE_LAYOUT, normalizeCertificateLayout } from "../utils/certificateTemplateSettings.js";
 
 const toCertificateRows = (raw) => {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.data)) return raw.data;
+  return [];
+};
+
+const toDocumentTypeRows = (raw) => {
   if (Array.isArray(raw)) return raw;
   if (Array.isArray(raw?.data)) return raw.data;
   return [];
@@ -33,6 +38,7 @@ const semesters   = ["1st Semester", "2nd Semester", "3rd Semester", "Summer"];
 const latinHonors = ["(Cum Laude)", "(Magna Cum Laude)", "(Summa Cum Laude)"];
 const eduLevels   = ["Undergraduate", "Graduate"];
 const yearNum     = ["2", "3", "4", "5"];
+const signeeOptions = ["Mhel P. Garcia", "Marissa B. Ferrer, DEM, RPsy"];
 
 const DEFAULT_FORM = {
   docType: "Certificate of Graduation",
@@ -62,6 +68,7 @@ const DEFAULT_FORM = {
   semestersNum: "", 
   officialReceiptNum: "",
   yearNum: "",
+  signee: "Mhel P. Garcia",
 };
 
 // ─── Field Config ─────
@@ -97,20 +104,26 @@ const FIELD_CONFIG = [
 
 // ─── Component ───────
 
-const GenerateCertification = ({ initialData, onClose }) => {
-  const [showSuccess, setShowSuccess] = useState(false);
+const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onLoadingChange }) => {
   const [loading, setLoading] = useState(false);
   const [certifications, setCertifications] = useState([]);
   const [layoutsByCertId, setLayoutsByCertId] = useState({});
   const [docTypeOptions, setDocTypeOptions] = useState(Object.keys(CERT_CONFIG));
   const [formData, setFormData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
+  const requestedDocType = typeof initialData?.docType === "string" ? initialData.docType.trim() : "";
+  const lockDocTypeToRequest = Boolean(initialData?.requestId && requestedDocType);
 
   useEffect(() => {
     const fetchLayoutData = async () => {
       try {
-        const [certRes, layoutRes] = await Promise.all([getCertifications(), getCertificationLayouts()]);
+        const [certRes, layoutRes, documentTypeRes] = await Promise.all([
+          getCertifications(),
+          getCertificationLayouts(),
+          getDocumentTypes(),
+        ]);
         const certs = toCertificateRows(certRes?.data);
         const layouts = layoutRes?.data ?? [];
+        const documentTypes = toDocumentTypeRows(documentTypeRes?.data);
 
         const nextLayouts = {};
         layouts.forEach((layoutRow) => {
@@ -120,14 +133,34 @@ const GenerateCertification = ({ initialData, onClose }) => {
         const fetchedNames = certs
           .map((item) => item?.certificate_name)
           .filter((name) => typeof name === "string" && name.trim().length > 0);
-        const fetchedDocTypes = Array.from(new Set([...fetchedNames, ...Object.keys(CERT_CONFIG)])).sort((a, b) => a.localeCompare(b));
+        const fetchedDocumentNames = documentTypes
+          .map((item) => item?.document_name)
+          .filter((name) => typeof name === "string" && name.trim().length > 0);
+        const fetchedDocTypes = Array.from(
+          new Set([
+            ...fetchedDocumentNames,
+            ...fetchedNames,
+            ...Object.keys(CERT_CONFIG),
+          ])
+        ).sort((a, b) => a.localeCompare(b));
 
         setCertifications(
           [...certs].sort((a, b) => String(a?.certificate_name ?? "").localeCompare(String(b?.certificate_name ?? "")))
         );
         setLayoutsByCertId(nextLayouts);
-        setDocTypeOptions(fetchedDocTypes);
+        if (lockDocTypeToRequest) {
+          setDocTypeOptions([requestedDocType]);
+        } else {
+          setDocTypeOptions(fetchedDocTypes);
+        }
         setFormData((prev) => {
+          if (lockDocTypeToRequest) {
+            return {
+              ...prev,
+              docType: requestedDocType,
+            };
+          }
+
           if (fetchedDocTypes.includes(prev.docType)) return prev;
           return {
             ...prev,
@@ -141,6 +174,12 @@ const GenerateCertification = ({ initialData, onClose }) => {
 
     fetchLayoutData();
   }, []);
+
+  useEffect(() => {
+    if (typeof onLoadingChange === "function") {
+      onLoadingChange(loading);
+    }
+  }, [loading, onLoadingChange]);
 
   useEffect(() => {
     if (formData.course && formData.studentNum) return;
@@ -174,9 +213,20 @@ const GenerateCertification = ({ initialData, onClose }) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+  const handlePrint = () => {
+    if (onCertificatePrinted && initialData?.requestId) {
+      const requestId = initialData.requestId;
+      const markPrinted = () => {
+        window.removeEventListener("afterprint", markPrinted);
+        onCertificatePrinted(requestId);
+      };
+
+      window.addEventListener("afterprint", markPrinted, { once: true });
+      window.print();
+      return;
+    }
+
+    window.print();
   };
 
   const certConfig = CERT_CONFIG[formData.docType];
@@ -187,47 +237,49 @@ const GenerateCertification = ({ initialData, onClose }) => {
     : DEFAULT_CERTIFICATE_LAYOUT;
 
   return (
-    <div className="max-w-7xl mx-auto p-4 mt-10 md:p-6 flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
+    <div className="mt-10 h-full min-h-0 flex flex-col overflow-y-auto bg-linear-to-br from-white via-stone-100 to-stone-200 print:mt-0 print:bg-white print:min-h-0 print:h-auto print:overflow-visible">
 
       {/* Header Toolbar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 pb-6 shrink-0">
-        <div className="w-full max-w-xs">
-          <DropDown
-            label="Certification Type"
-            name="docType"
-            value={formData.docType}
-            onChange={handleChange}
-            options={docTypeOptions}
-            labelColor="text-gray-600"
-          />
-        </div>
-        <div className="flex gap-3 w-full sm:w-auto">
-          {onClose && (
+      <div className="w-full max-w-7xl mx-auto px-4 pt-5 pb-3 md:px-6 md:pt-6 md:pb-4 print:hidden">
+        <div className="flex flex-col gap-4 rounded-2xl border border-stone-200/80 bg-white/90 px-4 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-white/70 md:flex-row md:items-end md:justify-between md:px-5 md:py-5">
+          <div className="w-full md:max-w-xs">
+            <DropDown
+              label="Certification Type"
+              name="docType"
+              value={formData.docType}
+              onChange={handleChange}
+              options={docTypeOptions}
+              labelColor="text-gray-600"
+            />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-stone-300 bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm transition-all hover:bg-stone-200 active:scale-95 md:px-6 md:py-3 md:text-base"
+              >
+                ← Back
+              </button>
+            )}
             <button
-              onClick={onClose}
-              className="flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-bold shadow active:scale-95 transition-all"
+              onClick={handlePrint}
+              className="w-full sm:w-auto flex-1 md:flex-none flex items-center justify-center gap-2 rounded-xl bg-pup-dark-maroon px-4 py-2 text-sm font-bold text-white shadow-lg shadow-stone-400/40 transition-all hover:bg-[#4a0000] active:scale-95 md:px-8 md:py-3 md:text-base"
             >
-              ← Back
+              <PrinterIcon className="w-4 h-4 md:w-5 md:h-5" />
+              Print File
             </button>
-          )}
-          <button
-            onClick={() => window.print()}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-[#4a120e] text-white px-8 py-3 rounded-lg font-bold shadow-lg active:scale-95 transition-all shrink-0"
-          >
-            <PrinterIcon className="w-5 h-5" />
-            Print File
-          </button>
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start flex-1 min-h-0">
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 items-start w-full max-w-7xl mx-auto px-4 md:px-6 pb-6 min-h-0 overflow-visible lg:overflow-visible print:block print:max-w-none print:px-0 print:pb-0 print:overflow-visible">
 
         {/* Left Sidebar */}
-        <div className="w-full lg:w-87.5 border border-gray-200 rounded-lg p-3 shrink-0 h-full overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200">
-          <div className="bg-gray-100 p-6 rounded-2xl border border-gray-200 shadow-sm">
-            <h3 className="font-bold text-lg text-gray-800 mb-6 uppercase tracking-tighter">Edit Information</h3>
-            <form className={`space-y-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
-              {loading && <p className="text-sm text-blue-600 animate-pulse">Fetching academic records...</p>}
+        <div className="w-full lg:w-88 xl:w-96 shrink-0 overflow-y-auto order-1 print:hidden">
+          <div className="rounded-2xl border border-stone-200/80 bg-white/95 p-4 shadow-md shadow-stone-200/60 md:p-6">
+            <h3 className="mb-6 text-base font-extrabold uppercase tracking-tight text-[#800000] md:text-lg">Edit Information</h3>
+            <form className={`space-y-4 md:space-y-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
+              {loading && <p className="text-xs md:text-sm text-stone-500 animate-pulse">Fetching academic records...</p>}
 
               {/* Dynamic fields */}
               {FIELD_CONFIG.map(([name, type, label, props]) => {
@@ -253,36 +305,50 @@ const GenerateCertification = ({ initialData, onClose }) => {
                     value={formData[name]}
                     onChange={handleChange}
                     {...props}
+                    voiceEnabled={props.type !== "date"}
                     labelColor="text-gray-600" 
                   />
                 );
               })}
 
               {/* Date Issued always visible */}
-              <InputGroup label="Date Issued" type="date" name="date" value={formData.date} onChange={handleChange} labelColor="text-gray-600" />
+              <InputGroup
+                label="Date Issued"
+                type="date"
+                name="date"
+                value={formData.date}
+                onChange={handleChange}
+                voiceEnabled={false}
+                labelColor="text-gray-600"
+                min={getTodayDate()}
+              />
 
-              <button
-                type="button"
-                onClick={handleSave}
-                className="w-full mt-4 bg-[#4a120e] text-white py-4 rounded-xl font-bold shadow-xl transition-all active:scale-95 hover:bg-[#360d0a]"
-              >
-                Save Changes
-              </button>
+              {/* Signee always visible */}
+              <DropDown
+                label="Signee"
+                name="signee"
+                value={formData.signee}
+                onChange={handleChange}
+                options={signeeOptions}
+                labelColor="text-gray-600"
+              />
+
             </form>
           </div>
         </div>
 
         {/* Certificate Preview */}
-        <div className="flex-1 bg-gray-100 rounded-2xl border border-gray-200 flex flex-col overflow-hidden h-full min-h-125 lg:min-h-0">
-          <div className="p-4 bg-white border-b border-gray-200 shrink-0">
+        <div className="relative flex-1 overflow-hidden rounded-2xl border border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70 min-h-168 lg:min-h-150 order-2 print:bg-white print:rounded-none print:border-0 print:min-h-0 print:overflow-visible">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(90,90,90,0.07),transparent_40%),radial-gradient(circle_at_85%_10%,rgba(120,120,120,0.06),transparent_35%)] print:hidden" />
+          <div className="relative p-4 bg-white/95 border-b border-stone-200 shrink-0 print:hidden">
             <div className="flex items-center justify-between max-w-187.5 mx-auto w-full">
-              <h2 className="text-lg font-bold text-gray-800 uppercase tracking-tight">Certificate Preview</h2>
+              <h2 className="text-lg font-extrabold uppercase tracking-tight text-stone-800">Certificate Preview</h2>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 sm:p-8 scrollbar-thin scrollbar-thumb-gray-300 print:p-0 print:overflow-visible">
+          <div className="relative flex-1 overflow-y-auto p-4 sm:p-8 print:p-0 print:overflow-visible">
             <div
               id="print-area"
-              className="bg-white shadow-2xl mx-auto w-full max-w-187.5 flex flex-col p-8 sm:p-10 ring-1 ring-black/5 text-gray-800 print:shadow-none print:ring-0 print:p-0"
+              className="bg-white shadow-2xl shadow-stone-300/70 mx-auto w-full max-w-187.5 flex flex-col origin-top scale-95 p-5 sm:p-8 ring-1 ring-stone-900/5 text-gray-800 print:scale-100 print:shadow-none print:ring-0 print:p-0"
             >
               {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
               <div className="flex-1">{certConfig?.renderBody(formData)}</div>
@@ -291,8 +357,6 @@ const GenerateCertification = ({ initialData, onClose }) => {
           </div>
         </div>
       </div>
-
-      {showSuccess && <SuccessToast message="Data saved successfully!" onClose={() => setShowSuccess(false)} />}
     </div>
   );
 };

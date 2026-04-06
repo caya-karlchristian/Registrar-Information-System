@@ -16,6 +16,7 @@ import {
 import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
+import LineLoading from '../components/LineLoading.jsx';
 import CertificateModal from '../components/CertificateModal.jsx';
 import { DOC_TYPE_MAP } from '../utils/constants';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
@@ -30,12 +31,14 @@ const STATUS_FALLBACK = {
 };
 
 const ITEMS_PER_PAGE = 5;
+const PRINTED_CERTIFICATE_STORAGE_KEY = 'printed-certificate-request-ids';
 
 const StaffDashboard = () => {
   const [requests, setRequests] = useState([]);
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -44,6 +47,16 @@ const StaffDashboard = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [certRequest, setCertRequest] = useState(null);
   const [requestStatuses, setRequestStatuses] = useState([]);
+  const [printedCertificateIds, setPrintedCertificateIds] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(PRINTED_CERTIFICATE_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
 
   const { notifications } = useNotificationsContext();
 
@@ -65,9 +78,9 @@ const StaffDashboard = () => {
   const resolvedStatusIds = statusIds();
 
   /* ---------------- FETCH DATA ---------------- */
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (showOverlay = true) => {
     try {
-      setLoading(true);
+      if (showOverlay) setLoading(true);
       const [requestsRes, statusesRes] = await Promise.all([
         getDocumentRequests(),
         getRequestStatuses(),
@@ -188,7 +201,7 @@ const StaffDashboard = () => {
     } catch (error) {
       console.error('Error fetching document requests:', error);
     } finally {
-      setLoading(false);
+      if (showOverlay) setLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -201,6 +214,11 @@ const StaffDashboard = () => {
   }, [notifications.length]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(PRINTED_CERTIFICATE_STORAGE_KEY, JSON.stringify(printedCertificateIds));
+  }, [printedCertificateIds]);
+
+  useEffect(() => {
     setCurrentPage(1);
   }, [filterStatus, searchTerm, sortOrder]);
 
@@ -208,12 +226,14 @@ const StaffDashboard = () => {
   const handleStatusUpdate = async (id, newStatusId) => {
     try {
     setUpdatingId(id);
+    setActionLoading(true);
     await updateDocumentRequest(id, { status_id: newStatusId });
-    await fetchData();
+    await fetchData(false);
     } catch (error) {
     console.error('Status update failed:', error);
     alert('Error: ' + error.message);
     } finally {
+    setActionLoading(false);
     setUpdatingId(null);
     }
   };
@@ -259,14 +279,15 @@ const StaffDashboard = () => {
 
   /* ---------------- STATUS BADGE ---------------- */
   const getStatusBadge = status => {
+    const normalizedStatus = String(status ?? '').trim().toLowerCase();
     const styles = {
-      Pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      'Ready to claim': 'bg-green-100 text-green-700 border-green-200',
-      Completed: 'bg-gray-200 text-gray-700 border-gray-300',
-      Forfeited: 'bg-red-100 text-red-700 border-red-200',
+      pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      'ready to claim': 'bg-green-100 text-green-700 border-green-200',
+      completed: 'bg-gray-200 text-gray-700 border-gray-300',
+      forfeited: 'bg-red-100 text-red-700 border-red-200',
     };
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${styles[status] ?? 'bg-gray-100 text-gray-600'}`}>
+      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${styles[normalizedStatus] ?? 'bg-gray-100 text-gray-600'}`}>
         {status ?? 'Unknown'}
       </span>
     );
@@ -295,15 +316,15 @@ const StaffDashboard = () => {
 
   const confirmDeleteSelected = async () => {
     try {
-      setLoading(true);
+      setActionLoading(true);
       await Promise.all(selectedIds.map(id => deleteDocumentRequest(id)));
       setSelectedIds([]);
       setShowDeleteConfirm(false);
-      await fetchData();
+      await fetchData(false);
     } catch (err) {
       console.error('Delete failed', err);
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -312,22 +333,28 @@ const StaffDashboard = () => {
     name === 'filterStatus' ? setFilterStatus(value) : setSortOrder(value);
   };
 
+  const markCertificateAsPrinted = (requestId) => {
+    if (!requestId) return;
+    setPrintedCertificateIds(prev => (prev.includes(requestId) ? prev : [...prev, requestId]));
+  };
+
   return (
     <div className="relative min-h-screen pb-10 z-20">
-      <main className="max-w-7xl mx-auto px-6 ">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6">
         <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
+        <LineLoading isVisible={actionLoading} />
 
         {/* ---------------- CARDS ---------------- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
           <StatCard title="New Requests" count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length} color="yellow" />
           <StatCard title="Ready for Pickup" count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length} color="green" />
         </div>
 
         {/* ---------------- TOOLBAR ---------------- */}
-        <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
+        <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-end">
           
           {selectedIds.length > 0 ? (
-            <div className="flex items-center gap-4 bg-red-50 p-2 rounded-lg border border-red-100">
+            <div className="flex flex-wrap items-center gap-3 bg-red-50 p-2 rounded-lg border border-red-100 w-full md:w-auto">
               <span className="text-red-700 font-bold text-sm ml-2">{selectedIds.length} Selected</span>
               <button 
                 onClick={handleDeleteSelected}
@@ -337,15 +364,17 @@ const StaffDashboard = () => {
               </button>
             </div>
           ) : (
-            <VoiceSearchInput
-              value={searchTerm}
-              onChange={setSearchTerm}
-              placeholder="Search"
-              language="en-US"
-            />
+            <div className="w-full md:max-w-md">
+              <VoiceSearchInput
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Search"
+                language="en-US"
+              />
+            </div>
           )} 
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 -mt-4 w-full md:w-auto md:min-w-95">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto md:min-w-95">
             <DropdownGroup
               label="Status"
               name="filterStatus"
@@ -367,8 +396,8 @@ const StaffDashboard = () => {
         </div>
 
         {/* ---------------- TABLE ---------------- */}
-        <div className="bg-white rounded-xl shadow border overflow-x-auto">
-          <table className="min-w-full divide-y">
+        <div className="bg-white rounded-xl shadow border border-gray-100 overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-4 w-10 text-center">
@@ -388,7 +417,7 @@ const StaffDashboard = () => {
                 <Th center>Actions</Th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {currentItems.map(req => (
                 <tr key={req.id} className={`hover:bg-gray-50 ${selectedIds.includes(req.id) ? 'bg-blue-50' : ''}`}>
                   <td className="px-6 py-4 text-center">
@@ -423,8 +452,8 @@ const StaffDashboard = () => {
                   <Td center><span className="font-semibold text-gray-700">{req.copies}</span></Td>
                   <Td center>{getStatusBadge(req.statusName)}</Td>
                   <Td center>
-                    <div className="flex items-center justify-end gap-2 min-w-37.5">
-                      {req.isCertificate && (
+                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-center sm:justify-end gap-1.5 sm:gap-2 min-w-0 sm:min-w-37.5">
+                      {req.isCertificate && req.statusId === resolvedStatusIds.PENDING && (
                         <button
                           title="Generate Certificate"
                           onClick={() => {
@@ -437,11 +466,23 @@ const StaffDashboard = () => {
                       )}
                       {req.statusId === resolvedStatusIds.PENDING && (
                         <button
-                          disabled={updatingId === req.id}
-                          onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.READY)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50"
+                          disabled={updatingId === req.id || (req.isCertificate && !printedCertificateIds.includes(req.id))}
+                          onClick={() => {
+                            if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
+                              alert('Please generate and print the certificate first before marking this request as Ready to claim.');
+                              return;
+                            }
+                            handleStatusUpdate(req.id, resolvedStatusIds.READY);
+                          }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={
+                            req.isCertificate && !printedCertificateIds.includes(req.id)
+                              ? 'Print certificate first'
+                              : 'Mark as Ready to claim'
+                          }
                         >
-                          <CheckCircleIcon className="w-4 h-4" /> Ready
+                          <CheckCircleIcon className="w-4 h-4" />
+                          {req.isCertificate && !printedCertificateIds.includes(req.id) ? 'Ready' : 'Ready'}
                         </button>
                       )}
 
@@ -469,8 +510,8 @@ const StaffDashboard = () => {
           </table>
 
           {/* ---------------- PAGINATION ---------------- */}
-          <div className="px-6 py-4 bg-gray-50 text-sm text-gray-500 flex justify-between items-center">
-            <span>
+          <div className="px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 text-xs sm:text-sm text-gray-500 flex justify-between items-center gap-3">
+            <span className="whitespace-nowrap">
               Showing {filteredData.length > 0 ? indexOfFirstItem + 1 : 0} to {Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} results
             </span>
             <div className="flex gap-2 items-center">
@@ -479,10 +520,10 @@ const StaffDashboard = () => {
                 disabled={currentPage === 1}
                 className={`p-1 rounded ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'}`}
               >
-                <ChevronLeftIcon className="w-5 h-5" />
+                <ChevronLeftIcon className="w-4 sm:w-5 h-4 sm:h-5" />
               </button>
 
-              <span className="text-xs font-semibold mx-2">
+              <span className="text-xs sm:text-sm font-semibold mx-1 sm:mx-2 whitespace-nowrap">
                 Page {currentPage} of {totalPages || 1}
               </span>
 
@@ -491,7 +532,7 @@ const StaffDashboard = () => {
                 disabled={currentPage === totalPages || totalPages === 0}
                 className={`p-1 rounded ${currentPage === totalPages || totalPages === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'}`}
               >
-                <ChevronRightIcon className="w-5 h-5" />
+                <ChevronRightIcon className="w-4 sm:w-5 h-4 sm:h-5" />
               </button>
             </div>
           </div>
@@ -510,6 +551,7 @@ const StaffDashboard = () => {
       {certRequest && (
         <CertificateModal
           request={certRequest}
+          onCertificatePrinted={markCertificateAsPrinted}
           onClose={() => setCertRequest(null)}
         />
       )}
