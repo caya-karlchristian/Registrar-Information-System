@@ -1,14 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import GenerateCertification from '../layouts/GenerateCertificate.jsx';
 import { CERT_CONFIG } from '../utils/Certification.jsx';
+import LoadingOverlay from './LoadingOverlay.jsx';
 
-const CertificateModal = ({ request, onClose }) => {
+const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   const [visible, setVisible] = useState(false);
+  const [opening, setOpening] = useState(true);
+  const [editLoading, setEditLoading] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 10);
-    return () => clearTimeout(t);
+    const openingTimer = setTimeout(() => setOpening(false), 600);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(openingTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -36,6 +43,7 @@ const CertificateModal = ({ request, onClose }) => {
   if (!visible) return null;
 
   const initialData = {
+    requestId: request.id,
     docType: validDocType,
     fullName: request.studentName ?? '',
     studentNum: request.studentNum?? '',
@@ -50,9 +58,10 @@ const CertificateModal = ({ request, onClose }) => {
   };
 
   return (
-    <div id="cert-modal-root" role="dialog" aria-modal="true" className="fixed inset-0 z-[9998]">
+    <div id="cert-modal-root" role="dialog" aria-modal="true" className="fixed inset-0 z-9998 mb-2">
       {/* Dim Overlay - Native div with keyboard support */}
       <div
+        id="cert-modal-overlay"
         className={`fixed inset-0 bg-black/40 transition-opacity duration-300 ${
           visible ? "opacity-100" : "opacity-0"
         }`}
@@ -63,49 +72,28 @@ const CertificateModal = ({ request, onClose }) => {
       {/* Slide-in Panel */}
       <div
         id="cert-modal-panel"
-        className={`fixed inset-y-0 top-15 right-0 bg-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed inset-y-0 top-0 md:top-15 right-0 bg-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
         style={{
-          width: isMobile ? "100%" : "calc(100vw - 300px)",
+          width: isMobile ? "100%" : "min(1200px, calc(100vw - 280px))",
           zIndex: 9999,
         }}
       >
-        {/* Modal Header: Accessible Close Button */}
-        <div className="flex items-center justify-between p-4 border-b bg-gray-50 shrink-0">
-          <h2 className="font-bold text-gray-800 uppercase text-sm tracking-tight">
-            Document Generator
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-full transition-colors"
-            aria-label="Close modal"
-          >
-            <span className="text-xl">✕</span>
-          </button>
-        </div>
-        {/* Top Bar — info only, no close button here */}
-        <div id="cert-modal-topbar" className="flex items-center px-6 py-3 bg-[#4a120e] text-white shrink-0">
-          <div>
-            <p className="text-xs opacity-70 uppercase tracking-wide">Generating Certificate for</p>
-            <p className="font-bold text-sm">
-              {request.studentName}
-              {request.certName ? ` — ${request.certName}` : ''}
-              {!CERT_CONFIG[request.certName] && request.certName && (
-                <span className="ml-2 text-yellow-300 text-xs font-normal">
-                  (Defaulting to "{validDocType}")
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="fixed inset-0 w-full bg-white shadow-xl z-50">
-          <div id="cert-modal-content" className="flex-1 overflow-auto h-full">
-            <GenerateCertification initialData={initialData} onClose={handleClose} />
-          </div>
+        <div id="cert-modal-content" className="flex-1 overflow-auto h-full bg-white">
+          <GenerateCertification
+            initialData={initialData}
+            onClose={handleClose}
+            onCertificatePrinted={onCertificatePrinted}
+            onLoadingChange={setEditLoading}
+          />
         </div>
       </div>
+
+      <LoadingOverlay
+        isVisible={opening || editLoading}
+        message= "Loading Certificate..." 
+      />
     </div>
   );
 };
