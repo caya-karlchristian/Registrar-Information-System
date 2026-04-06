@@ -84,6 +84,27 @@
 }
 .bar-right { animation: grow-right 2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 .bar-left  { animation: grow-left  2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+
+  .cert-header,
+  .cert-footer,
+  .cert-header *,
+  .cert-footer * {
+    font-family: "Times New Roman", Times, serif !important;
+  }
+
+  .cert-editable-block {
+    outline: none;
+    caret-color: #800000;
+  }
+
+  .cert-editable-block:focus {
+    background: rgba(128, 0, 0, 0.04);
+  }
+
+  /* Add a one-line gap between consecutive certificate paragraphs. */
+  #print-area .cert-paragraph + .cert-paragraph {
+    margin-top: 1em;
+  }
 }
 
 @page {
