@@ -12,14 +12,16 @@ use App\Models\RequestHistory;
 
 class DocumentRequestController extends Controller
 {
+
     private const RELATIONS = [
         'user',
-        'studentProfile.academicRecords',
         'studentProfile',
         'academicRecord',
+        'alumniProfile',
+        'alumniAcademicRecord',
         'status',
+        'purpose',
         'documents.documentType',
-        'history',  
     ];
 
     // Maps status_id → trigger_event slug for notifications
@@ -79,39 +81,67 @@ class DocumentRequestController extends Controller
         $this->authorize('create', DocumentRequest::class);
 
         $validated = $request->validate([
-            'request_purpose_id'              => 'required|integer|exists:request_purpose,request_purpose_id',
-            'or_number'                        => 'nullable|string|max:50',
-            'receipt_date'                     => 'nullable|date',
-
-            // documents is now an array of objects, not a flat array of IDs
-            'documents'                        => 'required|array|min:1',
-            'documents.*.document_type_id'     => 'required|integer|exists:document_type,document_type_id',
-            'documents.*.number_of_copies'     => 'required|integer|min:1|max:10',
-            // documents.*.  means "for every item in the documents array, validate these keys"
+            'request_purpose_id'          => 'required|integer|exists:request_purpose,request_purpose_id',
+            'or_number'                    => 'nullable|string|max:50',
+            'receipt_date'                 => 'nullable|date',
+            'documents'                    => 'required|array|min:1',
+            'documents.*.document_type_id' => 'required|integer|exists:document_type,document_type_id',
+            'documents.*.number_of_copies' => 'required|integer|min:1|max:10',
         ]);
 
         /** @var SystemUser $user */
-        $user           = Auth::user();
-        $studentProfile = $user->studentProfile;
-        $academicRecord = $user->academicRecord;
+        $user = Auth::user();
 
-        if (!$studentProfile || !$academicRecord) {
-            return response()->json([
-                'message' => 'Student profile or academic record not found.'
-            ], 400);
+        if ($user->isStudent()) {
+            $studentProfile = $user->studentProfile;
+            $academicRecord = $user->academicRecord;
+
+            if (!$studentProfile || !$academicRecord) {
+                return response()->json([
+                    'message' => 'Student profile or academic record not found.'
+                ], 400);
+            }
+
+            $requestData = [
+                'user_id'             => $user->user_id,
+                'student_profile_id'  => $studentProfile->student_profile_id,
+                'student_academic_id' => $academicRecord->student_academic_id,
+                'alumni_profile_id'   => null,
+                'alumni_academic_id'  => null,
+                'status_id'           => 1,
+                'request_purpose_id'  => $validated['request_purpose_id'],
+                'or_number'           => $validated['or_number'] ?? null,
+                'receipt_date'        => $validated['receipt_date'] ?? null,
+            ];
+
+        } elseif ($user->isAlumni()) {
+            $alumniProfile  = $user->alumniProfile;
+            $academicRecord = $alumniProfile?->academicRecord;
+
+            if (!$alumniProfile || !$academicRecord) {
+                return response()->json([
+                    'message' => 'Alumni profile or academic record not found.'
+                ], 400);
+            }
+
+            $requestData = [
+                'user_id'             => $user->user_id,
+                'student_profile_id'  => null,
+                'student_academic_id' => null,
+                'alumni_profile_id'   => $alumniProfile->alumni_profile_id,
+                'alumni_academic_id'  => $academicRecord->alumni_academic_id,
+                'status_id'           => 1,
+                'request_purpose_id'  => $validated['request_purpose_id'],
+                'or_number'           => $validated['or_number'] ?? null,
+                'receipt_date'        => $validated['receipt_date'] ?? null,
+            ];
+
+        } else {
+            return response()->json(['message' => 'Unauthorized role.'], 403);
         }
 
-        $documentRequest = DocumentRequest::create([
-            'user_id'             => $user->user_id,
-            'student_profile_id'  => $studentProfile->student_profile_id,
-            'student_academic_id' => $academicRecord->student_academic_id,
-            'status_id'           => 1,
-            'request_purpose_id'  => $validated['request_purpose_id'],
-            'or_number'           => $validated['or_number'] ?? null,
-            'receipt_date'        => $validated['receipt_date'] ?? null,
-        ]);
+        $documentRequest = DocumentRequest::create($requestData);
 
-        // Each document type gets its own row with its own copy count
         foreach ($validated['documents'] as $doc) {
             $documentRequest->documents()->create([
                 'document_type_id' => $doc['document_type_id'],
@@ -119,7 +149,6 @@ class DocumentRequestController extends Controller
             ]);
         }
 
-        // Notify student
         NotificationService::send(
             recipient:    $user,
             triggerEvent: 'request_submitted',
@@ -127,7 +156,6 @@ class DocumentRequestController extends Controller
             requestId:    $documentRequest->request_id,
         );
 
-        // Notify all admins
         NotificationService::sendToAdmins(
             triggerEvent: 'admin_new_request',
             data:         ['request_id' => $documentRequest->request_id],

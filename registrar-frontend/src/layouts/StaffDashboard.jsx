@@ -164,8 +164,12 @@ const StaffDashboard = () => {
           },
           studentName: r.student_profile
             ? `${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`
+            : r.alumni_profile
+            ? `${r.alumni_profile.first_name} ${r.alumni_profile.middle_name ?? ''} ${r.alumni_profile.last_name}`
             : 'N/A',
-          studentNumber: r.academic_record?.student_number ?? 'N/A',
+          studentNumber: r.academic_record?.student_number
+            ?? r.alumni_academic_record?.student_number
+            ?? 'N/A',
           certName: finalCertName,
           isCertificate,
           copies: totalCopies,

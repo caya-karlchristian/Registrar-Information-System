@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class StudentAcademicRecord extends Model
 {
     protected $table = 'student_academic_record';
-    protected $primaryKey = 'academic_record_id';
+    protected $primaryKey = 'student_academic_id';
     public $timestamps = false;
     protected $guarded = [];
 
@@ -18,6 +18,6 @@ class StudentAcademicRecord extends Model
 
     public function documentRequests()
     {
-        return $this->hasMany(DocumentRequest::class, 'academic_record_id');
+        return $this->hasMany(DocumentRequest::class, 'student_academic_id');
     }
 }
