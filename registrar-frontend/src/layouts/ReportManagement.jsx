@@ -79,14 +79,14 @@ const ReportManagement = () => {
   // If you want a real clear, add a backend endpoint for it
   // and discuss with your adviser first.
   // -------------------------------------------------------
-  const handleClearLogs = () => {
-    setLogs([]);
+  const handleClearLogs = async () => {
     setSearch("");
     setRoleFilter("All");
     setActionFilter("All");
     setCurrentPage(1);
     setShowConfirm(false);
-  };
+    await fetchLogs();  // ← force a fresh fetch
+};
 
   const pageNumbers = () => {
     if (totalPages <= 6) return Array.from({ length: totalPages }, (_, i) => i + 1);

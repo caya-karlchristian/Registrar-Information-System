@@ -88,12 +88,14 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <p>
                   <strong>Full Name:</strong>{' '}
-                  {`${request.student_profile?.first_name} ${request.student_profile?.middle_name ?? ''} ${request.student_profile?.last_name}`.trim()}
+                  {request.student_profile
+                    ? `${request.student_profile.first_name} ${request.student_profile.middle_name ?? ''} ${request.student_profile.last_name}`.trim()
+                    : `${request.alumni_profile?.first_name ?? ''} ${request.alumni_profile?.middle_name ?? ''} ${request.alumni_profile?.last_name ?? ''}`.trim() || 'N/A'}
                 </p>
-                <p><strong>Student Number:</strong> {request.student_profile?.academic_records?.[0]?.student_number ?? 'N/A'}</p>
-                <p><strong>Date of Birth:</strong> {request.student_profile?.date_of_birth ?? 'N/A'}</p>
-                <p><strong>Course:</strong> {request.student_profile?.academic_records?.[0]?.course ?? 'N/A'}</p>
-                <p><strong>Year Level:</strong> {request.student_profile?.academic_records?.[0]?.year_level ?? 'N/A'}</p>
+                <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? request.alumni_academic_record?.student_number ?? 'N/A'}</p>
+                <p><strong>Date of Birth:</strong> {request.student_profile?.date_of_birth ?? request.alumni_profile?.date_of_birth ?? 'N/A'}</p>
+                <p><strong>Course:</strong> {request.academic_record?.course ?? request.alumni_academic_record?.course ?? 'N/A'}</p>
+                <p><strong>Year Level:</strong> {request.academic_record?.year_level ?? 'N/A'}</p>
               </div>
             </Section>
           )}
