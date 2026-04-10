@@ -17,9 +17,11 @@ class DocumentRequestController extends Controller
         'studentProfile.academicRecords',
         'studentProfile',
         'academicRecord',
+        'alumniProfile',
+        'alumniAcademicRecord',
         'status',
         'documents.documentType',
-        'history',  
+        'history',
     ];
 
     // Maps status_id → trigger_event slug for notifications
