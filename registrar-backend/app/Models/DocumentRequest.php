@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class DocumentRequest extends Model
 {
-    protected $table = 'document_request';
+    protected $table      = 'document_request';
     protected $primaryKey = 'request_id';
-    public $timestamps = false;
-    protected $guarded = [];
+    public    $timestamps = false;
+    protected $guarded    = [];
 
     protected $casts = [
         'requested_at' => 'datetime',
@@ -46,22 +46,24 @@ class DocumentRequest extends Model
         return $this->belongsTo(RequestStatus::class, 'status_id');
     }
 
+    public function purpose()
+    {
+        return $this->belongsTo(RequestPurpose::class, 'request_purpose_id');
+    }
+
     public function documents()
     {
         return $this->hasMany(RequestDocument::class, 'request_id');
     }
 
-    public function certificationType()
+    // Rows in request_certificate — one per certificate type selected
+    public function certificates()
     {
-        return $this->belongsTo(CertificationType::class, 'cert_type_id');
+        return $this->hasMany(RequestCertificate::class, 'request_id');
     }
 
     public function history()
     {
         return $this->hasMany(RequestHistory::class, 'request_id');
-    }
-    public function purpose()
-    {
-        return $this->belongsTo(RequestPurpose::class, 'request_purpose_id');
     }
 }
