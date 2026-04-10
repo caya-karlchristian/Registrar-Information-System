@@ -4,6 +4,7 @@ import CheckboxItem from '../components/Checkbox.jsx';
 import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
 import ErrorToast from "../components/ErrorToast.jsx";
+import ImageUploader from "../components/ImageUploader.jsx";
 import axios from "../services/api.js";
 import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
@@ -56,6 +57,7 @@ const AlumniRequestForm = () => {
     receiptNumber: '',
     dateOfPayment: '',
     documentCopies: {},
+    torImage: null,
   });
 
   // Helper to update text inputs
@@ -67,7 +69,29 @@ const AlumniRequestForm = () => {
   // Helper to update checkboxes
   const handleCheckboxChange = (e) => {
     const { name, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: checked }));
+    setFormData((prev) => {
+      if (name === "noRequests") {
+        return {
+          ...prev,
+          noRequests: checked,
+          doneRequest: checked ? false : prev.doneRequest,
+        };
+      }
+
+      if (name === "doneRequest") {
+        return {
+          ...prev,
+          doneRequest: checked,
+          noRequests: checked ? false : prev.noRequests,
+        };
+      }
+
+      return { ...prev, [name]: checked };
+    });
+  };
+
+  const handleImageChange = (name, file) => {
+    setFormData(prev => ({ ...prev, [name]: file }));
   };
 
   const handlePreSubmit = (e) => {
@@ -120,6 +144,8 @@ const AlumniRequestForm = () => {
   const nextStep = (e) => {
     e.preventDefault();
 
+    const finalStep = hasTOR ? 4 : 3;
+
     if (currentStep === 1 && !formData.termsAgreed) {
       setErrorMessage("You must read and agree to the Terms & Conditions to proceed.");
       return;
@@ -129,23 +155,28 @@ const AlumniRequestForm = () => {
       setErrorMessage("Please select at least one document to proceed.");
       return;
     }
-    
-    if (currentStep === 2 && hasTOR && !formData.noRequests && !formData.doneRequest) {
-      setErrorMessage("Please select at least one TOR option to proceed.");
-      return;
-    }
 
     if (currentStep === 2 && formData.purposeOfRequest.length === 0) {
       setErrorMessage("Please select a purpose for your request.");
       return;
     }
 
-    if (showCertificationDropdown && formData.certification.length === 0) {
+    if (currentStep === 2 && showCertificationDropdown && formData.certification.length === 0) {
       setErrorMessage("Please specify the certification type.");
       return;
     }
 
-    if (currentStep < 3) setCurrentStep(currentStep + 1);
+    if (currentStep === 3 && hasTOR && !formData.noRequests && !formData.doneRequest) {
+      setErrorMessage("Please select at least one TOR option to proceed.");
+      return;
+    }
+
+    if (currentStep === 3 && hasTOR && !formData.torImage) {
+      setErrorMessage("Please upload your 1x1 size photo for TOR request.");
+      return;
+    }
+
+    if (currentStep < finalStep) setCurrentStep(currentStep + 1);
   };
 
   const prevStep = (e) => {
@@ -200,6 +231,7 @@ const AlumniRequestForm = () => {
       receiptNumber: "",
       dateOfPayment: "",
       documentCopies: {},
+      torImage: null,
     });
     setErrorMessage("");
     setIsLoading(false);
@@ -220,18 +252,26 @@ const AlumniRequestForm = () => {
       ? availableCertifications.map((c) => c.certificate_name)
       : Object.values(CERTIFICATION_MAP);
 
-
-  const stepProcess = {
-            1: "Terms & Conditions",
-            2: "Alumni Request",
-            3: "Payment and Document Details"
-          };
   const purposeOptions = Object.values(PURPOSE_MAP);
 
 
   const documentOptions = availableDocs.length > 0
     ? availableDocs.map(d => d.document_name)
     : Object.values(DOC_TYPE_MAP);
+
+  const stepLabels = hasTOR
+    ? [
+        "Terms & Conditions",
+        "Alumni Request",
+        "TOR Requirements",
+        "Payment and Document Details",
+      ]
+    : [
+        "Terms & Conditions",
+        "Alumni Request",
+        "Payment and Document Details",
+      ];
+  const totalSteps = stepLabels.length;
 
   const certificationLabel = formData.certification.join(', ');
 
@@ -265,7 +305,7 @@ const AlumniRequestForm = () => {
           
           <div className="flex flex-col items-center pt-8 pb-4">
             <div className="flex space-x-3 mb-2">
-              {[1, 2, 3].map((step) => (
+              {Array.from({ length: totalSteps }, (_, idx) => idx + 1).map((step) => (
                 <div 
                   key={step}
                   className={`w-4 h-4 rounded-full border border-pup-yellow ${
@@ -275,11 +315,11 @@ const AlumniRequestForm = () => {
               ))}
             </div>
             <p className="text-pup-yellow font-bold text-sm tracking-wider">
-              {currentStep} of 3
+              {currentStep} of {totalSteps}
             </p>
 
           <h2 className="text-white text-xl font-semibold mt-2">
-            {stepProcess[currentStep]}
+            {stepLabels[currentStep - 1]}
           </h2>
 
           </div>
@@ -354,32 +394,46 @@ const AlumniRequestForm = () => {
                     required
                     options={purposeOptions} 
                   />
-                  {hasTOR && (
-                    <div className="space-y-3 bg-white/10 p-4 rounded-lg border">
-                      <p className="text-sm text-justify lg:text-[15px] ">
-                        For TOR request for further studies, please secure an HONORABLE DISMISSAL first. 
-                        Once processed and submitted back to the University, you may request for TOR with copy for remarks.
-                      </p>
-                      <CheckboxItem
-                        text="No Request Yet"
-                        name="noRequests"
-                        checked={formData.noRequests}
-                        onChange={handleCheckboxChange}
-                      />
-                      <CheckboxItem
-                        text="Done Honorable Dismissal Request"
-                        name="doneRequest"
-                        checked={formData.doneRequest}
-                        onChange={handleCheckboxChange}
+              </div>
+              </div>
+            )}
+
+            {currentStep === 3 && hasTOR && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="grid grid-cols-1 gap-6 w-full mt-10">
+                  <div className="space-y-3 p-4 ">
+                    <p className="text-sm text-justify lg:text-[15px] ">
+                      For TOR request for further studies, please secure an HONORABLE DISMISSAL first.
+                      Once processed and submitted back to the University, you may request for TOR with copy for remarks.
+                    </p>
+                    <CheckboxItem
+                      text="No Request Yet"
+                      name="noRequests"
+                      checked={formData.noRequests}
+                      onChange={handleCheckboxChange}
+                    />
+                    <CheckboxItem
+                      text="Done Honorable Dismissal Request"
+                      name="doneRequest"
+                      checked={formData.doneRequest}
+                      onChange={handleCheckboxChange}
+                    />
+                    <div className="mt-4 pt-4 bg-white/10 p-4 rounded-lg border">
+                      <ImageUploader
+                        label="1x1 Size Photo (Required for TOR)"
+                        name="torImage"
+                        required={true}
+                        value={formData.torImage}
+                        onChange={handleImageChange}
                       />
                     </div>
-                  )}
-              </div>
+                  </div>
+                </div>
               </div>
             )}
     
             {/* STEP 6: SUBMIT */}
-            {currentStep === 3 && (
+            {currentStep === (hasTOR ? 4 : 3) && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full -mt-6">
                   <InputGroup
@@ -543,10 +597,10 @@ const AlumniRequestForm = () => {
               <div className="w-32">
                 <button
                   type="button"
-                  onClick={currentStep < 3 ? nextStep : handlePreSubmit}
+                  onClick={currentStep < totalSteps ? nextStep : handlePreSubmit}
                   className="font-bold py-2 px-6 rounded shadow-md w-full ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
                 >
-                  {currentStep < 3 ? "Next" : "Submit"}
+                  {currentStep < totalSteps ? "Next" : "Submit"}
                 </button>
               </div>
             </div>
