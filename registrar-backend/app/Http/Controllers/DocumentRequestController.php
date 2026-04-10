@@ -21,7 +21,7 @@ class DocumentRequestController extends Controller
         'alumniAcademicRecord',
         'status',
         'purpose',
-        'items.documentType',
+        'documents.documentType',
     ];
 
     // Maps status_id → trigger_event slug for notifications

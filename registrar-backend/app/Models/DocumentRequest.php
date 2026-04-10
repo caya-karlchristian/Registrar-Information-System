@@ -60,4 +60,8 @@ class DocumentRequest extends Model
     {
         return $this->hasMany(RequestHistory::class, 'request_id');
     }
+    public function purpose()
+    {
+        return $this->belongsTo(RequestPurpose::class, 'request_purpose_id');
+    }
 }
