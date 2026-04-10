@@ -18,4 +18,9 @@ class AlumniProfile extends Model
     {
         return $this->belongsTo(Alumni::class, 'alumni_id', 'alumni_id');
     }
+    
+    public function academicRecord()
+    {
+        return $this->hasOne(AlumniAcademicRecord::class, 'alumni_profile_id', 'alumni_profile_id');
+    }
 }

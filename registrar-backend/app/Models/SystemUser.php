@@ -8,6 +8,7 @@ use App\Models\AdminProfile;
 use App\Models\Alumni;
 use App\Models\AlumniProfile;
 use App\Models\AlumniType;
+use App\Models\AlumniAcademicRecord;
 
 class SystemUser extends Authenticatable
 {
@@ -78,6 +79,18 @@ class SystemUser extends Authenticatable
             'alumni_id',  // FK on alumni_profile → alumni
             'user_id',    // Local key on users
             'alumni_id'   // Local key on alumni
+        );
+    }
+
+    public function alumniAcademicRecord()
+    {
+        return $this->hasManyThrough(
+            AlumniAcademicRecord::class,
+            AlumniProfile::class,
+            'alumni_id',         // FK on alumni_profile → alumni
+            'alumni_profile_id', // FK on alumni_academic_record → alumni_profile
+            'user_id',           // Local key chain start — but we need alumni first
+            'alumni_profile_id'  // Local key on alumni_profile
         );
     }
 
