@@ -12,16 +12,16 @@ use App\Models\RequestHistory;
 
 class DocumentRequestController extends Controller
 {
+
     private const RELATIONS = [
         'user',
-        'studentProfile.academicRecords',
         'studentProfile',
         'academicRecord',
         'alumniProfile',
         'alumniAcademicRecord',
         'status',
-        'documents.documentType',
-        'history',
+        'purpose',
+        'items.documentType',
     ];
 
     // Maps status_id → trigger_event slug for notifications
