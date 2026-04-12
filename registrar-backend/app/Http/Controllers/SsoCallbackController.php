@@ -120,7 +120,10 @@ class SsoCallbackController extends Controller
         $firstName  = $profile['first_name']  ?? null;
         $middleName = $profile['middle_name'] ?? null;
         $lastName   = $profile['last_name']   ?? null;
-        $roles      = $profile['roles']       ?? [];
+        $rolesRaw   = $profile['roles']       ?? [];
+        $roles      = is_array($rolesRaw)
+            ? $rolesRaw
+            : array_filter(array_map('trim', explode(',', $rolesRaw)));
 
         if (!$email) {
             return response()->json(['message' => 'Invalid profile returned by identity provider.'], 422);
@@ -210,6 +213,8 @@ class SsoCallbackController extends Controller
         // -------------------------------------------------------
         // Replace the AuditLog::create block with:
         \App\Services\AuditLogger::log($request, $user, \App\Models\AuditLog::ACTION_LOGIN);
+
+        $user->update(['idp_access_token' => $accessToken]);
 
         $sanctumToken = $user->createToken('sso')->plainTextToken;
 
