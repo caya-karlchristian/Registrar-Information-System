@@ -4,7 +4,9 @@ return [
     'allowed_methods' => ['*'],
     'allowed_origins' => [
         'http://localhost',
+        'https://localhost',
         'http://registrar-information-system.southeastasia.cloudapp.azure.com',
+        'https://registrar-information-system.southeastasia.cloudapp.azure.com',
     ],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],

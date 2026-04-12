@@ -126,7 +126,10 @@ class AuthController extends Controller
         $firstName    = $profile['first_name']  ?? null;
         $middleName   = $profile['middle_name'] ?? null;
         $lastName     = $profile['last_name']   ?? null;
-        $roles        = $profile['roles']       ?? [];
+        $rolesRaw     = $profile['roles']       ?? [];
+        $roles        = is_array($rolesRaw)
+            ? $rolesRaw
+            : array_filter(array_map('trim', explode(',', $rolesRaw)));
 
         // Step 4 — Resolve role
         $roleId = $this->resolveRoleId($roles);
@@ -204,6 +207,8 @@ try {
     return response()->json(['message' => 'Login failed.'], 500);
 }
 
+        $user->update(['idp_access_token' => $accessToken]);
+
         AuditLogger::log($request, $user, AuditLog::ACTION_LOGIN);
 
         $sanctumToken = $user->createToken('login')->plainTextToken;
@@ -257,13 +262,19 @@ private function resolveRoleId(array $roles): ?int
         $idpBaseUrl = env('SSO_BASE_URL');
         $clientId   = env('SSO_CLIENT_ID');
 
-        if ($idpBaseUrl && $clientId) {
+        $idpToken = $request->user()->idp_access_token;
+
+        if ($idpBaseUrl && $clientId && $idpToken) {
             $ch = curl_init("{$idpBaseUrl}/api/v1/auth/logout");
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => json_encode(['client_id' => $clientId]), // ← THIS was missing
-                CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
+                CURLOPT_POSTFIELDS     => json_encode(['client_id' => $clientId]),
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Accept: application/json',
+                    'Authorization: Bearer ' . $idpToken,
+                ],
                 CURLOPT_TIMEOUT        => 5,
                 CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
                 CURLOPT_SSL_VERIFYPEER => false,
