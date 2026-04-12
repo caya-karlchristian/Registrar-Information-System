@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
 {
-    Schema::table('users', function (Blueprint $table) {
-        $table->text('idp_access_token')->nullable()->after('idp_user_id');
-    });
+    if (!Schema::hasColumn('users', 'idp_access_token')) {
+        Schema::table('users', function (Blueprint $table) {
+            $table->text('idp_access_token')->nullable()->after('idp_user_id');
+        });
+    }
 }
 
 public function down(): void
