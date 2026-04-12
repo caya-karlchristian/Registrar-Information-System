@@ -22,6 +22,7 @@ class DocumentRequestController extends Controller
         'status',
         'purpose',
         'documents.documentType',
+        'certificates.certificationType',   // ← added
     ];
 
     // Maps status_id → trigger_event slug for notifications
@@ -70,24 +71,47 @@ class DocumentRequestController extends Controller
     // -------------------------------------------------------
     // POST /document-requests
     // -------------------------------------------------------
-    // CHANGED: document_type_ids is now an array of objects:
-    //   [{ document_type_id: 1, number_of_copies: 3 }, ...]
-    //
-    // Each line item carries its own copy count (1–10).
-    // This replaces the old single number_of_copies on the header.
+    // Payload shape:
+    // {
+    //   "request_purpose_id": 1,
+    //   "or_number": "OR-001",
+    //   "receipt_date": "2026-04-10",
+    //   "documents": [
+    //     { "document_type_id": 15, "number_of_copies": 2 }
+    //   ],
+    //   "certificates": [          ← optional; omit or send [] if none
+    //     { "certificate_type_id": 1 },
+    //     { "certificate_type_id": 3 }
+    //   ]
+    // }
     // -------------------------------------------------------
     public function store(Request $request)
     {
         $this->authorize('create', DocumentRequest::class);
 
         $validated = $request->validate([
-            'request_purpose_id'          => 'required|integer|exists:request_purpose,request_purpose_id',
-            'or_number'                    => 'nullable|string|max:50',
-            'receipt_date'                 => 'nullable|date',
-            'documents'                    => 'required|array|min:1',
-            'documents.*.document_type_id' => 'required|integer|exists:document_type,document_type_id',
-            'documents.*.number_of_copies' => 'required|integer|min:1|max:10',
+            'request_purpose_id'                => 'required|integer|exists:request_purpose,request_purpose_id',
+            'or_number'                         => 'nullable|string|max:50',
+            'receipt_date'                      => 'nullable|date',
+
+            // At least one document OR one certificate must be present
+            'documents'                         => 'nullable|array',
+            'documents.*.document_type_id'      => 'required|integer|exists:document_type,document_type_id',
+            'documents.*.number_of_copies'      => 'required|integer|min:1|max:10',
+
+            'certificates'                      => 'nullable|array',
+            'certificates.*.certificate_type_id'=> 'required|integer|exists:certificate_type,certificate_type_id',
         ]);
+
+        // Require at least one document or one certificate
+        $hasDocuments    = !empty($validated['documents']);
+        $hasCertificates = !empty($validated['certificates']);
+
+        if (!$hasDocuments && !$hasCertificates) {
+            return response()->json([
+                'message' => 'At least one document or certificate must be requested.',
+            ], 422);
+        }
 
         /** @var SystemUser $user */
         $user = Auth::user();
@@ -142,10 +166,18 @@ class DocumentRequestController extends Controller
 
         $documentRequest = DocumentRequest::create($requestData);
 
-        foreach ($validated['documents'] as $doc) {
+        // Persist document line items
+        foreach ($validated['documents'] ?? [] as $doc) {
             $documentRequest->documents()->create([
                 'document_type_id' => $doc['document_type_id'],
                 'number_of_copies' => $doc['number_of_copies'],
+            ]);
+        }
+
+        // Persist certificate line items
+        foreach ($validated['certificates'] ?? [] as $cert) {
+            $documentRequest->certificates()->create([
+                'certificate_type_id' => $cert['certificate_type_id'],
             ]);
         }
 
@@ -172,59 +204,6 @@ class DocumentRequestController extends Controller
     // PUT /document-requests/{id}
     // Admin/Super Admin only
     // -------------------------------------------------------
-    // public function update(Request $request, DocumentRequest $documentRequest)
-    // {
-    //     $this->authorize('update', $documentRequest);
-
-    //     $validated = $request->validate([
-    //         'status_id'    => 'sometimes|integer|exists:request_status,status_id',
-    //         'or_number'    => 'sometimes|nullable|string|max:50',
-    //         'receipt_date' => 'sometimes|nullable|date',
-    //     ]);
-
-    //     $oldStatusId = $documentRequest->status_id;
-    //     $oldOrNumber = $documentRequest->or_number;
-
-    //     $documentRequest->update($validated);
-
-    //     /** @var SystemUser $owner */
-    //     $owner = SystemUser::find($documentRequest->user_id);
-
-    //     // Notify owner if status changed
-    //     if ($owner && isset($validated['status_id']) && $documentRequest->status_id !== $oldStatusId) {
-
-    //         $triggerEvent = self::STATUS_NOTIFICATION_MAP[$documentRequest->status_id] ?? null;
-
-    //         if ($triggerEvent) {
-    //             NotificationService::send(
-    //                 recipient:    $owner,
-    //                 triggerEvent: $triggerEvent,
-    //                 data:         ['request_id' => $documentRequest->request_id],
-    //                 requestId:    $documentRequest->request_id,
-    //             );
-    //         }
-
-    //         // Specific trigger event above already covers status change
-    //     }
-
-    //     // Notify admins if OR number was added/changed
-    //     if (
-    //         isset($validated['or_number']) &&
-    //         $documentRequest->or_number !== $oldOrNumber &&
-    //         !empty($documentRequest->or_number)
-    //     ) {
-    //         NotificationService::sendToAdmins(
-    //             triggerEvent: 'admin_payment_verification',
-    //             data:         ['request_id' => $documentRequest->request_id],
-    //             requestId:    $documentRequest->request_id,
-    //         );
-    //     }
-
-    //     return response()->json(
-    //         $documentRequest->load(self::RELATIONS),
-    //         200
-    //     );
-    // }
     public function update(Request $request, DocumentRequest $documentRequest)
     {
         $this->authorize('update', $documentRequest);
