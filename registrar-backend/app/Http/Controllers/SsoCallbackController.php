@@ -14,11 +14,9 @@ use Illuminate\Support\Str;
 class SsoCallbackController extends Controller
 {
     private const ROLE_MAP = [
-        'RIS:superadmin'    => SystemUser::ROLE_SUPER_ADMIN,
-        'RIS:admin'         => SystemUser::ROLE_ADMIN,
-        'RIS:student'       => SystemUser::ROLE_STUDENT,
-        'RIS:alumni_sis'    => SystemUser::ROLE_ALUMNI,
-        'RIS:alumni_nonsis' => SystemUser::ROLE_ALUMNI,
+        'Admin'   => SystemUser::ROLE_ADMIN,
+        'Student' => SystemUser::ROLE_STUDENT,
+        'Guest'   => SystemUser::ROLE_ALUMNI,
     ];
 
     public function handle(Request $request)
@@ -120,7 +118,10 @@ class SsoCallbackController extends Controller
         $firstName  = $profile['first_name']  ?? null;
         $middleName = $profile['middle_name'] ?? null;
         $lastName   = $profile['last_name']   ?? null;
-        $roles      = $profile['roles']       ?? [];
+        $rolesRaw   = $profile['roles']       ?? [];
+        $roles      = is_array($rolesRaw)
+            ? $rolesRaw
+            : array_filter(array_map('trim', explode(',', (string) $rolesRaw)));
 
         if (!$email) {
             return response()->json(['message' => 'Invalid profile returned by identity provider.'], 422);
@@ -129,7 +130,7 @@ class SsoCallbackController extends Controller
         // -------------------------------------------------------
         // Step 3 — Map SSO role to RIS role_id
         // -------------------------------------------------------
-        $roleId = $this->resolveRoleId($roles);
+        $roleId = $this->resolveRoleId($roles, $email);
 
         // If no role from IdP, fall back to existing local role
         if (!$roleId) {
@@ -137,12 +138,12 @@ class SsoCallbackController extends Controller
             if ($existing) {
                 $roleId = $existing->role_id;
             } else {
-                return response()->json(['message' => 'No recognized role for this system.'], 403);
+                return response()->json(['message' => 'No recognized role for this system.', 'roles_received' => $roles], 403);
             }
         }
 
-        $isSisAlumni    = in_array('RIS:alumni_sis', $roles);
-        $isNonSisAlumni = in_array('RIS:alumni_nonsis', $roles);
+        $isSisAlumni    = false; // IdP does not distinguish — handle during onboarding
+        $isNonSisAlumni = true;  // Default Guest to non-SIS; update after onboarding
 
         // -------------------------------------------------------
         // Step 4 — Find or create user + profile
@@ -211,6 +212,8 @@ class SsoCallbackController extends Controller
         // Replace the AuditLog::create block with:
         \App\Services\AuditLogger::log($request, $user, \App\Models\AuditLog::ACTION_LOGIN);
 
+        $user->update(['idp_access_token' => $accessToken]);
+
         $sanctumToken = $user->createToken('sso')->plainTextToken;
 
         return response()->json([
@@ -225,14 +228,20 @@ class SsoCallbackController extends Controller
         ]);
     }
 
-    private function resolveRoleId(array $roles): ?int
+    private function resolveRoleId(array $roles, string $email): ?int
     {
+        // Superadmins are identified by email, configured in .env
+        $superAdminEmails = array_filter(
+            array_map('trim', explode(',', env('SSO_SUPERADMIN_EMAILS', '')))
+        );
+        if (in_array($email, $superAdminEmails)) {
+            return SystemUser::ROLE_SUPER_ADMIN;
+        }
+
         $priority = [
-            'RIS:superadmin'    => 4,
-            'RIS:admin'         => 3,
-            'RIS:student'       => 2,
-            'RIS:alumni_sis'    => 1,
-            'RIS:alumni_nonsis' => 1,
+            'Admin'   => 3,
+            'Student' => 2,
+            'Guest'   => 1,
         ];
 
         $resolved = null;
