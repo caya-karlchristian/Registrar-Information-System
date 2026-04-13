@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import certificate_footer from '../assets/certificate_footer.png';
 
-export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, bpLogoSrc) => {
+export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, bpLogoSrc, historyByRequestId = {}) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Logbook Records');
 
@@ -18,6 +18,7 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
       row.student_profile?.academic_records?.[0]?.course ||
       row.student_profile?.course ||
       row.academic_record?.course ||
+      row.alumni_academic_record?.course ||
       '---'
     );
   };
@@ -26,14 +27,29 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
     return row.user?.email || row.student_profile?.email || '---';
   };
 
+  const getHistoryRows = (row) => {
+    const fromMap = historyByRequestId?.[row.request_id];
+    const base = Array.isArray(fromMap)
+      ? fromMap
+      : (Array.isArray(row.history) ? row.history : []);
+
+    return [...base].sort((a, b) => {
+      const aTime = new Date(a?.changed_at || 0).getTime();
+      const bTime = new Date(b?.changed_at || 0).getTime();
+      return bTime - aTime;
+    });
+  };
+
   const getProcessedAt = (row) => {
-    if (!row.history || row.history.length === 0) return null;
-    return row.history[0]?.changed_at || null;
+    const history = getHistoryRows(row);
+    if (history.length === 0) return null;
+    return history[0]?.changed_at || null;
   };
 
   const getMinutesProcessed = (row) => {
-    if (!row.history || row.history.length === 0) return null;
-    return row.history[0]?.minutes_processed ?? null;
+    const history = getHistoryRows(row);
+    if (history.length === 0) return null;
+    return history[0]?.minutes_processed ?? null;
   };
 
   const formatMinutesDuration = (minutesValue) => {
@@ -60,8 +76,9 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
   };
 
   const getClaimedAt = (row) => {
-    if (!row.history || row.history.length === 0) return null;
-    const claimEntry = row.history.find((h) => h.new_status_id === 3);
+    const history = getHistoryRows(row);
+    if (history.length === 0) return null;
+    const claimEntry = history.find((h) => h.new_status_id === 3);
     return claimEntry?.changed_at || null;
   };
 
@@ -101,8 +118,8 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
   };
 
   sheet.columns = [
-    { width: 22 }, { width: 30 }, { width: 25 }, { width: 10 }, 
-    { width: 30 }, { width: 24 }, { width: 26 }, { width: 18 }, 
+    { width: 22 }, { width: 30 }, { width: 25 },
+    { width: 30 }, { width: 24 }, { width: 26 }, { width: 18 },
   ];
 
   const centerBold = (cell, value, size = 11) => {
@@ -124,7 +141,7 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
   };
 
   if (pupLogoSrc) await addLogo(pupLogoSrc, { col: 0.1, row: 0.5 }, { col: 1.0, row: 6.5 });
-  if (bpLogoSrc) await addLogo(bpLogoSrc, { col: 7.0, row: 0.5 }, { col: 8.0, row: 6.5 });
+  if (bpLogoSrc) await addLogo(bpLogoSrc, { col: 6.0, row: 0.5 }, { col: 7.0, row: 6.5 });
 
   const headers = [
     { row: 2, text: 'REPUBLIC OF THE PHILIPPINES', font: { size: 9, name: 'Arial' } },
@@ -135,7 +152,7 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
   ];
 
   headers.forEach(({ row, text, font }) => {
-    sheet.mergeCells(`B${row}:G${row}`);
+    sheet.mergeCells(`B${row}:F${row}`);
     const cell = sheet.getCell(`B${row}`);
     cell.value = text;
     cell.font = font;
@@ -143,18 +160,18 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
     sheet.getRow(row).height = 22;
   });
 
-  sheet.mergeCells('A9:H9');
+  sheet.mergeCells('A9:G9');
   sheet.getCell('A9').border = { bottom: { style: 'medium', color: { argb: 'FF800000' } } };
   sheet.getRow(9).height = 8;
 
   sheet.addRow([]); 
-  sheet.mergeCells('A11:H11');
+  sheet.mergeCells('A11:G11');
   centerBold(sheet.getCell('A11'), `Processing of Application for ${selectedDocLabel}`, 14);
   sheet.addRow([]); 
 
   const headerRow = sheet.addRow([
     'Date Requested', 'Client Name', 'Course/Year & Section',
-    'Gender', 'Email Address/Contact', 'Date/Time Processed',
+    'Email Address/Contact', 'Date/Time Processed',
     'No. of Minutes Processed', 'Date Claimed',
   ]);
 
@@ -174,7 +191,6 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
       formatDateLong(row.requested_at, false) || 'N/A',
       getFullName(row),
       getCourse(row),
-      row.student_profile?.gender || '---',
       getEmail(row),
       formatDateLong(getProcessedAt(row), true) || '---',
       formatMinutesDuration(getMinutesProcessed(row)),
@@ -193,7 +209,7 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
 
   sheet.addRow([]); 
   const dividerRowIndex = sheet.lastRow.number + 1;
-  sheet.mergeCells(`A${dividerRowIndex}:H${dividerRowIndex}`);
+  sheet.mergeCells(`A${dividerRowIndex}:G${dividerRowIndex}`);
   sheet.getCell(`A${dividerRowIndex}`).border = { top: { style: 'medium', color: { argb: 'FF800000' } } };
   sheet.getRow(dividerRowIndex).height = 12;
 
@@ -208,7 +224,7 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
 
   footerLines.forEach(({ text, bold = false, color = { argb: 'FF333333' } }, i) => {
     const r = footerStartRow + i;
-    sheet.mergeCells(`A${r}:E${r}`);
+    sheet.mergeCells(`A${r}:D${r}`);
     const cell = sheet.getCell(`A${r}`);
     cell.value = text;
     cell.font = { size: bold ? 11 : 10, name: 'Arial', bold, color };
@@ -222,14 +238,14 @@ export const logbookExcel = async (filteredData, selectedDocLabel, pupLogoSrc, b
     const badgeId = workbook.addImage({ buffer: badgeBuffer, extension: 'png' });
 
     sheet.addImage(badgeId, {
-      tl: { col: 6.5, row: footerStartRow - 0.5 }, 
-      br: { col: 8.0, row: footerStartRow + 3.5 }, 
+      tl: { col: 5.5, row: footerStartRow - 0.5 },
+      br: { col: 7.0, row: footerStartRow + 3.5 },
       editAs: 'oneCell', 
     });
   } catch (err) { console.error("Footer badge failed", err); }
 
   const lastRowNumber = sheet.lastRow.number;
-  sheet.pageSetup.printArea = `A1:H${lastRowNumber}`;
+  sheet.pageSetup.printArea = `A1:G${lastRowNumber}`;
 
   const buffer = await workbook.xlsx.writeBuffer();
   saveAs(new Blob([buffer]), `Logbook_${selectedDocLabel.replace(/\s+/g, '_')}.xlsx`);
