@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { getDocumentTypes } from '../services/api';
-import LineLoading from '../components/LineLoading.jsx';
+import LoadingOverlay from '../components/LoadingOverlay.jsx';
 
 const DocumentLists = () => {
   const [openId, setOpenId] = useState(null);
@@ -39,7 +39,7 @@ const DocumentLists = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50 font-sans">
-      <LineLoading isVisible={loading} />
+      <LoadingOverlay isVisible={loading} message="Loading Documents..." />
       <div className="max-w-6xl mx-auto px-4 pt-4 pb-10">
         {/* --- HEADER --- */}
         <div className="mb-8 border-b-2 border-[#4a120e]/10 pb-6">
@@ -61,7 +61,7 @@ const DocumentLists = () => {
             return (
               <div
                 key={id}
-                className={`transition-all duration-300 bg-white h-fit border rounded-[2rem] overflow-hidden ${
+                className={`transition-all duration-300 bg-white h-fit border rounded-4xl overflow-hidden ${
                   isOpen
                     ? 'border-[#4a120e] shadow-xl ring-1 ring-[#4a120e]/10'
                     : 'border-gray-200 shadow-sm hover:border-gray-300'
@@ -115,7 +115,7 @@ const DocumentLists = () => {
                           {doc.document_description || "No description provided."}
                         </p>
                       </div>
-                      <div className="bg-gray-50 rounded-[1.5rem] p-5 border border-gray-100">
+                      <div className="bg-gray-50 rounded-3xl p-5 border border-gray-100">
                         <h5 className="text-[9px] font-black text-[#4a120e] uppercase tracking-[0.2em] mb-4">
                           Requirements
                         </h5>
