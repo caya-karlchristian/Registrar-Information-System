@@ -20,7 +20,7 @@ const ErrorToast = ({ message, onClose }) => {
   if (!message) return null;
 
   return (
-<div className="fixed top-30 right-9 z-[9999] flex items-center w-auto max-w-sm px-4 py-3 text-white bg-pup-maroon rounded-lg shadow-xl border border-white/20 animate-slide-in-right">
+<div className="fixed top-30 right-4 lg:right-9 md:right-8 z-[9999] flex items-center w-auto max-w-sm px-4 py-3 text-white bg-pup-maroon rounded-lg shadow-xl border border-white/20 animate-slide-in-right">
   
   <div className="flex items-center justify-center w-9 h-9 text-pup-maroon bg-white rounded-md">
     <ExclamationCircleIcon className="w-9 h-7" strokeWidth={2.5} />

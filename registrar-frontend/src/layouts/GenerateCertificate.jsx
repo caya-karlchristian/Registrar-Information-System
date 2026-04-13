@@ -110,8 +110,11 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
   const [layoutsByCertId, setLayoutsByCertId] = useState({});
   const [docTypeOptions, setDocTypeOptions] = useState(Object.keys(CERT_CONFIG));
   const [formData, setFormData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
+  const requestedCertTypes = Array.isArray(initialData?.certificateNames)
+    ? initialData.certificateNames.filter((name) => typeof name === "string" && name.trim().length > 0)
+    : [];
   const requestedDocType = typeof initialData?.docType === "string" ? initialData.docType.trim() : "";
-  const lockDocTypeToRequest = Boolean(initialData?.requestId && requestedDocType);
+  const lockDocTypeToRequest = Boolean(initialData?.requestId && requestedCertTypes.length > 0);
 
   useEffect(() => {
     const fetchLayoutData = async () => {
@@ -149,7 +152,7 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
         );
         setLayoutsByCertId(nextLayouts);
         if (lockDocTypeToRequest) {
-          setDocTypeOptions([requestedDocType]);
+          setDocTypeOptions(requestedCertTypes);
         } else {
           setDocTypeOptions(fetchedDocTypes);
         }
@@ -157,7 +160,9 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
           if (lockDocTypeToRequest) {
             return {
               ...prev,
-              docType: requestedDocType,
+              docType: requestedCertTypes.includes(prev.docType)
+                ? prev.docType
+                : (requestedDocType || requestedCertTypes[0]),
             };
           }
 
@@ -341,17 +346,17 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
         </div>
 
         {/* Certificate Preview */}
-        <div className="relative flex-1 overflow-hidden rounded-2xl border border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70 min-h-168 lg:min-h-150 order-2 print:bg-white print:rounded-none print:border-0 print:min-h-0 print:overflow-visible">
+        <div className="relative order-2 flex flex-1 flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70 min-h-96 sm:min-h-120 lg:min-h-150 max-h-[78vh] lg:max-h-[82vh] print:bg-white print:rounded-none print:border-0 print:min-h-0 print:max-h-none print:overflow-visible">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(90,90,90,0.07),transparent_40%),radial-gradient(circle_at_85%_10%,rgba(120,120,120,0.06),transparent_35%)] print:hidden" />
           <div className="relative p-4 bg-white/95 border-b border-stone-200 shrink-0 print:hidden">
             <div className="flex items-center justify-between max-w-187.5 mx-auto w-full">
               <h2 className="text-lg font-extrabold uppercase tracking-tight text-stone-800">Certificate Preview</h2>
             </div>
           </div>
-          <div className="relative flex-1 overflow-y-auto p-4 sm:p-8 print:p-0 print:overflow-visible">
+          <div className="relative flex-1 min-h-0 overflow-y-auto overflow-x-auto p-3 sm:p-6 lg:p-8 print:p-0 print:overflow-visible">
             <div
               id="print-area"
-              className="bg-white shadow-2xl shadow-stone-300/70 mx-auto w-full max-w-187.5 flex flex-col origin-top scale-95 p-5 sm:p-8 ring-1 ring-stone-900/5 text-gray-800 print:scale-100 print:shadow-none print:ring-0 print:p-0"
+              className="bg-white shadow-2xl shadow-stone-300/70 mx-auto w-full max-w-full md:max-w-187.5 flex flex-col origin-top scale-100 md:scale-95 p-3 sm:p-6 md:p-8 ring-1 ring-stone-900/5 text-gray-800 print:scale-100 print:shadow-none print:ring-0 print:p-0"
             >
               {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
               <div className="flex-1">{certConfig?.renderBody(formData)}</div>
