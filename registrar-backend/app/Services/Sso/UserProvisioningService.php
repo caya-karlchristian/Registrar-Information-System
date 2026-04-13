@@ -30,6 +30,7 @@ class UserProvisioningService
 
             $user = $existing ?? SystemUser::create([
                 'email'    => $email,
+                'idp_user_id' => $profile['id'] ?? null,  // add this
                 'password' => bcrypt(Str::random(32)),
                 'role_id'  => $roleId,
                 'status'   => 'Activated',
