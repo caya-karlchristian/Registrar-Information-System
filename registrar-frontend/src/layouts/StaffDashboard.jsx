@@ -179,6 +179,7 @@ const StaffDashboard = () => {
             ?? r.alumni_academic_record?.student_number
             ?? 'N/A',
           certName: finalCertName,
+          certificateNames: r.certificates?.map(c => c.certification_type?.certificate_name).filter(Boolean) ?? [],
           isCertificate,
           copies: totalCopies,
           documentDetailsArray,
