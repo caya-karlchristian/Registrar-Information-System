@@ -141,7 +141,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
                   <strong>Certification Types:</strong>
                   <ul className="list-disc ml-5 mt-1">
                     {request.certificates.map((c, i) => (
-                      <li key={i}>{c.certification_type?.certificate_name ?? 'Unknown'}</li>
+                      <li key={i}>{c.certification_type?.certificate_name ?? 'Unknown'} — {c.number_of_copies || 1} {(c.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}</li>
                     ))}
                   </ul>
                 </div>
