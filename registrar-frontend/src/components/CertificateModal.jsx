@@ -44,7 +44,7 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
 
   const initialData = {
     requestId: request.id,
-    docType: validDocType,
+    docType: selectedCert,
     fullName: request.studentName ?? '',
     studentNum: request.studentNum?? '',
     course: request.course ?? '',
