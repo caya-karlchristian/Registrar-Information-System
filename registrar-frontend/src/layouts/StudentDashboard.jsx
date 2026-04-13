@@ -53,27 +53,12 @@ const StudentDashboard = () => {
       })
       .filter(Boolean) || [];
 
-        const certTypeNames = r.certificates?.map(c =>
-          c.certification_type?.certificate_name
-        ).filter(Boolean) ?? [];
-
-        const enrichedDocNames = docNames.map(name => {
-          if (name.toLowerCase().includes('certif') && certTypeNames.length > 0) {
-            return `${name} (${certTypeNames.join(', ')})`;
-          }
-          return name;
-        });
-
-        if (certTypeNames.length > 0 && !docNames.some(n => n.toLowerCase().includes('certif'))) {
-          enrichedDocNames.push(`Certification (${certTypeNames.join(', ')})`);
-        }
-
         return {
           ...r,
           config,
           purpose_label: purposeLabel,
           type: TAB_MAP[r.status_id] || "history",
-          doc_names: enrichedDocNames,
+          doc_names: docNames,
         };
       })
       .sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
@@ -133,7 +118,7 @@ const StudentDashboard = () => {
       </div>
 
       {/* Document Requests List */}
-      <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-[700px]">
+      <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-175">
         <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-gray-800 text-lg">
             {activeTab === "pending" && "Processing Documents"}
@@ -168,7 +153,7 @@ const StudentDashboard = () => {
                       </span>
                     </div>
                     <h4 className="text-gray-800 font-bold text-base md:text-lg uppercase flex items-center gap-2 flex-wrap">
-                      {req.doc_names?.[0] || 'N/A'}
+                      {req.doc_names?.[0] || (req.certificates?.length ? 'CERTIFICATION' : 'N/A')}
                       {req.doc_names?.length > 1 && (
                         <span className="text-[10px] font-black bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full normal-case">
                           +{req.doc_names.length - 1} more

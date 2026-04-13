@@ -7,7 +7,6 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   const [visible, setVisible] = useState(false);
   const [opening, setOpening] = useState(true);
   const [editLoading, setEditLoading] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 10);
@@ -32,19 +31,12 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   const defaultCert = certNames.length > 0 ? certNames[0] : Object.keys(CERT_CONFIG)[0];
   const [selectedCert, setSelectedCert] = useState(defaultCert);
 
-    useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const isMobile = windowWidth < 1024;
-
   if (!visible) return null;
 
   const initialData = {
     requestId: request.id,
     docType: selectedCert,
+    certificateNames: certNames,
     fullName: request.studentName ?? '',
     studentNum: request.studentNum?? '',
     course: request.course ?? '',
@@ -72,13 +64,10 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
       {/* Slide-in Panel */}
       <div
         id="cert-modal-panel"
-        className={`fixed inset-y-0 top-0 md:top-15 right-0 bg-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 bottom-0 left-0 right-0 md:top-15 lg:left-72 bg-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
-        style={{
-          width: isMobile ? "100%" : "min(1200px, calc(100vw - 280px))",
-          zIndex: 9999,
-        }}
+        style={{ zIndex: 9999 }}
       >
         {certNames.length > 1 && (
           <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-gray-100 bg-gray-50 flex-wrap">
