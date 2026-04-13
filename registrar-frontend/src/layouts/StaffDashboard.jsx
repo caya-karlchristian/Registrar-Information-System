@@ -122,10 +122,12 @@ const StaffDashboard = () => {
           });
         }
 
-        const finalCertName = r.certification_type?.certificate_name || null;
+        const finalCertName = r.certificates?.length > 0
+          ? r.certificates.map(c => c.certificate_type?.certificate_name).filter(Boolean).join(', ')
+          : null;
 
         const isCertificate = Boolean(
-          r.certification_type ||
+          (r.certificates && r.certificates.length > 0) ||
             r.documents?.some(d => {
               const name =
                 d.document_type?.document_name?.toLowerCase() ||
