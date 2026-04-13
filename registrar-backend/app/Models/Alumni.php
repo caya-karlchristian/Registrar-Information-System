@@ -10,6 +10,8 @@ class Alumni extends Model
     protected $primaryKey = 'alumni_id';
     protected $guarded = [];
     protected $table = 'alumni';
+    const TYPE_SIS     = 2;
+    const TYPE_NON_SIS = 2;
 
     // -------------------------------------------------------
     // Alumni belongs to a user account
