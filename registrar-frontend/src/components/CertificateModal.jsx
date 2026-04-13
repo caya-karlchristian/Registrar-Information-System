@@ -28,9 +28,9 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
     setTimeout(onClose, 300);
   };
 
-  const validDocType = CERT_CONFIG[request.certName]
-    ? request.certName
-    : Object.keys(CERT_CONFIG)[0];
+  const certNames = (request.certificateNames ?? []).filter(n => CERT_CONFIG[n]);
+  const defaultCert = certNames.length > 0 ? certNames[0] : Object.keys(CERT_CONFIG)[0];
+  const [selectedCert, setSelectedCert] = useState(defaultCert);
 
     useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
