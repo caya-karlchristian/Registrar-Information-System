@@ -53,6 +53,7 @@ const RequestForm = () => {
     receiptNumber: "",
     dateOfPayment: "",
     documentCopies: {},
+    certCopies: {},
   });
 
   const handleInputChange = (e) => {
@@ -94,6 +95,16 @@ const RequestForm = () => {
     }
 
     setShowConfirmModal(true);
+  };
+
+  const handleCertCopyChange = (certName, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      certCopies: {
+        ...prev.certCopies,
+        [certName]: value,
+      },
+    }));
   };
 
   const handleDocCopyChange = (docName, value) => {
@@ -155,7 +166,8 @@ const RequestForm = () => {
       .map(name => ({
         certificate_type_id: availableCertifications.find(
           c => c.certificate_name === name
-        )?.certificate_type_id
+        )?.certificate_type_id,
+        number_of_copies: parseInt(formData.certCopies[name]) || 1,
       }))
       .filter(c => c.certificate_type_id);
     // 3. Prepare Payload (Matches your Laravel store validation)
@@ -190,6 +202,7 @@ const RequestForm = () => {
       receiptNumber: "",
       dateOfPayment: "",
       documentCopies: {},
+      certCopies: {},
     });
     setErrorMessage("");
     setIsLoading(false);
@@ -399,6 +412,28 @@ const RequestForm = () => {
                       ))}
                     </div>
                   </div>
+                  {showCertificationDropdown && formData.certification.length > 0 && (
+                    <div className="border-t border-white/20 mt-2 pt-2">
+                      <p className="text-[#eebc48] text-xs font-bold uppercase tracking-wide mb-2">
+                        Copies per certification type
+                      </p>
+                      {formData.certification.map((certName, index) => (
+                        <div key={index} className="flex items-center justify-between gap-4 mt-2">
+                          <label className="text-white text-sm flex-1">{certName}</label>
+                          <div className="w-24">
+                            <input
+                              type="number"
+                              min="1"
+                              max="10"
+                              className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg outline-none transition-all duration-200 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
+                              value={formData.certCopies[certName] || 1}
+                              onChange={e => handleCertCopyChange(certName, e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar">
                     {formData.documentsRequested.map((doc, index) => {
