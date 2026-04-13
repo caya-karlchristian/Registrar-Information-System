@@ -145,7 +145,13 @@ const StaffDashboard = () => {
 
         const documentDetailsArray = (() => {
           const docs = [];
-          if (r.certification_type) docs.push(`Certification: ${r.certification_type.certificate_name}`);
+          if (r.certificates?.length > 0) {
+            r.certificates.forEach(c => {
+              if (c.certificate_type?.certificate_name) {
+                docs.push(`Certification: ${c.certificate_type.certificate_name}`);
+              }
+            });
+          }
           if (r.documents?.length > 0) {
             r.documents.forEach(d => docs.push(getDocName(d)));
           }
