@@ -53,12 +53,27 @@ const StudentDashboard = () => {
       })
       .filter(Boolean) || [];
 
+        const certTypeNames = r.certificates?.map(c =>
+          c.certification_type?.certificate_name
+        ).filter(Boolean) ?? [];
+
+        const enrichedDocNames = docNames.map(name => {
+          if (name.toLowerCase().includes('certif') && certTypeNames.length > 0) {
+            return `${name} (${certTypeNames.join(', ')})`;
+          }
+          return name;
+        });
+
+        if (certTypeNames.length > 0 && !docNames.some(n => n.toLowerCase().includes('certif'))) {
+          enrichedDocNames.push(`Certification (${certTypeNames.join(', ')})`);
+        }
+
         return {
           ...r,
           config,
           purpose_label: purposeLabel,
           type: TAB_MAP[r.status_id] || "history",
-          doc_names: docNames,
+          doc_names: enrichedDocNames,
         };
       })
       .sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
