@@ -118,7 +118,9 @@ const AlumniRequestForm = () => {
       return;
     }
 
-    const hasInvalidDocCopy = formData.documentsRequested.some((doc) => {
+    const hasInvalidDocCopy = formData.documentsRequested
+      .filter((doc) => !doc.toLowerCase().includes("certif"))
+      .some((doc) => {
       const copies = Number(formData.documentCopies[doc] || 1);
       return !Number.isInteger(copies) || copies < 1 || copies > 10;
     });
@@ -218,7 +220,7 @@ const AlumniRequestForm = () => {
         request_purpose_id: purposeId,
         or_number: formData.receiptNumber,
         receipt_date: formData.dateOfPayment,
-        documents: formData.documentsRequested.map(name => { const dbDoc = availableDocs.find(d => d.document_name === name); const id = dbDoc?.document_type_id ?? Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name); return { document_type_id: id, number_of_copies: parseInt(formData.documentCopies[name]) || 1 }; }).filter(doc => doc.document_type_id),
+        documents: formData.documentsRequested.filter(name => !name.toLowerCase().includes("certif")).map(name => { const dbDoc = availableDocs.find(d => d.document_name === name); const id = dbDoc?.document_type_id ?? Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name); return { document_type_id: id, number_of_copies: parseInt(formData.documentCopies[name]) || 1 }; }).filter(doc => doc.document_type_id),
         certificates: certificates,
       };
 
@@ -341,7 +343,7 @@ const AlumniRequestForm = () => {
 
           </div>
 
-          <div className="flex-1 px-10 md:px-20 py-4 text-white">
+          <div className="flex-1 px-4 sm:px-6 md:px-10 py-4 text-white">
             
             {/* STEP 1: TERMS & CONDITIONS */}
             {currentStep === 1 && (
@@ -473,6 +475,7 @@ const AlumniRequestForm = () => {
                     min={getDateDaysAgo(7)}
                     max={getTodayDate()}
                     required
+                    voiceEnabled={false}
                   />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-1 w-full -mt-2">
@@ -481,16 +484,11 @@ const AlumniRequestForm = () => {
                       Number of copies per document
                     </h3>
                     <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
-                      {formData.documentsRequested.length > 0 ? (
-                        formData.documentsRequested.map((doc, index) => (
+                      {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).length > 0 ? (
+                        formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => (
                           <div key={index} className="flex items-center justify-between gap-2">
                            <label className="text-white text-sm flex-1">
                             {doc}
-                              {doc.toLowerCase().includes("certif") && certificationLabel && (
-                                <span className="text-[#eebc48] font-semibold ml-1">
-                                  — {certificationLabel}
-                                </span>
-                              )}
                             </label>
                               <div className="w-24">
                                 <input
@@ -513,33 +511,28 @@ const AlumniRequestForm = () => {
                       ) : (
                         <p className="text-gray-300 text-sm italic">No documents selected.</p>
                       )}
+                      {showCertificationDropdown && formData.certification.length > 0 &&
+                        formData.certification.map((certName, index) => (
+                          <div key={index} className="flex items-center justify-between gap-2">
+                            <label className="text-white text-sm flex-1">CERTIFICATION (<span className="text-[#FFC72C]">{certName}</span>)</label>
+                            <div className="w-24">
+                              <input
+                                type="number"
+                                min="1"
+                                max="10"
+                                className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg outline-none transition-all duration-200 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
+                                value={formData.certCopies[certName] || 1}
+                                onChange={e => handleCertCopyChange(certName, e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        ))
+                      }
                     </div>
                   </div>
-                  {showCertificationDropdown && formData.certification.length > 0 && (
-                    <div className="border-t border-white/20 mt-2 pt-2">
-                      <p className="text-pup-yellow text-xs font-bold uppercase tracking-wide mb-2">
-                        Copies per certification type
-                      </p>
-                      {formData.certification.map((certName, index) => (
-                        <div key={index} className="flex items-center justify-between gap-2 mt-2">
-                          <label className="text-white text-sm flex-1">{certName}</label>
-                          <div className="w-24">
-                            <input
-                              type="number"
-                              min="1"
-                              max="10"
-                              className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg outline-none transition-all duration-200 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
-                              value={formData.certCopies[certName] || 1}
-                              onChange={e => handleCertCopyChange(certName, e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar -mt-2">
+                <div className="flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar bg-white/10 p-2 rounded-lg border -mt-2">
                   {formData.documentsRequested.map((doc, index) => {
 
                     const docData = availableDocs.find((d) => d.document_name === doc);
@@ -558,11 +551,6 @@ const AlumniRequestForm = () => {
                           <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
                           <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
                             {doc}
-                            {doc.toLowerCase().includes("certif") && certificationLabel && (
-                              <span className="text-white/60 font-normal ml-1 normal-case tracking-normal">
-                                — {certificationLabel}
-                              </span>
-                            )}
                           </h3>
                         </div>
 
@@ -572,7 +560,7 @@ const AlumniRequestForm = () => {
                               <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
                                 <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
 
-                                <span className="wrap-break-word whitespace-normal">
+                                <span className="wrap-break-word whitespace-normal break-all max-w-full">
                                   {req}
                                 </span>
                               </li>
