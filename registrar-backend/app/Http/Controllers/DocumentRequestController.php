@@ -101,6 +101,7 @@ class DocumentRequestController extends Controller
 
             'certificates'                      => 'nullable|array',
             'certificates.*.certificate_type_id'=> 'required|integer|exists:certificate_type,certificate_type_id',
+            'certificates.*.number_of_copies'      => 'nullable|integer|min:1|max:10',
         ]);
 
         // Require at least one document or one certificate
@@ -178,6 +179,7 @@ class DocumentRequestController extends Controller
         foreach ($validated['certificates'] ?? [] as $cert) {
             $documentRequest->certificates()->create([
                 'certificate_type_id' => $cert['certificate_type_id'],
+                'number_of_copies'    => $cert['number_of_copies'] ?? 1,
             ]);
         }
 

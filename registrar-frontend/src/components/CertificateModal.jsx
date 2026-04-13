@@ -28,9 +28,9 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
     setTimeout(onClose, 300);
   };
 
-  const validDocType = CERT_CONFIG[request.certName]
-    ? request.certName
-    : Object.keys(CERT_CONFIG)[0];
+  const certNames = (request.certificateNames ?? []).filter(n => CERT_CONFIG[n]);
+  const defaultCert = certNames.length > 0 ? certNames[0] : Object.keys(CERT_CONFIG)[0];
+  const [selectedCert, setSelectedCert] = useState(defaultCert);
 
     useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -44,7 +44,7 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
 
   const initialData = {
     requestId: request.id,
-    docType: validDocType,
+    docType: selectedCert,
     fullName: request.studentName ?? '',
     studentNum: request.studentNum?? '',
     course: request.course ?? '',
@@ -80,8 +80,27 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
           zIndex: 9999,
         }}
       >
+        {certNames.length > 1 && (
+          <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-gray-100 bg-gray-50 flex-wrap">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Generate:</span>
+            {certNames.map(name => (
+              <button
+                key={name}
+                onClick={() => setSelectedCert(name)}
+                className={`px-3 py-1 rounded-full text-xs font-bold border transition ${
+                  selectedCert === name
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                }`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
         <div id="cert-modal-content" className="flex-1 overflow-auto h-full bg-white">
           <GenerateCertification
+            key={selectedCert}
             initialData={initialData}
             onClose={handleClose}
             onCertificatePrinted={onCertificatePrinted}
