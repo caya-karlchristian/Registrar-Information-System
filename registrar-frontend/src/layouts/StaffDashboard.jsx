@@ -123,7 +123,7 @@ const StaffDashboard = () => {
         }
 
         const finalCertName = r.certificates?.length > 0
-          ? r.certificates.map(c => c.certificate_type?.certificate_name).filter(Boolean).join(', ')
+          ? r.certificates.map(c => c.certification_type?.certificate_name).filter(Boolean).join(', ')
           : null;
 
         const isCertificate = Boolean(
@@ -149,8 +149,8 @@ const StaffDashboard = () => {
           const docs = [];
           if (r.certificates?.length > 0) {
             r.certificates.forEach(c => {
-              if (c.certificate_type?.certificate_name) {
-                docs.push(`Certification: ${c.certificate_type.certificate_name}`);
+              if (c.certification_type?.certificate_name) {
+                docs.push(`Certification: ${c.certification_type.certificate_name}`);
               }
             });
           }

@@ -183,12 +183,14 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
 
   useEffect(() => {
     if (formData.course && formData.studentNum) return;
+    const studentNum = initialData?.studentNum;
+    const studentId  = initialData?.studentId;
     const fetch = async () => {
       try {
         setLoading(true);
         const res = await getAcademicRecords();
         const record = res.data.find(
-          (r) => r.student_number === initialData?.studentNum || r.student_id === initialData?.studentId
+          (r) => r.student_number === studentNum || r.student_id === studentId
         );
         if (record) {
           const educationLevel = ["Alumni", "Graduated"].includes(record.status) ? "Graduate" : "Undergraduate";
@@ -206,7 +208,8 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
       }
     };
     fetch();
-  }, [initialData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData?.studentNum, initialData?.studentId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
