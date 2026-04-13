@@ -151,10 +151,13 @@ const RequestForm = () => {
       key => PURPOSE_MAP[key] === formData.purposeOfRequest
     );
 
-    const selectedCertification = formData.certification[0] || null;
-    const certId = availableCertifications.find(
-      (c) => c.certificate_name === selectedCertification
-    )?.certificate_type_id ?? null;
+    const certificates = formData.certification
+      .map(name => ({
+        certificate_type_id: availableCertifications.find(
+          c => c.certificate_name === name
+        )?.certificate_type_id
+      }))
+      .filter(c => c.certificate_type_id);
     // 3. Prepare Payload (Matches your Laravel store validation)
     const payload = {
       request_purpose_id: purposeId,
