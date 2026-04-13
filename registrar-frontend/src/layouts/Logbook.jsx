@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
-import { getDocumentRequests, getDocumentTypes } from "../services/api"; 
+import { getDocumentRequests, getDocumentTypes, getRequestHistory } from "../services/api"; 
 import LoadingOverlay from "../components/LoadingOverlay"; 
 import DropDown from '../components/DropDown';
 import { logbookExcel } from '../utils/logbookExcel.js';
@@ -8,9 +8,16 @@ import pupLogoSrc from '../assets/puplogoimage.png';
 import bpLogoSrc from '../assets/Bagong_Pilipinas_logo.png';
 import { DOC_TYPE_MAP } from '../utils/constants';
 
+const toRows = (raw) => {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.data)) return raw.data;
+  return [];
+};
+
 const LogbookRecords = () => {
   const [data, setData] = useState([]);
   const [dbDocTypes, setDbDocTypes] = useState([]);
+  const [historyByRequestId, setHistoryByRequestId] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDocTypeId, setSelectedDocTypeId] = useState("");
@@ -20,19 +27,39 @@ const LogbookRecords = () => {
     const fetchLogbookData = async () => {
       setLoading(true);
       try {
-        const [requestsRes, typesRes] = await Promise.all([
+        const [requestsRes, typesRes, historyRes] = await Promise.all([
           getDocumentRequests(),
-          getDocumentTypes()
+          getDocumentTypes(),
+          getRequestHistory(),
         ]);
-        const requests = requestsRes.data || [];
-        const types = typesRes.data || [];
+        const requests = toRows(requestsRes.data);
+        const types = toRows(typesRes.data);
+        const historyRows = toRows(historyRes.data);
+        const groupedHistory = historyRows.reduce((acc, item) => {
+          const requestId = item?.request_id;
+          if (!requestId) return acc;
+          if (!acc[requestId]) acc[requestId] = [];
+          acc[requestId].push(item);
+          return acc;
+        }, {});
+
+        Object.keys(groupedHistory).forEach((requestId) => {
+          groupedHistory[requestId].sort((a, b) => {
+            const aTime = new Date(a?.changed_at || 0).getTime();
+            const bTime = new Date(b?.changed_at || 0).getTime();
+            return bTime - aTime;
+          });
+        });
+
         setData(requests);
         setDbDocTypes(types);
-        console.log('Logbook data loaded:', { requests: requests.length, types: types.length });
+        setHistoryByRequestId(groupedHistory);
+        console.log('Logbook data loaded:', { requests: requests.length, types: types.length, history: historyRows.length });
       } catch (error) {
         console.error('Error loading logbook records:', error);
         setData([]);
         setDbDocTypes([]);
+        setHistoryByRequestId({});
       } finally {
         setLoading(false);
       }
@@ -79,7 +106,7 @@ const LogbookRecords = () => {
     return activeDocMap[selectedDocTypeId] || "All Document Types";
   }, [selectedDocTypeId, activeDocMap]);
 
-  const handleExportExcel = () => logbookExcel(sortedData, selectedDocLabel, pupLogoSrc, bpLogoSrc);
+  const handleExportExcel = () => logbookExcel(sortedData, selectedDocLabel, pupLogoSrc, bpLogoSrc, historyByRequestId);
 
   const toProperCase = (value = '') => {
     return value
@@ -109,6 +136,7 @@ const LogbookRecords = () => {
       row.student_profile?.academic_records?.[0]?.course ||
       row.student_profile?.course ||
       row.academic_record?.course ||
+      row.alumni_academic_record?.course ||
       '---'
     );
   };
@@ -143,13 +171,15 @@ const LogbookRecords = () => {
   };
 
   const getProcessedAt = (row) => {
-    if (!row.history || row.history.length === 0) return null;
-    return row.history[0]?.changed_at || null;
+    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
+    if (history.length === 0) return null;
+    return history[0]?.changed_at || null;
   };
 
   const getMinutesProcessed = (row) => {
-    if (!row.history || row.history.length === 0) return null;
-    return row.history[0]?.minutes_processed ?? null;
+    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
+    if (history.length === 0) return null;
+    return history[0]?.minutes_processed ?? null;
   };
 
   const formatMinutesDuration = (minutesValue) => {
@@ -171,8 +201,9 @@ const LogbookRecords = () => {
   };
 
   const getClaimedAt = (row) => {
-    if (!row.history || row.history.length === 0) return null;
-    const claimEntry = row.history.find(h => h.new_status_id === 3);
+    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
+    if (history.length === 0) return null;
+    const claimEntry = history.find((h) => h.new_status_id === 3);
     return claimEntry?.changed_at || null;
   };
 
