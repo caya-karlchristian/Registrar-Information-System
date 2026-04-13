@@ -122,10 +122,12 @@ const StaffDashboard = () => {
           });
         }
 
-        const finalCertName = r.certification_type?.certificate_name || null;
+        const finalCertName = r.certificates?.length > 0
+          ? r.certificates.map(c => c.certification_type?.certificate_name).filter(Boolean).join(', ')
+          : null;
 
         const isCertificate = Boolean(
-          r.certification_type ||
+          (r.certificates && r.certificates.length > 0) ||
             r.documents?.some(d => {
               const name =
                 d.document_type?.document_name?.toLowerCase() ||
@@ -141,11 +143,17 @@ const StaffDashboard = () => {
           DOC_TYPE_MAP[d.document_type_id] ||
           `Unknown Doc (ID: ${d.document_type_id})`;
 
-        const totalCopies = r.documents?.reduce((sum, d) => sum + (Number(d.number_of_copies) || 1), 0) || 1;
+        const totalCopies = (r.documents?.reduce((sum, d) => sum + (Number(d.number_of_copies) || 1), 0) || 0) + (r.certificates?.reduce((sum, c) => sum + (Number(c.number_of_copies) || 1), 0) || 0) || 1;
 
         const documentDetailsArray = (() => {
           const docs = [];
-          if (r.certification_type) docs.push(`Certification: ${r.certification_type.certificate_name}`);
+          if (r.certificates?.length > 0) {
+            r.certificates.forEach(c => {
+              if (c.certification_type?.certificate_name) {
+                docs.push(`Certification: ${c.certification_type.certificate_name}`);
+              }
+            });
+          }
           if (r.documents?.length > 0) {
             r.documents.forEach(d => docs.push(getDocName(d)));
           }
@@ -171,6 +179,7 @@ const StaffDashboard = () => {
             ?? r.alumni_academic_record?.student_number
             ?? 'N/A',
           certName: finalCertName,
+          certificateNames: r.certificates?.map(c => c.certification_type?.certificate_name).filter(Boolean) ?? [],
           isCertificate,
           copies: totalCopies,
           documentDetailsArray,

@@ -136,8 +136,15 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               </p>
               <p><strong>Status:</strong> {displayStatus}</p>
               <p><strong>Purpose:</strong> {request.request_purpose?.purpose_name ?? PURPOSE_MAP[request.request_purpose_id] ?? 'N/A'}</p>
-              {request.certification && (
-                <p><strong>Certification Type:</strong> {request.certification}</p>
+              {request.certificates?.length > 0 && (
+                <div>
+                  <strong>Certification Types:</strong>
+                  <ul className="list-disc ml-5 mt-1">
+                    {request.certificates.map((c, i) => (
+                      <li key={i}>{c.certification_type?.certificate_name ?? 'Unknown'} — {c.number_of_copies || 1} {(c.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           </Section>
