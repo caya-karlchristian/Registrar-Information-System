@@ -193,17 +193,21 @@ const AlumniRequestForm = () => {
         key => PURPOSE_MAP[key] === formData.purposeOfRequest
       );
 
-      const selectedCertification = formData.certification[0] || null;
-      const certId = availableCertifications.find(
-        (c) => c.certificate_name === selectedCertification
-      )?.certificate_type_id ?? null;
+      // Map all selected certification names to their IDs
+      const certificates = formData.certification
+        .map(name => ({
+          certificate_type_id: availableCertifications.find(
+            c => c.certificate_name === name
+          )?.certificate_type_id
+        }))
+        .filter(c => c.certificate_type_id);
 
       const payload = {
         request_purpose_id: purposeId,
         or_number: formData.receiptNumber,
         receipt_date: formData.dateOfPayment,
         documents: formData.documentsRequested.map(name => { const dbDoc = availableDocs.find(d => d.document_name === name); const id = dbDoc?.document_type_id ?? Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name); return { document_type_id: id, number_of_copies: parseInt(formData.documentCopies[name]) || 1 }; }).filter(doc => doc.document_type_id),
-        cert_type_id: certId,
+        certificates: certificates,
       };
 
       const response = await axios.post("/document-requests", payload);
