@@ -121,15 +121,31 @@ class NotificationService
     // read_at state. The WebSocket push is just the real-time
     // alert on top of that persistent record.
     // -------------------------------------------------------
+    public static function sendToAllExcept(
+        array  $excludedRoleIds,
+        string $triggerEvent,
+        array  $data      = [],
+        ?int   $requestId = null,
+    ): void {
+        $users = SystemUser::whereNotIn('role_id', $excludedRoleIds)
+            ->where('status', 'Activated')
+            ->get();
+        foreach ($users as $user) {
+            self::send(
+                recipient:    $user,
+                triggerEvent: $triggerEvent,
+                data:         $data,
+                requestId:    $requestId,
+            );
+        }
+    }
     public static function sendToAdmins(
         string $triggerEvent,
         array  $data      = [],
         ?int   $requestId = null,
     ): void {
-        $admins = SystemUser::whereIn('role_id', [
-            SystemUser::ROLE_ADMIN,
-            SystemUser::ROLE_SUPER_ADMIN,
-        ])->where('status', 'Activated')->get();
+        $admins = SystemUser::where('role_id', SystemUser::ROLE_ADMIN)
+            ->where('status', 'Activated')->get();
 
         foreach ($admins as $admin) {
             self::send(
