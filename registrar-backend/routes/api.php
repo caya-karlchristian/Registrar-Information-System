@@ -15,6 +15,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\SsoCallbackController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AnnouncementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -175,5 +176,14 @@ Route::middleware('auth:sanctum')->group(function () {
         // Audit log viewer
         Route::get('audit-logs', [AuditLogController::class, 'index']);
         Route::get('audit-logs/filters', [AuditLogController::class, 'filters']);
+
+        // Announcements — super admin CRUD
+        Route::post('announcements', [AnnouncementController::class, 'store']);
+        Route::put('announcements/{announcement}', [AnnouncementController::class, 'update']);
+        Route::delete('announcements/{announcement}', [AnnouncementController::class, 'destroy']);
     });
+
+    // Announcements — read for all authenticated users
+    Route::get('announcements', [AnnouncementController::class, 'index']);
+    Route::get('announcements/{announcement}', [AnnouncementController::class, 'show']);
 });
