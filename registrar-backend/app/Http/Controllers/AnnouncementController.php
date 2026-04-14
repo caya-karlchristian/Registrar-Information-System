@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Announcement;
+use App\Models\SystemUser;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class AnnouncementController extends Controller
@@ -30,6 +32,15 @@ class AnnouncementController extends Controller
             'created_by' => $request->user()->user_id,
         ]);
 
+        NotificationService::sendToAllExcept(
+            excludedRoleIds: [SystemUser::ROLE_SUPER_ADMIN],
+            triggerEvent:    'announcement_published',
+            data: [
+                'announcement_id'      => $announcement->id,
+                'announcement_title'   => $announcement->title,
+                'announcement_content' => $announcement->content,
+            ],
+        );
         return response()->json($announcement, 201);
     }
 
