@@ -36,8 +36,8 @@ services:
       SESSION_DOMAIN: ${SESSION_DOMAIN}
     ports:
       - "8000:8000"
-    volumes:
-      - ./registrar-backend:/var/www/html
+    # volumes:
+    #   - ./registrar-backend:/var/www/html
     networks:
       - ris_network
 
@@ -70,7 +70,7 @@ services:
     ports:
       - "8080:8080"
     # volumes:
-    #   - ./registrar-backend:/var/www/html
+      # - ./registrar-backend:/var/www/html
     depends_on:
       backend:
         condition: service_started
