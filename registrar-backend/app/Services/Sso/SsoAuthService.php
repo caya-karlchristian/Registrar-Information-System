@@ -22,9 +22,7 @@ class SsoAuthService
         $accessToken = $this->idpClient->exchangeCode($code);
         $profile     = $this->idpClient->fetchUserProfile($accessToken);
 
-        $roles = $this->parseRoles($profile['roles'] ?? []);
-
-        $result = $this->provisioner->provision($profile, $roles);
+        $result = $this->provisioner->provision($profile);
         $user   = $result->user;
 
         $user->update(['idp_access_token' => $accessToken]);
@@ -43,14 +41,5 @@ class SsoAuthService
                 'role_name' => $user->role_name ?? null,
             ],
         ];
-    }
-
-    private function parseRoles(mixed $raw): array
-    {
-        if (is_array($raw)) {
-            return $raw;
-        }
-
-        return array_filter(array_map('trim', explode(',', (string) $raw)));
     }
 }
