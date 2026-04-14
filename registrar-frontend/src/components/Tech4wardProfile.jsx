@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MegaphoneIcon,
   QuestionMarkCircleIcon,
@@ -8,6 +8,9 @@ import {
 } from '@heroicons/react/24/solid';
 import risImage from "../assets/RIS1.png";
 import logoImage from "../assets/puplogoimage.png";
+import { getAnnouncements } from "../services/api";
+
+const ICON_CYCLE = [MegaphoneIcon, QuestionMarkCircleIcon, ClipboardDocumentListIcon];
 
 const TEAM_MEMBERS = [
   { lastName: "CAYA",      firstName: "Karl Christian", role: "PROJECT LEAD, UI/UX, AND DATABASE", image: logoImage },
@@ -19,28 +22,41 @@ const TEAM_MEMBERS = [
 const Tech4wardProfile = ({ bgImage }) => {
   const bg = bgImage || risImage;
   const [announcementPage, setAnnouncementPage] = useState(0);
+  const [announcements, setAnnouncements] = useState([]);
   const ITEMS_PER_PAGE = 3;
 
-   const ANNOUNCEMENTS = [
-     { icon: MegaphoneIcon, title: 'Enrollment Period', desc: 'Configured in System Settings: this card shows the enrollment announcement preview.' },
-     { icon: QuestionMarkCircleIcon, title: 'Help & Support', desc: 'Configured in System Settings: contact details and support guidance can be edited there.' },
-     { icon: ClipboardDocumentListIcon, title: 'Requirements', desc: 'Configured in System Settings: document requirements and request instructions are managed there.' },
-     { icon: MegaphoneIcon, title: 'Important Dates', desc: 'Configured in System Settings: key academic schedule notices are prepared there.' },
-     { icon: QuestionMarkCircleIcon, title: 'Service Advisory', desc: 'Configured in System Settings: temporary service updates are drafted there.' },
-     { icon: ClipboardDocumentListIcon, title: 'Submission Checklist', desc: 'Configured in System Settings: checklist details are maintained there.' },
-   ];
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        // Fetch all pages and collect enabled announcements
+        let page = 1;
+        let all = [];
+        while (true) {
+          const res = await getAnnouncements(page, 20);
+          const data = res.data.data ?? [];
+          all = [...all, ...data.filter(a => a.enabled)];
+          if (page >= (res.data.last_page ?? 1)) break;
+          page++;
+        }
+        setAnnouncements(all);
+      } catch (err) {
+        console.warn("Could not load announcements:", err);
+      }
+    };
+    fetchAll();
+  }, []);
 
-   const totalPages = Math.ceil(ANNOUNCEMENTS.length / ITEMS_PER_PAGE);
-   const startIndex = announcementPage * ITEMS_PER_PAGE;
-   const visibleAnnouncements = ANNOUNCEMENTS.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(announcements.length / ITEMS_PER_PAGE);
+  const startIndex = announcementPage * ITEMS_PER_PAGE;
+  const visibleAnnouncements = announcements.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-   const handlePrevAnnouncements = () => {
-     setAnnouncementPage((prev) => Math.max(prev - 1, 0));
-   };
+  const handlePrevAnnouncements = () => {
+    setAnnouncementPage((prev) => Math.max(prev - 1, 0));
+  };
 
-   const handleNextAnnouncements = () => {
-     setAnnouncementPage((prev) => Math.min(prev + 1, totalPages - 1));
-   };
+  const handleNextAnnouncements = () => {
+    setAnnouncementPage((prev) => Math.min(prev + 1, totalPages - 1));
+  };
 
   return (
     <div className="w-full overflow-hidden bg-gray-50 border-b-4 border-yellow-400">
@@ -60,20 +76,29 @@ const Tech4wardProfile = ({ bgImage }) => {
             </button>
 
             <div className="order-3 md:order-2 basis-full md:basis-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 flex-1">
-              {visibleAnnouncements.map((item, index) => (
-                <div
-                  key={`${item.title}-${startIndex + index}`}
-                  className="bg-[#800000] rounded-lg p-6 shadow-lg"
-                >
-                  <div className="flex flex-col items-center text-center gap-3">
-                    <item.icon className="w-10 h-10 text-yellow-300" />
-                    <div>
-                      <h3 className="text-lg font-black text-white uppercase">{item.title}</h3>
-                      <p className="text-xs text-gray-200 mt-1">{item.desc}</p>
-                    </div>
-                  </div>
+              {visibleAnnouncements.length === 0 ? (
+                <div className="col-span-3 text-center text-white/60 py-8 italic text-sm">
+                  No announcements at this time.
                 </div>
-              ))}
+              ) : (
+                visibleAnnouncements.map((item, index) => {
+                  const Icon = ICON_CYCLE[(startIndex + index) % ICON_CYCLE.length];
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-[#800000] rounded-lg p-6 shadow-lg"
+                    >
+                      <div className="flex flex-col items-center text-center gap-3">
+                        <Icon className="w-10 h-10 text-yellow-300" />
+                        <div>
+                          <h3 className="text-lg font-black text-white uppercase">{item.title}</h3>
+                          <p className="text-xs text-gray-200 mt-1">{item.content}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             <button
