@@ -20,9 +20,33 @@ const ROLE_CONFIG = {
   }
 };
 
-const capitalizeWord = (str) => {
-  if (!str) return '';
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+const capitalizeWord = (word) => {
+  if (!word) return "";
+
+  return word
+    .split("-")
+    .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : ""))
+    .join("-");
+};
+
+const capitalizeName = (value) => {
+  if (!value) return "";
+
+  return String(value)
+    .trim()
+    .split(/\s+/)
+    .map(capitalizeWord)
+    .join(" ");
+};
+
+const formatSuffix = (value) => {
+  const normalized = capitalizeName(value);
+  if (!normalized) return "";
+
+  return normalized
+    .split(" ")
+    .map((part) => (/^(i|ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(part) ? part.toUpperCase() : part))
+    .join(" ");
 };
 
 const ProfilePage = ({ userType = "student" }) => {
@@ -88,6 +112,13 @@ const ProfilePage = ({ userType = "student" }) => {
     setModal(prev => ({ ...prev, isOpen: false }));
   };
 
+  const displayProfile = {
+    firstName: capitalizeName(profileData.firstName),
+    middleName: capitalizeName(profileData.middleName),
+    lastName: capitalizeName(profileData.lastName),
+    suffix: formatSuffix(profileData.suffix),
+  };
+
 
   return (
     <div className="min-h-screen flex items-start justify-center font-sans py-2 lg:-mt-5">
@@ -105,9 +136,10 @@ const ProfilePage = ({ userType = "student" }) => {
 
               <div className="text-white space-y-1 mt-2 text-center md:text-left">
                 <h2 className="text-3xl font-bold tracking-wide flex flex-wrap gap-3 justify-center md:justify-start">
-                  <span>{capitalizeWord(profileData.firstName)}</span>
-                  <span>{capitalizeWord(profileData.middleName)}</span>
-                  <span>{capitalizeWord(profileData.lastName)}</span>
+                  <span>{displayProfile.firstName}</span>
+                  <span>{displayProfile.middleName}</span>
+                  <span>{displayProfile.lastName}</span>
+                  {displayProfile.suffix && <span>{displayProfile.suffix}</span>}
                 </h2>
                 {/* Dynamic ID Display */}
                 <p className="text-sm font-medium opacity-90">{profileData.studentId}</p>
@@ -138,21 +170,21 @@ const ProfilePage = ({ userType = "student" }) => {
               <FieldGroup 
                 label="First Name" 
                 name="firstName" 
-                value={profileData.firstName} 
+                value={displayProfile.firstName} 
                 isEditing={false} 
                 required
               />
               <FieldGroup 
                 label="Middle Name" 
                 name="middleName" 
-                value={profileData.middleName} 
+                value={displayProfile.middleName} 
                 isEditing={false} 
                 required
               />
               <FieldGroup 
                 label="Last Name" 
                 name="lastName" 
-                value={profileData.lastName} 
+                value={displayProfile.lastName} 
                 isEditing={false} 
                 required
               />
@@ -184,7 +216,7 @@ const ProfilePage = ({ userType = "student" }) => {
               <FieldGroup 
                 label="Suffix" 
                 name="suffix" 
-                value={profileData.suffix} 
+                value={displayProfile.suffix} 
                 isEditing={false} 
                 placeholder="e.g. Jr., Sr., III (Optional)"
                 type="text"
