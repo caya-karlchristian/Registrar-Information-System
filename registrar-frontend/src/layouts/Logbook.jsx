@@ -123,7 +123,7 @@ const LogbookRecords = () => {
   };
 
   const getFullName = (row) => {
-    const p = row.student_profile;
+    const p = row.student_profile || row.alumni_profile;
     if (!p) return 'Walk-in Client';
     const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
     const lastName = toProperCase(p.last_name || '');
