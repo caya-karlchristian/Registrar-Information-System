@@ -69,8 +69,8 @@ services:
       BROADCAST_CONNECTION: reverb
     ports:
       - "8080:8080"
-    volumes:
-      - ./registrar-backend:/var/www/html
+    # volumes:
+    #   - ./registrar-backend:/var/www/html
     depends_on:
       backend:
         condition: service_started
