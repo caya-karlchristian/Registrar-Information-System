@@ -13,32 +13,28 @@ class UserProvisioningService
 {
     public function __construct(private RoleResolver $roleResolver) {}
 
-    public function provision(array $profile, array $idpRoles): ProvisioningResult
+    public function provision(array $profile): ProvisioningResult
     {
         $email      = $profile['email'];
         $firstName  = $profile['first_name']  ?? null;
         $middleName = $profile['middle_name']  ?? null;
         $lastName   = $profile['last_name']    ?? null;
 
-        return DB::transaction(function () use ($email, $firstName, $middleName, $lastName, $idpRoles) {
+        return DB::transaction(function () use ($email, $firstName, $middleName, $lastName, $profile) {
             $existing = SystemUser::where('email', $email)->first();
-            $roleId   = $this->roleResolver->resolve($idpRoles, $existing);
+            $roleId   = $this->roleResolver->resolve($existing);
 
             if (!$roleId) {
-                throw new \RuntimeException('No recognized role for this user.');
+                throw new \RuntimeException('Your account is not yet registered in RIS. Please contact the registrar.');
             }
 
             $user = $existing ?? SystemUser::create([
-                'email'    => $email,
-                'idp_user_id' => $profile['id'] ?? null,  // add this
-                'password' => bcrypt(Str::random(32)),
-                'role_id'  => $roleId,
-                'status'   => 'Activated',
+                'email'       => $email,
+                'idp_user_id' => $profile['id'] ?? null,
+                'password'    => bcrypt(Str::random(32)),
+                'role_id'     => $roleId,
+                'status'      => 'Activated',
             ]);
-
-            if ($existing && $this->roleResolver->shouldUpdateRole($existing, $roleId)) {
-                $user->update(['role_id' => $roleId]);
-            }
 
             $needsOnboarding = $this->provisionProfile(
                 $user, $roleId, $firstName, $middleName, $lastName
@@ -90,7 +86,7 @@ class UserProvisioningService
 
         $alumni = Alumni::create([
             'user_id'        => $user->user_id,
-            'alumni_type_id' => Alumni::TYPE_NON_SIS, // default; corrected during onboarding
+            'alumni_type_id' => Alumni::TYPE_NON_SIS,
         ]);
 
         AlumniProfile::create([
