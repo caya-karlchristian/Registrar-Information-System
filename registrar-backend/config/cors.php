@@ -8,7 +8,8 @@ return [
         'https://d1234abcdef.cloudfront.net',  
         'https://registrar-information-system-bsit2027.com',              
         'http://13.250.214.23',              
-        'https://pupt-ris.registrar-information-system.com'
+        'http://pupt-ris.registrar-information-system-bsit2027.com',
+        'https://pupt-ris.registrar-information-system-bsit2027.com',
 
     ],
     'allowed_origins_patterns' => [],
