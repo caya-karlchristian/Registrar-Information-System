@@ -65,7 +65,12 @@ class NotificationController extends Controller
                 'request_id' => $n->request_id,
                 'read_at'    => $n->read_at?->toISOString(),
                 'created_at' => $n->created_at->toISOString(),
-                'is_unread'  => is_null($n->read_at),
+                'is_unread'    => is_null($n->read_at),
+                'announcement' => isset($n->data['announcement_id']) ? [
+                    'id'      => $n->data['announcement_id'],
+                    'title'   => $n->data['announcement_title'],
+                    'content' => $n->data['announcement_content'],
+                ] : null,
             ];
         });
 
