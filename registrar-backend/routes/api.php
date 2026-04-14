@@ -27,6 +27,10 @@ Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
 Route::post('/auth/callback', [SsoCallbackController::class, 'handle']);
 
+// Announcements — read for all authenticated users
+Route::get('announcements', [AnnouncementController::class, 'index']);
+Route::get('announcements/{announcement}', [AnnouncementController::class, 'show']);
+
 /*
 |--------------------------------------------------------------------------
 | PROTECTED ROUTES — requires valid Sanctum token
@@ -183,7 +187,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('announcements/{announcement}', [AnnouncementController::class, 'destroy']);
     });
 
-    // Announcements — read for all authenticated users
-    Route::get('announcements', [AnnouncementController::class, 'index']);
-    Route::get('announcements/{announcement}', [AnnouncementController::class, 'show']);
+    // // Announcements — read for all authenticated users
+    // Route::get('announcements', [AnnouncementController::class, 'index']);
+    // Route::get('announcements/{announcement}', [AnnouncementController::class, 'show']);
 });
