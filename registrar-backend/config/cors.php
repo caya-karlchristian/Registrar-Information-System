@@ -6,8 +6,9 @@ return [
         'http://localhost',
         'https://localhost',
         'https://d1234abcdef.cloudfront.net',  
-        'https://yourdomain.com',              
+        'https://registrar-information-system-bsit2027.com',              
         'http://13.250.214.23',              
+        'https://pupt-ris.registrar-information-system.com'
 
     ],
     'allowed_origins_patterns' => [],
