@@ -59,7 +59,7 @@ const MainPage = () => {
         </div>
         </h1>
             <p className="mt-8 max-w-xl text-sm md:text-base leading-relaxed text-gray-200 antialiased font-medium opacity-90 text-justify">
-            Development of the PUP-Taguig Registrar Information System (RIS) a web-based platform that 
+            Development of the PUP-Taguig Registrar Information System (RIS) a web-based platform that 
             automates registrar transactions, digitizes student records, and enables remote 
             access for students and alumni. By integrating online requests, payments, and 
             document tracking into a unified system, RIS aims to improve accuracy, reduce 
