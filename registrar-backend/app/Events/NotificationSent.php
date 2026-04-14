@@ -67,14 +67,20 @@ class NotificationSent implements ShouldBroadcastNow
     // -------------------------------------------------------
     public function broadcastWith(): array
     {
+        $data = $this->notification->data ?? [];
         return [
-            'id'          => $this->notification->id,
-            'title'       => $this->notification->type->title,
-            'message'     => $this->notification->data['message'] ?? '',
-            'type'        => $this->notification->type->trigger_event,
-            'request_id'  => $this->notification->request_id,
-            'read_at'     => $this->notification->read_at,
-            'created_at'  => $this->notification->created_at->toISOString(),
+            'id'           => $this->notification->id,
+            'title'        => $this->notification->type->title,
+            'message'      => $data['message'] ?? '',
+            'type'         => $this->notification->type->trigger_event,
+            'request_id'   => $this->notification->request_id,
+            'read_at'      => $this->notification->read_at,
+            'created_at'   => $this->notification->created_at->toISOString(),
+            'announcement' => isset($data['announcement_id']) ? [
+                'id'      => $data['announcement_id'],
+                'title'   => $data['announcement_title'],
+                'content' => $data['announcement_content'],
+            ] : null,
         ];
     }
 
