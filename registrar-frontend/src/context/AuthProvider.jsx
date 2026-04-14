@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { fetchCurrentUser, logoutRequest, ssoCallbackRequest } from "../services/authService";
 import ErrorToast from "../components/ErrorToast";
+import SSOErrorToast from "../components/SSOErrorToast";
 const AuthContext = createContext();
 
 // -------------------------------------------------------
@@ -31,11 +32,13 @@ const ROLE_HOME = {
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser]       = useState(null);
   const [token, setToken]     = useState(localStorage.getItem("token") ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null); // replaces alert()
-  const [isLoggingOut, setIsLoggingOut] = useState(false); 
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showSSOSetupScreen, setShowSSOSetupScreen] = useState(false);
   const [hasAgreed, setHasAgreed] = useState(
     () => localStorage.getItem("hasAgreed") === "true"
   );
@@ -115,12 +118,13 @@ export const AuthProvider = ({ children }) => {
     const userData = userRes.data.data;
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
+    setShowSSOSetupScreen(false);
 
     const destination = ROLE_HOME[userData.role_name] ?? '/';
     navigate(destination, { replace: true });
   } catch (err) {
     console.error('[SSO] failed:', err.response?.data ?? err.message);
-    setError('SSO login failed. Please try again.');
+    setShowSSOSetupScreen(true);
   }
 };
 
@@ -137,13 +141,32 @@ export const AuthProvider = ({ children }) => {
   const isStaff = () =>
     hasRole(ROLES.ADMIN) || hasRole(ROLES.SUPER_ADMIN);
 
+  const handleSSOSetupBack = () => {
+    // NOTE: Explicitly close the SSO setup screen before routing out of callback flow.
+    setShowSSOSetupScreen(false);
+    navigate('/', { replace: true });
+  };
+
+  // NOTE: Prevent stale SSO-error UI from reappearing once user leaves /auth/callback.
+  useEffect(() => {
+    if (showSSOSetupScreen && location.pathname !== '/auth/callback') {
+      setShowSSOSetupScreen(false);
+    }
+  }, [location.pathname, showSSOSetupScreen]);
+
   return (
     <AuthContext.Provider value={{ user, loading, token, error, logout, ssoCallback, hasRole, isStaff, isLoggingOut, hasAgreed, setHasAgreed, agreeToTerms }}>
-      <ErrorToast              
-        message={error}
-        onClose={() => setError(null)}
-      />
-      {children}
+      {showSSOSetupScreen ? (
+        <SSOErrorToast onBack={handleSSOSetupBack} />
+      ) : (
+        <>
+          <ErrorToast              
+            message={error}
+            onClose={() => setError(null)}
+          />
+          {children}
+        </>
+      )}
     </AuthContext.Provider>
   );
 };
