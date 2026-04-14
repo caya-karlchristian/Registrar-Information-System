@@ -5,7 +5,7 @@ return [
     'allowed_origins' => [
         'http://localhost',
         'https://localhost',
-        'https://d1234abcdef.cloudfront.net',  
+        'https://d38uplsfjqa5i6.cloudfront.net',
         'https://registrar-information-system-bsit2027.com',              
         'http://13.250.214.23',              
         'http://pupt-ris.registrar-information-system-bsit2027.com',

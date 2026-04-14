@@ -26,3 +26,5 @@ Dockerfile.dev
 registrar-frontend/certs/
 *.pem
 *.key
+*.env.*
+.env.production
