@@ -140,3 +140,11 @@ export const getAnalyticsPeakHours      = (params = {}) => api.get("/analytics/p
 export const getAnalyticsProcessingTime = (params = {}) => api.get("/analytics/processing-time", { params });
 
 export default api;
+// -------------------------------------------------------
+// ANNOUNCEMENTS (read: all authenticated | write: Super Admin)
+// -------------------------------------------------------
+export const getAnnouncements = (page = 1, perPage = 4) => api.get("/announcements", { params: { page, per_page: perPage } });
+export const getAnnouncement = (id) => api.get(`/announcements/${id}`);
+export const createAnnouncement = (data) => api.post("/announcements", data);
+export const updateAnnouncement = (id, data) => api.put(`/announcements/${id}`, data);
+export const deleteAnnouncement = (id) => api.delete(`/announcements/${id}`);
