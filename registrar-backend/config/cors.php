@@ -5,8 +5,10 @@ return [
     'allowed_origins' => [
         'http://localhost',
         'https://localhost',
-        'http://registrar-information-system.southeastasia.cloudapp.azure.com',
-        'https://registrar-information-system.southeastasia.cloudapp.azure.com',
+        'https://d1234abcdef.cloudfront.net',  
+        'https://yourdomain.com',              
+        'http://13.250.214.23',              
+
     ],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
