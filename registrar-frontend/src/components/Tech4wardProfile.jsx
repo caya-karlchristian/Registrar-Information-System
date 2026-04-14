@@ -9,6 +9,8 @@ import {
 import risImage from "../assets/RIS1.png";
 import logoImage from "../assets/puplogoimage.png";
 import { getAnnouncements } from "../services/api";
+import { getEcho } from "../services/echo";
+import { useAuth } from "../context/AuthProvider";
 
 const ICON_CYCLE = [MegaphoneIcon, QuestionMarkCircleIcon, ClipboardDocumentListIcon];
 
@@ -21,6 +23,7 @@ const TEAM_MEMBERS = [
 
 const Tech4wardProfile = ({ bgImage }) => {
   const bg = bgImage || risImage;
+  const { user } = useAuth();
   const [announcementPage, setAnnouncementPage] = useState(0);
   const [announcements, setAnnouncements] = useState([]);
   const ITEMS_PER_PAGE = 3;
@@ -45,6 +48,22 @@ const Tech4wardProfile = ({ bgImage }) => {
     };
     fetchAll();
   }, []);
+
+  // Real-time listener — prepend new announcements instantly
+  useEffect(() => {
+    if (!user) return;
+    const echo = getEcho();
+    const handler = (e) => {
+      if (e.type !== 'announcement_published' || !e.announcement) return;
+      setAnnouncements(prev => {
+        if (prev.some(a => a.id === e.announcement.id)) return prev;
+        return [{ id: e.announcement.id, title: e.announcement.title, content: e.announcement.content, enabled: true }, ...prev];
+      });
+      setAnnouncementPage(0);
+    };
+    echo.private(`notifications.${user.user_id}`).listen('.NotificationSent', handler);
+    return () => { echo.leave(`notifications.${user.user_id}`); };
+  }, [user?.user_id]);
 
   const totalPages = Math.ceil(announcements.length / ITEMS_PER_PAGE);
   const startIndex = announcementPage * ITEMS_PER_PAGE;
