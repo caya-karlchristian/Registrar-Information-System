@@ -15,7 +15,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL}
       DB_CONNECTION: mysql
-      DB_HOST: ${DB_HOST}                           
+      DB_HOST: ${DB_HOST}
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE}
       DB_USERNAME: ${DB_USERNAME}
@@ -35,9 +35,8 @@ services:
       AZURE_STORAGE_NAME: ${AZURE_STORAGE_NAME}
       AZURE_STORAGE_KEY: ${AZURE_STORAGE_KEY}
       AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER}
-      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS}  
-      SESSION_DOMAIN: ${SESSION_DOMAIN}                      
-      # MYSQL_ATTR_SSL_CA: ${MYSQL_ATTR_SSL_CA}
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS}
+      SESSION_DOMAIN: ${SESSION_DOMAIN}
     ports:
       - "8000:8000"
     volumes:
@@ -59,7 +58,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL}
       DB_CONNECTION: mysql
-      DB_HOST: ${DB_HOST}                            
+      DB_HOST: ${DB_HOST}
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE}
       DB_USERNAME: ${DB_USERNAME}
@@ -78,31 +77,6 @@ services:
     depends_on:
       backend:
         condition: service_started
-    networks:
-      - ris_network
-
-  # -------------------------------------------------------
-  # React Frontend
-  # -------------------------------------------------------
-  frontend:
-    build:
-      context: ./registrar-frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL}
-        VITE_SSO_LOGIN_URL: ${VITE_SSO_LOGIN_URL}
-        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY}
-        VITE_REVERB_HOST: ${VITE_REVERB_HOST}
-        VITE_REVERB_PORT: ${VITE_REVERB_PORT:-443}
-        VITE_REVERB_SCHEME: ${VITE_REVERB_SCHEME:-https}
-        VITE_SSO_CLIENT_ID: ${SSO_CLIENT_ID}
-    container_name: ris_frontend
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      - backend
     networks:
       - ris_network
 

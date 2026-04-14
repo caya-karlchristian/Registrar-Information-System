@@ -1,0 +1,7 @@
+services:
+  # In production, backend and reverb use the built image directly.
+  # No bind mounts — code is baked into the image.
+  backend:
+    volumes: []
+  reverb:
+    volumes: []
