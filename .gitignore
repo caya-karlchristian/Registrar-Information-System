@@ -4,7 +4,8 @@ ris_backup.sql
 .github/workflows   
 .github/workflows/deploy.yml
 docker-compose.yml.env.production
-# *.env*
+*.env*
 .env
 docker-compose.dev.yml
 registrar-frontend/certs/
+.env.production
