@@ -15,7 +15,12 @@ import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 
 //REMOVE THIS LATER, JUST FOR DEMO PURPOSES
-const EXCLUSIVE_FOR = ["All", "Student", "Alumni"];
+const EXCLUSIVE_FOR = ["Student", "Alumni", "All"];
+
+const ACCESS_MAP = { Student: 1, Alumni: 2, All: 3 };
+
+const ACCESS_MAP_REVERSE = { 1: "Student", 2: "Alumni", 3: "All" };
+
 const PER_PAGE = 7;
 
 const EMPTY_FORM = {
@@ -69,16 +74,16 @@ const DocumentManagement = () => {
   };
 
   const handleEdit = (doc) => {
-    setSelected(doc);
-    setIsAdding(false);
-    setForm({
-      document_name:           doc.document_name,
-      document_description:    doc.document_description,
-      document_requirements:   doc.document_requirements,
-      document_process_period: doc.document_process_period,
-      access_id:           doc.access_id,
-    });
-  };
+  setSelected(doc);
+  setIsAdding(false);
+  setForm({
+    document_name:           doc.document_name,
+    document_description:    doc.document_description,
+    document_requirements:   doc.document_requirements,
+    document_process_period: doc.document_process_period,
+    access_id: ACCESS_MAP_REVERSE[doc.access_id] ?? doc.access_id,
+  });
+};
 
   const handleAdd = () => {
     setSelected(null);
@@ -87,27 +92,30 @@ const DocumentManagement = () => {
   };
 
   const handleSave = async (e) => {
-    e.preventDefault();
-    try {
-      if (isAdding) {
-        const res = await createDocumentType(form);
-        setDocuments((prev) => [...prev, res.data]);
-        setSuccessMsg("Document added successfully!"); 
-      } else if (selected) {
-        const res = await updateDocumentType(selected.document_type_id, form);
-        setDocuments((prev) =>
-          prev.map((d) => d.document_type_id === selected.document_type_id ? res.data : d)
-        );
-        setSuccessMsg("Document updated successfully!"); 
-      }
-      setForm(EMPTY_FORM);
-      setSelected(null);
-      setIsAdding(true);
-    } catch (err) {
-      setErrorMsg(err.response?.data?.message || "An unexpected error occurred.");
-    }
+  e.preventDefault();
+  const payload = {
+    ...form,
+    access_id: ACCESS_MAP[form.access_id] ?? form.access_id,
   };
-
+  try {
+    if (isAdding) {
+      const res = await createDocumentType(payload);
+      setDocuments((prev) => [...prev, res.data]);
+      setSuccessMsg("Document added successfully!"); 
+    } else if (selected) {
+      const res = await updateDocumentType(selected.document_type_id, payload);
+      setDocuments((prev) =>
+        prev.map((d) => d.document_type_id === selected.document_type_id ? res.data : d)
+      );
+      setSuccessMsg("Document updated successfully!"); 
+    }
+    setForm(EMPTY_FORM);
+    setSelected(null);
+    setIsAdding(true);
+  } catch (err) {
+    setErrorMsg(err.response?.data?.message || "An unexpected error occurred.");
+  }
+};
   const handleDelete = async (id) => {
     try {
       await deleteDocumentType(id);
