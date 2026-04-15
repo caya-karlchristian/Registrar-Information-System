@@ -3,11 +3,9 @@ import { Bars3Icon, BellIcon } from '@heroicons/react/24/outline';
 import NotificationModal from "../components/NotificationModal.jsx";
 import LogoImage from "../assets/puplogoimage.png";
 import { useNotificationsContext as useNotifications } from "../context/NotificationsContext";
-import { useToast } from "../context/NotificationToastContext.jsx";
 
 function Header({ onMenuClick }) {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const { addToast } = useToast();
   const { unreadCount } = useNotifications();
 
   return (
