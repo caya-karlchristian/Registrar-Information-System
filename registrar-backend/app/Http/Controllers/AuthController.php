@@ -263,7 +263,11 @@ private function resolveRoleId(array $roles): ?int
     $user = $request->user();
 
     if ($user->idp_access_token) {
-        app(IdpClient::class)->logout($user->idp_access_token);
+        try {
+            app(\App\Services\Sso\IdpClient::class)->logout($user->idp_access_token);
+        } catch (\Exception $e) {
+            Log::warning('SSO: logout call failed', ['error' => $e->getMessage()]);
+        }
     }
 
     $user->tokens()->delete();
