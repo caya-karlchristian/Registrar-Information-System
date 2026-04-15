@@ -46,28 +46,22 @@ class IdpClient
     }
     public function logout(string $accessToken): void
 {
-    $parts   = explode('.', $accessToken);
-    $payload = json_decode(base64_decode(
-        str_pad($parts[1], strlen($parts[1]) + (4 - strlen($parts[1]) % 4) % 4, '=')
-    ), true);
-    $userId = $payload['userId'] ?? null;
-
-    $url = $this->baseUrl . '/logout?' . http_build_query([
-        'client_id' => $this->clientId,
-        'user_id'   => $userId,
-    ]);
-
-    $ch = curl_init($url);
+    $ch = curl_init($this->baseUrl . '/api/v1/auth/logout');
     curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => [
+        CURLOPT_RETURNTRANSFER  => true,
+        CURLOPT_POST            => true,
+        CURLOPT_POSTFIELDS      => json_encode(['client_id' => $this->clientId]),
+        CURLOPT_HTTPHEADER      => [
             'Authorization: Bearer ' . $accessToken,
+            'Content-Type: application/json',
             'Accept: application/json',
         ],
-        CURLOPT_TIMEOUT        => 10,
-        CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_FOLLOWLOCATION  => true,   // follow the 302
+        CURLOPT_MAXREDIRS       => 5,
+        CURLOPT_TIMEOUT         => 15,
+        CURLOPT_IPRESOLVE       => CURL_IPRESOLVE_V4,
+        CURLOPT_SSL_VERIFYPEER  => false,
+        CURLOPT_SSL_VERIFYHOST  => false,
     ]);
     $this->exec($ch);
 }
