@@ -256,15 +256,17 @@ private function resolveRoleId(array $roles): ?int
         return new UserResource($user);
     }
 
-    public function logout(Request $request)
+   public function logout(Request $request)
 {
     AuditLogger::log($request, $request->user(), AuditLog::ACTION_LOGOUT);
-    $request->user()->tokens()->delete();
 
-    // Call SSO logout to destroy the SSO session
-    Http::post(env('SSO_BASE_URL') . '/api/v1/auth/logout', [
-        'client_id' => env('SSO_CLIENT_ID'),
-    ]);
+    $user = $request->user();
+
+    if ($user->idp_access_token) {
+        app(IdpClient::class)->logout($user->idp_access_token);
+    }
+
+    $user->tokens()->delete();
 
     return response()->json(['message' => 'Logged out']);
 }
