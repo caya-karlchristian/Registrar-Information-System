@@ -13,6 +13,7 @@ import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import { getDocumentTypes, createDocumentType, updateDocumentType, deleteDocumentType } from '../services/api';
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
 
 //REMOVE THIS LATER, JUST FOR DEMO PURPOSES
 const EXCLUSIVE_FOR = ["Student", "Alumni", "All"];
@@ -41,6 +42,8 @@ const DocumentManagement = () => {
   const [loading, setLoading]     = useState(true);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, docId: null });
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -117,6 +120,7 @@ const DocumentManagement = () => {
   }
 };
   const handleDelete = async (id) => {
+    setDeleteLoading(true);
     try {
       await deleteDocumentType(id);
       setDocuments((prev) => prev.filter((d) => d.document_type_id !== id));
@@ -125,9 +129,16 @@ const DocumentManagement = () => {
         setIsAdding(true);
         setForm(EMPTY_FORM);
       }
+      setDeleteModal({ isOpen: false, docId: null });
     } catch (err) {
       setErrorMsg(err.response?.data?.message || "Failed to delete document:");
+    } finally {
+      setDeleteLoading(false);
     }
+  };
+
+  const confirmDelete = (id) => {
+    setDeleteModal({ isOpen: true, docId: id });
   };
 
   const handleCancel = () => {
@@ -214,7 +225,7 @@ const DocumentManagement = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDelete(doc.document_type_id)}
+                    onClick={() => confirmDelete(doc.document_type_id)}
                     className="p-1 hover:text-red-600 text-gray-400 transition-colors"
                   >
                     <TrashIcon className="w-4 h-4" />
@@ -340,6 +351,15 @@ const DocumentManagement = () => {
           </div>
         </form>
       </div>
+      <DeleteConfirmModal
+        open={deleteModal.isOpen}
+        count={1}
+        loading={deleteLoading}
+        onCancel={() => setDeleteModal({ isOpen: false, docId: null })}
+        onConfirm={() => {
+          if (deleteModal.docId) handleDelete(deleteModal.docId);
+        }}
+      />
     </div>
   );
 }

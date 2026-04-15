@@ -502,8 +502,14 @@ const AlumniRequestForm = () => {
                                   focus:ring-2 
                                   focus:ring-[#FFC72C]/30 
                                   focus:text-black"    
-                                  value={formData.documentCopies[doc] || 1}
-                                  onChange={(e) => handleDocCopyChange(doc, e.target.value)}
+                                  value={formData.documentCopies[doc] === undefined ? '' : formData.documentCopies[doc]}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    handleDocCopyChange(doc, val === '' ? '' : Math.max(1, Math.min(10, Number(val))));
+                                  }}
+                                  onBlur={e => {
+                                    if (e.target.value === '') handleDocCopyChange(doc, 1);
+                                  }}
                                 />
                               </div>
                           </div>
