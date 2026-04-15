@@ -23,9 +23,11 @@ class DocumentTypeController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'document_name' => 'required|string|max:100',
-            'description' => 'nullable|string',
-            'requires_clearance' => 'nullable|boolean',
+            'document_name'           => 'required|string|max:100',
+            'document_description'    => 'nullable|string',
+            'document_requirements'   => 'nullable|string',
+            'document_process_period' => 'nullable|string',
+            'access_id'               => 'nullable|integer',
         ]);
 
         $docType = DocumentType::create($request->all());
