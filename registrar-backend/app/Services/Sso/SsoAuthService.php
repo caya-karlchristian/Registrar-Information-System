@@ -16,30 +16,35 @@ class SsoAuthService
     ) {}
 
     public function loginWithCode(string $code, Request $request): array
-    {
-        Log::info('SSO: code received', ['code' => substr($code, 0, 10)]);
+{
 
-        $accessToken = $this->idpClient->exchangeCode($code);
-        $profile     = $this->idpClient->fetchUserProfile($accessToken);
+    $accessToken = $this->idpClient->exchangeCode($code);
+    $profile     = $this->idpClient->fetchUserProfile($accessToken);
 
-        $result = $this->provisioner->provision($profile);
-        $user   = $result->user;
+    $result = $this->provisioner->provision($profile);
+    $user   = $result->user;
 
-        $user->update(['idp_access_token' => $accessToken]);
 
-        AuditLogger::log($request, $user, AuditLog::ACTION_LOGIN);
+    // Single update — removed the duplicate above
+    $user->update([
+        'idp_access_token' => $accessToken,
+        'idp_user_id'      => $profile['id'] ?? $profile['user_id'] ?? $profile['sub'] ?? null,
+    ]);
 
-        $token = $user->createToken('sso')->plainTextToken;
 
-        return [
-            'token'            => $token,
-            'needs_onboarding' => $result->needsOnboarding,
-            'data'             => [
-                'user_id'   => $user->user_id,
-                'email'     => $user->email,
-                'role_id'   => $user->role_id,
-                'role_name' => $user->role_name ?? null,
-            ],
-        ];
-    }
+    AuditLogger::log($request, $user, AuditLog::ACTION_LOGIN);
+
+    $token = $user->createToken('sso')->plainTextToken;
+
+    return [
+        'token'            => $token,
+        'needs_onboarding' => $result->needsOnboarding,
+        'data'             => [
+            'user_id'   => $user->user_id,
+            'email'     => $user->email,
+            'role_id'   => $user->role_id,
+            'role_name' => $user->role_name ?? null,
+        ],
+    ];
+}
 }

@@ -44,27 +44,46 @@ class IdpClient
 
         return $response;
     }
-    public function logout(string $accessToken): void
-{
-    $ch = curl_init($this->baseUrl . '/api/v1/auth/logout');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER  => true,
-        CURLOPT_POST            => true,
-        CURLOPT_POSTFIELDS      => json_encode(['client_id' => $this->clientId]),
-        CURLOPT_HTTPHEADER      => [
-            'Authorization: Bearer ' . $accessToken,
-            'Content-Type: application/json',
-            'Accept: application/json',
-        ],
-        CURLOPT_FOLLOWLOCATION  => true,   // follow the 302
-        CURLOPT_MAXREDIRS       => 5,
-        CURLOPT_TIMEOUT         => 15,
-        CURLOPT_IPRESOLVE       => CURL_IPRESOLVE_V4,
-        CURLOPT_SSL_VERIFYPEER  => false,
-        CURLOPT_SSL_VERIFYHOST  => false,
-    ]);
-    $this->exec($ch);
-}
+
+    public function logout(string $accessToken, ?string $userId): void
+    {
+        if (!$userId) {
+            \Illuminate\Support\Facades\Log::warning('SSO: logout skipped — no user_id');
+            return;
+        }
+
+        $url = $this->baseUrl . '/logout?' . http_build_query([
+            'client_id' => $this->clientId,
+            'user_id'   => $userId,
+        ]);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPGET        => true,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $accessToken,
+                'Accept: application/json',
+            ],
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+        ]);
+
+        [$body, $status, $error] = $this->exec($ch);
+
+        \Illuminate\Support\Facades\Log::info('SSO: IdP logout called', [
+            'user_id'     => $userId,
+            'http_status' => $status,
+            'response'    => $body,
+            'curl_error'  => $error ?: null,
+        ]);
+
+        if ($error || ($status >= 400 && $status !== 401)) {
+            throw new \App\Exceptions\IdpException('IdP logout failed: ' . ($error ?: $body));
+        }
+    }
 
     private function post(string $path, array $payload): array
     {

@@ -201,6 +201,21 @@ try {
             ]);
         }
     }
+    $user->update([
+        'idp_access_token' => $accessToken,
+        'idp_user_id'      => $profile['user_id'] ?? $profile['sub'] ?? $profile['id'] ?? null,
+    ]);
+
+    Log::info('SSO: idp_user_id save debug', [
+    'profile_keys'     => array_keys($profile ?? []),
+    'profile_id_value' => $profile['id'] ?? 'MISSING',
+    'user_id_col'      => $user->user_id,
+    'idp_user_id_after'=> $user->fresh()->idp_user_id,
+    'update_result'    => $user->update([
+        'idp_access_token' => $accessToken,
+        'idp_user_id'      => $profile['user_id'] ?? $profile['sub'] ?? $profile['id'] ?? null,
+    ]),
+]);
 
     DB::commit();
 } catch (\Exception $e) {
@@ -209,7 +224,7 @@ try {
     return response()->json(['message' => 'Login failed.'], 500);
 }
 
-        $user->update(['idp_access_token' => $accessToken]);
+        
 
         AuditLogger::log($request, $user, AuditLog::ACTION_LOGIN);
 
@@ -264,7 +279,7 @@ private function resolveRoleId(array $roles): ?int
 
     if ($user->idp_access_token) {
         try {
-            app(\App\Services\Sso\IdpClient::class)->logout($user->idp_access_token);
+            app(\App\Services\Sso\IdpClient::class)->logout($user->idp_access_token, $user->idp_user_id);
         } catch (\Exception $e) {
             Log::warning('SSO: logout call failed', ['error' => $e->getMessage()]);
         }
@@ -272,6 +287,15 @@ private function resolveRoleId(array $roles): ?int
 
     $user->tokens()->delete();
 
-    return response()->json(['message' => 'Logged out']);
+    // Build the IdP logout redirect URL
+    $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
+        'client_id' => config('sso.client_id'),
+        'user_id'   => $user->idp_user_id,
+    ]);
+
+    return response()->json([
+        'message'    => 'Logged out',
+        'logout_url' => $logoutUrl,
+    ]);
 }
 }
