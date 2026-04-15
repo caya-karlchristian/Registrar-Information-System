@@ -523,27 +523,32 @@ const StaffDashboard = () => {
           </table>
 
           {/* ---------------- PAGINATION ---------------- */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 text-xs sm:text-sm text-gray-500 flex justify-between items-center gap-3">
-            <span className="whitespace-nowrap">
+          <div className="sticky left-0 bottom-0 w-full px-4 sm:px-8 py-4 bg-gray-50 text-[11px] sm:text-sm text-gray-500 flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t border-gray-200 z-10">
+            <span className="text-center sm:text-left whitespace-nowrap">
               Showing {filteredData.length > 0 ? indexOfFirstItem + 1 : 0} to {Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} results
             </span>
-            <div className="flex gap-2 items-center">
+
+            <div className="flex gap-4 items-center">
               <button
                 onClick={handlePrevPage}
                 disabled={currentPage === 1}
-                className={`p-1 rounded ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'}`}
+                className={`p-1 rounded transition-colors ${
+                  currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'
+                }`}
               >
                 <ChevronLeftIcon className="w-4 sm:w-5 h-4 sm:h-5" />
               </button>
 
-              <span className="text-xs sm:text-sm font-semibold mx-1 sm:mx-2 whitespace-nowrap">
-                Page {currentPage} of {totalPages || 1}
+              <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                Page {currentPage} of {totalPages}
               </span>
 
               <button
                 onClick={handleNextPage}
                 disabled={currentPage === totalPages || totalPages === 0}
-                className={`p-1 rounded ${currentPage === totalPages || totalPages === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'}`}
+                className={`p-1 rounded transition-colors ${
+                  currentPage === totalPages || totalPages === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'
+                }`}
               >
                 <ChevronRightIcon className="w-4 sm:w-5 h-4 sm:h-5" />
               </button>
