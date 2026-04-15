@@ -395,15 +395,26 @@ const RequestForm = () => {
                                 type="number"
                                 min="1"
                                 max="10"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg 
                                   outline-none transition-all duration-200
                                   focus:bg-white 
                                   focus:border-[#FFC72C] 
                                   focus:ring-2 
                                   focus:ring-[#FFC72C]/30 
-                                  focus:text-black"        
-                                value={formData.documentCopies[doc] || 1}
-                                onChange={(e) => handleDocCopyChange(doc, e.target.value)}
+                                  focus:text-black
+                                  appearance-auto"        
+                                value={formData.documentCopies[doc] === undefined ? '' : formData.documentCopies[doc]}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  // Allow empty string for editing
+                                  handleDocCopyChange(doc, val === '' ? '' : Math.max(1, Math.min(10, Number(val))));
+                                }}
+                                onBlur={e => {
+                                  // If left empty, fallback to 1
+                                  if (e.target.value === '') handleDocCopyChange(doc, 1);
+                                }}
                               />
                            </div>
                         </div>
