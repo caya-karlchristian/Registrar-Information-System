@@ -23,7 +23,7 @@ const EMPTY_FORM = {
   document_description:    "",
   document_requirements:   "",
   document_process_period: "",
-  exclusive_for:           "",
+  access_id:           "",
 };
 
 const DocumentManagement = () => {
@@ -76,7 +76,7 @@ const DocumentManagement = () => {
       document_description:    doc.document_description,
       document_requirements:   doc.document_requirements,
       document_process_period: doc.document_process_period,
-      exclusive_for:           doc.exclusive_for,
+      access_id:           doc.access_id,
     });
   };
 
@@ -296,8 +296,8 @@ const DocumentManagement = () => {
             />
             <DropDown
               label="Exclusive For"
-              name="exclusive_for"
-              value={form.exclusive_for}
+              name="access_id"
+              value={form.access_id}
               onChange={handleChange}
               options={EXCLUSIVE_FOR}
               labelColor="text-gray-600"
