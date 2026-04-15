@@ -5,7 +5,12 @@ export const fetchCurrentUser = () => api.get("/me");
 export const ssoCallbackRequest = (code) => api.post("/auth/callback", { code });
 
 export const logoutRequest = async () => {
-  await api.post("/logout");
-  // window.location.href = `${import.meta.env.VITE_SSO_BASE_URL}/api/v1/auth/logout?client_id=${import.meta.env.VITE_SSO_CLIENT_ID}`;
-  window.location.href = "/";
+  const response = await api.post("/logout");
+  const logoutUrl = response.data?.logout_url;
+
+  if (logoutUrl) {
+    window.location.href = logoutUrl;  // Redirects to IdP to clear SSO session
+  } else {
+    window.location.href = "/";
+  }
 };
