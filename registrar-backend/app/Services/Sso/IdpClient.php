@@ -100,4 +100,33 @@ class IdpClient
 
         return [$body, $status, $error];
     }
+
+    public function logout(string $accessToken): void
+{
+    // Decode user_id from JWT payload
+    $parts = explode('.', $accessToken);
+    $payload = json_decode(base64_decode(
+        str_pad($parts[1], strlen($parts[1]) + (4 - strlen($parts[1]) % 4) % 4, '=')
+    ), true);
+    $userId = $payload['userId'] ?? $payload['sub'] ?? null;
+
+    $url = $this->baseUrl . '/logout?' . http_build_query([
+        'client_id' => $this->clientId,
+        'user_id'   => $userId,
+    ]);
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: Bearer ' . $accessToken,
+            'Accept: application/json',
+        ],
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+    ]);
+    $this->exec($ch);
+}
 }

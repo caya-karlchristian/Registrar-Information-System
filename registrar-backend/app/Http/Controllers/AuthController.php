@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Services\AuditLogger;
 use App\Models\AuditLog;
+use App\Services\Sso\IdpClient;
+
 
 class AuthController extends Controller
 {
