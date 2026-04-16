@@ -82,6 +82,13 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  useEffect(() => {
+  if (sessionStorage.getItem('sso_role_error') === '1') {
+    sessionStorage.removeItem('sso_role_error');
+    setShowSSOSetupScreen(true);
+  }
+}, []);
+
   // -------------------------------------------------------
   // Logout
   // -------------------------------------------------------
@@ -107,9 +114,9 @@ export const AuthProvider = ({ children }) => {
   }
 };
 
-  const ssoCallback = async (code) => {  // ← was 'token'
+  const ssoCallback = async (code) => {
   try {
-    const res = await ssoCallbackRequest(code);  // ← passes code
+    const res = await ssoCallbackRequest(code);
     const sanctumToken = res.data.token;
     localStorage.setItem('token', sanctumToken);
     setToken(sanctumToken);
@@ -123,8 +130,25 @@ export const AuthProvider = ({ children }) => {
     const destination = ROLE_HOME[userData.role_name] ?? '/';
     navigate(destination, { replace: true });
   } catch (err) {
-    console.error('[SSO] failed:', err.response?.data ?? err.message);
-    setShowSSOSetupScreen(true);
+    const status = err.response?.status;
+    const logoutUrl = err.response?.data?.logout_url;
+
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('hasAgreed');
+    setToken(null);
+    setUser(null);
+    setHasAgreed(false);
+
+    if (status === 403 && logoutUrl) {
+      // Store a flag so we can show the SSOErrorToast AFTER the IDP redirect lands back
+      sessionStorage.setItem('sso_role_error', '1');
+      // Hard redirect to kill the IDP browser session — no loop because
+      // the IDP logout page won't re-issue a code, it just clears cookies
+      window.location.href = logoutUrl;
+    } else {
+      setShowSSOSetupScreen(true);
+    }
   }
 };
 
@@ -148,11 +172,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   // NOTE: Prevent stale SSO-error UI from reappearing once user leaves /auth/callback.
-  useEffect(() => {
-    if (showSSOSetupScreen && location.pathname !== '/auth/callback') {
-      setShowSSOSetupScreen(false);
-    }
-  }, [location.pathname, showSSOSetupScreen]);
+  // useEffect(() => {
+  //   if (showSSOSetupScreen && location.pathname !== '/auth/callback') {
+  //     setShowSSOSetupScreen(false);
+  //   }
+  // }, [location.pathname, showSSOSetupScreen]);
 
   return (
     <AuthContext.Provider value={{ user, loading, token, error, logout, ssoCallback, hasRole, isStaff, isLoggingOut, hasAgreed, setHasAgreed, agreeToTerms }}>
