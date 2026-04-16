@@ -287,15 +287,10 @@ private function resolveRoleId(array $roles): ?int
 
     $user->tokens()->delete();
 
-    // Build the IdP logout redirect URL
-    $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
-        'client_id' => config('sso.client_id'),
-        'user_id'   => $user->idp_user_id,
-    ]);
-
     return response()->json([
-        'message'    => 'Logged out',
-        'logout_url' => $logoutUrl,
+        'logout_url' => config('sso.base_url') . '/logout?' . http_build_query([
+            'client_id' => config('sso.client_id'),
+        ]),
     ]);
 }
 }
