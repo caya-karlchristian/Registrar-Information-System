@@ -3,51 +3,41 @@
 namespace App\Http\Controllers;
 
 use App\Models\RequestHistory;
-use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
+/**
+ * Request history — READ ONLY.
+ *
+ * History is an immutable audit trail written exclusively by
+ * DocumentRequestService::updateRequest(). It must never be
+ * created, modified, or deleted via the API.
+ */
 class RequestHistoryController extends Controller
 {
-    public function index()
+    // -------------------------------------------------------------------------
+    // GET /request-history
+    // -------------------------------------------------------------------------
+    public function index(): JsonResponse
     {
-        return response()->json(RequestHistory::with(['request'])->get(), 200);
+        return response()->json(
+            RequestHistory::with(['request', 'oldStatus', 'newStatus', 'changedBy'])
+                ->orderByDesc('changed_at')
+                ->get(),
+            200
+        );
     }
 
-    public function show($id)
+    // -------------------------------------------------------------------------
+    // GET /request-history/{id}
+    // -------------------------------------------------------------------------
+    public function show($id): JsonResponse
     {
-        $history = RequestHistory::with(['request'])->find($id);
-        if (!$history) return response()->json(['message' => 'History not found'], 404);
+        $history = RequestHistory::with(['request', 'oldStatus', 'newStatus', 'changedBy'])->find($id);
+
+        if (!$history) {
+            return response()->json(['message' => 'History not found'], 404);
+        }
 
         return response()->json($history, 200);
-    }
-
-    public function store(Request $request)
-    {
-        $request->validate([
-            'request_id' => 'required|integer',
-            'old_status_id' => 'required|integer',
-            'new_status_id' => 'required|integer',
-            'changed_by' => 'required|integer',
-        ]);
-
-        $history = RequestHistory::create($request->all());
-        return response()->json($history, 201);
-    }
-
-    public function update(Request $request, $id)
-    {
-        $history = RequestHistory::find($id);
-        if (!$history) return response()->json(['message' => 'History not found'], 404);
-
-        $history->update($request->all());
-        return response()->json($history, 200);
-    }
-
-    public function destroy($id)
-    {
-        $history = RequestHistory::find($id);
-        if (!$history) return response()->json(['message' => 'History not found'], 404);
-
-        $history->delete();
-        return response()->json(['message' => 'History deleted'], 200);
     }
 }
