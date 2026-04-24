@@ -165,7 +165,7 @@ class DocumentRequestController extends Controller
             return response()->json(['message' => 'Unauthorized role.'], 403);
         }
 
-        $documentRequest = DocumentRequest::create($requestData);
+        $documentRequest = DocumentRequest::create($requestData);   
 
         // Persist document line items
         foreach ($validated['documents'] ?? [] as $doc) {
