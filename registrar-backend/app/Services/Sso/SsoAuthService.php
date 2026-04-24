@@ -27,6 +27,32 @@ class SsoAuthService
         private UserProvisioningService $provisioner,
     ) {}
 
+
+    /**
+     * Authenticate via OAuth authorization code (SSO redirect flow).
+     *
+     * @return array{token: string, user: SystemUser}
+     * @throws \App\Exceptions\IdpException|\RuntimeException
+     */
+    public function loginWithCode(string $code, \Illuminate\Http\Request $request): array
+    {
+        $accessToken = $this->idpClient->exchangeCode($code);
+        $profile     = $this->idpClient->fetchUserProfile($accessToken);
+        $idpResponse = array_merge($profile, ["access_token" => $accessToken]);
+        $result      = $this->provisioner->provision($idpResponse);
+        $user        = $result->user;
+        if ($result->wasRejected()) {
+            throw new \RuntimeException($result->rejectionReason(), 403);
+        }
+        $user->update([
+            "idp_access_token" => $accessToken,
+            "idp_user_id"      => $profile["id"] ?? $user->idp_user_id,
+        ]);
+        $token = $user->createToken("sanctum")->plainTextToken;
+        \App\Services\AuditLogger::log($request, $user, \App\Models\AuditLog::ACTION_LOGIN);
+        return ["token" => $token, "user" => $user];
+    }
+
     /**
      * Authenticate with email + password via the IdP.
      *
