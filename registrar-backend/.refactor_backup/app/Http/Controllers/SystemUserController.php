@@ -4,15 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\IdpException;
 use App\Http\Resources\UserResource;
+use App\Models\AuditLog;
 use App\Models\SystemUser;
 use App\Services\AdminUserService;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rules\Password;
 
 /**
  * System user management controller (admin / superadmin accounts only).
  *
- * Delegates all IdP + DB + audit-log coordination to AdminUserService.
+ * Delegates all IdP + DB logic to AdminUserService.
  */
 class SystemUserController extends Controller
 {
@@ -30,7 +32,7 @@ class SystemUserController extends Controller
     {
         $users = SystemUser::whereIn('role_id', self::MANAGEABLE_ROLES)
             ->with('adminProfile')
-            ->paginate(20);
+            ->get();
 
         return UserResource::collection($users);
     }
@@ -69,14 +71,15 @@ class SystemUserController extends Controller
         ]);
 
         try {
-            // Audit logging is handled inside AdminUserService::create()
-            $user = $this->adminUserService->create($validated, $request);
+            $user = $this->adminUserService->create($validated);
         } catch (IdpException $e) {
             return response()->json([
                 'message' => 'Failed to create user in identity provider.',
                 'detail'  => $e->getMessage(),
             ], 500);
         }
+
+        AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
 
         return (new UserResource($user))->response()->setStatusCode(201);
     }
@@ -108,13 +111,14 @@ class SystemUserController extends Controller
         ]);
 
         try {
-            // Audit logging is handled inside AdminUserService::update()
-            $user = $this->adminUserService->update($user, $validated, $request);
+            $user = $this->adminUserService->update($user, $validated);
         } catch (IdpException $e) {
             return response()->json(['message' => 'Failed to sync with identity provider.', 'detail' => $e->getMessage()], 500);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Failed to update user.'], 500);
         }
+
+        AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_UPDATED);
 
         return new UserResource($user);
     }
@@ -138,8 +142,9 @@ class SystemUserController extends Controller
             return response()->json(['message' => 'You cannot delete your own account.'], 403);
         }
 
-        // Audit logging is handled inside AdminUserService::delete()
-        $this->adminUserService->delete($user, $request);
+        AuditLogger::log($request, $request->user(), AuditLog::ACTION_ADMIN_DELETED);
+
+        $this->adminUserService->delete($user);
 
         return response()->json(['message' => 'User deleted successfully'], 200);
     }

@@ -3,20 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\IdpException;
+use App\Models\AuditLog;
+use App\Models\SystemUser;
 use App\Http\Resources\UserResource;
+use App\Services\AuditLogger;
+use App\Services\Sso\IdpClient;
 use App\Services\Sso\SsoAuthService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Authentication controller.
  *
  * Handles login (credential-based), logout, and /me.
- * All SSO orchestration — including IdP token revocation and
- * audit logging — is delegated to SsoAuthService.
+ * All SSO orchestration is delegated to SsoAuthService.
  */
 class AuthController extends Controller
 {
-    public function __construct(private SsoAuthService $ssoAuthService) {}
+    public function __construct(
+        private SsoAuthService $ssoAuthService,
+        private IdpClient $idpClient,
+    ) {}
 
     // -------------------------------------------------------------------------
     // POST /api/login
@@ -59,8 +66,25 @@ class AuthController extends Controller
     // -------------------------------------------------------------------------
     public function logout(Request $request)
     {
-        $logoutUrl = $this->ssoAuthService->logout($request->user(), $request);
+        /** @var SystemUser $user */
+        $user = $request->user();
 
-        return response()->json(['logout_url' => $logoutUrl]);
+        AuditLogger::log($request, $user, AuditLog::ACTION_LOGOUT);
+
+        if ($user->idp_access_token) {
+            try {
+                $this->idpClient->logout($user->idp_access_token, $user->idp_user_id);
+            } catch (\Exception $e) {
+                Log::warning('SSO: logout call failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        $user->tokens()->delete();
+
+        return response()->json([
+            'logout_url' => config('sso.base_url') . '/logout?' . http_build_query([
+                'client_id' => config('sso.client_id'),
+            ]),
+        ]);
     }
 }
