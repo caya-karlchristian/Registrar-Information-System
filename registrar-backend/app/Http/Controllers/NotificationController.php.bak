@@ -19,7 +19,7 @@ class NotificationController extends Controller
     // -------------------------------------------------------
     // GET /notifications
     // -------------------------------------------------------
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         /** @var SystemUser $user */
         $user = $request->user();
@@ -34,12 +34,10 @@ class NotificationController extends Controller
             $query->whereNull('read_at');
         }
 
-        // Return the resource collection directly — do NOT wrap in response()->json().
-        // Wrapping a paginated ResourceCollection bypasses Laravel's serialization
-        // pipeline and can produce an empty 'data' array even when rows exist.
-        // Returning directly lets Laravel handle content-negotiation and envelope
-        // structure correctly, preserving pagination metadata (links, meta).
-        return NotificationResource::collection($query->paginate(20));
+        // NotificationResource::collection preserves pagination metadata
+        return response()->json(
+            NotificationResource::collection($query->paginate(20))
+        );
     }
 
     // -------------------------------------------------------
