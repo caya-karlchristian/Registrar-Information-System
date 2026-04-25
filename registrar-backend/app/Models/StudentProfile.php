@@ -21,6 +21,12 @@ class StudentProfile extends Model
         return $this->hasMany(StudentAcademicRecord::class, 'student_profile_id');
     }
 
+    /** Singular — first (typically only) academic record for this profile. */
+    public function academicRecord()
+    {
+        return $this->hasOne(StudentAcademicRecord::class, 'student_profile_id');
+    }
+
     public function documentRequests()
     {
         return $this->hasMany(DocumentRequest::class, 'student_profile_id');

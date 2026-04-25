@@ -37,6 +37,15 @@ Route::get('announcements/{announcement}', [AnnouncementController::class, 'show
 */
 Route::middleware('auth:sanctum')->group(function () {
 
+    // ── OGOS student data ────────────────────────────────────────────────────
+    Route::prefix('students')->group(function () {
+        Route::get('search',                    [StudentProfileController::class, 'search']);
+        Route::get('{studentNumber}/ogos',      [StudentProfileController::class, 'showByStudentNumber']);
+        Route::get('{studentNumber}/personal-info', [StudentProfileController::class, 'personalInfo']);
+        Route::get('{studentNumber}/addresses', [StudentProfileController::class, 'addresses']);
+    });
+
+
     // Auth
     Route::get('/me',      [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
