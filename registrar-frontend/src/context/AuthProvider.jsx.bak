@@ -109,7 +109,6 @@ export const AuthProvider = ({ children }) => {
         .replace(/^ +/, "")
         .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
     );
-    resetEcho();   // disconnect WebSocket so Reverb drops the stale connection
     setUser(null);
     setToken(null);
     navigate("/", { replace: true }); // stay in your own app
