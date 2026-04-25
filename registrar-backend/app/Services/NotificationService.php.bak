@@ -141,13 +141,17 @@ class NotificationService
         array  $data      = [],
         ?int   $requestId = null,
     ): void {
-        // Dispatch to queue — loop runs in background, HTTP response is instant.
-        dispatch(new SendBulkNotificationJob(
-            triggerEvent: $triggerEvent,
-            data:         $data,
-            onlyRoleIds:  [SystemUser::ROLE_ADMIN],
-            requestId:    $requestId,
-        ));
+        $admins = SystemUser::where('role_id', SystemUser::ROLE_ADMIN)
+            ->where('status', 'Activated')->get();
+
+        foreach ($admins as $admin) {
+            self::send(
+                recipient:    $admin,
+                triggerEvent: $triggerEvent,
+                data:         $data,
+                requestId:    $requestId,
+            );
+        }
     }
 
     // -------------------------------------------------------
