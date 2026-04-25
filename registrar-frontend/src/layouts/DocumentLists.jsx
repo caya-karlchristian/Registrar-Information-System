@@ -3,6 +3,16 @@ import { ChevronDownIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { getDocumentTypes } from '../services/api';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
 
+const ensureArray = (data) => {
+    if (Array.isArray(data)) return data; // Already an array
+    if (typeof data === 'string' && data.trim().length > 0) {
+      return data.split(',').map(item => item.trim()); // Convert string to array
+    }
+    return []; // Fallback for null or empty
+  };
+
+const STUDENT_ACCESS_IDS = [1, 3];
+
 const DocumentLists = () => {
   const [openId, setOpenId] = useState(null);
   const contentRefs = useRef({});
@@ -14,7 +24,7 @@ const DocumentLists = () => {
       try {
         setLoading(true);
         const res = await getDocumentTypes();
-        setDocuments(res.data ?? []);
+        setDocuments(res.data?.filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id)) || []);
       } catch (err) {
         console.error("Failed to fetch documents:", err);
       } finally {
@@ -26,15 +36,6 @@ const DocumentLists = () => {
 
   const toggleAccordion = (id) => {
     setOpenId(openId === id ? null : id);
-  };
-
-  // Helper function to force data into an array format
-  const ensureArray = (data) => {
-    if (Array.isArray(data)) return data; // Already an array
-    if (typeof data === 'string' && data.trim().length > 0) {
-      return data.split(',').map(item => item.trim()); // Convert string to array
-    }
-    return []; // Fallback for null or empty
   };
 
   return (
@@ -50,7 +51,10 @@ const DocumentLists = () => {
 
         {/* --- FIXED GRID LAYOUT --- */}
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {documents.map((doc) => {
+          {documents.length === 0 && !loading ? (
+            <p className="text-gray-400 italic col-span-2">No documents available.</p>
+          ) : (
+          documents.map((doc) => {
             const id = doc.document_type_id;
             const isOpen = openId === id;
             const contentHeight = contentRefs.current[id]?.scrollHeight || 0;
@@ -140,7 +144,8 @@ const DocumentLists = () => {
                 </div>
               </div>
             );
-          })}
+          })
+          )}
         </main>
       </div>
     </div>
