@@ -11,6 +11,8 @@ import qrCode from "../assets/qrcode.png";
 import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 
+const STUDENT_ACCESS_IDS = [1, 3];
+
 const RequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -30,14 +32,14 @@ const RequestForm = () => {
     const loadOptions = async () => {
       try {
         const docsRes = await axios.get("/document-types");
-        setAvailableDocs(docsRes.data);
+        setAvailableDocs((docsRes.data ?? []).filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id)));
       } catch (err) {
         console.warn("Failed to load document types.");
       }
 
       try {
         const certRes = await axios.get("/certifications");
-        setAvailableCertifications(certRes.data);
+        setAvailableCertifications((certRes.data ?? []).filter(cert => STUDENT_ACCESS_IDS.includes(cert.access_id)));
       } catch (err) {
         console.warn("Certification types API unavailable, using constants.");
       }
@@ -429,8 +431,14 @@ const RequestForm = () => {
                                 min="1"
                                 max="10"
                                 className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg outline-none transition-all duration-200 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
-                                value={formData.certCopies[certName] || 1}
-                                onChange={e => handleCertCopyChange(certName, e.target.value)}
+                                value={formData.certCopies[certName] === undefined ? '' : formData.certCopies[certName]}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  handleCertCopyChange(certName, val === '' ? '' : Math.max(1, Math.min(10, Number(val))));
+                                }}
+                                onBlur={e => {
+                                  if (e.target.value === '') handleCertCopyChange(certName, 1);
+                                }}
                               />
                             </div>
                           </div>
