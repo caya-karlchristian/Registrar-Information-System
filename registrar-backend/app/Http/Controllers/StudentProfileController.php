@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\StudentProfile;
 use Illuminate\Http\Request;
+use App\Exceptions\OgosException;
+use App\Services\Ogos\OgosStudentService;
 
 /**
  * Student profile management.
@@ -62,4 +64,43 @@ class StudentProfileController extends Controller
         $profile->delete();
         return response()->json(['message' => 'Profile deleted'], 200);
     }
+
+    // ── OGOS-backed endpoints ────────────────────────────────────────────────
+
+    public function showByStudentNumber(string $studentNumber): \Illuminate\Http\JsonResponse
+    {
+        try {
+            return response()->json($this->ogos->getEnrichedProfile($studentNumber));
+        } catch (OgosException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 502);
+        }
+    }
+
+    public function personalInfo(string $studentNumber): \Illuminate\Http\JsonResponse
+    {
+        try {
+            return response()->json($this->ogos->getPersonalInfo($studentNumber));
+        } catch (OgosException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 502);
+        }
+    }
+
+    public function addresses(string $studentNumber): \Illuminate\Http\JsonResponse
+    {
+        try {
+            return response()->json($this->ogos->getAddresses($studentNumber));
+        } catch (OgosException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 502);
+        }
+    }
+
+    public function search(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    {
+        try {
+            return response()->json($this->ogos->search($request->query()));
+        } catch (OgosException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 502);
+        }
+    }
+
 }
