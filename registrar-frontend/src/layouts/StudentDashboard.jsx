@@ -154,11 +154,18 @@ const StudentDashboard = () => {
                     </div>
                     <h4 className="text-gray-800 font-bold text-base md:text-lg uppercase flex items-center gap-2 flex-wrap">
                       {req.doc_names?.[0] || (req.certificates?.length ? 'CERTIFICATION' : 'N/A')}
-                      {req.doc_names?.length > 1 && (
-                        <span className="text-[10px] font-black bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full normal-case">
-                          +{req.doc_names.length - 1} more
-                        </span>
-                      )}
+                      {(() => {
+                        const totalDocs = req.doc_names?.length || 0;
+                        const totalCerts = req.certificates?.length || 0;
+                        const total = totalDocs + totalCerts;
+                        const shownFirst = req.doc_names?.[0] ? 1 : (totalCerts > 0 ? 1 : 0);
+                        const remaining = total - shownFirst;
+                        return remaining > 0 ? (
+                          <span className="text-[10px] font-black bg-gray-100 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full normal-case">
+                            +{remaining} more
+                          </span>
+                        ) : null;
+                      })()}
                     </h4>
                     <p className="text-xs text-gray-500 mt-0.5">
                       Purpose: {req.purpose_label}

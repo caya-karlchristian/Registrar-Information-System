@@ -22,10 +22,10 @@ function Header({ onMenuClick }) {
             className="w-16 h-16 lg:w-20 lg:h-20"
           />
           <div className="flex flex-col justify-center">
-            <h1 className="text-white font-bold text-[14px] uppercase lg:text-[22px] leading-tight font-inter">
+            <h1 className="text-white font-bold text-[12px] uppercase lg:text-[22px] leading-tight font-inter">
               POLYTECHNIC UNIVERSITY OF THE PHILIPPINES - TAGUIG CAMPUS
             </h1>
-            <p className="text-white text-[10px] uppercase lg:text-[13px] font-inter">
+            <p className="text-white text-[9px] uppercase lg:text-[13px] font-inter">
               THE COUNTRY'S 1ST POLYTECHNIC
             </p>
           </div>

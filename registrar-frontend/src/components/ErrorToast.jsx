@@ -38,7 +38,7 @@ const ErrorToast = ({ message, onClose }) => {
   return (
     <div
       ref={toastRef}
-      className="fixed top-26 lg:top-30 md:top-30 right-3 lg:right-5 md:right-5 z-9999 flex items-center w-auto max-w-sm px-4 py-3 text-white bg-pup-maroon rounded-lg shadow-xl border border-white/20 animate-slide-in-right"
+      className="fixed top-26 lg:top-30 right-3 lg:right-5 md:right-5 z-9999 flex items-center w-auto max-w-sm px-4 py-3 text-white bg-pup-maroon rounded-lg shadow-xl border border-white/20 animate-slide-in-right"
     >
       <div className="flex items-center justify-center w-9 h-9 text-pup-maroon bg-white rounded-md">
         <ExclamationCircleIcon className="w-9 h-7" strokeWidth={2.5} />
