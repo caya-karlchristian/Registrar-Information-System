@@ -47,7 +47,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
   const displayStatus = request.status?.status_name || request.status || 'N/A';
 
   return (
-    <div className="fixed inset-x-0 top-25 bottom-0 z-50 flex items-start justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm overflow-hidden lg:top-24 lg:left-72 lg:w-[calc(100vw-18rem)] lg:bottom-0 lg:items-start lg:justify-center">
+    <div className="fixed inset-x-0 top-25 pt-10 md:pt-10 bottom-0 pb-5 z-50 flex items-start justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm overflow-hidden lg:top-24 lg:left-72 lg:w-[calc(100vw-18rem)] lg:bottom-0 lg:items-start lg:justify-center">
       <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-[95vw] sm:w-full sm:max-w-2xl lg:max-w-4xl flex flex-col h-full sm:h-auto max-h-full sm:max-h-[calc(100vh-110px)] lg:max-h-[calc(100vh-145px)] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none mx-auto my-0 sm:my-4 lg:my-4">
 
         {/* Header */}
@@ -123,17 +123,6 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
             </Section>
           )}
 
-          {/* Academic Records - only for students //NEED FETCHING IN BACKEND IN MODAL FK TO STUDENT ACAD ID
-          {isStudent && (
-            <Section title="Academic Records">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
-                <p><strong>Course:</strong> {request.academic_record?.course ?? 'N/A'}</p>
-                <p><strong>Year Level:</strong> {request.academic_record?.year_level ?? 'N/A'}</p>
-                <p><strong>Section:</strong> {request.academic_record?.section ?? 'N/A'}</p>
-              </div>
-            </Section>
-          )} */}
 
           {/* Request Information */}
           <Section title="Request Information">
