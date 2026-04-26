@@ -213,14 +213,16 @@ const ProfilePage = ({ userType = "student" }) => {
                 title="Please enter a valid email address"
                 required
               />
-              <FieldGroup 
-                label="Suffix" 
-                name="suffix" 
-                value={displayProfile.suffix} 
-                isEditing={false} 
-                placeholder="e.g. Jr., Sr., III (Optional)"
-                type="text"
-              />
+              {displayProfile.suffix && (
+                <FieldGroup 
+                  label="Suffix" 
+                  name="suffix" 
+                  value={displayProfile.suffix} 
+                  isEditing={false} 
+                  placeholder="e.g. Jr., Sr., III (Optional)"
+                  type="text"
+                />
+              )}
             </div>
           </div>
         </div>

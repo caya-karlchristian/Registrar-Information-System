@@ -49,7 +49,7 @@ export const TAB_MAP = {
 
 export const TABS = [
   { 
-    label: "Ongoing", 
+    label: "Pending", 
     value: "pending", 
     active: "bg-yellow-50 border-yellow-500 text-yellow-900", 
     inactive: "bg-white border-gray-200 text-gray-500 hover:bg-yellow-50" 

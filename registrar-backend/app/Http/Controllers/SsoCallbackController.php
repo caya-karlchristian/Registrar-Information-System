@@ -26,9 +26,17 @@ class SsoCallbackController extends Controller
             Log::warning('SSO: IdP error', ['message' => $e->getMessage()]);
             return response()->json(['message' => $e->getMessage()], 401);
         } catch (\RuntimeException $e) {
-            Log::warning('SSO: role error', ['message' => $e->getMessage()]);
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Exception $e) {
+    Log::warning('SSO: role error', ['message' => $e->getMessage()]);
+
+    $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
+        'client_id' => config('sso.client_id'),
+    ]);
+
+    return response()->json([
+        'message'    => $e->getMessage(),
+        'logout_url' => $logoutUrl,  
+    ], 403);
+} catch (\Exception $e) {
             Log::error('SSO: unexpected error', ['error' => $e->getMessage()]);
             return response()->json(['message' => 'Failed to process SSO login.'], 500);
         }

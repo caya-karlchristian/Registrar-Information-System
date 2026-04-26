@@ -3,7 +3,15 @@ import { ChevronDownIcon, ClockIcon  } from '@heroicons/react/24/outline';
 import { getDocumentTypes } from '../services/api';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
 
-const ALUMNI_IDS = [1, 3, 2, 4, 6, 5]; 
+const ensureArray = (data) => {
+    if (Array.isArray(data)) return data; // Already an array
+    if (typeof data === 'string' && data.trim().length > 0) {
+      return data.split(',').map(item => item.trim()); // Convert string to array
+    }
+    return []; 
+  };
+
+const ALUMNI_ACCESS_IDS = [2, 3];
 
 const AlumniDocumentList = () => {
   const [openId, setOpenId] = useState(null);
@@ -17,8 +25,7 @@ const AlumniDocumentList = () => {
         setLoading(true);
         const res = await getDocumentTypes();
         const all = res.data ?? [];
-        setDocuments(all.filter(doc => ALUMNI_IDS.includes(doc.document_type_id)));
-      } catch (err) {
+        setDocuments(all.filter(doc => ALUMNI_ACCESS_IDS.includes(doc.access_id)));      } catch (err) {
         console.error("Failed to fetch documents:", err);
       } finally {
         setLoading(false);
@@ -29,14 +36,6 @@ const AlumniDocumentList = () => {
 
   const toggleAccordion = (id) => {
     setOpenId(openId === id ? null : id);
-  };
-
-  const ensureArray = (data) => {
-    if (Array.isArray(data)) return data; // Already an array
-    if (typeof data === 'string' && data.trim().length > 0) {
-      return data.split(',').map(item => item.trim()); // Convert string to array
-    }
-    return []; // Fallback for null or empty
   };
 
   return (
@@ -52,7 +51,10 @@ const AlumniDocumentList = () => {
 
         {/* --- FIXED GRID LAYOUT --- */}
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {documents.map((doc) => {
+          {documents.length === 0 && !loading ? (
+            <p className="text-gray-400 italic col-span-2">No documents available.</p>
+          ) : (
+          documents.map((doc) => {
             const id = doc.document_type_id;
             const isOpen = openId === id;
             const contentHeight = contentRefs.current[id]?.scrollHeight || 0;
@@ -141,7 +143,8 @@ const AlumniDocumentList = () => {
                 </div>
               </div>
             );
-          })}
+          })
+        )}
         </main>
       </div>
     </div>

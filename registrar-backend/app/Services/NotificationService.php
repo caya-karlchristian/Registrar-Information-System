@@ -6,6 +6,7 @@ use App\Events\NotificationSent;
 use App\Models\Notification;
 use App\Models\NotificationType;
 use App\Models\SystemUser;
+use App\Jobs\SendBulkNotificationJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -127,34 +128,26 @@ class NotificationService
         array  $data      = [],
         ?int   $requestId = null,
     ): void {
-        $users = SystemUser::whereNotIn('role_id', $excludedRoleIds)
-            ->where('status', 'Activated')
-            ->get();
-        foreach ($users as $user) {
-            self::send(
-                recipient:    $user,
-                triggerEvent: $triggerEvent,
-                data:         $data,
-                requestId:    $requestId,
-            );
-        }
+        // Dispatch to queue — loop runs in background, HTTP response is instant.
+        dispatch(new SendBulkNotificationJob(
+            triggerEvent:    $triggerEvent,
+            data:            $data,
+            excludedRoleIds: $excludedRoleIds,
+            requestId:       $requestId,
+        ));
     }
     public static function sendToAdmins(
         string $triggerEvent,
         array  $data      = [],
         ?int   $requestId = null,
     ): void {
-        $admins = SystemUser::where('role_id', SystemUser::ROLE_ADMIN)
-            ->where('status', 'Activated')->get();
-
-        foreach ($admins as $admin) {
-            self::send(
-                recipient:    $admin,
-                triggerEvent: $triggerEvent,
-                data:         $data,
-                requestId:    $requestId,
-            );
-        }
+        // Dispatch to queue — loop runs in background, HTTP response is instant.
+        dispatch(new SendBulkNotificationJob(
+            triggerEvent: $triggerEvent,
+            data:         $data,
+            onlyRoleIds:  [SystemUser::ROLE_ADMIN],
+            requestId:    $requestId,
+        ));
     }
 
     // -------------------------------------------------------
