@@ -221,9 +221,25 @@ const StaffDashboard = () => {
     fetchData();
   }, [fetchData]);
 
-  // Refetch whenever a new notification arrives (e.g. new request submitted)
+  // Refetch only when a notification type that affects the request list arrives.
+  // Avoids unnecessary full-table fetches on unrelated events (announcements, etc.)
+  const DASHBOARD_REFETCH_TRIGGERS = new Set([
+    'admin_new_request',
+    'admin_payment_verification',
+    'admin_incomplete_request',
+    'status_updated',
+    'request_processing',
+    'ready_to_claim',
+    'request_completed',
+    'request_forfeited',
+  ]);
+
   useEffect(() => {
-    if (notifications.length > 0) fetchData();
+    if (notifications.length === 0) return;
+    const latest = notifications[0];
+    if (latest && DASHBOARD_REFETCH_TRIGGERS.has(latest.type)) {
+      fetchData(false); // silent background refresh, no loading overlay
+    }
   }, [notifications.length]);
 
   useEffect(() => {

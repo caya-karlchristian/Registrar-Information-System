@@ -3,12 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\Announcement;
-use App\Models\SystemUser;
-use App\Services\NotificationService;
+use App\Services\AnnouncementService;
 use Illuminate\Http\Request;
 
+/**
+ * Announcement HTTP adapter.
+ *
+ * Creating an announcement also broadcasts a notification to all
+ * non-superadmin users. That side-effect is owned by
+ * AnnouncementService — this controller stays a thin HTTP layer.
+ */
 class AnnouncementController extends Controller
 {
+    public function __construct(private AnnouncementService $announcementService) {}
+
     public function index(Request $request)
     {
         $perPage = $request->input('per_page', 4);
@@ -25,22 +33,8 @@ class AnnouncementController extends Controller
             'content' => 'required|string',
         ]);
 
-        $announcement = Announcement::create([
-            'title'      => $validated['title'],
-            'content'    => $validated['content'],
-            'enabled'    => true,
-            'created_by' => $request->user()->user_id,
-        ]);
+        $announcement = $this->announcementService->create($validated, $request->user());
 
-        NotificationService::sendToAllExcept(
-            excludedRoleIds: [SystemUser::ROLE_SUPER_ADMIN],
-            triggerEvent:    'announcement_published',
-            data: [
-                'announcement_id'      => $announcement->id,
-                'announcement_title'   => $announcement->title,
-                'announcement_content' => $announcement->content,
-            ],
-        );
         return response()->json($announcement, 201);
     }
 
