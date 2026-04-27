@@ -80,7 +80,7 @@ const StudentDashboard = () => {
   useEffect(() => {
     if (!user || notifications.length === 0) return;
     fetchRequests();
-  }, [notifications.length]);
+  }, [notifications[0]?.id]);
 
   useEffect(() => { 
     setCurrentPage(1);
