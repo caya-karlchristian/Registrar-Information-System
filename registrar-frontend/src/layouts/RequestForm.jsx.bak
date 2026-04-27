@@ -21,7 +21,6 @@ const RequestForm = () => {
   const [availableDocs, setAvailableDocs] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [availableCertifications, setAvailableCertifications] = useState([]);
-  const [availablePurposes, setAvailablePurposes] = useState([]);
 
   const getDateDaysAgo = (days) => {
     const date = new Date();
@@ -43,13 +42,6 @@ const RequestForm = () => {
         setAvailableCertifications((certRes.data ?? []).filter(cert => STUDENT_ACCESS_IDS.includes(cert.access_id)));
       } catch (err) {
         console.warn("Certification types API unavailable, using constants.");
-      }
-
-      try {
-        const purposeRes = await axios.get("/request-purposes");
-        setAvailablePurposes(purposeRes.data ?? []);
-      } catch (err) {
-        console.warn("Request purposes API unavailable, using constants.");
       }
     };
     loadOptions();
@@ -170,11 +162,9 @@ const RequestForm = () => {
   setIsLoading(true);
 
   try {
-    const selectedPurpose = availablePurposes.find(
-      p => p.purpose_name === formData.purposeOfRequest
+    const purposeId = Object.keys(PURPOSE_MAP).find(
+      key => PURPOSE_MAP[key] === formData.purposeOfRequest
     );
-    const purposeId = selectedPurpose?.request_purpose_id
-      ?? Object.keys(PURPOSE_MAP).find(key => PURPOSE_MAP[key] === formData.purposeOfRequest);
 
     const certificates = formData.certification
       .map(name => ({
@@ -235,9 +225,7 @@ const RequestForm = () => {
     3: "Payment and Document Details",
   };
 
-  const purposeOptions = availablePurposes.length > 0
-    ? availablePurposes.map(p => p.purpose_name)
-    : Object.values(PURPOSE_MAP);
+  const purposeOptions = Object.values(PURPOSE_MAP);
 
   const certificationOptions = availableCertifications.length > 0
     ? availableCertifications.map((c) => c.certificate_name)

@@ -8,6 +8,21 @@ window.Pusher = Pusher;
 
 let echoInstance = null;
 
+// Dev-time guard: VITE_REVERB_PORT must be the *nginx* port (443 for https,
+// 80 for http), NOT Reverb's internal port (8080). The browser connects to
+// nginx which terminates TLS and proxies /app/* → Reverb:8080.
+if (import.meta.env.DEV) {
+    const _scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'https';
+    const _port   = Number(import.meta.env.VITE_REVERB_PORT);
+    if (_scheme === 'https' && _port === 8080) {
+        console.warn(
+            '[echo] VITE_REVERB_PORT=8080 with VITE_REVERB_SCHEME=https will ' +
+            'break WebSocket connections. Set VITE_REVERB_PORT=443 (the nginx ' +
+            'port) — Reverb internal port 8080 is not exposed to the browser.'
+        );
+    }
+}
+
 export const getEcho = () => {
     if (echoInstance) return echoInstance;
 

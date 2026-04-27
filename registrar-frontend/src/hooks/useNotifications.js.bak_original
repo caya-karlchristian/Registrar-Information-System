@@ -80,15 +80,11 @@ export const useNotifications = (onNewNotification = null) => {
         echo.private(`notifications.${user.user_id}`)
             .listen('.NotificationSent', handleNewNotification);
 
-        // admin.notifications channel removed:
-        // broadcastOn() only sends to personal notifications.{user_id} channels.
-        // Each admin/super_admin receives their own copy via SendBulkNotificationJob.
 
         return () => {
             echo.leave(`notifications.${user.user_id}`);
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.user_id, fetchNotifications, onNewNotification]);
+            };
+    }, [user?.user_id]);
 
     return { notifications, unreadCount, loading, markAsRead, markAllAsRead, dismiss, refetch: fetchNotifications };
 };

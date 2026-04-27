@@ -51,8 +51,11 @@ class SendBulkNotificationJob implements ShouldQueue
 
     public function handle(): void
     {
-        // Query all activated users; callers control targeting via onlyRoleIds / excludedRoleIds.
-        $query = SystemUser::where('status', 'Activated');
+        // SUPER_ADMIN_GUARD — super admins are never a bulk-notification target.
+        // They rely on audit logs and the analytics dashboard instead.
+        // This guard applies even if the caller forgets to exclude them.
+        $query = SystemUser::where('status', 'Activated')
+            ->where('role_id', '!=', SystemUser::ROLE_SUPER_ADMIN);
 
         // Caller-supplied role filters are applied on top of the base guard above.
         if (!empty($this->onlyRoleIds)) {

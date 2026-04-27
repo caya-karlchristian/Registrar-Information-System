@@ -41,6 +41,14 @@ class NotificationSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    /**
+     * Hold the broadcast until the wrapping DB::transaction() commits.
+     * Without this, the WebSocket push can reach the frontend before the
+     * notification row is visible to other DB connections, causing a brief
+     * race where GET /notifications returns stale data right after the push.
+     */
+    public bool $afterCommit = true;
+
     public function __construct(
         public readonly Notification $notification,
         public readonly SystemUser   $recipient,

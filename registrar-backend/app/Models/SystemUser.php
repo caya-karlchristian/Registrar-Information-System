@@ -18,6 +18,18 @@ class SystemUser extends Authenticatable
     protected $primaryKey = 'user_id';
     public $timestamps = false;
 
+    /**
+     * Laravel's Authenticatable base returns 'id' by default.
+     * Without this override, Auth::id() reads $this->id (null),
+     * which breaks Broadcast::auth() — the channel closure receives
+     * a valid $user but the framework cannot confirm the socket's
+     * identity, so every private-channel subscription is rejected.
+     */
+    public function getAuthIdentifierName(): string
+    {
+        return 'user_id';
+    }
+
     // -------------------------------------------------------
     // Role constants — must match your roles table:
     // 1 = student, 2 = alumni, 3 = admin, 4 = super_admin
