@@ -26,12 +26,6 @@ COPY composer.json composer.lock ./
 # Install dependencies (cached as long as above files don't change)
 RUN composer install --optimize-autoloader --no-scripts
 
-# Copy the rest of the source FIRST, then patch vendor/.
-# The patch must come AFTER COPY so it always runs on the final layer —
-# if it ran before COPY, a cache hit on the COPY layer would silently
-# restore the unpatched file.
-COPY . .
-
 # Patch laravel/reverb Router.php — operator precedence bug in isWebSocketRequest().
 # The original code: $request->getHeader('Upgrade')[0] ?? null === 'websocket'
 # evaluates as:      $request->getHeader('Upgrade')[0] ?? (null === 'websocket')
@@ -43,6 +37,9 @@ COPY . .
 RUN sed -i \
     "s/return \$request->getHeader('Upgrade')\[0\] ?? null === 'websocket';/return (\$request->getHeader('Upgrade')[0] ?? null) === 'websocket';/" \
     /var/www/html/vendor/laravel/reverb/src/Servers/Reverb/Http/Router.php
+
+# Now copy the rest of the source
+COPY . .
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache

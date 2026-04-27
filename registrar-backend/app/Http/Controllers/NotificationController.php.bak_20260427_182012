@@ -34,9 +34,11 @@ class NotificationController extends Controller
             $query->whereNull('read_at');
         }
 
-        // ResourceCollection must be returned directly.
-        // Wrapping it in response()->json() bypasses Laravel's resource pipeline
-        // and produces an empty 'data' array even when rows exist.
+        // Return the resource collection directly — do NOT wrap in response()->json().
+        // Wrapping a paginated ResourceCollection bypasses Laravel's serialization
+        // pipeline and can produce an empty 'data' array even when rows exist.
+        // Returning directly lets Laravel handle content-negotiation and envelope
+        // structure correctly, preserving pagination metadata (links, meta).
         return NotificationResource::collection($query->paginate(20));
     }
 

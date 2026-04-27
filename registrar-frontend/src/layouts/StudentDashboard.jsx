@@ -76,11 +76,24 @@ const StudentDashboard = () => {
     fetchRequests();
   }, [user]);
 
-  // Refetch whenever a new notification arrives (e.g. status update)
-  useEffect(() => {
-    if (!user || notifications.length === 0) return;
+// Refetch only when a notification type that actually affects the request
+// list arrives. Prevents unnecessary API calls on unrelated events
+// (announcements, generic alerts, etc.) — mirrors StaffDashboard behaviour.
+const STUDENT_REFETCH_TRIGGERS = new Set([
+  'request_submitted',   // confirmation: own submission landed
+  'request_processing',  // admin started processing
+  'ready_to_claim',      // ready for pickup
+  'request_completed',   // done
+  'request_forfeited',   // forfeited / expired
+]);
+
+useEffect(() => {
+  if (!user || notifications.length === 0) return;
+  const latest = notifications[0];
+  if (latest && STUDENT_REFETCH_TRIGGERS.has(latest.type)) {
     fetchRequests();
-  }, [notifications[0]?.id]);
+  }
+}, [notifications[0]?.id]);
 
   useEffect(() => { 
     setCurrentPage(1);
