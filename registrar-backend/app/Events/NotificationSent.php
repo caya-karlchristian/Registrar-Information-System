@@ -39,7 +39,7 @@ use Illuminate\Queue\SerializesModels;
 |--------------------------------------------------------------------------
 */
 
-class NotificationSent implements ShouldBroadcast
+class NotificationSent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

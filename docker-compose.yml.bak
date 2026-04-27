@@ -77,53 +77,6 @@ services:
     networks:
       - ris_network
 
-  # -------------------------------------------------------
-  # Queue Worker
-  # -------------------------------------------------------
-  # Runs SendBulkNotificationJob and any other queued work.
-  # Uses the same image as the backend — no extra build step.
-  # Scale independently: docker compose up --scale worker=2
-  # -------------------------------------------------------
-  worker:
-    image: ris_backend_image
-    container_name: ris_worker
-    restart: always
-    command: >
-      sh -c 'while true; do
-        php artisan queue:work
-          --sleep=3
-          --tries=3
-          --timeout=120
-          --max-time=3600
-          --queue=default;
-        echo "[worker] exited, restarting in 5s...";
-        sleep 5;
-      done'
-    environment:
-      APP_ENV: ${APP_ENV:-production}
-      APP_KEY: ${APP_KEY}
-      APP_DEBUG: ${APP_DEBUG:-false}
-      APP_URL: ${APP_URL}
-      DB_CONNECTION: mysql
-      DB_HOST: ${DB_HOST}
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_DATABASE}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      QUEUE_CONNECTION: database
-      REVERB_APP_ID: ${REVERB_APP_ID}
-      REVERB_APP_KEY: ${REVERB_APP_KEY}
-      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
-      REVERB_HOST: reverb
-      REVERB_PORT: ${REVERB_PORT:-8080}
-      REVERB_SCHEME: ${REVERB_SCHEME:-http}
-      BROADCAST_CONNECTION: reverb
-    depends_on:
-      backend:
-        condition: service_started
-    networks:
-      - ris_network
-
 volumes:
   ris_db_data:
 

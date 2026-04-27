@@ -20,11 +20,14 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy project files
-COPY . .
+# Copy only dependency files first — this layer is cached until composer.json/lock changes
+COPY composer.json composer.lock ./
 
-# Install dependencies
+# Install dependencies (cached as long as above files don't change)
 RUN composer install --optimize-autoloader --no-scripts
+
+# Now copy the rest of the source
+COPY . .
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache

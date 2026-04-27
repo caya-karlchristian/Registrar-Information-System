@@ -80,10 +80,15 @@ export const useNotifications = (onNewNotification = null) => {
         echo.private(`notifications.${user.user_id}`)
             .listen('.NotificationSent', handleNewNotification);
 
+        if (isStaff) {
+            echo.private('admin.notifications')
+                .listen('.NotificationSent', handleNewNotification);
+        }
 
         return () => {
             echo.leave(`notifications.${user.user_id}`);
-            };
+            if (isStaff) echo.leave('admin.notifications');
+        };
     }, [user?.user_id]);
 
     return { notifications, unreadCount, loading, markAsRead, markAllAsRead, dismiss, refetch: fetchNotifications };

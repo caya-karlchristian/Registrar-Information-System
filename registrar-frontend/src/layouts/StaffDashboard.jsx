@@ -240,7 +240,7 @@ const StaffDashboard = () => {
     if (latest && DASHBOARD_REFETCH_TRIGGERS.has(latest.type)) {
       fetchData(false); // silent background refresh, no loading overlay
     }
-  }, [notifications.length]);
+  }, [notifications[0]?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
