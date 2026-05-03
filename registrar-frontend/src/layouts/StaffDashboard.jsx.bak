@@ -104,7 +104,7 @@ const StaffDashboard = () => {
         };
       })();
 
-      const formatted = (requestsRes.data || []).map(r => {
+      const formatted = (requestsRes.data?.data ?? requestsRes.data ?? []).map(r => {
         const requestDate = r.requested_at ? new Date(r.requested_at) : null;
         const now = new Date();
         const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
@@ -221,10 +221,26 @@ const StaffDashboard = () => {
     fetchData();
   }, [fetchData]);
 
-  // Refetch whenever a new notification arrives (e.g. new request submitted)
+  // Refetch only when a notification type that affects the request list arrives.
+  // Avoids unnecessary full-table fetches on unrelated events (announcements, etc.)
+  const DASHBOARD_REFETCH_TRIGGERS = new Set([
+    'admin_new_request',
+    'admin_payment_verification',
+    'admin_incomplete_request',
+    'status_updated',
+    'request_processing',
+    'ready_to_claim',
+    'request_completed',
+    'request_forfeited',
+  ]);
+
   useEffect(() => {
-    if (notifications.length > 0) fetchData();
-  }, [notifications.length]);
+    if (notifications.length === 0) return;
+    const latest = notifications[0];
+    if (latest && DASHBOARD_REFETCH_TRIGGERS.has(latest.type)) {
+      fetchData(false); // silent background refresh, no loading overlay
+    }
+  }, [notifications[0]?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

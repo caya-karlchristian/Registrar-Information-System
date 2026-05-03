@@ -82,13 +82,25 @@ export const useNotifications = (onNewNotification = null) => {
         if (!user) return;
         fetchNotifications();
 
+        // Reset the singleton before constructing a new one so each login
+        // gets a fresh WebSocket connection with the current token.
+        // Without this, a connection made before localStorage had the token
+        // (e.g. during a fast re-render) can persist into the authenticated session.
+        resetEcho();
         const echo = getEcho();
         if (!echo) {
             // Env vars were missing at build time — see vite.config.js and Dockerfile.
             // Notifications will still load via REST; real-time push is unavailable.
-            console.error('[useNotifications] Echo unavailable — real-time notifications disabled.');
+            console.error('[useNotifications] Echo unavailable — VITE_REVERB_HOST or VITE_REVERB_APP_KEY missing.');
             return;
         }
+
+        // Log WebSocket connection state changes so failures are visible in the console.
+        // "connected" = WS handshake succeeded and Pusher protocol is active.
+        // "disconnected" / "failed" = check nginx /app/ proxy and Reverb container.
+        echo.connector.pusher.connection.bind('state_change', ({ current }) => {
+            console.info(`[Echo] connection → ${current}`);
+        });
 
         const handleNewNotification = (e) => {
             setNotifications(prev => {
@@ -99,8 +111,14 @@ export const useNotifications = (onNewNotification = null) => {
             });
         };
 
+        // .error() fires when Pusher-js fails to authenticate the private channel.
+        // Previously this failed silently — the subscription was set up but events
+        // were never delivered because the channel was never authorised.
         echo.private(`notifications.${user.user_id}`)
-            .listen('.NotificationSent', handleNewNotification);
+            .listen('.NotificationSent', handleNewNotification)
+            .error((err) => {
+                console.error('[Echo] private channel auth failed:', err);
+            });
 
         return () => {
             echo.leave(`notifications.${user.user_id}`);

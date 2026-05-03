@@ -141,7 +141,7 @@ useEffect(() => {
       <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-175">
         <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-gray-800 text-lg">
-            {activeTab === "pending" && "Processing Requests"}
+            {activeTab === "pending" && "Processing Documents"}
             {activeTab === "ready" && "Documents Ready for Pickup"}
             {activeTab === "history" && "Transaction Archive"}
           </h3>

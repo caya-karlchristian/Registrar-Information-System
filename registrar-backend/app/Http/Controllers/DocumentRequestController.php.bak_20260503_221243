@@ -45,19 +45,10 @@ class DocumentRequestController extends Controller
         }
 
         if (!$user->isStaff()) {
-            // Students / alumni: return ALL of their own requests so the
-            // frontend dashboard never silently loses older records.
-            // Their volume is low enough that a full ->get() is safe.
-            return response()->json([
-                'data' => $query
-                    ->where('user_id', $user->user_id)
-                    ->orderByDesc('requested_at')
-                    ->get(),
-            ], 200);
+            $query->where('user_id', $user->user_id);
         }
 
-        // Staff: potentially thousands of rows — keep pagination.
-        return response()->json($query->orderByDesc('requested_at')->paginate(20), 200);
+        return response()->json($query->paginate(20), 200);
     }
 
     // -------------------------------------------------------------------------

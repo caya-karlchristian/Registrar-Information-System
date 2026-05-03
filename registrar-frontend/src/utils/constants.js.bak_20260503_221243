@@ -72,11 +72,11 @@ export const TABS = [
 ];
 
 export const PROGRESS_MAP = {
-  1: 25,  // Processing
-  2: 75,  // Ready to Claim
+  1: 25,  // Pending
+  2: 75,  // Ready to claim
   3: 100, // Completed
-  4: 0,   // Forfeited
-  5: 0,   // Cancelled
+  5: 0,   // Forfeited
+  6: 75,  // Ready
 };
 
 export const CERTIFICATION_MAP = {
