@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Auth;
 class DocumentRequestService implements DocumentRequestServiceInterface
 {
     public function __construct(
-        private NotificationServiceInterface $notificationService,
+        private NotificationService $notificationService,
     ) {}
 
     // -------------------------------------------------------------------------

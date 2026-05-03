@@ -32,11 +32,13 @@ services:
       REVERB_PORT: ${REVERB_PORT:-8080}
       REVERB_SCHEME: ${REVERB_SCHEME:-http}
       BROADCAST_CONNECTION: reverb
-      QUEUE_CONNECTION: database
+      QUEUE_CONNECTION: database 
       SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS}
       SESSION_DOMAIN: ${SESSION_DOMAIN}
     ports:
       - "8000:8000"
+    # volumes:
+    #   - ./registrar-backend:/var/www/html
     networks:
       - ris_network
 
@@ -62,12 +64,14 @@ services:
       REVERB_APP_ID: ${REVERB_APP_ID}
       REVERB_APP_KEY: ${REVERB_APP_KEY}
       REVERB_APP_SECRET: ${REVERB_APP_SECRET}
-      REVERB_HOST: reverb
+      REVERB_HOST: reverb # 0.0.0.0
       REVERB_PORT: 8080
       REVERB_SCHEME: ${REVERB_SCHEME:-http}
       BROADCAST_CONNECTION: reverb
     ports:
       - "8080:8080"
+    # volumes:
+      # - ./registrar-backend:/var/www/html
     depends_on:
       backend:
         condition: service_started
@@ -76,6 +80,10 @@ services:
 
   # -------------------------------------------------------
   # Queue Worker
+  # -------------------------------------------------------
+  # Runs SendBulkNotificationJob and any other queued work.
+  # Uses the same image as the backend — no extra build step.
+  # Scale independently: docker compose up --scale worker=2
   # -------------------------------------------------------
   worker:
     image: ris_backend_image
@@ -114,18 +122,6 @@ services:
     depends_on:
       backend:
         condition: service_started
-    networks:
-      - ris_network
-
-  # -------------------------------------------------------
-  # Redis — shared cache + session store for horizontal scaling
-  # -------------------------------------------------------
-  redis:
-    image: redis:7-alpine
-    container_name: ris_redis
-    restart: always
-    ports:
-      - "6379:6379"
     networks:
       - ris_network
 

@@ -36,7 +36,7 @@ use Illuminate\Support\Facades\Log;
 |--------------------------------------------------------------------------
 */
 
-class NotificationService implements NotificationServiceInterface
+class NotificationService
 {
     // -------------------------------------------------------
     // SEND TO A SPECIFIC USER

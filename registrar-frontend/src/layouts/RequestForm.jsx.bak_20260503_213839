@@ -193,7 +193,7 @@ const RequestForm = () => {
       certificates: certificates,
     };
 
-    const response = await createDocumentRequest(payload);
+    const response = await axios.post("/document-requests", payload);
 
     console.log("Submission successful:", response.data);
     setIsSubmitted(true);
