@@ -29,7 +29,7 @@ class DocumentRequestController extends Controller
         'certificates.certificationType',
     ];
 
-    public function __construct(private DocumentRequestServiceInterface $requestService) {}
+    public function __construct(private DocumentRequestService $requestService) {}
 
     // -------------------------------------------------------------------------
     // GET /document-requests

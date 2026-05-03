@@ -31,7 +31,7 @@ const StudentDashboard = () => {
     setLoading(true);
     const res = await getDocumentRequests();
 
-    const studentRequests = (res.data.data ?? res.data)
+    const studentRequests = res.data
       .filter(r => r.user_id === user.user_id)
       .map(r => {
         const baseConfig = STATUS_CONFIG[r.status_id] || {

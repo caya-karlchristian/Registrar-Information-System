@@ -105,7 +105,7 @@ export const useNotifications = (onNewNotification = null) => {
         return () => {
             echo.leave(`notifications.${user.user_id}`);
         };
-    }, [user?.user_id, fetchNotifications]);
+    }, [user?.user_id, fetchNotifications, onNewNotification]);
 
     return { notifications, unreadCount, loading, markAsRead, markAllAsRead, dismiss, refetch: fetchNotifications };
 };
