@@ -53,20 +53,6 @@ export const getEcho = () => {
         },
     });
 
-    // Log any low-level Pusher/WebSocket errors globally.
-    // These appear in the browser console as [Echo] error: {...}
-    // and indicate problems at the WS transport layer (bad app key,
-    // TLS cert mismatch, Reverb unreachable, nginx proxy misconfiguration).
-    echoInstance.connector.pusher.connection.bind('error', (err) => {
-        console.error('[Echo] connection error:', err);
-    });
-
-    // Expose on window so the live connection state can be inspected from
-    // DevTools at any time, even if the console was opened after mount:
-    //   window.__echo.connector.pusher.connection.state
-    //   → "connected" | "connecting" | "disconnected" | "failed"
-    window.__echo = echoInstance;
-
     return echoInstance;
 };
 

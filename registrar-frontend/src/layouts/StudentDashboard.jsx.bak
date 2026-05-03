@@ -87,20 +87,13 @@ const STUDENT_REFETCH_TRIGGERS = new Set([
   'request_forfeited',   // forfeited / expired
 ]);
 
-// Hoist into a stable primitive so React's dep-array comparison is reliable.
-// Optional-chaining directly in the dep array re-evaluates to `undefined`
-// every render when the array is empty, which triggers the effect spuriously.
-const latestNotificationId = notifications[0]?.id ?? null;
-
 useEffect(() => {
-  if (!user || latestNotificationId === null) return;
+  if (!user || notifications.length === 0) return;
   const latest = notifications[0];
   if (latest && STUDENT_REFETCH_TRIGGERS.has(latest.type)) {
     fetchRequests();
   }
-// fetchRequests is wrapped in useCallback so its identity is stable;
-// include it here to satisfy the exhaustive-deps rule and avoid stale closures.
-}, [latestNotificationId, fetchRequests]);
+}, [notifications[0]?.id]);
 
   useEffect(() => { 
     setCurrentPage(1);
@@ -141,7 +134,7 @@ useEffect(() => {
       <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-175">
         <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-gray-800 text-lg">
-            {activeTab === "pending" && "Processing Requests"}
+            {activeTab === "pending" && "Processing Documents"}
             {activeTab === "ready" && "Documents Ready for Pickup"}
             {activeTab === "history" && "Transaction Archive"}
           </h3>

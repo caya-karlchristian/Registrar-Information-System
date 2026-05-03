@@ -84,7 +84,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
         $documentRequest->update($validated);
 
-        if (isset($validated['status_id']) && (int) $validated['status_id'] !== (int) $oldStatusId) {
+        if (isset($validated['status_id']) && $documentRequest->status_id !== $oldStatusId) {
             $this->recordStatusHistory($documentRequest, $oldStatusId);
             $this->notifyOwnerOfStatusChange($documentRequest);
         }

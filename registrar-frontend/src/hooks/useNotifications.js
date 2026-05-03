@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthProvider';
-import { getEcho } from '../services/echo';
+import { getEcho, resetEcho } from '../services/echo';
 import api from '../services/api';
 
 export const useNotifications = (onNewNotification = null) => {
@@ -78,17 +78,36 @@ export const useNotifications = (onNewNotification = null) => {
         }
     }, []);
 
+    // Track the previous user_id so we only reset Echo when the user
+    // actually changes (login/logout), not on every effect re-run.
+    const prevUserIdRef = useRef(null);
+
     useEffect(() => {
         if (!user) return;
         fetchNotifications();
 
+        // Reset the singleton ONLY when the user identity changes so each
+        // new login gets a fresh WebSocket connection with the current token.
+        // Resetting on every run would cause a connect→disconnect→connect
+        // flap on re-renders and navigation, which drops in-flight events.
+        if (prevUserIdRef.current !== user.user_id) {
+            resetEcho();
+            prevUserIdRef.current = user.user_id;
+        }
         const echo = getEcho();
         if (!echo) {
             // Env vars were missing at build time — see vite.config.js and Dockerfile.
             // Notifications will still load via REST; real-time push is unavailable.
-            console.error('[useNotifications] Echo unavailable — real-time notifications disabled.');
+            console.error('[useNotifications] Echo unavailable — VITE_REVERB_HOST or VITE_REVERB_APP_KEY missing.');
             return;
         }
+
+        // Log WebSocket connection state changes so failures are visible in the console.
+        // "connected" = WS handshake succeeded and Pusher protocol is active.
+        // "disconnected" / "failed" = check nginx /app/ proxy and Reverb container.
+        echo.connector.pusher.connection.bind('state_change', ({ current }) => {
+            console.info(`[Echo] connection → ${current}`);
+        });
 
         const handleNewNotification = (e) => {
             setNotifications(prev => {
@@ -99,8 +118,14 @@ export const useNotifications = (onNewNotification = null) => {
             });
         };
 
+        // .error() fires when Pusher-js fails to authenticate the private channel.
+        // Previously this failed silently — the subscription was set up but events
+        // were never delivered because the channel was never authorised.
         echo.private(`notifications.${user.user_id}`)
-            .listen('.NotificationSent', handleNewNotification);
+            .listen('.NotificationSent', handleNewNotification)
+            .error((err) => {
+                console.error('[Echo] private channel auth failed:', err);
+            });
 
         return () => {
             echo.leave(`notifications.${user.user_id}`);
