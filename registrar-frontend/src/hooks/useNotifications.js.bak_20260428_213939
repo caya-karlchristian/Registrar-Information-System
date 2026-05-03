@@ -64,15 +64,11 @@ export const useNotifications = (onNewNotification = null) => {
     const dismiss = useCallback(async (id) => {
         try {
             await api.delete(`/notifications/${id}`);
-            // Read the snapshot, then update both states at the same level —
-            // calling setState inside another setState's updater fn is unsafe
-            // in React's concurrent renderer (the inner call can be dropped
-            // if the updater is replayed).
-            setNotifications(prev => prev.filter(n => n.id !== id));
-            // Sync the authoritative count from the server so we stay correct
-            // regardless of whether the dismissed notification was read or not.
-            const { data } = await api.get('/notifications/unread-count');
-            setUnreadCount(data.count ?? 0);
+            setNotifications(prev => {
+                const target = prev.find(n => n.id === id);
+                if (target && !target.read_at) setUnreadCount(c => Math.max(0, c - 1));
+                return prev.filter(n => n.id !== id);
+            });
         } catch (err) {
             console.error('[useNotifications] dismiss failed:', err);
         }

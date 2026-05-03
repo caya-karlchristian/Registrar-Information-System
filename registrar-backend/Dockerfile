@@ -58,4 +58,10 @@ EXPOSE 8000
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
+# At the end of your Dockerfile, BEFORE the CMD/ENTRYPOINT
+RUN php artisan config:clear \
+ && php artisan cache:clear \
+ && php artisan route:clear \
+ && php artisan view:clear
+
 CMD ["/start.sh"]

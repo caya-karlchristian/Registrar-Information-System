@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthProvider';
 import { getEcho } from '../services/echo';
 import api from '../services/api';
@@ -8,15 +8,6 @@ export const useNotifications = (onNewNotification = null) => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount]     = useState(0);
     const [loading, setLoading]             = useState(true);
-
-    // Keep a ref that always points at the latest callback so the Echo
-    // subscription effect does not need to depend on it — this prevents
-    // the channel from being left/re-joined whenever the callback identity
-    // changes (e.g. if the caller ever forgets useCallback).
-    const onNewNotificationRef = useRef(onNewNotification);
-    useEffect(() => {
-        onNewNotificationRef.current = onNewNotification;
-    }, [onNewNotification]);
 
     const fetchNotifications = useCallback(async () => {
         try {
@@ -39,11 +30,7 @@ export const useNotifications = (onNewNotification = null) => {
             setNotifications(prev =>
                 prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
             );
-            // Fetch the authoritative count from the server rather than
-            // guessing — prevents drift when the notification was already
-            // read in another tab or via markAllAsRead.
-            const { data } = await api.get('/notifications/unread-count');
-            setUnreadCount(data.count ?? 0);
+            setUnreadCount(prev => Math.max(0, prev - 1));
         } catch (err) {
             console.error('[useNotifications] markAsRead failed:', err);
         }
@@ -64,15 +51,11 @@ export const useNotifications = (onNewNotification = null) => {
     const dismiss = useCallback(async (id) => {
         try {
             await api.delete(`/notifications/${id}`);
-            // Read the snapshot, then update both states at the same level —
-            // calling setState inside another setState's updater fn is unsafe
-            // in React's concurrent renderer (the inner call can be dropped
-            // if the updater is replayed).
-            setNotifications(prev => prev.filter(n => n.id !== id));
-            // Sync the authoritative count from the server so we stay correct
-            // regardless of whether the dismissed notification was read or not.
-            const { data } = await api.get('/notifications/unread-count');
-            setUnreadCount(data.count ?? 0);
+            setNotifications(prev => {
+                const target = prev.find(n => n.id === id);
+                if (target && !target.read_at) setUnreadCount(c => Math.max(0, c - 1));
+                return prev.filter(n => n.id !== id);
+            });
         } catch (err) {
             console.error('[useNotifications] dismiss failed:', err);
         }
@@ -83,28 +66,28 @@ export const useNotifications = (onNewNotification = null) => {
         fetchNotifications();
 
         const echo = getEcho();
-        if (!echo) {
-            // Env vars were missing at build time — see vite.config.js and Dockerfile.
-            // Notifications will still load via REST; real-time push is unavailable.
-            console.error('[useNotifications] Echo unavailable — real-time notifications disabled.');
-            return;
-        }
+        const isStaff = ['admin', 'super_admin'].includes(user.role_name);
 
         const handleNewNotification = (e) => {
-            setNotifications(prev => {
-                if (prev.some(n => n.id === e.id)) return prev; // deduplicate
-                setUnreadCount(c => c + 1);
-                if (typeof onNewNotification === 'function') onNewNotification(e);
-                return [e, ...prev];
-            });
-        };
+    setNotifications(prev => {
+        if (prev.some(n => n.id === e.id)) return prev; // duplicate, ignore
+        setUnreadCount(c => c + 1); // only increment when it's actually new
+        if (typeof onNewNotification === 'function') onNewNotification(e);
+        return [e, ...prev];
+    });
+};
 
         echo.private(`notifications.${user.user_id}`)
             .listen('.NotificationSent', handleNewNotification);
 
+        // admin.notifications channel removed:
+        // broadcastOn() only sends to personal notifications.{user_id} channels.
+        // Each admin/super_admin receives their own copy via SendBulkNotificationJob.
+
         return () => {
             echo.leave(`notifications.${user.user_id}`);
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.user_id, fetchNotifications, onNewNotification]);
 
     return { notifications, unreadCount, loading, markAsRead, markAllAsRead, dismiss, refetch: fetchNotifications };
