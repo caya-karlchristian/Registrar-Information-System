@@ -51,14 +51,18 @@ class SendBulkNotificationJob implements ShouldQueue
 
     public function handle(): void
     {
+        // Query all activated users; callers control targeting via onlyRoleIds / excludedRoleIds.
         $query = SystemUser::where('status', 'Activated');
 
+        // Caller-supplied role filters are applied on top of the base guard above.
         if (!empty($this->onlyRoleIds)) {
             $query->whereIn('role_id', $this->onlyRoleIds);
         } elseif (!empty($this->excludedRoleIds)) {
             $query->whereNotIn('role_id', $this->excludedRoleIds);
         }
 
+        // cursor() streams rows one at a time — no full result set in memory,
+        // safe for large user tables.
         foreach ($query->cursor() as $user) {
             NotificationService::send(
                 recipient:    $user,

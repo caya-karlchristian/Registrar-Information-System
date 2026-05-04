@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DocumentRequest;
 use App\Models\SystemUser;
+use App\Contracts\DocumentRequestServiceInterface;
 use App\Services\DocumentRequestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,7 +29,7 @@ class DocumentRequestController extends Controller
         'certificates.certificationType',
     ];
 
-    public function __construct(private DocumentRequestService $requestService) {}
+    public function __construct(private DocumentRequestServiceInterface $requestService) {}
 
     // -------------------------------------------------------------------------
     // GET /document-requests
@@ -44,10 +45,19 @@ class DocumentRequestController extends Controller
         }
 
         if (!$user->isStaff()) {
-            $query->where('user_id', $user->user_id);
+            // Students / alumni: return ALL of their own requests so the
+            // frontend dashboard never silently loses older records.
+            // Their volume is low enough that a full ->get() is safe.
+            return response()->json([
+                'data' => $query
+                    ->where('user_id', $user->user_id)
+                    ->orderByDesc('requested_at')
+                    ->get(),
+            ], 200);
         }
 
-        return response()->json($query->get(), 200);
+        // Staff: potentially thousands of rows — keep pagination.
+        return response()->json($query->orderByDesc('requested_at')->paginate(20), 200);
     }
 
     // -------------------------------------------------------------------------

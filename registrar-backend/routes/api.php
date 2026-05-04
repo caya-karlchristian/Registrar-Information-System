@@ -16,6 +16,7 @@ use App\Http\Controllers\SsoCallbackController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\RequestPurposeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,27 +46,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{studentNumber}/addresses', [StudentProfileController::class, 'addresses']);
     });
 
-
-    // Auth
-    Route::get('/me',      [AuthController::class, 'me']);
-    Route::post('/logout', [AuthController::class, 'logout']);
-
-    // ── OGOS student data ────────────────────────────────────────────────────
-    Route::prefix('students')->group(function () {
-        Route::get('search',                    [StudentProfileController::class, 'search']);
-        Route::get('{studentNumber}/ogos',      [StudentProfileController::class, 'showByStudentNumber']);
-        Route::get('{studentNumber}/personal-info', [StudentProfileController::class, 'personalInfo']);
-        Route::get('{studentNumber}/addresses', [StudentProfileController::class, 'addresses']);
-    });
-
-
     // Auth
     Route::get('/me',      [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // Broadcasting auth
+    // Resolve the sanctum user once before passing to Broadcast::auth().
+    // Using setUserResolver(fn() => $request->user('sanctum')) causes infinite
+    // recursion because Broadcast::auth() calls $request->user() internally,
+    // which re-invokes the resolver, which calls $request->user() again, etc.
     Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
-        return \Illuminate\Support\Facades\Broadcast::auth($request);
+        $user = $request->user('sanctum');
+        return \Illuminate\Support\Facades\Broadcast::auth(
+            $request->setUserResolver(fn () => $user)
+        );
     });
 
     // Notifications — all roles, own records only
@@ -109,6 +103,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('certifications/{id}',        [CertificationTypeController::class, 'show']);
     Route::get('request-statuses',           [RequestStatusController::class, 'index']);
     Route::get('request-statuses/{id}',      [RequestStatusController::class, 'show']);
+    Route::get('request-purposes',      [RequestPurposeController::class, 'index']);
+    Route::get('request-purposes/{id}', [RequestPurposeController::class, 'show']);
 
     // Admin only (role 3 — superadmin bypasses via RoleMiddleware)
     Route::middleware('role:3')->group(function () {
@@ -135,6 +131,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('peak-hours',       [AnalyticsController::class, 'peakHours']);
             Route::get('by-purpose',       [AnalyticsController::class, 'byPurpose']);
         });
+
+        Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
+        Route::put('request-purposes/{id}',    [RequestPurposeController::class, 'update']);
+        Route::delete('request-purposes/{id}', [RequestPurposeController::class, 'destroy']);
     });
 
     // Superadmin only (role 4)

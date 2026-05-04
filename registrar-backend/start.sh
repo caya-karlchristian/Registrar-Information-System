@@ -1,4 +1,8 @@
 #!/bin/bash
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
 
 set -e
 
@@ -16,11 +20,5 @@ php artisan optimize
 # Start PHP-FPM in background
 php-fpm -D
 
-# Start Nginx in foreground
+# Start Nginx in foreground (queue worker runs in the dedicated ris_worker container)
 nginx -g "daemon off;"
-
-until php artisan db:show > /dev/null 2>&1; do
-  echo "Waiting for database..."; sleep 2
-done
-# DB is ready — now safe to migrate
-php artisan migrate --force

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthProvider';
-import { getEcho } from '../services/echo';
+import { getEcho, resetEcho } from '../services/echo';
 import api from '../services/api';
 
 export const useNotifications = (onNewNotification = null) => {
@@ -8,6 +8,15 @@ export const useNotifications = (onNewNotification = null) => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount]     = useState(0);
     const [loading, setLoading]             = useState(true);
+
+    // Keep a ref that always points at the latest callback so the Echo
+    // subscription effect does not need to depend on it — this prevents
+    // the channel from being left/re-joined whenever the callback identity
+    // changes (e.g. if the caller ever forgets useCallback).
+    const onNewNotificationRef = useRef(onNewNotification);
+    useEffect(() => {
+        onNewNotificationRef.current = onNewNotification;
+    }, [onNewNotification]);
 
     const fetchNotifications = useCallback(async () => {
         try {
@@ -30,7 +39,11 @@ export const useNotifications = (onNewNotification = null) => {
             setNotifications(prev =>
                 prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
             );
-            setUnreadCount(prev => Math.max(0, prev - 1));
+            // Fetch the authoritative count from the server rather than
+            // guessing — prevents drift when the notification was already
+            // read in another tab or via markAllAsRead.
+            const { data } = await api.get('/notifications/unread-count');
+            setUnreadCount(data.count ?? 0);
         } catch (err) {
             console.error('[useNotifications] markAsRead failed:', err);
         }
@@ -51,45 +64,73 @@ export const useNotifications = (onNewNotification = null) => {
     const dismiss = useCallback(async (id) => {
         try {
             await api.delete(`/notifications/${id}`);
-            setNotifications(prev => {
-                const target = prev.find(n => n.id === id);
-                if (target && !target.read_at) setUnreadCount(c => Math.max(0, c - 1));
-                return prev.filter(n => n.id !== id);
-            });
+            // Read the snapshot, then update both states at the same level —
+            // calling setState inside another setState's updater fn is unsafe
+            // in React's concurrent renderer (the inner call can be dropped
+            // if the updater is replayed).
+            setNotifications(prev => prev.filter(n => n.id !== id));
+            // Sync the authoritative count from the server so we stay correct
+            // regardless of whether the dismissed notification was read or not.
+            const { data } = await api.get('/notifications/unread-count');
+            setUnreadCount(data.count ?? 0);
         } catch (err) {
             console.error('[useNotifications] dismiss failed:', err);
         }
     }, []);
 
+    // Track the previous user_id so we only reset Echo when the user
+    // actually changes (login/logout), not on every effect re-run.
+    const prevUserIdRef = useRef(null);
+
     useEffect(() => {
         if (!user) return;
         fetchNotifications();
 
+        // Reset the singleton ONLY when the user identity changes so each
+        // new login gets a fresh WebSocket connection with the current token.
+        // Resetting on every run would cause a connect→disconnect→connect
+        // flap on re-renders and navigation, which drops in-flight events.
+        if (prevUserIdRef.current !== user.user_id) {
+            resetEcho();
+            prevUserIdRef.current = user.user_id;
+        }
         const echo = getEcho();
-        const isStaff = ['admin', 'super_admin'].includes(user.role_name);
+        if (!echo) {
+            // Env vars were missing at build time — see vite.config.js and Dockerfile.
+            // Notifications will still load via REST; real-time push is unavailable.
+            console.error('[useNotifications] Echo unavailable — VITE_REVERB_HOST or VITE_REVERB_APP_KEY missing.');
+            return;
+        }
+
+        // Log WebSocket connection state changes so failures are visible in the console.
+        // "connected" = WS handshake succeeded and Pusher protocol is active.
+        // "disconnected" / "failed" = check nginx /app/ proxy and Reverb container.
+        echo.connector.pusher.connection.bind('state_change', ({ current }) => {
+            console.info(`[Echo] connection → ${current}`);
+        });
 
         const handleNewNotification = (e) => {
-    setNotifications(prev => {
-        if (prev.some(n => n.id === e.id)) return prev; // duplicate, ignore
-        setUnreadCount(c => c + 1); // only increment when it's actually new
-        if (typeof onNewNotification === 'function') onNewNotification(e);
-        return [e, ...prev];
-    });
-};
+            setNotifications(prev => {
+                if (prev.some(n => n.id === e.id)) return prev; // deduplicate
+                setUnreadCount(c => c + 1);
+                if (typeof onNewNotificationRef.current === 'function') onNewNotificationRef.current(e);
+                return [e, ...prev];
+            });
+        };
 
+        // .error() fires when Pusher-js fails to authenticate the private channel.
+        // Previously this failed silently — the subscription was set up but events
+        // were never delivered because the channel was never authorised.
         echo.private(`notifications.${user.user_id}`)
-            .listen('.NotificationSent', handleNewNotification);
-
-        if (isStaff) {
-            echo.private('admin.notifications')
-                .listen('.NotificationSent', handleNewNotification);
-        }
+            .listen('.NotificationSent', handleNewNotification)
+            .error((err) => {
+                console.error('[Echo] private channel auth failed:', err);
+            });
 
         return () => {
             echo.leave(`notifications.${user.user_id}`);
-            if (isStaff) echo.leave('admin.notifications');
         };
-    }, [user?.user_id]);
+    }, [user?.user_id, fetchNotifications]);
 
     return { notifications, unreadCount, loading, markAsRead, markAllAsRead, dismiss, refetch: fetchNotifications };
 };

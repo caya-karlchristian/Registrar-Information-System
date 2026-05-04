@@ -6,6 +6,8 @@ use App\Enums\RequestStatusEnum;
 use App\Models\DocumentRequest;
 use App\Models\RequestHistory;
 use App\Models\SystemUser;
+use App\Contracts\DocumentRequestServiceInterface;
+use App\Contracts\NotificationServiceInterface;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -14,8 +16,12 @@ use Illuminate\Support\Facades\Auth;
  * Controllers become thin HTTP adapters — they validate input,
  * call this service, and return JSON.
  */
-class DocumentRequestService
+class DocumentRequestService implements DocumentRequestServiceInterface
 {
+    public function __construct(
+        private NotificationServiceInterface $notificationService,
+    ) {}
+
     // -------------------------------------------------------------------------
     // Create
     // -------------------------------------------------------------------------
@@ -46,14 +52,14 @@ class DocumentRequestService
         }
 
         // Notify the requester and all admins (never superadmins)
-        NotificationService::send(
+        $this->notificationService->send(
             recipient:    $user,
             triggerEvent: 'request_submitted',
             data:         ['request_id' => $documentRequest->request_id],
             requestId:    $documentRequest->request_id,
         );
 
-        NotificationService::sendToAdmins(
+        $this->notificationService->sendToAdmins(
             triggerEvent: 'admin_new_request',
             data:         ['request_id' => $documentRequest->request_id],
             requestId:    $documentRequest->request_id,
@@ -78,7 +84,7 @@ class DocumentRequestService
 
         $documentRequest->update($validated);
 
-        if (isset($validated['status_id']) && $documentRequest->status_id !== $oldStatusId) {
+        if (isset($validated['status_id']) && (int) $validated['status_id'] !== (int) $oldStatusId) {
             $this->recordStatusHistory($documentRequest, $oldStatusId);
             $this->notifyOwnerOfStatusChange($documentRequest);
         }
@@ -88,7 +94,7 @@ class DocumentRequestService
             $documentRequest->or_number !== $oldOrNumber &&
             !empty($documentRequest->or_number)
         ) {
-            NotificationService::sendToAdmins(
+            $this->notificationService->sendToAdmins(
                 triggerEvent: 'admin_payment_verification',
                 data:         ['request_id' => $documentRequest->request_id],
                 requestId:    $documentRequest->request_id,
@@ -175,7 +181,7 @@ class DocumentRequestService
         $trigger = $status->notificationTrigger();
 
         if ($trigger) {
-            NotificationService::send(
+            $this->notificationService->send(
                 recipient:    $owner,
                 triggerEvent: $trigger,
                 data:         ['request_id' => $documentRequest->request_id],

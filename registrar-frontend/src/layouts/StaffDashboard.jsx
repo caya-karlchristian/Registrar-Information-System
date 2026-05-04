@@ -104,7 +104,7 @@ const StaffDashboard = () => {
         };
       })();
 
-      const formatted = (requestsRes.data || []).map(r => {
+      const formatted = (requestsRes.data?.data ?? requestsRes.data ?? []).map(r => {
         const requestDate = r.requested_at ? new Date(r.requested_at) : null;
         const now = new Date();
         const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
@@ -240,7 +240,7 @@ const StaffDashboard = () => {
     if (latest && DASHBOARD_REFETCH_TRIGGERS.has(latest.type)) {
       fetchData(false); // silent background refresh, no loading overlay
     }
-  }, [notifications.length]);
+  }, [notifications[0]?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
