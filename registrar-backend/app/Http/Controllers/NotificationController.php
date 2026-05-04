@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\NotificationResource;
 use App\Models\Notification;
 use App\Models\SystemUser;
+use App\Contracts\NotificationServiceInterface;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,10 @@ use Illuminate\Http\Request;
  */
 class NotificationController extends Controller
 {
+    public function __construct(
+        private NotificationServiceInterface $notificationService,
+    ) {}
+
     // -------------------------------------------------------
     // GET /notifications
     // -------------------------------------------------------
@@ -34,11 +39,9 @@ class NotificationController extends Controller
             $query->whereNull('read_at');
         }
 
-        // Return the resource collection directly — do NOT wrap in response()->json().
-        // Wrapping a paginated ResourceCollection bypasses Laravel's serialization
-        // pipeline and can produce an empty 'data' array even when rows exist.
-        // Returning directly lets Laravel handle content-negotiation and envelope
-        // structure correctly, preserving pagination metadata (links, meta).
+        // ResourceCollection must be returned directly.
+        // Wrapping it in response()->json() bypasses Laravel's resource pipeline
+        // and produces an empty 'data' array even when rows exist.
         return NotificationResource::collection($query->paginate(20));
     }
 
@@ -51,7 +54,7 @@ class NotificationController extends Controller
         $user = $request->user();
 
         return response()->json([
-            'count' => NotificationService::unreadCount($user),
+            'count' => $this->notificationService->unreadCount($user),
         ]);
     }
 
@@ -82,7 +85,7 @@ class NotificationController extends Controller
         /** @var SystemUser $user */
         $user = $request->user();
 
-        NotificationService::markAllAsRead($user);
+        $this->notificationService->markAllAsRead($user);
 
         return response()->json(['message' => 'All notifications marked as read.']);
     }

@@ -31,20 +31,23 @@ export const PURPOSE_MAP = {
   7: "Personal Copy",
 };
 
+// Status IDs mirror RequestStatusEnum in the backend:
+//   1 = Processing  2 = ReadyToClaim  3 = Completed
+//   4 = Forfeited   5 = Cancelled
 export const STATUS_CONFIG = {
-  1: { label: "Pending", classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  2: { label: "Ready to claim", classes: "bg-green-100 text-green-700 border-green-200" },
-  3: { label: "Completed", classes: "bg-gray-100 text-gray-700 border-gray-200" },
-  5: { label: "Forfeited", classes: "bg-red-100 text-red-700 border-red-200" },
-  6: { label: "Ready", classes: "bg-green-100 text-green-700 border-green-200" },
+  1: { label: "Processing",     classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  2: { label: "Ready to Claim", classes: "bg-green-100 text-green-700 border-green-200" },
+  3: { label: "Completed",      classes: "bg-gray-100 text-gray-700 border-gray-200" },
+  4: { label: "Forfeited",      classes: "bg-red-100 text-red-700 border-red-200" },
+  5: { label: "Cancelled",      classes: "bg-orange-100 text-orange-700 border-orange-200" },
 };
 
 export const TAB_MAP = {
-  1: "pending",   // Pending
-  2: "ready",     // Ready to claim
-  6: "ready",     // Ready
+  1: "pending",   // Processing
+  2: "ready",     // Ready to Claim
   3: "history",   // Completed
-  5: "history",   // Forfeited
+  4: "history",   // Forfeited
+  5: "history",   // Cancelled
 };
 
 export const TABS = [
@@ -69,11 +72,11 @@ export const TABS = [
 ];
 
 export const PROGRESS_MAP = {
-  1: 25,  // Pending
-  2: 75,  // Ready to claim
+  1: 25,  // Processing
+  2: 75,  // Ready to Claim
   3: 100, // Completed
-  5: 0,   // Forfeited
-  6: 75,  // Ready
+  4: 0,   // Forfeited
+  5: 0,   // Cancelled
 };
 
 export const CERTIFICATION_MAP = {

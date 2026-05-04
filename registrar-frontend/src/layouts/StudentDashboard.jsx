@@ -31,7 +31,7 @@ const StudentDashboard = () => {
     setLoading(true);
     const res = await getDocumentRequests();
 
-    const studentRequests = res.data
+    const studentRequests = (res.data.data ?? res.data)
       .filter(r => r.user_id === user.user_id)
       .map(r => {
         const baseConfig = STATUS_CONFIG[r.status_id] || {
@@ -76,11 +76,31 @@ const StudentDashboard = () => {
     fetchRequests();
   }, [user]);
 
-  // Refetch whenever a new notification arrives (e.g. status update)
-  useEffect(() => {
-    if (!user || notifications.length === 0) return;
+// Refetch only when a notification type that actually affects the request
+// list arrives. Prevents unnecessary API calls on unrelated events
+// (announcements, generic alerts, etc.) — mirrors StaffDashboard behaviour.
+const STUDENT_REFETCH_TRIGGERS = new Set([
+  'request_submitted',   // confirmation: own submission landed
+  'request_processing',  // admin started processing
+  'ready_to_claim',      // ready for pickup
+  'request_completed',   // done
+  'request_forfeited',   // forfeited / expired
+]);
+
+// Hoist into a stable primitive so React's dep-array comparison is reliable.
+// Optional-chaining directly in the dep array re-evaluates to `undefined`
+// every render when the array is empty, which triggers the effect spuriously.
+const latestNotificationId = notifications[0]?.id ?? null;
+
+useEffect(() => {
+  if (!user || latestNotificationId === null) return;
+  const latest = notifications[0];
+  if (latest && STUDENT_REFETCH_TRIGGERS.has(latest.type)) {
     fetchRequests();
-  }, [notifications.length]);
+  }
+// fetchRequests is wrapped in useCallback so its identity is stable;
+// include it here to satisfy the exhaustive-deps rule and avoid stale closures.
+}, [latestNotificationId, fetchRequests]);
 
   useEffect(() => { 
     setCurrentPage(1);
@@ -121,7 +141,7 @@ const StudentDashboard = () => {
       <div className="flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden min-h-175">
         <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-gray-800 text-lg">
-            {activeTab === "pending" && "Processing Documents"}
+            {activeTab === "pending" && "Processing Requests"}
             {activeTab === "ready" && "Documents Ready for Pickup"}
             {activeTab === "history" && "Transaction Archive"}
           </h3>

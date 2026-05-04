@@ -27,7 +27,13 @@ const MainPage = () => {
 
   const handleSsoLogin = () => {
     setLoading(true);
-    window.location.href = import.meta.env.VITE_SSO_LOGIN_URL;
+    // Defer the hard-navigation so React's synthetic event handling and
+    // the Router's location subscriptions finish before the document is
+    // replaced.  Without this, Chromium logs:
+    //   "Prevented /auth/callback from accessing QueryParameters"
+    setTimeout(() => {
+      window.location.href = import.meta.env.VITE_SSO_LOGIN_URL;
+    }, 0);
   };
   return (
     <>

@@ -147,7 +147,7 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.setItem('sso_role_error', '1');
       // Hard redirect to kill the IDP browser session — no loop because
       // the IDP logout page won't re-issue a code, it just clears cookies
-      window.location.href = logoutUrl;
+      setTimeout(() => { window.location.href = logoutUrl; }, 0);
     } else {
       setShowSSOSetupScreen(true);
     }

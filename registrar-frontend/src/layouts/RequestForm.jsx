@@ -1,5 +1,5 @@
 import React, { useState, useEffect} from "react";
-import axios from "../services/api"
+import { getDocumentTypes, getCertifications, getRequestPurposes, createDocumentRequest } from "../services/api"
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
@@ -21,6 +21,7 @@ const RequestForm = () => {
   const [availableDocs, setAvailableDocs] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [availableCertifications, setAvailableCertifications] = useState([]);
+  const [availablePurposes, setAvailablePurposes] = useState([]);
 
   const getDateDaysAgo = (days) => {
     const date = new Date();
@@ -31,17 +32,24 @@ const RequestForm = () => {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const docsRes = await axios.get("/document-types");
+        const docsRes = await getDocumentTypes();
         setAvailableDocs((docsRes.data ?? []).filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id)));
       } catch (err) {
         console.warn("Failed to load document types.");
       }
 
       try {
-        const certRes = await axios.get("/certifications");
+        const certRes = await getCertifications();
         setAvailableCertifications((certRes.data ?? []).filter(cert => STUDENT_ACCESS_IDS.includes(cert.access_id)));
       } catch (err) {
         console.warn("Certification types API unavailable, using constants.");
+      }
+
+      try {
+        const purposeRes = await getRequestPurposes();
+        setAvailablePurposes(purposeRes.data ?? []);
+      } catch (err) {
+        console.warn("Request purposes API unavailable, using constants.");
       }
     };
     loadOptions();
@@ -162,9 +170,11 @@ const RequestForm = () => {
   setIsLoading(true);
 
   try {
-    const purposeId = Object.keys(PURPOSE_MAP).find(
-      key => PURPOSE_MAP[key] === formData.purposeOfRequest
+    const selectedPurpose = availablePurposes.find(
+      p => p.purpose_name === formData.purposeOfRequest
     );
+    const purposeId = selectedPurpose?.request_purpose_id
+      ?? Object.keys(PURPOSE_MAP).find(key => PURPOSE_MAP[key] === formData.purposeOfRequest);
 
     const certificates = formData.certification
       .map(name => ({
@@ -183,7 +193,7 @@ const RequestForm = () => {
       certificates: certificates,
     };
 
-    const response = await axios.post("/document-requests", payload);
+    const response = await createDocumentRequest(payload);
 
     console.log("Submission successful:", response.data);
     setIsSubmitted(true);
@@ -225,7 +235,9 @@ const RequestForm = () => {
     3: "Payment and Document Details",
   };
 
-  const purposeOptions = Object.values(PURPOSE_MAP);
+  const purposeOptions = availablePurposes.length > 0
+    ? availablePurposes.map(p => p.purpose_name)
+    : Object.values(PURPOSE_MAP);
 
   const certificationOptions = availableCertifications.length > 0
     ? availableCertifications.map((c) => c.certificate_name)

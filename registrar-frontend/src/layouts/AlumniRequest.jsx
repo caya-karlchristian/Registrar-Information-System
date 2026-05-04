@@ -5,7 +5,7 @@ import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
 import ErrorToast from "../components/ErrorToast.jsx";
 import ImageUploader from "../components/ImageUploader.jsx";
-import axios from "../services/api.js";
+import { getDocumentTypes, getCertifications, createDocumentRequest } from "../services/api.js";
 import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
@@ -32,14 +32,14 @@ const AlumniRequestForm = () => {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const docsRes = await axios.get("/document-types");
+        const docsRes = await getDocumentTypes();
         setAvailableDocs((docsRes.data ?? []).filter(doc => ALUMNI_ACCESS_IDS.includes(doc.access_id)));
       } catch (err) {
         console.warn("Failed to load document types.");
       }
 
       try {
-        const certRes = await axios.get("/certifications");
+        const certRes = await getCertifications();
         setAvailableCertifications((certRes.data ?? []).filter(cert => ALUMNI_ACCESS_IDS.includes(cert.access_id)));
       } catch (err) {
         console.warn("Certification types API unavailable, using constants.");
@@ -225,7 +225,7 @@ const AlumniRequestForm = () => {
         certificates: certificates,
       };
 
-      const response = await axios.post("/document-requests", payload);
+      const response = await createDocumentRequest(payload);
 
       console.log("Submission successful:", response.data);
       setIsSubmitted(true);
