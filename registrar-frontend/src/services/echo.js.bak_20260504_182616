@@ -39,13 +39,7 @@ export const getEcho = () => {
         // Use wss for https, ws for http — matches VITE_REVERB_SCHEME.
         // nginx terminates TLS and proxies /app/ → reverb:8080 internally,
         // so the browser always connects on the public port (443 or 80).
-        // Include both 'ws' and 'wss' — Pusher-js requires 'ws' to be present
-        // in its internal transport registry even when forceTLS:true forces it
-        // to use WSS. With only ['wss'], Pusher's transport manager finds no
-        // valid transport and fails immediately without making any network
-        // attempt (confirmed: raw WebSocket to wss://localhost works fine,
-        // but Pusher goes disconnected→failed instantly with only ['wss']).
-        enabledTransports: ['ws', 'wss'],
+        enabledTransports: forceTLS ? ['wss'] : ['ws'],
         // Relative auth endpoint — avoids mixed-content blocks.
         // nginx proxies /api/ → backend:8000.
         authEndpoint: '/api/broadcasting/auth',
