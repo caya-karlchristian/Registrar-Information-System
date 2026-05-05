@@ -49,16 +49,7 @@ class SendBulkNotificationJob implements ShouldQueue
         public readonly ?int   $requestId       = null,
     ) {}
 
-    /**
-     * Laravel automatically injects dependencies declared here from the
-     * service container — this is the correct pattern for queued jobs.
-     *
-     * IMPORTANT: Do NOT call NotificationService::send() statically.
-     * send() is an instance method; a static call throws a fatal PHP 8 Error
-     * ("Non-static method cannot be called statically"), silently crashing
-     * the job and preventing all admin notifications from being delivered.
-     */
-    public function handle(NotificationServiceInterface $notificationService): void
+    public function handle(): void
     {
         // Query all activated users; callers control targeting via onlyRoleIds / excludedRoleIds.
         $query = SystemUser::where('status', 'Activated');
@@ -73,7 +64,7 @@ class SendBulkNotificationJob implements ShouldQueue
         // cursor() streams rows one at a time — no full result set in memory,
         // safe for large user tables.
         foreach ($query->cursor() as $user) {
-            $notificationService->send(
+            NotificationService::send(
                 recipient:    $user,
                 triggerEvent: $this->triggerEvent,
                 data:         $this->data,

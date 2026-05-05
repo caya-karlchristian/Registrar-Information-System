@@ -233,25 +233,26 @@ const StaffDashboard = () => {
     fetchData();
   }, [fetchData]);
 
-  // Refetch when a relevant notification arrives via WebSocket.
-  // DASHBOARD_REFETCH_TRIGGERS is defined at module scope so it is
-  // stable across renders and can safely be omitted from deps.
+  // Refetch only when a notification type that affects the request list arrives.
+  // Avoids unnecessary full-table fetches on unrelated events (announcements, etc.)
+  const DASHBOARD_REFETCH_TRIGGERS = new Set([
+    'admin_new_request',
+    'admin_payment_verification',
+    'admin_incomplete_request',
+    'status_updated',
+    'request_processing',
+    'ready_to_claim',
+    'request_completed',
+    'request_forfeited',
+  ]);
+
   useEffect(() => {
     if (notifications.length === 0) return;
     const latest = notifications[0];
     if (latest && DASHBOARD_REFETCH_TRIGGERS.has(latest.type)) {
       fetchData(false); // silent background refresh, no loading overlay
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notifications[0]?.id, fetchData]);
-
-  // Polling fallback — keeps the dashboard eventually-consistent even when
-  // the WebSocket is down or the queue worker misses an event.
-  // 30 s is frequent enough to feel live without hammering the backend.
-  useEffect(() => {
-    const id = setInterval(() => fetchData(false), 30_000);
-    return () => clearInterval(id);
-  }, [fetchData]);
+  }, [notifications[0]?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
