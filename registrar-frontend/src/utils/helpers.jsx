@@ -24,9 +24,9 @@ export const fillOrLine = (value, lineLength = 10) => {
 
 export const CertificateTitle = ({ title }) => (
   <div className="text-center mb-6 print:mb-7">
-    <h1 className="cert-title font-lucida text-[12px] sm:text-[20px] md:text-[25px] font-bold uppercase tracking-normal leading-tight text-black">
+    <TextBlock className="cert-title font-lucida text-[12px] sm:text-[20px] md:text-[25px] font-bold uppercase tracking-normal leading-tight text-black">
       {title}
-    </h1>
+    </TextBlock>
   </div>
 );
 
@@ -62,7 +62,7 @@ export const getSigneeInfo = (signee, fallbackKey = "mhel") => {
 };
 
 export const FooterInfo = ({ diplomaNum, date }) => (
-  <TextBlock className="mt-15 pt-3 print:mt-25 font-lucida">
+  <TextBlock className="mt-10 pt-3 print:mt-25 font-lucida">
     <p className="text-[6px] sm:text-[8px] print:text-[8pt] tracking-tighter mb-1">
       Not valid without University Dry Seal
     </p>
