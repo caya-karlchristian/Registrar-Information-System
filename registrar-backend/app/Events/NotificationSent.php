@@ -64,6 +64,19 @@ class NotificationSent implements ShouldBroadcast
             new PrivateChannel('notifications.' . $this->recipient->user_id),
         ];
     }
+    // -------------------------------------------------------
+    // WHICH QUEUE TO DISPATCH THE BROADCAST JOB ON
+    // -------------------------------------------------------
+    // Routing to a dedicated 'broadcasts' queue keeps WebSocket
+    // pushes from being delayed by slow or long-running default-queue
+    // jobs.  The broadcast-worker container drains this queue with a
+    // short sleep (1 s) and timeout (30 s) for low latency.
+    // -------------------------------------------------------
+    public function viaQueues(): array
+    {
+        return ['broadcasts'];
+    }
+
 
     // -------------------------------------------------------
     // WHAT DATA TO SEND TO THE FRONTEND
