@@ -74,9 +74,6 @@ class NotificationSent implements ShouldBroadcastNow
             'request_id'   => $this->notification->request_id,
             'read_at'      => $this->notification->read_at,
             'created_at'   => $this->notification->created_at->toISOString(),
-            // Forward requirements checklist so the real-time toast/bell
-            // can show it immediately without a follow-up REST call.
-            'requirements' => $data['requirements'] ?? null,
             'announcement' => isset($data['announcement_id']) ? [
                 'id'      => $data['announcement_id'],
                 'title'   => $data['announcement_title'],
@@ -89,7 +86,7 @@ class NotificationSent implements ShouldBroadcastNow
     // EVENT NAME THE FRONTEND LISTENS FOR
     // -------------------------------------------------------
     // Without this, Laravel uses the full class name as the
-    // event name: "App\Events\NotificationSent" — ugly.
+    // event name: "App\\Events\\NotificationSent" — ugly.
     // This makes it clean: listen('.NotificationSent', ...)
     // The dot prefix tells Echo this is a custom event name.
     // -------------------------------------------------------
