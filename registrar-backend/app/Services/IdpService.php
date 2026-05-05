@@ -16,8 +16,6 @@ class IdpService
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
         ], $options));
 
         $body = curl_exec($ch);

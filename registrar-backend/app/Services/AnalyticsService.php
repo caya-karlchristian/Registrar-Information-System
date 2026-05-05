@@ -6,6 +6,7 @@ use App\Enums\RequestStatusEnum;
 use App\Models\DocumentRequest;
 use App\Models\RequestHistory;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Encapsulates all analytics queries.
@@ -86,7 +87,7 @@ class AnalyticsService
         [$from, $to] = $range;
 
         $rows = DocumentRequest::select(
-                DB::raw("DATE_FORMAT(requested_at, '%Y-%m') as month"),
+                DB::raw(self::monthExpression('requested_at') . ' as month'),
                 DB::raw('COUNT(*) as total')
             )
             ->whereBetween('requested_at', [$from, $to])
