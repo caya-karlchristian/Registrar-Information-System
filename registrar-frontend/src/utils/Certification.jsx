@@ -24,7 +24,7 @@ export const CERT_CONFIG = {
   1: {
     id: 1,
     name: "Certificate of GWA",
-    fields: ["fullName", "course", "gwa", "officialReceiptNum"],
+    fields: ["fullName", "course", "gwa", "officialReceiptNum","educationLevel"],
     renderBody: (data) => (
       <StandardCertLayout date={data.date}>
         <CertParagraph>
@@ -111,7 +111,7 @@ export const CERT_CONFIG = {
           </CertParagraph>
           <CertParagraph>
             The {fillOrLine(data.course)} is a{" "}
-            {fillOrLine(`${data.semestersNum || ""}-year degree program`)} with a total of{" "}
+            {fillOrLine(`${data.semestersNum || ""} year degree program`)} with a total of{" "}
             {fillOrLine(`${data.units || ""} academic units`)}.
           </CertParagraph>
           <CertParagraph>
@@ -650,7 +650,7 @@ export const CERT_CONFIG = {
             enrolled in this school for the _____________ semester/summer, _____________ upon
             presentation of his/her Certificate of Eligibility to Transfer/Honorable Dismissal.
           </TextBlock>
-          <div className="flex justify-between items-end mt-6">
+          <div className="flex justify-between items-end mt-3">
             <TextBlock>
               <p className="italic text-[10px]">This is to certify that I am actually</p>
               <p className="italic text-[10px]">Enrolled in the school mentioned above</p>
@@ -665,7 +665,7 @@ export const CERT_CONFIG = {
               </TextBlock>
             </div>
           </div>
-          <p className="text-[9px] mt-4">/shgsese{CURRENT_YEAR}</p>
+          <p className="text-[9px]">/shgsese{CURRENT_YEAR}</p>
         </TextBlock>
       </>
     ),
