@@ -30,3 +30,5 @@ export const formatDateOrdinal = (date) => {
     year
   );
 };
+
+export const CURRENT_YEAR = new Date().getFullYear();
