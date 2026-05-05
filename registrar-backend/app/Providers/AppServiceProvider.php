@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Contracts\NotificationServiceInterface;
+use App\Services\AuditLogger;
 use App\Services\DocumentRequestService;
 use App\Services\NotificationService;
 use Illuminate\Support\ServiceProvider;
@@ -29,6 +30,10 @@ class AppServiceProvider extends ServiceProvider
             NotificationServiceInterface::class,
             NotificationService::class,
         );
+
+        // AuditLogger is a concrete class — no interface needed.
+        // Singleton so the same instance is reused within a request.
+        $this->app->singleton(AuditLogger::class);
     }
 
     /**

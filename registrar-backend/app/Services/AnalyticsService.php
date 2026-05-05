@@ -241,7 +241,11 @@ class AnalyticsService
         [$from, $to] = $range;
 
         $rows = DocumentRequest::select(
-                DB::raw('HOUR(requested_at) as hour'),
+                DB::raw(
+            DB::connection()->getDriverName() === 'sqlite'
+                ? "CAST(strftime('%H', requested_at) AS INTEGER) as hour"
+                : 'HOUR(requested_at) as hour'
+        ),
                 DB::raw('COUNT(*) as total')
             )
             ->whereBetween('requested_at', [$from, $to])
@@ -286,5 +290,26 @@ class AnalyticsService
                 'total'        => (int) $r->total,
             ])
             ->all();
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Return a SQL expression that formats a datetime column as 'YYYY-MM'.
+     *
+     * Portable across MySQL/MariaDB (default), SQLite (tests/local), and
+     * PostgreSQL (future migration path).
+     */
+    private static function monthExpression(string $column): string
+    {
+        $driver = DB::connection()->getDriverName();
+
+        return match ($driver) {
+            'sqlite' => "strftime('%Y-%m', {$column})",
+            'pgsql'  => "to_char({$column}, 'YYYY-MM')",
+            default  => "DATE_FORMAT({$column}, '%Y-%m')",  // MySQL / MariaDB
+        };
     }
 }

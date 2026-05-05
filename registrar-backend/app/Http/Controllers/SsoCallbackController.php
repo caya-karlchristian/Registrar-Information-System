@@ -20,8 +20,22 @@ class SsoCallbackController extends Controller
         }
 
         try {
-            $result = $this->ssoAuthService->loginWithCode($code, $request);
-            return response()->json($result);
+$result = $this->ssoAuthService->loginWithCode($code, $request);
+$token  = $result['token'];
+$user   = $result['user'];
+
+return response()
+    ->json(['user' => new \App\Http\Resources\UserResource($user)])
+    ->cookie(
+        name:     'token',
+        value:    $token,
+        minutes:  60 * 24 * 7,
+        path:     '/',
+        domain:   env('SESSION_DOMAIN'),
+        secure:   true,
+        httpOnly: true,
+        sameSite: 'Lax',
+    );
         } catch (IdpException $e) {
             Log::warning('SSO: IdP error', ['message' => $e->getMessage()]);
             return response()->json(['message' => $e->getMessage()], 401);

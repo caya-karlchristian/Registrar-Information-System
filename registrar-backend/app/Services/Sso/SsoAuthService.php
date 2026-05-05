@@ -5,7 +5,6 @@ namespace App\Services\Sso;
 use App\Exceptions\IdpException;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
-use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -25,8 +24,9 @@ use Illuminate\Support\Facades\Log;
 class SsoAuthService
 {
     public function __construct(
-        private IdpClient            $idpClient,
+        private IdpClient               $idpClient,
         private UserProvisioningService $provisioner,
+        private \App\Services\AuditLogger $auditLogger,
     ) {}
 
     /**
@@ -59,7 +59,7 @@ class SsoAuthService
 
         $token = $user->createToken('sanctum')->plainTextToken;
 
-        AuditLogger::log($request, $user, AuditLog::ACTION_LOGIN);
+        $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGIN);
 
         return ['token' => $token, 'user' => $user];
     }
@@ -92,7 +92,7 @@ class SsoAuthService
         ]);
 
         $token = $user->createToken('sanctum')->plainTextToken;
-        AuditLogger::log($request, $user, AuditLog::ACTION_LOGIN);
+        $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGIN);
 
         return ['token' => $token, 'user' => $user];
     }
@@ -104,7 +104,7 @@ class SsoAuthService
      */
     public function logout(SystemUser $user, Request $request): string
     {
-        AuditLogger::log($request, $user, AuditLog::ACTION_LOGOUT);
+        $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGOUT);
 
         if ($user->idp_access_token) {
             try {
