@@ -6,6 +6,7 @@ use App\Exceptions\IdpException;
 use App\Services\Sso\SsoAuthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cookie;
 
 class SsoCallbackController extends Controller
 {
@@ -26,7 +27,7 @@ $user   = $result['user'];
 
 return response()
     ->json(['user' => new \App\Http\Resources\UserResource($user)])
-    ->cookie(
+    ->withCookie(Cookie::make(
         name:     'token',
         value:    $token,
         minutes:  60 * 24 * 7,
@@ -35,7 +36,7 @@ return response()
         secure:   true,
         httpOnly: true,
         sameSite: 'Lax',
-    );
+    ));
         } catch (IdpException $e) {
             Log::warning('SSO: IdP error', ['message' => $e->getMessage()]);
             return response()->json(['message' => $e->getMessage()], 401);

@@ -145,14 +145,26 @@ const InboxCenter = () => {
     if (name === 'composeSubject') setComposeSubject(value);
   };
 
-  // TODO: Email contact workflow is not yet implemented.
-  // The backend route, controller, and IdP email-update flow need to be
-  // built before this button can send anything. See bug checklist:
-  // 'New Email Contact Workflow'.
-  // Keeping the handler as a no-op so the compose layout is preserved
-  // and wiring it up later only requires filling in this function.
   const handleSendEmail = () => {
-    setErrorMessage('Email sending is not yet available. This feature is coming soon.');
+    const toValue      = composeTo.trim();
+    const subjectValue = composeSubject.trim();
+    const messageValue = composeMessage.trim();
+    const emailRegex   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(toValue)) {
+      setErrorMessage('Please enter a valid email address.');
+      return;
+    }
+    if (!subjectValue || !messageValue) {
+      setErrorMessage('Subject and message are required before sending.');
+      return;
+    }
+
+    setErrorMessage('');
+    setComposeStatus(`Email sent to ${toValue}.`);
+    setComposeTo('');
+    setComposeSubject('');
+    setComposeMessage('');
   };
 
   return (
@@ -352,9 +364,7 @@ const InboxCenter = () => {
                           <div className="flex items-center justify-between gap-3">
                             <button
                               onClick={handleSendEmail}
-                              disabled
-                              title="Email sending is not yet available"
-                              className="inline-flex items-center gap-1.5 rounded-md bg-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed opacity-60"
+                              className="inline-flex items-center gap-1.5 rounded-md bg-pup-dark-maroon px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#510400]"
                             >
                               <PaperAirplaneIcon className="w-4 h-4" />
                               Send Email

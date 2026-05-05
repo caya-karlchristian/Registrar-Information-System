@@ -50,13 +50,12 @@ export const getEcho = () => {
         // nginx proxies /api/ → backend:8000.
         authEndpoint: '/api/broadcasting/auth',
         auth: {
-            // withCredentials causes the browser to send the HttpOnly 'token'
-            // cookie on the /api/broadcasting/auth request automatically.
-            // Sanctum reads and validates it server-side — no manual header needed.
             headers: {
+                get Authorization() {
+                    return `Bearer ${localStorage.getItem('token')}`;
+                },
                 Accept: 'application/json',
             },
-            withCredentials: true,
         },
     });
 
