@@ -6,27 +6,36 @@ use App\Models\AuditLog;
 use App\Models\SystemUser;
 use Illuminate\Http\Request;
 
+/**
+ * Records user actions to the audit_log table.
+ *
+ * Registered as a singleton in AppServiceProvider so the same instance
+ * is shared across the request lifecycle.  Being an instance class
+ * (rather than static) means it can be swapped for a test double:
+ *
+ *   $this->instance(AuditLogger::class, Mockery::mock(AuditLogger::class));
+ */
 class AuditLogger
 {
     // -------------------------------------------------------
     // Log an action for a given user.
     //
-    // Usage anywhere in a controller:
-    //   AuditLogger::log($request, $user, AuditLog::ACTION_LOGIN);
+    // Usage — inject via constructor, then call:
+    //   $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGIN);
     //
     // The Request is needed to extract browser + IP address.
     // -------------------------------------------------------
-    public static function log(
-        Request $request,
+    public function log(
+        Request    $request,
         SystemUser $user,
-        string $action
+        string     $action
     ): void {
         AuditLog::create([
             'user_id'    => $user->user_id,
             'email'      => $user->email,
-            'role_name'  => self::resolveRoleName($user->role_id),
+            'role_name'  => $this->resolveRoleName($user->role_id),
             'action'     => $action,
-            'browser'    => self::parseBrowser($request->userAgent()),
+            'browser'    => $this->parseBrowser($request->userAgent()),
             'ip_address' => $request->ip(),
             'created_at' => now(),
         ]);
@@ -37,7 +46,7 @@ class AuditLogger
     // Mirrors UserResource::resolveRoleName() intentionally —
     // audit logs should use the same labels the UI shows.
     // -------------------------------------------------------
-    private static function resolveRoleName(int $roleId): string
+    private function resolveRoleName(int $roleId): string
     {
         return match ($roleId) {
             SystemUser::ROLE_STUDENT     => 'student',
@@ -51,9 +60,9 @@ class AuditLogger
     // -------------------------------------------------------
     // Parse a readable browser name from the User-Agent string.
     // Returns e.g. "Chrome", "Safari", "Firefox", "Edge",
-    // "Mobile Safari", or the raw agent if unrecognized.
+    // "Mobile Safari", or the raw agent if unrecognised.
     // -------------------------------------------------------
-    private static function parseBrowser(?string $userAgent): ?string
+    private function parseBrowser(?string $userAgent): ?string
     {
         if (!$userAgent) {
             return null;

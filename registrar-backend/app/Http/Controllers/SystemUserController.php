@@ -68,33 +68,9 @@ class SystemUserController extends Controller
             'suffix'      => 'nullable|string|max:20',
         ]);
 
-        // Map RIS role_id → IdP role name
-        $idpRoleMap = [
-            SystemUser::ROLE_ADMIN       => 'RIS:admin',
-            SystemUser::ROLE_SUPER_ADMIN => 'RIS:superadmin',
-        ];
-        $idpRole = $idpRoleMap[$validated['role_id']];
-
-        // Create in IdP first
-        $idp = new IdpService();
-        $idpResult = $idp->createUser([
-            'email'       => $validated['email'],
-            'first_name'  => $validated['first_name'],
-            'middle_name' => $validated['middle_name'] ?? '',
-            'last_name'   => $validated['last_name'],
-            'password'    => $validated['password'],
-            'roles'       => [$idpRole],
-        ]);
-
-        if (!$idpResult['success']) {
-            return response()->json([
-                'message' => 'Failed to create user in identity provider.',
-                'detail'  => $idpResult['error'],
-            ], 500);
-        }
-
         try {
-            // Audit logging is handled inside AdminUserService::create()
+            // AdminUserService::create() owns IdP + DB coordination.
+            // Do not call IdpService here — it is a legacy duplicate.
             $user = $this->adminUserService->create($validated, $request);
         } catch (IdpException $e) {
             return response()->json([

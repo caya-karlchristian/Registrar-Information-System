@@ -3,6 +3,7 @@
 namespace App\Services\Sso;
 
 use App\Exceptions\IdpException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -157,11 +158,16 @@ class IdpClient
      */
     public function getSuperAdminToken(): string
     {
-        $code = $this->loginAndGetCode(
-            config('sso.superadmin_email'),
-            config('sso.superadmin_password')
-        );
-        return $this->exchangeCode($code);
+        // Cache the admin token for 55 minutes (slightly under the typical
+        // 1-hour OAuth token lifetime) to avoid a full login round-trip on
+        // every admin operation.
+        return Cache::remember('idp:superadmin_token', 55 * 60, function () {
+            $code = $this->loginAndGetCode(
+                config('sso.superadmin_email'),
+                config('sso.superadmin_password')
+            );
+            return $this->exchangeCode($code);
+        });
     }
 
     /**
@@ -185,8 +191,21 @@ class IdpClient
             throw new IdpException('Failed to create user in identity provider: ' . $body, 500);
         }
 
-        // Fetch user list to resolve UUID
-        [$listBody, $listStatus] = $this->getWithAuth('/api/v1/users?page=1', $adminToken);
+        // Prefer the UUID returned directly in the create response body.
+        // Only fall back to a search if the IdP does not embed it, so we
+        // never silently return null for datasets larger than page 1.
+        $created = json_decode($body, true) ?? [];
+        if (!empty($created['id'])) {
+            return $created['id'];
+        }
+        if (!empty($created['user']['id'])) {
+            return $created['user']['id'];
+        }
+
+        // Fallback: search by email using server-side filtering to avoid
+        // scanning a fixed page and missing newly created users.
+        $query = http_build_query(['email' => $data['email'], 'per_page' => 1]);
+        [$listBody, $listStatus] = $this->getWithAuth("/api/v1/users?{$query}", $adminToken);
 
         if ($listStatus === 200) {
             $users = json_decode($listBody, true)['users'] ?? [];
@@ -197,6 +216,9 @@ class IdpClient
             }
         }
 
+        Log::warning('IdpClient: could not resolve UUID for newly created user', [
+            'email' => $data['email'],
+        ]);
         return null;
     }
 
@@ -263,8 +285,6 @@ class IdpClient
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
         ]);
         [$body, $status] = $this->execRaw($ch);
         return [$body, $status];
@@ -292,8 +312,6 @@ class IdpClient
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
         ]);
         [$body, $status] = $this->execRaw($ch);
         return [$body, $status];
@@ -318,8 +336,6 @@ class IdpClient
             ],
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
         ]);
         [$body, $status] = $this->execRaw($ch);
         return [$body, $status];
@@ -337,8 +353,6 @@ class IdpClient
             ],
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
         ]);
         [$body, $status] = $this->execRaw($ch);
         return [$body, $status];
@@ -355,8 +369,6 @@ class IdpClient
             ],
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
         ]);
         return $ch;
     }

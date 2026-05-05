@@ -26,7 +26,8 @@ use App\Http\Controllers\RequestPurposeController;
 Route::post('/login', [AuthController::class, 'login'])
     ->middleware('throttle:10,1');
 
-Route::post('/auth/callback', [SsoCallbackController::class, 'handle']);
+Route::post('/auth/callback', [SsoCallbackController::class, 'handle'])
+    ->middleware('throttle:20,1');
 
 Route::get('announcements',               [AnnouncementController::class, 'index']);
 Route::get('announcements/{announcement}', [AnnouncementController::class, 'show']);

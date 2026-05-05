@@ -41,7 +41,13 @@ return [
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
-            'after_commit' => false,
+            // true = Laravel holds queued jobs in memory until the surrounding
+            // DB transaction commits before inserting them into the jobs table.
+            // Without this, a broadcast job can be picked up by the worker and
+            // executed before the notifications row it references is visible to
+            // other DB connections — causing the frontend to receive a real-time
+            // push for a row it cannot yet fetch via REST (intermittent 404/empty).
+            'after_commit' => true,
         ],
 
         'beanstalkd' => [
@@ -70,7 +76,7 @@ return [
             'queue' => env('REDIS_QUEUE', 'default'),
             'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
             'block_for' => null,
-            'after_commit' => false,
+            'after_commit' => true,
         ],
 
         'deferred' => [

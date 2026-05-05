@@ -107,8 +107,8 @@ export const AuthProvider = ({ children }) => {
 
   const ssoCallback = async (code) => {
   try {
-    // The backend sets an HttpOnly cookie — no token in the response body.
-    await ssoCallbackRequest(code);
+    const res = await ssoCallbackRequest(code);
+    // The backend now sets an HttpOnly cookie — no token in the response body.
 
     const userRes = await fetchCurrentUser();
     const userData = userRes.data.data;

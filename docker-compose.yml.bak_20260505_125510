@@ -66,8 +66,6 @@ services:
       REVERB_PORT: 8080
       REVERB_SCHEME: ${REVERB_SCHEME:-http}
       BROADCAST_CONNECTION: reverb
-      REVERB_SCALING_ENABLED: ${REVERB_SCALING_ENABLED:-false}
-      REVERB_SCALING_CHANNEL: ${REVERB_SCALING_CHANNEL:-reverb}
     ports:
       - "8080:8080"
     depends_on:

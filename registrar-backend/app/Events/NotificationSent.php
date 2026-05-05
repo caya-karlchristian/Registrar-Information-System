@@ -7,7 +7,7 @@ use App\Models\SystemUser;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -37,7 +37,12 @@ use Illuminate\Queue\SerializesModels;
 |--------------------------------------------------------------------------
 */
 
-class NotificationSent implements ShouldBroadcastNow
+// ShouldBroadcast (queued) is used instead of ShouldBroadcastNow (synchronous)
+// so the WebSocket push is dispatched AFTER the DB transaction commits.
+// With ShouldBroadcastNow the push fires inside the transaction, meaning the
+// frontend can receive a real-time event for a row not yet visible to other
+// DB connections — a silent race condition on every notification send.
+class NotificationSent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
