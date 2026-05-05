@@ -66,14 +66,4 @@ class DocumentRequest extends Model
     {
         return $this->hasMany(RequestHistory::class, 'request_id');
     }
-
-    /**
-     * Notifications that reference this request via the request_id FK.
-     * Used by the scheduler commands to check whether a reminder has
-     * already been sent for a given request (idempotency guard).
-     */
-    public function notifications()
-    {
-        return $this->hasMany(Notification::class, 'request_id');
-    }
 }
