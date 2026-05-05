@@ -17,8 +17,9 @@ use Illuminate\Support\Facades\Log;
 | ShredExpiredRequests
 |--------------------------------------------------------------------------
 | Runs daily via the Laravel scheduler (see routes/console.php).
-| Scheduled BEFORE SendUnclaimedReminders so a request expiring on day 90
-| is forfeited rather than receiving a 7-day reminder on the same day.
+| It MUST be scheduled before SendUnclaimedReminders so that a request
+| hitting exactly 90 days is forfeited first and does not also receive
+| a 7-day reminder on the same day.
 |
 | Policy
 |   If a document request has been in "ReadyToClaim" status for 90 or
@@ -28,24 +29,25 @@ use Illuminate\Support\Facades\Log;
 | Audit trail
 |   A RequestHistory row is written for every automated transition so
 |   admin reports remain consistent with manual status changes.
-|   processed_by = null / processed_by_email = 'system' distinguishes
-|   automated transitions from manual admin updates.
 |
 | Idempotency
-|   The status is immediately updated to Forfeited inside the same DB
-|   transaction, so re-running the command finds no qualifying rows.
+|   The status is immediately updated to Forfeited inside the same
+|   DB transaction as the notification write, so re-running the command
+|   will simply find no qualifying rows.
 |--------------------------------------------------------------------------
 */
 
 class ShredExpiredRequests extends Command
 {
     protected $signature   = 'notifications:shred-expired-requests';
-    protected $description = 'Auto-forfeit ReadyToClaim requests unclaimed for 90+ days and notify the student';
+    protected $description = 'Auto-forfeit ReadyToClaim requests that have been unclaimed for 90+ days and notify the student';
 
     public function handle(NotificationServiceInterface $notificationService): int
     {
         $cutoff = Carbon::now()->subDays(90);
 
+        // Find every still-unclaimed ReadyToClaim request where the
+        // status transition happened 90 or more days ago.
         $requests = DocumentRequest::query()
             ->where('status_id', RequestStatusEnum::ReadyToClaim->value)
             ->whereNull('deleted_at')
@@ -62,8 +64,13 @@ class ShredExpiredRequests extends Command
             DB::transaction(function () use ($request, $notificationService, &$shredded) {
                 $oldStatusId = $request->status_id;
 
+                // 1. Transition to Forfeited.
                 $request->update(['status_id' => RequestStatusEnum::Forfeited->value]);
 
+                // 2. Write audit history.
+                //    processed_by is null because this is a system action;
+                //    processed_by_email = 'system' preserves readability in
+                //    admin audit reports without requiring a real user FK.
                 RequestHistory::create([
                     'request_id'         => $request->request_id,
                     'old_status_id'      => $oldStatusId,
@@ -74,6 +81,7 @@ class ShredExpiredRequests extends Command
                     'minutes_processed'  => (int) $request->requested_at->diffInMinutes(now()),
                 ]);
 
+                // 3. Notify the student.
                 /** @var SystemUser $owner */
                 $owner = $request->user;
                 if ($owner instanceof SystemUser) {
