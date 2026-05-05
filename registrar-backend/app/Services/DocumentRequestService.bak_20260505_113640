@@ -51,51 +51,11 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             ]);
         }
 
-        // ── Build per-item requirements list ─────────────────────────────────
-        // Load relations fresh so we always have the latest document/cert data
-        // even if the relations were already partially loaded above.
-        // Each entry exposes: item name, requirements text, copy count, and the
-        // office's stated processing period — everything the student needs to
-        // prepare, visible directly inside their inbox notification.
-        $documentRequest->load([
-            'documents.documentType',
-            'certificates.certificationType',
-        ]);
-
-        $requirements = [];
-
-        foreach ($documentRequest->documents as $rd) {
-            $type = $rd->documentType;
-            if ($type) {
-                $requirements[] = [
-                    'item'         => $type->document_name,
-                    'requirements' => $type->document_requirements,
-                    'copies'       => $rd->number_of_copies,
-                    'process_days' => $type->document_process_period,
-                ];
-            }
-        }
-
-        foreach ($documentRequest->certificates as $rc) {
-            $type = $rc->certificationType;
-            if ($type) {
-                $requirements[] = [
-                    'item'         => $type->certificate_name,
-                    'requirements' => $type->certificate_requirements,
-                    'copies'       => $rc->number_of_copies,
-                    'process_days' => $type->certificate_process_period,
-                ];
-            }
-        }
-
         // Notify the requester and all admins (never superadmins)
         $this->notificationService->send(
             recipient:    $user,
             triggerEvent: 'request_submitted',
-            data:         [
-                'request_id'   => $documentRequest->request_id,
-                'requirements' => $requirements,   // checklist shown in inbox
-            ],
+            data:         ['request_id' => $documentRequest->request_id],
             requestId:    $documentRequest->request_id,
         );
 
