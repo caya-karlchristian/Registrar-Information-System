@@ -55,7 +55,7 @@ const toMailItem = (n) => ({
   category: CATEGORY_MAP[n.type] ?? 'Notification',
   time:    n.created_at,
   unread:  n.is_unread ?? !n.read_at,
-  // Keep original for markAsRead and requirements checklist
+  // Keep original for markAsRead
   _raw: n,
 });
 
@@ -264,7 +264,6 @@ const InboxCenter = () => {
                   <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-gray-50">
                     {rightPanelMode === 'preview' ? (
                       <div className="space-y-4">
-
                         {/* ── Message body ── */}
                         <div className="rounded-lg border border-gray-200 bg-white px-4 py-4">
                           <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-2">
@@ -321,7 +320,6 @@ const InboxCenter = () => {
                             </div>
                           </div>
                         )}
-
                       </div>
                     ) : (
                       /* ── COMPOSE FORM ── */
