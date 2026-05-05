@@ -131,8 +131,12 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             (int) $validated['status_id'] === RequestStatusEnum::ReadyToClaim->value &&
             (int) $oldStatusId            === RequestStatusEnum::Processing->value
         ) {
-            $isCertificate = $documentRequest->certificates()->exists();
-            if ($isCertificate && $documentRequest->certificates()->count() === 0) {
+            // One DB call: count() returns 0 when no certificate row exists.
+            // The original guard used exists() && count() === 0 which is a logical
+            // contradiction — exists() is true only when rows *do* exist, so count()
+            // could never be 0 at the same time. The abort was unreachable.
+            $certCount = $documentRequest->certificates()->count();
+            if ($certCount === 0) {
                 abort(422, 'Certificate must be generated before marking as Ready to Claim.');
             }
         }

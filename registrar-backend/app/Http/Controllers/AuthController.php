@@ -35,7 +35,21 @@ class AuthController extends Controller
                 $request
             );
 
-            return response()->json(['token' => $result['token']]);
+$user  = $result['user'];
+$token = $result['token'];
+
+return response()
+    ->json(['user' => new UserResource($user)])
+    ->cookie(
+        name:     'token',
+        value:    $token,
+        minutes:  60 * 24 * 7,
+        path:     '/',
+        domain:   env('SESSION_DOMAIN'),
+        secure:   true,
+        httpOnly: true,
+        sameSite: 'Lax',
+    );
 
         } catch (IdpException $e) {
             return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 401);
@@ -61,6 +75,8 @@ class AuthController extends Controller
     {
         $logoutUrl = $this->ssoAuthService->logout($request->user(), $request);
 
-        return response()->json(['logout_url' => $logoutUrl]);
+return response()
+    ->json(['logout_url' => $logoutUrl])
+    ->withCookie(\Illuminate\Support\Facades\Cookie::forget('token'));
     }
 }
