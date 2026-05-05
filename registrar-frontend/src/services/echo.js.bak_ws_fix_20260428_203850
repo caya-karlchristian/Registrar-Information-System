@@ -1,0 +1,153 @@
+// // echo.js
+// import Echo from 'laravel-echo';
+// import Pusher from 'pusher-js';
+
+// // Must be assigned unconditionally at module load —
+// // Pusher reads window.Pusher synchronously when Echo is constructed.
+// window.Pusher = Pusher;
+
+// let echoInstance = null;
+
+// // Dev-time guard: VITE_REVERB_PORT must be the *nginx* port (443 for https,
+// // 80 for http), NOT Reverb's internal port (8080). The browser connects to
+// // nginx which terminates TLS and proxies /app/* → Reverb:8080.
+// if (import.meta.env.DEV) {
+//     const _scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'https';
+//     const _port   = Number(import.meta.env.VITE_REVERB_PORT);
+//     if (_scheme === 'https' && _port === 8080) {
+//         console.warn(
+//             '[echo] VITE_REVERB_PORT=8080 with VITE_REVERB_SCHEME=https will ' +
+//             'break WebSocket connections. Set VITE_REVERB_PORT=443 (the nginx ' +
+//             'port) — Reverb internal port 8080 is not exposed to the browser.'
+//         );
+//     }
+// }
+
+// export const getEcho = () => {
+//     if (echoInstance) return echoInstance;
+
+//     const scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'https';
+//     const forceTLS = scheme === 'https';
+
+//     echoInstance = new Echo({
+//         broadcaster: 'reverb',
+//         key: import.meta.env.VITE_REVERB_APP_KEY,
+//         wsHost: import.meta.env.VITE_REVERB_HOST,
+//         wsPort: Number(import.meta.env.VITE_REVERB_PORT ?? 80),
+//         wssPort: Number(import.meta.env.VITE_REVERB_PORT ?? 443),
+//         forceTLS,
+//         // Allow both secure and plain transports so local (ws) and
+//         // production (wss) both work without changing this file.
+//         enabledTransports: forceTLS ? ['wss'] : ['ws'],
+//         // Relative URL — avoids mixed-content blocks when page is served over HTTPS.
+//         // Frontend nginx proxies /api/ → backend, /app/ → reverb.
+//         authEndpoint: '/api/broadcasting/auth',
+//         auth: {
+//             headers: {
+//                 get Authorization() {
+//                     return `Bearer ${localStorage.getItem('token')}`;
+//                 },
+//                 Accept: 'application/json',
+//             },
+//         },
+//     });
+
+//     return echoInstance;
+// };
+
+// export const resetEcho = () => {
+//     if (echoInstance) {
+//         echoInstance.disconnect();
+//         echoInstance = null;
+//     }
+// };
+
+// echo.js
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
+
+// Must be assigned unconditionally at module load —
+// Pusher reads window.Pusher synchronously when Echo is constructed.
+window.Pusher = Pusher;
+
+let echoInstance = null;
+
+// Dev-time guard: warn on common misconfiguration
+if (import.meta.env.DEV) {
+    const _scheme = import.meta.env.VITE_REVERB_SCHEME ?? 'https';
+    const _port   = Number(import.meta.env.VITE_REVERB_PORT);
+    const _host   = import.meta.env.VITE_REVERB_HOST;
+    const _key    = import.meta.env.VITE_REVERB_APP_KEY;
+
+    if (_scheme === 'https' && _port === 8080) {
+        console.warn(
+            '[echo] VITE_REVERB_PORT=8080 with VITE_REVERB_SCHEME=https will ' +
+            'break WebSocket connections. Set VITE_REVERB_PORT=443 (the nginx ' +
+            'port) — Reverb internal port 8080 is not exposed to the browser.'
+        );
+    }
+    if (!_host) {
+        console.error('[echo] VITE_REVERB_HOST is not set. WebSocket connection will fail.');
+    }
+    if (!_key) {
+        console.error('[echo] VITE_REVERB_APP_KEY is not set. Reverb will reject the connection with error 4009.');
+    }
+}
+
+export const getEcho = () => {
+    if (echoInstance) return echoInstance;
+
+    const scheme   = import.meta.env.VITE_REVERB_SCHEME ?? 'https';
+    const host     = import.meta.env.VITE_REVERB_HOST;
+    const port     = Number(import.meta.env.VITE_REVERB_PORT ?? (scheme === 'https' ? 443 : 80));
+    const forceTLS = scheme === 'https';
+
+    // Hard-fail early with a clear message rather than a silent connection attempt
+    // to an invalid URL (e.g. wss://:443/app/undefined) that leaves no trace in
+    // the Network tab and makes the bug invisible.
+    if (!host || !import.meta.env.VITE_REVERB_APP_KEY) {
+        console.error(
+            '[echo] Cannot create Echo instance — VITE_REVERB_HOST or ' +
+            'VITE_REVERB_APP_KEY is missing. Check your .env and Dockerfile ARG/ENV declarations.'
+        );
+        // Return a no-op stub so callers don't crash
+        return {
+            private: () => ({ listen: () => ({}) }),
+            leave:   () => {},
+            disconnect: () => {},
+        };
+    }
+
+    echoInstance = new Echo({
+        broadcaster: 'reverb',
+        key: import.meta.env.VITE_REVERB_APP_KEY,
+        wsHost: host,
+        wsPort: port,
+        wssPort: port,
+        forceTLS,
+        // Allow both secure and plain transports so local (ws) and
+        // production (wss) both work without changing this file.
+        enabledTransports: forceTLS ? ['wss'] : ['ws'],
+        // Relative URL — avoids mixed-content blocks when page is served over HTTPS.
+        // Frontend nginx proxies /api/ → backend, /app/ → reverb WebSocket,
+        // /apps/ → reverb HTTP API (channel auth endpoint).
+        authEndpoint: '/api/broadcasting/auth',
+        auth: {
+            headers: {
+                get Authorization() {
+                    return `Bearer ${localStorage.getItem('token')}`;
+                },
+                Accept: 'application/json',
+            },
+        },
+    });
+
+    return echoInstance;
+};
+
+export const resetEcho = () => {
+    if (echoInstance) {
+        echoInstance.disconnect();
+        echoInstance = null;
+    }
+};
