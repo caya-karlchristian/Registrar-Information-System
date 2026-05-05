@@ -122,6 +122,21 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         $oldStatusId = $documentRequest->status_id;
         $oldOrNumber = $documentRequest->or_number;
 
+        // Guard: transitioning to ReadyToClaim on a certificate request
+        // requires at least one certificate row — the frontend enforces a
+        // print step, but we validate server-side so direct API calls cannot
+        // bypass it.
+        if (
+            isset($validated['status_id']) &&
+            (int) $validated['status_id'] === RequestStatusEnum::ReadyToClaim->value &&
+            (int) $oldStatusId            === RequestStatusEnum::Processing->value
+        ) {
+            $isCertificate = $documentRequest->certificates()->exists();
+            if ($isCertificate && $documentRequest->certificates()->count() === 0) {
+                abort(422, 'Certificate must be generated before marking as Ready to Claim.');
+            }
+        }
+
         $documentRequest->update($validated);
 
         if (isset($validated['status_id']) && (int) $validated['status_id'] !== (int) $oldStatusId) {

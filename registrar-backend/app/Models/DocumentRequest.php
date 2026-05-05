@@ -9,7 +9,22 @@ class DocumentRequest extends Model
     protected $table      = 'document_request';
     protected $primaryKey = 'request_id';
     public    $timestamps = false;
-    protected $guarded    = [];
+    /**
+     * Only these columns may be mass-assigned.
+     * Explicit whitelist prevents accidental field-injection via update().
+     */
+    protected $fillable = [
+        'user_id',
+        'status_id',
+        'request_purpose_id',
+        'or_number',
+        'receipt_date',
+        'requested_at',
+        'student_profile_id',
+        'student_academic_id',
+        'alumni_profile_id',
+        'alumni_academic_id',
+    ];
 
     protected $casts = [
         'requested_at' => 'datetime',
