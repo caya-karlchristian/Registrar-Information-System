@@ -143,7 +143,7 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
   const [docTypeOptions, setDocTypeOptions] = useState(Object.keys(CERT_CONFIG).map(Number));
   const [certNameById, setCertNameById] = useState(certIdToName);
   const [formData, setFormData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
-  const debouncedFormData = useDebounce(formData, 300);
+  const [savedData, setSavedData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
   const requestedCertNames = Array.from(
     new Set(
       [
@@ -179,6 +179,11 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
         
         setDocTypeOptions(requestedIds);
         setFormData((prev) => {
+          const prevDocType = Number(prev.docType);
+          const defaultId = requestedIds.includes(prevDocType) ? prevDocType : (requestedIds[0] ?? prevDocType ?? null);
+          return { ...prev, docType: defaultId };
+        });
+        setSavedData((prev) => {
           const prevDocType = Number(prev.docType);
           const defaultId = requestedIds.includes(prevDocType) ? prevDocType : (requestedIds[0] ?? prevDocType ?? null);
           return { ...prev, docType: defaultId };
@@ -219,8 +224,15 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
         setCertifications(certs);
         setLayoutsByCertId(nextLayouts);
         setDocTypeOptions(fetchedIds);
-        
+
         setFormData((prev) => {
+          if (fetchedIds.includes(prev.docType)) return prev;
+          return {
+            ...prev,
+            docType: fetchedIds[0] ?? prev.docType,
+          };
+        });
+        setSavedData((prev) => {
           if (fetchedIds.includes(prev.docType)) return prev;
           return {
             ...prev,
@@ -288,7 +300,10 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
     // If this is the docType field, convert display name back to numeric ID
     if (name === "docType") {
       const selectedId = docTypeOptions.find((id) => certIdToName[id] === value);
-      setFormData((prev) => ({ ...prev, [name]: selectedId || value }));
+      const nextDocType = selectedId || value;
+      setFormData((prev) => ({ ...prev, [name]: nextDocType }));
+      // Always reflect doc type changes in preview so layout switches immediately.
+      setSavedData((prev) => ({ ...prev, [name]: nextDocType }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -317,11 +332,12 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
     }
   };
 
-  const certConfig = CERT_CONFIG[formData.docType];
-  const shouldShow = useCallback((fieldName) => certConfig?.fields.includes(fieldName), [certConfig]);
+  const formCertConfig = CERT_CONFIG[formData.docType];
+  const previewCertConfig = CERT_CONFIG[savedData.docType];
+  const shouldShow = useCallback((fieldName) => formCertConfig?.fields.includes(fieldName), [formCertConfig]);
   
   // Get the certificate name for display
-  const certDisplayName = certIdToName[formData.docType] || "Certificate";
+  const certDisplayName = certIdToName[savedData.docType] || "Certificate";
 
   // Find active certification by matching against CERT_CONFIG name 
   const activeCertification = useMemo(() => {
@@ -436,6 +452,14 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
                   options={signeeOptions}
                   labelColor="text-gray-600"
                 />
+
+                <button
+                  type="button"
+                  onClick={() => setSavedData({ ...formData })}
+                  className="w-full mt-6 rounded-lg bg-pup-dark-maroon hover:bg-[#4a0000] text-white font-semibold py-2.5 transition-all active:scale-95"
+                >
+                  Save Changes
+                </button>
               </form>
             </div>
           </div>
@@ -450,7 +474,7 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
             </div>
           </div>
           <div className="relative flex-1 p-3 sm:p-6 lg:p-8 print:p-0 print:overflow-visible">
-            <CertificatePreview certConfig={certConfig} activeLayout={activeLayout} debouncedFormData={debouncedFormData} />
+            <CertificatePreview certConfig={previewCertConfig} activeLayout={activeLayout} debouncedFormData={savedData} />
           </div>
         </div>
       </div>
