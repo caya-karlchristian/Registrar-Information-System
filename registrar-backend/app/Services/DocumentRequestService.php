@@ -122,6 +122,45 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         $oldStatusId = $documentRequest->status_id;
         $oldOrNumber = $documentRequest->or_number;
 
+        // Guard: transitioning to ReadyToClaim on a *certificate* request
+        // requires that at least one certificate row already exists in
+        // request_certificate (i.e. it has been generated/printed).
+        //
+        // Pure document requests (transcripts, enrollment certs, etc.) have
+        // zero rows in request_certificate by design — they must NOT be blocked.
+        // Only requests that were submitted WITH certificate items are checked.
+        //
+        // Flow:
+        //   1. Does this request have any certificate items? (hasCertificateItems)
+        //   2. If yes, has at least one been generated?     (certCount > 0)
+        //   3. If both fail → 422.  Otherwise → allow.
+        if (
+            isset($validated['status_id']) &&
+            (int) $validated['status_id'] === RequestStatusEnum::ReadyToClaim->value &&
+            (int) $oldStatusId            === RequestStatusEnum::Processing->value
+        ) {
+            // Count rows in request_certificate that were submitted as part of
+            // this request (created during store(), referencing certificate_type).
+            // A non-zero count means the request includes certificate items.
+            $submittedCertCount = $documentRequest->certificates()->count();
+
+            // Only enforce the print-first rule when this request actually
+            // includes certificate items. Document-only requests skip this guard.
+            if ($submittedCertCount > 0) {
+                // All certificate items must have been generated before claiming.
+                // Currently: if the row exists it has been generated (the modal
+                // creates the row). Adjust this condition if a "generated" flag
+                // is added to the model later.
+                $generatedCount = $documentRequest->certificates()
+                    ->whereNotNull('certificate_type_id')
+                    ->count();
+
+                if ($generatedCount === 0) {
+                    abort(422, 'Certificate must be generated before marking as Ready to Claim.');
+                }
+            }
+        }
+
         $documentRequest->update($validated);
 
         if (isset($validated['status_id']) && (int) $validated['status_id'] !== (int) $oldStatusId) {

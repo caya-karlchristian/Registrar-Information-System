@@ -102,13 +102,6 @@ export const useNotifications = (onNewNotification = null) => {
             return;
         }
 
-        // Log WebSocket connection state changes so failures are visible in the console.
-        // "connected" = WS handshake succeeded and Pusher protocol is active.
-        // "disconnected" / "failed" = check nginx /app/ proxy and Reverb container.
-        echo.connector.pusher.connection.bind('state_change', ({ current }) => {
-            console.info(`[Echo] connection → ${current}`);
-        });
-
         const handleNewNotification = (e) => {
             setNotifications(prev => {
                 if (prev.some(n => n.id === e.id)) return prev; // deduplicate
@@ -118,17 +111,43 @@ export const useNotifications = (onNewNotification = null) => {
             });
         };
 
-        // .error() fires when Pusher-js fails to authenticate the private channel.
-        // Previously this failed silently — the subscription was set up but events
-        // were never delivered because the channel was never authorised.
-        echo.private(`notifications.${user.user_id}`)
-            .listen('.NotificationSent', handleNewNotification)
-            .error((err) => {
-                console.error('[Echo] private channel auth failed:', err);
-            });
+        const channelName = `notifications.${user.user_id}`;
+
+        const subscribe = () => {
+            console.info('[Echo] subscribing to', channelName);
+            echo.private(channelName)
+                .listen('.NotificationSent', handleNewNotification)
+                .error((err) => {
+                    console.error('[Echo] private channel auth failed:', err);
+                });
+        };
+
+        const connectionState = echo.connector.pusher.connection.state;
+
+        // Log all connection state transitions so failures are visible in DevTools.
+        echo.connector.pusher.connection.bind('state_change', ({ current }) => {
+            console.info(`[Echo] connection → ${current}`);
+        });
+
+        if (connectionState === 'connected') {
+            // Already connected (e.g. navigating between pages with same user) —
+            // subscribe immediately, no need to wait for the handshake.
+            subscribe();
+        } else {
+            // Connection is still being established (fresh login, page reload).
+            // Wait for the 'connected' event before subscribing to the private
+            // channel — subscribing too early causes the channel auth request
+            // (/api/broadcasting/auth) to race against the WS handshake and
+            // intermittently fail with a 401 even though the token is valid.
+            const onConnected = () => {
+                echo.connector.pusher.connection.unbind('connected', onConnected);
+                subscribe();
+            };
+            echo.connector.pusher.connection.bind('connected', onConnected);
+        }
 
         return () => {
-            echo.leave(`notifications.${user.user_id}`);
+            echo.leave(channelName);
         };
     }, [user?.user_id, fetchNotifications]);
 

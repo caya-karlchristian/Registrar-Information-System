@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\IdpException;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
+use App\Services\AuditLogger;
 use App\Services\Sso\IdpClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,10 @@ use Illuminate\Support\Facades\Log;
  */
 class AdminUserService
 {
-    public function __construct(private IdpClient $idpClient) {}
+public function __construct(
+    private IdpClient   $idpClient,
+    private AuditLogger $auditLogger,
+) {}
 
     // -------------------------------------------------------------------------
     // Create
@@ -73,7 +77,7 @@ class AdminUserService
             return $user;
         });
 
-        AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
+        $this->auditLogger->log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
 
         return $user;
     }
@@ -130,7 +134,7 @@ class AdminUserService
             return $user->fresh();
         });
 
-        AuditLogger::log($request, $user, AuditLog::ACTION_ADMIN_UPDATED);
+        $this->auditLogger->log($request, $user, AuditLog::ACTION_ADMIN_UPDATED);
 
         return $user;
     }
@@ -142,7 +146,7 @@ class AdminUserService
     public function delete(SystemUser $user, Request $request): void
     {
         // Audit BEFORE delete so we still have the actor context
-        AuditLogger::log($request, $request->user(), AuditLog::ACTION_ADMIN_DELETED);
+        $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_DELETED);
 
         if ($user->idp_user_id) {
             try {

@@ -27,7 +27,7 @@ const STATUS_FALLBACK = {
   PENDING: 1,
   READY: 2,
   COMPLETED: 3,
-  FORFEITED: 6,
+  FORFEITED: 4,  // matches RequestStatusEnum::Forfeited = 4 on the backend
 };
 
 const ITEMS_PER_PAGE = 5;

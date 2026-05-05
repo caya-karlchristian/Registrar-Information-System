@@ -21,7 +21,9 @@ class RoleMiddleware
             return $next($request);
         }
 
-        $allowedRoles = explode(',', implode(',', $roles));
+        // $roles is already a flat array from the variadic parameter.
+        // Cast each element to string so in_array() comparison is type-safe.
+        $allowedRoles = array_map('strval', $roles);
 
         if (!in_array((string) $user->role_id, $allowedRoles)) {
             return response()->json(['message' => 'Forbidden'], 403);

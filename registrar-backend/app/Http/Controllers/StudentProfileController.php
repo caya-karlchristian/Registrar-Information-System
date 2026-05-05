@@ -14,6 +14,8 @@ use App\Services\Ogos\OgosStudentService;
  */
 class StudentProfileController extends Controller
 {
+    public function __construct(private OgosStudentService $ogos) {}
+
     public function index()
     {
         return response()->json(StudentProfile::with('user')->get(), 200);

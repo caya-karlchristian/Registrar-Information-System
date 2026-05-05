@@ -1,10 +1,11 @@
 #!/bin/bash
+set -euo pipefail
+
+# Clear stale caches before anything else so config:cache picks up fresh values.
 php artisan config:clear
 php artisan cache:clear
 php artisan route:clear
 php artisan view:clear
-
-set -e
 
 # Ensure the public storage symlink exists for assets served from /storage
 if [ ! -L public/storage ] && [ ! -e public/storage ]; then

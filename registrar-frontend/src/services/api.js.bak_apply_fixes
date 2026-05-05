@@ -8,26 +8,28 @@ import axios from "axios";
 // -------------------------------------------------------
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000/api",
-  // withCredentials: true sends the HttpOnly 'token' cookie on every request.
-  // The backend reads it via Sanctum's cookie guard — no manual header needed.
-  withCredentials: true,
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
   },
 });
 
-// No manual token header needed — withCredentials: true above causes the
-// browser to send the HttpOnly 'token' cookie automatically.
-// Sanctum reads and validates it on the server side.
+// Attach Bearer token to every outgoing request automatically.
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
-// On 401 — clear non-sensitive local state so stale UI doesn't persist.
-// The HttpOnly cookie is cleared by the server on logout; we just clear
-// the local user cache here.  Navigation to "/" is handled by AuthProvider.
+// On 401 — clear local auth state so stale sessions don't persist.
+// Navigation back to "/" is handled by AuthProvider, not here.
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
+      localStorage.removeItem("token");
       localStorage.removeItem("user");
     }
     return Promise.reject(err);

@@ -6,6 +6,7 @@ use App\Enums\RequestStatusEnum;
 use App\Models\DocumentRequest;
 use App\Models\RequestHistory;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Encapsulates all analytics queries.
@@ -86,7 +87,7 @@ class AnalyticsService
         [$from, $to] = $range;
 
         $rows = DocumentRequest::select(
-                DB::raw("DATE_FORMAT(requested_at, '%Y-%m') as month"),
+                DB::raw(self::monthExpression('requested_at') . ' as month'),
                 DB::raw('COUNT(*) as total')
             )
             ->whereBetween('requested_at', [$from, $to])
@@ -240,7 +241,11 @@ class AnalyticsService
         [$from, $to] = $range;
 
         $rows = DocumentRequest::select(
-                DB::raw('HOUR(requested_at) as hour'),
+                DB::raw(
+            DB::connection()->getDriverName() === 'sqlite'
+                ? "CAST(strftime('%H', requested_at) AS INTEGER) as hour"
+                : 'HOUR(requested_at) as hour'
+        ),
                 DB::raw('COUNT(*) as total')
             )
             ->whereBetween('requested_at', [$from, $to])
@@ -285,5 +290,26 @@ class AnalyticsService
                 'total'        => (int) $r->total,
             ])
             ->all();
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Return a SQL expression that formats a datetime column as 'YYYY-MM'.
+     *
+     * Portable across MySQL/MariaDB (default), SQLite (tests/local), and
+     * PostgreSQL (future migration path).
+     */
+    private static function monthExpression(string $column): string
+    {
+        $driver = DB::connection()->getDriverName();
+
+        return match ($driver) {
+            'sqlite' => "strftime('%Y-%m', {$column})",
+            'pgsql'  => "to_char({$column}, 'YYYY-MM')",
+            default  => "DATE_FORMAT({$column}, '%Y-%m')",  // MySQL / MariaDB
+        };
     }
 }
