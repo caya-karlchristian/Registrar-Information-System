@@ -13,20 +13,30 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-    $middleware->alias([
-        'role' => \App\Http\Middleware\RoleMiddleware::class,
-    ]);
+        // ── Cookie → Bearer token bridge ────────────────────────────────────
+        // Login stores the Sanctum token in an HttpOnly cookie named "token".
+        // Sanctum's token guard only reads Authorization: Bearer headers, so
+        // without this the cookie is invisible to Sanctum and every request
+        // returns 401.  This middleware runs first on all API routes and
+        // promotes the cookie value into the header so Sanctum finds it.
+        $middleware->prependToGroup('api', \App\Http\Middleware\AuthenticateFromCookie::class);
 
-    // Tell auth middleware to return 401 JSON for API routes
-    $middleware->redirectGuestsTo(function ($request) {
+        // ── Route middleware aliases ─────────────────────────────────────────
+        $middleware->alias([
+            'role' => \App\Http\Middleware\RoleMiddleware::class,
+        ]);
+
+        // ── Auth redirect behaviour ──────────────────────────────────────────
+        // Return 401 JSON for API routes instead of redirecting to a login page.
+        $middleware->redirectGuestsTo(function ($request) {
             if ($request->is('api/*') || $request->expectsJson()) {
-                return null; // return null = throw 401, don't redirect
+                return null; // null = throw AuthenticationException → 401
             }
             return '/';
         });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(function ($request, $e) {
-            return true; // always return JSON, never redirect
+            return true; // always return JSON, never HTML error pages
         });
     })->create();

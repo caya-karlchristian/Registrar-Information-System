@@ -32,7 +32,8 @@ class NotificationController extends Controller
         $query = Notification::with('type')
             ->where('notifiable_type', SystemUser::class)
             ->where('notifiable_id', $user->user_id)
-            ->whereNull('deleted_at')
+            // SoftDeletes automatically appends WHERE deleted_at IS NULL —
+            // no manual whereNull() needed.
             ->orderBy('created_at', 'desc');
 
         if ($request->boolean('unread_only')) {
@@ -69,7 +70,6 @@ class NotificationController extends Controller
         $notification = Notification::where('id', $id)
             ->where('notifiable_type', SystemUser::class)
             ->where('notifiable_id', $user->user_id)
-            ->whereNull('deleted_at')
             ->firstOrFail();
 
         $notification->markAsRead();
@@ -101,7 +101,6 @@ class NotificationController extends Controller
         $notification = Notification::where('id', $id)
             ->where('notifiable_type', SystemUser::class)
             ->where('notifiable_id', $user->user_id)
-            ->whereNull('deleted_at')
             ->firstOrFail();
 
         $notification->delete();
