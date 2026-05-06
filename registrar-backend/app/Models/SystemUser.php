@@ -53,7 +53,10 @@ class SystemUser extends Authenticatable
     ];
 
     protected $casts = [
-        'created_at' => 'datetime',
+        'created_at'       => 'datetime',
+        // Encrypt the live IdP credential at rest.
+        // Laravel uses APP_KEY (AES-256-CBC) — reads/writes are transparent.
+        'idp_access_token' => 'encrypted',
     ];
 
     // -------------------------------------------------------

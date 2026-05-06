@@ -44,7 +44,8 @@ return response()
     Log::warning('SSO: role error', ['message' => $e->getMessage()]);
 
     $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
-        'client_id' => config('sso.client_id'),
+        'client_id'                => config('sso.client_id'),
+        'post_logout_redirect_uri' => config('app.url'),
     ]);
 
     return response()->json([

@@ -13,6 +13,22 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // ── Cookie encryption exclusion ──────────────────────────────────────
+        // The 'token' cookie holds a raw Sanctum token and must not be
+        // decrypted by EncryptCookies. Exclusion is declared in:
+        //   App\Http\Middleware\EncryptCookies  ($except = ['token'])
+        // Laravel auto-discovers that class and uses it instead of the default.
+
+        // ── Reverse-proxy trust ──────────────────────────────────────────────
+        // The app runs behind an nginx TLS terminator.  Without this, Laravel
+        // never sees X-Forwarded-Proto: https, so:
+        //   • request()->secure() returns false
+        //   • Secure cookies set by the backend are not sent back by the browser
+        //     (browser rejects a non-Secure Set-Cookie over what it believes is
+        //     plain HTTP), causing every /api/me call after login to return 401.
+        //   • APP_URL-based helpers generate http:// URLs.
+        $middleware->trustProxies(at: '*');
+
         // ── Cookie → Bearer token bridge ────────────────────────────────────
         // Login stores the Sanctum token in an HttpOnly cookie named "token".
         // Sanctum's token guard only reads Authorization: Bearer headers, so
