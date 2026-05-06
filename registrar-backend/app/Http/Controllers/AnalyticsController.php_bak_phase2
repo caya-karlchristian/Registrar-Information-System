@@ -71,34 +71,4 @@ class AnalyticsController extends Controller
     {
         return response()->json($this->analytics->byPurpose($this->dateRange($request)));
     }
-
-    /**
-     * POST /analytics/ai-report
-     *
-     * Collects all aggregated stats for the requested range, strips PII,
-     * forwards the anonymised payload to the Claude API via AnthropicService,
-     * and returns the generated narrative.
-     *
-     * The frontend never talks to the Claude API directly — this controller
-     * is the sole gateway, enforcing the security model from the blueprint.
-     */
-    public function aiReport(Request $request)
-    {
-        try {
-            $range     = $this->dateRange($request);
-            $payload   = $this->analytics->buildAiPayload($range);
-            $narrative = $this->anthropic->generateAnalyticsNarrative($payload);
-
-            return response()->json([
-                'narrative'  => $narrative,
-                'generated_at' => now()->toIso8601String(),
-                'range' => [
-                    'from' => $range[0]->toDateString(),
-                    'to'   => $range[1]->toDateString(),
-                ],
-            ]);
-        } catch (\RuntimeException $e) {
-            return response()->json(['error' => $e->getMessage()], 502);
-        }
-    }
 }
