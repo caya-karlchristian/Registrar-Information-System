@@ -1,4 +1,60 @@
-<?php
+#!/usr/bin/env python3
+"""
+apply_phase2_mock.py  —  RIS Intelligence: AI Mock Fallback
+============================================================
+Run this AFTER apply_phase2.py has already been applied.
+
+Drop in Registrar-Information-System/ root and run:
+    python3 apply_phase2_mock.py
+
+What it does
+------------
+Patches registrar-backend/app/Services/AnthropicService.php only.
+
+When ANTHROPIC_API_KEY is absent (or empty), instead of throwing a
+RuntimeException, the service now returns a realistic mock narrative
+built from the actual stats payload — so the "Generate Report" button
+and AIInsightCard are fully demoable without a key.
+
+When the real key IS present, behaviour is unchanged: the live Claude
+API is called as normal.
+
+One file modified. One backup created: AnthropicService.php_bak_phase2_mock
+"""
+
+import sys
+import shutil
+from pathlib import Path
+from datetime import datetime
+
+ROOT    = Path(__file__).parent.resolve()
+BACKEND = ROOT / "registrar-backend"
+
+if not BACKEND.is_dir():
+    sys.exit(
+        "ERROR: Run from the Registrar-Information-System root directory.\n"
+        f"  Expected: {BACKEND}"
+    )
+
+TARGET = BACKEND / "app" / "Services" / "AnthropicService.php"
+
+if not TARGET.exists():
+    sys.exit(
+        "ERROR: AnthropicService.php not found.\n"
+        "  Run apply_phase2.py first, then run this script."
+    )
+
+print(f"\nRIS Intelligence — AI Mock Fallback Patcher")
+print(f"Root : {ROOT}")
+print(f"Time : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+# ── Backup ────────────────────────────────────────────────────────────────────
+backup = str(TARGET) + "_bak_phase2_mock"
+shutil.copy2(TARGET, backup)
+print(f"  Backup → {backup}")
+
+# ── New file content ──────────────────────────────────────────────────────────
+NEW_CONTENT = r"""<?php
 
 namespace App\Services;
 
@@ -200,3 +256,25 @@ class AnthropicService
         return implode("\n\n", array_filter([$p1, $p2, $p3, $p4, $p5, $p6]));
     }
 }
+"""
+
+TARGET.write_text(NEW_CONTENT, encoding="utf-8")
+print(f"  ✓  {TARGET}")
+
+print("""
+────────────────────────────────────────────────────────────
+  COMPLETE
+────────────────────────────────────────────────────────────
+
+  The AI card will now work without an API key.
+  The mock narrative uses real data from your database —
+  total requests, completion rate, top document type, etc.
+  A "[Preview Mode]" footer line is appended so you know
+  which mode is active.
+
+  To enable live Claude output later:
+    1. Add ANTHROPIC_API_KEY=sk-ant-... to registrar-backend/.env
+    2. docker compose build backend && docker compose up -d backend
+
+  No frontend changes needed.
+""")
