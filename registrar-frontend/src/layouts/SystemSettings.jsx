@@ -111,8 +111,8 @@ const SystemSettings = () => {
   };
 
   return (
-    <div className="bg-[#F5F5F5] min-h-screen font-sans">
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
+    <div className="bg-[#F5F5F5] min-h-screen font-sans px-4 sm:px-6">
+      <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 items-start">
         {/* Left Panel */}
         <div className="w-full lg:w-105 shrink-0">
           <div className="mb-4">
@@ -125,7 +125,7 @@ const SystemSettings = () => {
               labelColor="text-gray-600"
             />
           </div>
-          <div className="bg-gray-200 rounded-xl w-full lg:max-w-lg flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 h-150">
+          <div className="bg-gray-200 rounded-xl w-full lg:max-w-lg flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150">
             <div className="px-6 pt-5 pb-3 text-center">
               <h2 className="text-pup-dark-maroon font-bold text-lg">List of Announcements</h2>
               <hr className="mt-3 border-gray-300" />
@@ -195,7 +195,7 @@ const SystemSettings = () => {
         </div>
 
         {/* Right Panel */}
-        <div className="lg:flex-1 w-full bg-gray-200 rounded-2xl p-6 mt-28 shadow-sm h-max">
+        <div className="lg:flex-1 w-full bg-gray-200 rounded-2xl p-6 sm:p-8 mt-6 lg:mt-28 shadow-sm h-max">
           <form onSubmit={handleSave} className="flex flex-col gap-5">
             <h2 className="font-bold text-2xl">
               {isAdding ? "Announcement Creation" : "Edit Announcement"}
@@ -223,7 +223,7 @@ const SystemSettings = () => {
                 required
               />
             </div>
-            <div className="flex items-center gap-3 pt-1">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
               {!isAdding && (
                 <>
                   <button
