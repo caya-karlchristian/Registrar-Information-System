@@ -25,6 +25,8 @@ $result = $this->ssoAuthService->loginWithCode($code, $request);
 $token  = $result['token'];
 $user   = $result['user'];
 
+$user->loadIdentityRelations();
+
 return response()
     ->json(['user' => new \App\Http\Resources\UserResource($user)])
     ->withCookie(Cookie::make(
