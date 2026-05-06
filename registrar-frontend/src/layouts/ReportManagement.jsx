@@ -98,11 +98,11 @@ const ReportManagement = () => {
   };
 
   return (
-    <div className="bg-[#F5F5F5] -mt-10 min-h-screen font-sans">
+    <div className="bg-[#F5F5F5] mt-5 min-h-screen font-sans px-4 sm:px-6">
 
-      <div className="flex flex-wrap items-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-6">
 
-        <div className="mt-12 flex-1 min-w-45 max-w-xs">
+        <div className="mt-6 sm:mt-12 flex-1 min-w-0 sm:min-w-[11.25rem] sm:max-w-xs">
           <VoiceSearchInput
             value={search}
             onChange={(value) => {
@@ -113,7 +113,7 @@ const ReportManagement = () => {
           />
         </div>
 
-        <div className="mt-6 flex-1 min-w-45 max-w-xs">
+        <div className="mt-2 sm:mt-6 flex-1 min-w-0 sm:min-w-[11.25rem] sm:max-w-xs">
           <DropDown label="Role" name="roleFilter"
             value={roleFilter === "All" ? "" : roleFilter}
             onChange={(e) => { setRoleFilter(e.target.value || "All"); handleFilterChange(); }}
@@ -121,7 +121,7 @@ const ReportManagement = () => {
           />
         </div>
 
-        <div className="mt-6 flex-1 min-w-45 max-w-xs">
+        <div className="mt-2 sm:mt-6 flex-1 min-w-0 sm:min-w-[11.25rem] sm:max-w-xs">
           <DropDown label="Action" name="actionFilter"
             value={actionFilter === "All" ? "" : actionFilter}
             onChange={(e) => { setActionFilter(e.target.value || "All"); handleFilterChange(); }}
@@ -131,7 +131,7 @@ const ReportManagement = () => {
 
         <button
           onClick={() => setShowConfirm(true)}
-          className="mt-12 px-5 py-2 rounded-full text-sm font-semibold border border-red-200 text-red-600 bg-white hover:bg-red-50 shadow-sm transition-all"
+          className="mt-4 sm:mt-12 w-full sm:w-auto px-5 py-2 rounded-full text-sm font-semibold border border-red-200 text-red-600 bg-white hover:bg-red-50 shadow-sm transition-all"
         >
           Clear Logs
         </button>
@@ -139,7 +139,8 @@ const ReportManagement = () => {
 
       {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-gray-100">
               {["Timestamp", "User", "Role", "Action", "Browser"].map((h) => (
@@ -171,13 +172,13 @@ const ReportManagement = () => {
                   <td className="px-4 py-3 text-gray-800">{log.user}</td>
 
                   <td className="px-4 py-3">
-                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-pup-dark-maroon">
+                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-pup-dark-maroon whitespace-nowrap">
                       {log.role}
                     </span>
                   </td>
 
                   <td className="px-4 py-3">
-                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
+                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 whitespace-nowrap">
                       {log.action}
                     </span>
                   </td>
@@ -188,7 +189,8 @@ const ReportManagement = () => {
               ))
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
 
         {/* Pagination */}
         <div className="flex items-center justify-center gap-1 px-4 py-4 border-t border-gray-100">
