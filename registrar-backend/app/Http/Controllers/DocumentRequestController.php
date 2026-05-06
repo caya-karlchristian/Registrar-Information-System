@@ -24,7 +24,7 @@ class DocumentRequestController extends Controller
         'alumniProfile',
         'alumniAcademicRecord',
         'status',
-        'purpose',
+        'requestPurpose',
         'documents.documentType',
         'certificates.certificationType',
     ];

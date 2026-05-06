@@ -49,6 +49,7 @@ class SystemUser extends Authenticatable
     ];
 
     protected $hidden = [
+        'idp_access_token',
         'password',
     ];
 
