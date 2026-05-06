@@ -240,9 +240,10 @@ class IdpClient
             }
         }
 
-        Log::warning('IdpClient: could not resolve UUID for newly created user', [
-            'email' => $data['email'],
-        ]);
+        // IdpClient.php
+        Log::warning('IdpClient: could not resolve UUID for newly created user', ['email' => $data['email']]);
+        throw new IdpException('User was created in IdP but UUID could not be resolved. Check IdP manually.');
+        // Previously: return null;
         return null;
     }
 

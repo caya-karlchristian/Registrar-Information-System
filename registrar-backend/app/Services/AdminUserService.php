@@ -91,6 +91,17 @@ public function __construct(
      */
     public function update(SystemUser $user, array $validated, Request $request): SystemUser
     {
+        if (!$user->idp_user_id) {
+            // ⚠️ This admin has no IdP record — password changes will
+            // desync and break login. This user needs to be re-created
+            // through AdminUserService::create() or have their idp_user_id patched.
+            Log::error('AdminUserService: update called on user with no idp_user_id', [
+                'user_id' => $user->user_id,
+                'email'   => $user->email,
+            ]);
+            // Optionally throw so the caller knows:
+            // throw new \RuntimeException('User is not linked to the identity provider.');
+        }
         if ($user->idp_user_id) {
             $adminToken = $this->idpClient->getSuperAdminToken();
 
