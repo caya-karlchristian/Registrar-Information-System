@@ -73,7 +73,7 @@ class DocumentRequest extends Model
         return $this->belongsTo(RequestStatus::class, 'status_id');
     }
 
-    public function purpose()
+    public function requestPurpose()
     {
         return $this->belongsTo(RequestPurpose::class, 'request_purpose_id');
     }
