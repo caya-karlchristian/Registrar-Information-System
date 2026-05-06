@@ -25,6 +25,8 @@ $result = $this->ssoAuthService->loginWithCode($code, $request);
 $token  = $result['token'];
 $user   = $result['user'];
 
+$user->loadIdentityRelations();
+
 return response()
     ->json(['user' => new \App\Http\Resources\UserResource($user)])
     ->withCookie(Cookie::make(
@@ -44,7 +46,8 @@ return response()
     Log::warning('SSO: role error', ['message' => $e->getMessage()]);
 
     $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
-        'client_id' => config('sso.client_id'),
+        'client_id'                => config('sso.client_id'),
+        'post_logout_redirect_uri' => config('app.url'),
     ]);
 
     return response()->json([
