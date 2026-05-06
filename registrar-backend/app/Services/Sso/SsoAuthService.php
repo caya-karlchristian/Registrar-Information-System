@@ -116,8 +116,14 @@ class SsoAuthService
 
         $user->tokens()->delete();
 
+        // post_logout_redirect_uri tells the IdP where to send the browser after
+        // it clears its own session.  Without it the IdP logs:
+        //   "Skipping logout API call because logout query params are incomplete."
+        // and may not fully clear the IdP browser session, causing subsequent
+        // SSO logins to silently reuse the old session.
         return config('sso.base_url') . '/logout?' . http_build_query([
-            'client_id' => config('sso.client_id'),
+            'client_id'                => config('sso.client_id'),
+            'post_logout_redirect_uri' => config('app.url'),
         ]);
     }
 }

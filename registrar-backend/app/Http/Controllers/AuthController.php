@@ -75,8 +75,22 @@ return response()
     {
         $logoutUrl = $this->ssoAuthService->logout($request->user(), $request);
 
-return response()
-    ->json(['logout_url' => $logoutUrl])
-    ->withCookie(\Illuminate\Support\Facades\Cookie::forget('token'));
+        // Use Cookie::make() with the same attributes that were used when
+        // setting the token (domain, secure, httpOnly, sameSite).
+        // Cookie::forget() does not carry these — modern browsers will silently
+        // refuse to clear a cookie whose clearing Set-Cookie doesn't match the
+        // original attributes.
+        return response()
+            ->json(['logout_url' => $logoutUrl])
+            ->withCookie(\Illuminate\Support\Facades\Cookie::make(
+                name:     'token',
+                value:    '',
+                minutes:  -1,
+                path:     '/',
+                domain:   env('SESSION_DOMAIN'),
+                secure:   true,
+                httpOnly: true,
+                sameSite: 'Lax',
+            ));
     }
 }

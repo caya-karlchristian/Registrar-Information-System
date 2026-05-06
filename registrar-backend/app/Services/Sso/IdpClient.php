@@ -158,16 +158,40 @@ class IdpClient
      */
     public function getSuperAdminToken(): string
     {
-        // Cache the admin token for 55 minutes (slightly under the typical
-        // 1-hour OAuth token lifetime) to avoid a full login round-trip on
-        // every admin operation.
-        return Cache::remember('idp:superadmin_token', 55 * 60, function () {
-            $code = $this->loginAndGetCode(
-                config('sso.superadmin_email'),
-                config('sso.superadmin_password')
-            );
-            return $this->exchangeCode($code);
-        });
+        return $this->fetchSuperAdminToken(retried: false);
+    }
+
+    /**
+     * Internal: fetch (or refresh) the cached super-admin token.
+     *
+     * On a 401 the cached token has been revoked or expired before our
+     * 55-minute TTL (e.g. IdP restart, password rotation). We bust the cache
+     * key and authenticate once more. The `retried` guard prevents an infinite
+     * loop if the IdP rejects even a fresh token.
+     */
+    private function fetchSuperAdminToken(bool $retried): string
+    {
+        try {
+            // Cache slightly under the typical 1-hour OAuth token lifetime
+            // to avoid a login round-trip on every admin operation.
+            return Cache::remember('idp:superadmin_token', 55 * 60, function () {
+                $code = $this->loginAndGetCode(
+                    config('sso.superadmin_email'),
+                    config('sso.superadmin_password')
+                );
+                return $this->exchangeCode($code);
+            });
+        } catch (IdpException $e) {
+            // Only retry when we haven't already done so — prevents infinite loops.
+            if (!$retried) {
+                Log::warning('SSO: super-admin token invalid, busting cache and retrying once.', [
+                    'error' => $e->getMessage(),
+                ]);
+                Cache::forget('idp:superadmin_token');
+                return $this->fetchSuperAdminToken(retried: true);
+            }
+            throw $e;
+        }
     }
 
     /**
