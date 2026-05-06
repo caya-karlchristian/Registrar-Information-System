@@ -32,10 +32,6 @@ class OgosStudentService
 
     /**
      * Fetch OGOS data and upsert local mirror rows.
-     * Fails silently — a login must never break because OGOS is down.
-     */
-    /**
-     * Fetch OGOS data and upsert local mirror rows.
      * Returns true if data was written, false if OGOS was unreachable.
      * Fails silently — a login must never break because OGOS is down.
      */
@@ -113,12 +109,12 @@ class OgosStudentService
         $profile = StudentProfile::updateOrCreate(
             ['user_id' => $user->user_id],
             [
-                'first_name'    => $student->firstName,
-                'middle_name'   => $student->middleName,
-                'last_name'     => $student->lastName,
-                'date_of_birth' => $personal?->dateOfBirth  ?? '2000-01-01',
-                'place_of_birth'=> $personal?->placeOfBirth ?? null,
-                'sex_at_birth'  => $sexAtBirth,
+                'first_name'     => $student->firstName,
+                'middle_name'    => $student->middleName,
+                'last_name'      => $student->lastName,
+                'date_of_birth'  => $personal?->dateOfBirth  ?? '2000-01-01',
+                'place_of_birth' => $personal?->placeOfBirth ?? null,
+                'sex_at_birth'   => $sexAtBirth,
             ]
         );
 
@@ -129,6 +125,10 @@ class OgosStudentService
                 'year_level'     => $student->yearLevel,
                 'section'        => $student->section,
                 'course_id'      => $student->courseId,
+                // Store the human-readable course name so the frontend can
+                // display it directly without a course table join.
+                // OGOS is the source of truth — this is updated on every login.
+                'course'         => $student->courseName,
             ]
         );
     }
