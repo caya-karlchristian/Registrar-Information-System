@@ -293,64 +293,6 @@ class AnalyticsService
     }
 
     // -------------------------------------------------------------------------
-    // AI payload builder
-    // -------------------------------------------------------------------------
-
-    /**
-     * Assemble a fully anonymised statistics payload for the AI narrative.
-     *
-     * Rules enforced here (the AI firewall):
-     *  - No student/alumni names, emails, or IDs.
-     *  - Admin display names are included in processing-time stats because
-     *    they are staff performance metrics, not student PII. Remove if
-     *    institutional policy requires it.
-     *  - Only aggregated counts, averages, and rates are included.
-     */
-    public function buildAiPayload(array $range): array
-    {
-        $overview       = $this->overview($range);
-        $volumeTrend    = $this->volumeTrend($range);
-        $byDocType      = $this->byDocumentType($range);
-        $byStatus       = $this->byStatus($range);
-        $processingTime = $this->processingTime($range);
-        $peakHours      = $this->peakHours($range);
-        $byPurpose      = $this->byPurpose($range);
-
-        // Strip admin user_id and email from processing stats — keep only
-        // display_name and performance numbers.
-        $adminPerf = collect($processingTime['by_admin'])->map(fn ($a) => [
-            'name'             => trim($a->display_name) ?: 'Unknown',
-            'avg_minutes'      => $a->avg_minutes,
-            'requests_handled' => $a->requests_handled,
-        ])->values()->all();
-
-        // Peak hours — only top 5 busiest to keep payload compact
-        $topHours = collect($peakHours)
-            ->sortByDesc('total')
-            ->take(5)
-            ->map(fn ($h) => ['hour' => $h['label'], 'requests' => $h['total']])
-            ->values()
-            ->all();
-
-        return [
-            'report_period' => [
-                'from' => $range[0]->toDateString(),
-                'to'   => $range[1]->toDateString(),
-            ],
-            'overview'              => $overview,
-            'monthly_volume_trend'  => $volumeTrend,
-            'top_document_types'    => array_slice($byDocType, 0, 10),
-            'status_breakdown'      => $byStatus,
-            'processing_time' => [
-                'by_document_type' => $processingTime['by_document_type'],
-                'by_admin'         => $adminPerf,
-            ],
-            'peak_hours_top5'       => $topHours,
-            'requests_by_purpose'   => $byPurpose,
-        ];
-    }
-
-    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
