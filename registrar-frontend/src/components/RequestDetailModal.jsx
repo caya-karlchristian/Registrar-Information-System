@@ -55,7 +55,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
           <div>
             <h3 className="text-base sm:text-lg font-bold text-white">Request Details</h3>
             <p className="text-xs sm:text-sm text-yellow-200 wrap-break-word">
-              Transaction ID: {request.request_id}
+              Transaction ID: {request.uuid ?? `#${request.request_id}`}
             </p>
           </div>
           <button

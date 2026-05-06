@@ -14,10 +14,23 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // ── Cookie encryption exclusion ──────────────────────────────────────
-        // The 'token' cookie holds a raw Sanctum token and must not be
-        // decrypted by EncryptCookies. Exclusion is declared in:
-        //   App\Http\Middleware\EncryptCookies  ($except = ['token'])
-        // Laravel auto-discovers that class and uses it instead of the default.
+        // The 'token' cookie holds a raw plain-text Sanctum personal-access
+        // token and must NOT be decrypted by EncryptCookies.
+        //
+        // WHY app/Http/Kernel.php IS NOT ENOUGH
+        // Laravel 11 does not load Kernel.php at all — it's a no-op legacy
+        // file from Laravel 10.  The framework's default EncryptCookies has no
+        // $except list, so without this line it tries to decrypt the raw
+        // 'token' cookie on every request, throws DecryptException
+        // ("The payload is invalid."), which is a RuntimeException, and
+        // SsoCallbackController's catch(\RuntimeException) converts it to a
+        // 403 — making every login fail for admins, superadmins, and any
+        // student who has a prior session cookie.
+        //
+        // $middleware->encryptCookies() is the correct Laravel 11 API for this.
+        // App\Http\Middleware\EncryptCookies ($except = ['token']) is kept for
+        // documentation but has no runtime effect on its own in L11.
+        $middleware->encryptCookies(except: ['token']);
 
         // ── Reverse-proxy trust ──────────────────────────────────────────────
         // The app runs behind an nginx TLS terminator.  Without this, Laravel

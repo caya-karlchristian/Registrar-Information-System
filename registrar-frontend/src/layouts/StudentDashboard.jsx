@@ -169,7 +169,7 @@ useEffect(() => {
                         {req.config.label}
                       </span>
                       <span className="text-xs text-gray-400">
-                        #{req.request_id} • {new Date(req.requested_at).toLocaleDateString()}
+                        {req.uuid ?? `#${req.request_id}`} • {new Date(req.requested_at).toLocaleDateString()}
                       </span>
                     </div>
                     <h4 className="text-gray-800 font-bold text-base md:text-lg uppercase flex items-center gap-2 flex-wrap">

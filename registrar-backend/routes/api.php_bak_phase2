@@ -131,7 +131,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('processing-time',  [AnalyticsController::class, 'processingTime']);
             Route::get('peak-hours',       [AnalyticsController::class, 'peakHours']);
             Route::get('by-purpose',       [AnalyticsController::class, 'byPurpose']);
-            Route::post('ai-report',          [AnalyticsController::class, 'aiReport']);
         });
 
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
