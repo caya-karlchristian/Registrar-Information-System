@@ -48,7 +48,7 @@ export const getEcho = () => {
         enabledTransports: ['ws', 'wss'],
         // Relative auth endpoint — avoids mixed-content blocks.
         // nginx proxies /api/ → backend:8000.
-        authEndpoint: '/api/broadcasting/auth',
+        authEndpoint: `${import.meta.env.VITE_API_URL}/broadcasting/auth`,
         auth: {
             // withCredentials causes the browser to send the HttpOnly 'token'
             // cookie on the /api/broadcasting/auth request automatically.
