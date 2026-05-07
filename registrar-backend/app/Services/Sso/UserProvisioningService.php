@@ -2,16 +2,21 @@
 
 namespace App\Services\Sso;
 
+use App\Exceptions\OgosException;
 use App\Models\Alumni;
 use App\Models\AlumniProfile;
 use App\Models\StudentProfile;
 use App\Models\SystemUser;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Services\Ogos\OgosStudentService;
 
 class UserProvisioningService
 {
-    public function __construct(private RoleResolver $roleResolver) {}
+    public function __construct(
+        private RoleResolver       $roleResolver,
+        private OgosStudentService $ogosStudentService,
+    ) {}
 
     public function provision(array $profile): ProvisioningResult
     {
@@ -25,7 +30,14 @@ class UserProvisioningService
             $roleId   = $this->roleResolver->resolve($existing);
 
             if (!$roleId) {
-                throw new \RuntimeException('Your account is not yet registered in RIS. Please contact the registrar.');
+                // Not pre-registered — check OGOS before rejecting.
+                // If they exist in OGOS they're a valid student; auto-register them.
+                try {
+                    $this->ogosStudentService->getClient()->getStudentByEmail($email);
+                    $roleId = SystemUser::ROLE_STUDENT;
+                } catch (OgosException) {
+                    throw new \RuntimeException('Your account is not yet registered in RIS. Please contact the registrar.');
+                }
             }
 
             $user = $existing ?? SystemUser::create([
@@ -64,18 +76,27 @@ class UserProvisioningService
 
     private function provisionStudentProfile(SystemUser $user, ?string $firstName, ?string $middleName, ?string $lastName): bool
     {
-        if (StudentProfile::where('user_id', $user->user_id)->exists()) {
-            return false;
+        $isNew = !StudentProfile::where('user_id', $user->user_id)->exists();
+
+        // Always try OGOS first — it is the source of truth and has
+        // all required NOT NULL fields (date_of_birth, sex_at_birth).
+        $provisioned = $this->ogosStudentService->provisionStudentData($user);
+
+        if (!$provisioned && $isNew) {
+            // OGOS was unreachable — insert a minimal stub so login
+            // still succeeds. The stub will be overwritten on next login
+            // when OGOS is back online.
+            StudentProfile::create([
+                'user_id'       => $user->user_id,
+                'first_name'    => $firstName  ?? 'Unknown',
+                'middle_name'   => $middleName,
+                'last_name'     => $lastName   ?? 'Unknown',
+                'date_of_birth' => '2000-01-01',
+                'sex_at_birth'  => 'Male',
+            ]);
         }
 
-        StudentProfile::create([
-            'user_id'     => $user->user_id,
-            'first_name'  => $firstName,
-            'middle_name' => $middleName,
-            'last_name'   => $lastName,
-        ]);
-
-        return true;
+        return $isNew;
     }
 
     private function provisionAlumniProfile(SystemUser $user, ?string $firstName, ?string $middleName, ?string $lastName): bool

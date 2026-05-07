@@ -12,7 +12,12 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
         \Illuminate\Foundation\Http\Middleware\TrimStrings::class,
-        // \Illuminate\Foundation\Http\Middleware\RoleMiddleware::class,
+        // Register our custom EncryptCookies globally so the 'token' cookie
+        // is excluded from decryption on every request (web + api).
+        // Without this, Laravel uses the default EncryptCookies which tries
+        // to decrypt the plain-text Sanctum token cookie and throws
+        // DecryptException → RuntimeException → caught as 403 in SsoCallbackController.
+        \App\Http\Middleware\EncryptCookies::class,
     ];
 
     protected $middlewareGroups = [
@@ -26,8 +31,8 @@ class Kernel extends HttpKernel
     ];
 
     protected $routeMiddleware = [
-        'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
+        'auth'     => \Illuminate\Auth\Middleware\Authenticate::class,
         'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,
-        'role' => \App\Http\Middleware\RoleMiddleware::class,
+        'role'     => \App\Http\Middleware\RoleMiddleware::class,
     ];
 }

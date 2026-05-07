@@ -1,6 +1,11 @@
 #!/bin/bash
+set -euo pipefail
 
-set -e
+# Clear stale caches before anything else so config:cache picks up fresh values.
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
 
 # Ensure the public storage symlink exists for assets served from /storage
 if [ ! -L public/storage ] && [ ! -e public/storage ]; then
@@ -16,5 +21,5 @@ php artisan optimize
 # Start PHP-FPM in background
 php-fpm -D
 
-# Start Nginx in foreground
+# Start Nginx in foreground (queue worker runs in the dedicated ris_worker container)
 nginx -g "daemon off;"
