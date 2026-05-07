@@ -48,7 +48,7 @@ return response()
         domain:   config('session.domain'),
         secure:   true,
         httpOnly: true,
-        sameSite: 'Lax',
+        sameSite: 'None',
     );
 
         } catch (IdpException $e) {
@@ -90,7 +90,7 @@ return response()
                 domain:   config('session.domain'),
                 secure:   true,
                 httpOnly: true,
-                sameSite: 'Lax',
+                sameSite: 'None',
             ));
     }
 }
