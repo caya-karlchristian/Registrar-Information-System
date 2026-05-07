@@ -36,9 +36,9 @@ return response()
         minutes:  60 * 24 * 7,
         path:     '/',
         domain:   config('session.domain'),
-        secure:   true,
+        secure:   config('session.secure_cookie'),   // ← was: true
         httpOnly: true,
-        sameSite: 'None',
+        sameSite: config('session.same_site'),        
     ));
         } catch (IdpException $e) {
             Log::warning('SSO: IdP error', ['message' => $e->getMessage()]);
