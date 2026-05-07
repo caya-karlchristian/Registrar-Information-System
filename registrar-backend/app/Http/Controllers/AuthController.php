@@ -45,10 +45,10 @@ return response()
         value:    $token,
         minutes:  60 * 24 * 7,
         path:     '/',
-        domain:   env('SESSION_DOMAIN'),
+        domain:   config('session.domain'),
         secure:   true,
         httpOnly: true,
-        sameSite: 'Lax',
+        sameSite: 'None',
     );
 
         } catch (IdpException $e) {
@@ -87,10 +87,10 @@ return response()
                 value:    '',
                 minutes:  -1,
                 path:     '/',
-                domain:   env('SESSION_DOMAIN'),
+                domain:   config('session.domain'),
                 secure:   true,
                 httpOnly: true,
-                sameSite: 'Lax',
+                sameSite: 'None',
             ));
     }
 }

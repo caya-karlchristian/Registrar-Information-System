@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Clear stale caches before anything else so config:cache picks up fresh values.
 php artisan config:clear
-php artisan cache:clear
+php artisan cache:clear || true   
 php artisan route:clear
 php artisan view:clear
 

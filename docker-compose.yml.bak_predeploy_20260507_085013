@@ -35,22 +35,6 @@ services:
       QUEUE_CONNECTION: database
       SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS}
       SESSION_DOMAIN: ${SESSION_DOMAIN}
-      REDIS_CLIENT: ${REDIS_CLIENT:-predis}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      CACHE_STORE: ${CACHE_STORE:-redis}
-      SESSION_DRIVER: ${SESSION_DRIVER:-redis}
-      OGOS_BASE_URL: ${OGOS_BASE_URL}
-      OGOS_CLIENT_ID: ${OGOS_CLIENT_ID}
-      OGOS_CLIENT_SECRET: ${OGOS_CLIENT_SECRET}
-      APP_NAME: ${APP_NAME:-RIS}
-      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-local}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
-      AWS_BUCKET: ${AWS_BUCKET}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     ports:
       - "8000:8000"
     networks:
@@ -84,22 +68,6 @@ services:
       BROADCAST_CONNECTION: reverb
       REVERB_SCALING_ENABLED: ${REVERB_SCALING_ENABLED:-false}
       REVERB_SCALING_CHANNEL: ${REVERB_SCALING_CHANNEL:-reverb}
-      REDIS_CLIENT: ${REDIS_CLIENT:-predis}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      CACHE_STORE: ${CACHE_STORE:-redis}
-      SESSION_DRIVER: ${SESSION_DRIVER:-redis}
-      OGOS_BASE_URL: ${OGOS_BASE_URL}
-      OGOS_CLIENT_ID: ${OGOS_CLIENT_ID}
-      OGOS_CLIENT_SECRET: ${OGOS_CLIENT_SECRET}
-      APP_NAME: ${APP_NAME:-RIS}
-      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-local}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
-      AWS_BUCKET: ${AWS_BUCKET}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     ports:
       - "8080:8080"
     depends_on:
@@ -140,22 +108,6 @@ services:
       REVERB_PORT: ${REVERB_PORT:-8080}
       REVERB_SCHEME: ${REVERB_SCHEME:-http}
       BROADCAST_CONNECTION: reverb
-      REDIS_CLIENT: ${REDIS_CLIENT:-predis}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      CACHE_STORE: ${CACHE_STORE:-redis}
-      SESSION_DRIVER: ${SESSION_DRIVER:-redis}
-      OGOS_BASE_URL: ${OGOS_BASE_URL}
-      OGOS_CLIENT_ID: ${OGOS_CLIENT_ID}
-      OGOS_CLIENT_SECRET: ${OGOS_CLIENT_SECRET}
-      APP_NAME: ${APP_NAME:-RIS}
-      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-local}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
-      AWS_BUCKET: ${AWS_BUCKET}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     depends_on:
       backend:
         condition: service_started
@@ -209,74 +161,6 @@ services:
       REVERB_PORT: ${REVERB_PORT:-8080}
       REVERB_SCHEME: ${REVERB_SCHEME:-http}
       BROADCAST_CONNECTION: reverb
-      REDIS_CLIENT: ${REDIS_CLIENT:-predis}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      CACHE_STORE: ${CACHE_STORE:-redis}
-      SESSION_DRIVER: ${SESSION_DRIVER:-redis}
-      OGOS_BASE_URL: ${OGOS_BASE_URL}
-      OGOS_CLIENT_ID: ${OGOS_CLIENT_ID}
-      OGOS_CLIENT_SECRET: ${OGOS_CLIENT_SECRET}
-      APP_NAME: ${APP_NAME:-RIS}
-      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-local}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
-      AWS_BUCKET: ${AWS_BUCKET}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-    depends_on:
-      backend:
-        condition: service_started
-    networks:
-      - ris_network
-
-# -------------------------------------------------------
-# Scheduler — runs php artisan schedule:run every minute.
-# Handles: notifications:shred-expired-requests (08:00)
-#          notifications:send-unclaimed-reminders (08:05)
-# -------------------------------------------------------
-  scheduler:
-    image: ris_backend_image
-    container_name: ris_scheduler
-    restart: unless-stopped
-    command: >
-      sh -c "while true; do php artisan schedule:run --no-interaction >> /var/log/scheduler.log 2>&1; sleep 60; done"
-    environment:
-      APP_ENV: ${APP_ENV:-production}
-      APP_KEY: ${APP_KEY}
-      APP_DEBUG: ${APP_DEBUG:-false}
-      APP_URL: ${APP_URL}
-      DB_CONNECTION: mysql
-      DB_HOST: ${DB_HOST}
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_DATABASE}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      QUEUE_CONNECTION: database
-      REVERB_APP_ID: ${REVERB_APP_ID}
-      REVERB_APP_KEY: ${REVERB_APP_KEY}
-      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
-      REVERB_HOST: reverb
-      REVERB_PORT: ${REVERB_PORT:-8080}
-      REVERB_SCHEME: ${REVERB_SCHEME:-http}
-      BROADCAST_CONNECTION: reverb
-      REDIS_CLIENT: ${REDIS_CLIENT:-predis}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      CACHE_STORE: ${CACHE_STORE:-redis}
-      SESSION_DRIVER: ${SESSION_DRIVER:-redis}
-      OGOS_BASE_URL: ${OGOS_BASE_URL}
-      OGOS_CLIENT_ID: ${OGOS_CLIENT_ID}
-      OGOS_CLIENT_SECRET: ${OGOS_CLIENT_SECRET}
-      APP_NAME: ${APP_NAME:-RIS}
-      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-local}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
-      AWS_BUCKET: ${AWS_BUCKET}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     depends_on:
       backend:
         condition: service_started
