@@ -27,29 +27,6 @@ $user   = $result['user'];
 
 $user->loadIdentityRelations();
 
-// --- DEBUG START ---
-    $cookieName = 'token';
-    $cookieMinutes = 60 * 24 * 7;
-    
-    // We create the cookie object manually to measure it
-    $debugCookie = Cookie::make(
-        name:     $cookieName,
-        value:    $token,
-        minutes:  $cookieMinutes,
-        path:     '/',
-        domain:   env('SESSION_DOMAIN'),
-        secure:   true,
-        httpOnly: true,
-        sameSite: 'Lax',
-    );
-
-    // Log the length. If this is > 4000, it will likely be dropped by the browser.
-    Log::info('SSO Cookie Debug', [
-        'user_id' => $user->id,
-        'length'  => strlen($debugCookie->getValue()),
-        'domain'  => env('SESSION_DOMAIN')
-    ]);
-    // --- DEBUG END ---
 
 return response()
     ->json(['user' => new \App\Http\Resources\UserResource($user)])
@@ -58,10 +35,10 @@ return response()
         value:    $token,
         minutes:  60 * 24 * 7,
         path:     '/',
-        domain:   env('SESSION_DOMAIN'),
+        domain:   config('session.domain'),
         secure:   true,
         httpOnly: true,
-        sameSite: 'Lax',
+        sameSite: 'None',
     ));
         } catch (IdpException $e) {
             Log::warning('SSO: IdP error', ['message' => $e->getMessage()]);

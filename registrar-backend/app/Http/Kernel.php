@@ -26,6 +26,7 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
+            \App\Http\Middleware\AuthenticateFromCookie::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
     ];
