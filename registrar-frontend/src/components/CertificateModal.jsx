@@ -4,6 +4,29 @@ import { CERT_CONFIG } from '../utils/Certification.jsx';
 import LoadingOverlay from './LoadingOverlay.jsx';
 
 const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
+  const normalizeCertName = (value) =>
+    typeof value === 'string' ? value.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
+
+  const configNames = Object.values(CERT_CONFIG)
+    .map((cfg) => normalizeCertName(cfg?.name))
+    .filter(Boolean);
+
+  const requestedNamesRaw = Array.isArray(request?.certificateNames)
+    ? request.certificateNames
+    : (typeof request?.certificateNames === 'string' ? [request.certificateNames] : []);
+
+  const requestedNames = requestedNamesRaw
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object') return item.certificate_name ?? item.name ?? '';
+      return '';
+    })
+    .map(normalizeCertName)
+    .filter(Boolean);
+
+  const certNames = Array.from(new Set(requestedNames)).filter((name) => configNames.includes(name));
+  const fallbackCertName = configNames[0] ?? '';
+
   const [visible, setVisible] = useState(false);
   const [opening, setOpening] = useState(true);
   const [editLoading, setEditLoading] = useState(false);
@@ -27,9 +50,7 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
     setTimeout(onClose, 300);
   };
 
-  const certNames = (request.certificateNames ?? []).filter(n => CERT_CONFIG[n]);
-  const defaultCert = certNames.length > 0 ? certNames[0] : Object.keys(CERT_CONFIG)[0];
-  const [selectedCert, setSelectedCert] = useState(defaultCert);
+  const selectedCert = certNames.length > 0 ? certNames[0] : fallbackCertName;
 
   if (!visible) return null;
 
@@ -47,6 +68,7 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
     diplomaNum: request.diplomaNum ?? '',
     major: request.major ?? '',
     date: new Date().toISOString().split('T')[0],
+    officialReceiptNum: request.or_number ?? '',
   };
 
   return (
@@ -69,24 +91,6 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
         }`}
         style={{ zIndex: 9999 }}
       >
-        {certNames.length > 1 && (
-          <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-gray-100 bg-gray-50 flex-wrap">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Generate:</span>
-            {certNames.map(name => (
-              <button
-                key={name}
-                onClick={() => setSelectedCert(name)}
-                className={`px-3 py-1 rounded-full text-xs font-bold border transition ${
-                  selectedCert === name
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        )}
         <div id="cert-modal-content" className="flex-1 overflow-auto h-full bg-white">
           <GenerateCertification
             key={selectedCert}

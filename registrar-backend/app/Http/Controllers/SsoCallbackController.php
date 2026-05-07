@@ -6,6 +6,7 @@ use App\Exceptions\IdpException;
 use App\Services\Sso\SsoAuthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cookie;
 
 class SsoCallbackController extends Controller
 {
@@ -20,8 +21,25 @@ class SsoCallbackController extends Controller
         }
 
         try {
-            $result = $this->ssoAuthService->loginWithCode($code, $request);
-            return response()->json($result);
+$result = $this->ssoAuthService->loginWithCode($code, $request);
+$token  = $result['token'];
+$user   = $result['user'];
+
+$user->loadIdentityRelations();
+
+
+return response()
+    ->json(['user' => new \App\Http\Resources\UserResource($user)])
+    ->withCookie(Cookie::make(
+        name:     'token',
+        value:    $token,
+        minutes:  60 * 24 * 7,
+        path:     '/',
+        domain:   config('session.domain'),
+        secure:   true,
+        httpOnly: true,
+        sameSite: 'Lax',
+    ));
         } catch (IdpException $e) {
             Log::warning('SSO: IdP error', ['message' => $e->getMessage()]);
             return response()->json(['message' => $e->getMessage()], 401);
@@ -29,7 +47,8 @@ class SsoCallbackController extends Controller
     Log::warning('SSO: role error', ['message' => $e->getMessage()]);
 
     $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
-        'client_id' => config('sso.client_id'),
+        'client_id'                => config('sso.client_id'),
+        'post_logout_redirect_uri' => config('app.url'),
     ]);
 
     return response()->json([

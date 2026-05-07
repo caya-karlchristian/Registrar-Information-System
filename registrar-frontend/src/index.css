@@ -182,6 +182,11 @@
     line-height: 1.2 !important; 
   }
 
+  /* Use Lucida Fax for printed certificates if available; fall back to common serif fonts. */
+  #print-area, #print-area * {
+    font-family: 'Lucida Fax', 'Lucida Sans Typewriter', 'Times New Roman', serif !important;
+  }
+
 }
 
 .asw-menu-btn {
@@ -232,4 +237,35 @@
   to {
     width: 0%;
   }
+}
+.font-lucida,
+.font-lucida * {
+  font-family: 'Lucida Fax', serif !important;
+}
+@font-face {
+  font-family: 'Lucida Fax';
+  src: url('/fonts/Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Lucida Fax';
+  src: url('/fonts/Demibold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Lucida Fax';
+  src: url('/fonts/Italic.ttf') format('truetype');
+  font-weight: normal;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Lucida Fax';
+  src: url('/fonts/DemiboldItalic.ttf') format('truetype');
+  font-weight: bold;
+  font-style: italic;
 }

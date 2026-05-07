@@ -154,12 +154,12 @@ const UserManagement = () => {
   };
 
   return (
-    <div className="bg-[#F5F5F5] min-h-screen font-sans">
+    <div className="bg-[#F5F5F5] min-h-screen font-sans px-4 sm:px-6">
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-6">
 
-        <div className="mt-6 flex-1 min-w-45 max-w-xs">
+        <div className="mt-4 sm:mt-6 flex-1 min-w-0 sm:min-w-45 sm:max-w-xs">
           <VoiceSearchInput
             value={search}
             onChange={(value) => {
@@ -170,7 +170,7 @@ const UserManagement = () => {
           />
         </div>
 
-        <div className="w-40">
+        <div className="w-full sm:w-40">
           <DropDown label="Role" name="roleFilter"
             value={roleFilter === "All" ? "" : roleFilter}
             onChange={(e) => { setRoleFilter(e.target.value || "All"); handleFilterChange(); }}
@@ -178,7 +178,7 @@ const UserManagement = () => {
           />
         </div>
 
-        <div className="w-40">
+        <div className="w-full sm:w-40">
           <DropDown label="Status" name="statusFilter"
             value={statusFilter === "All" ? "" : statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value || "All"); handleFilterChange(); }}
@@ -186,7 +186,7 @@ const UserManagement = () => {
           />
         </div>
 
-        <div className="w-36">
+        <div className="w-full sm:w-36">
           <DropDown label="Date" name="dateOrder"
             value={dateOrder}
             onChange={(e) => { setDateOrder(e.target.value); handleFilterChange(); }}
@@ -196,7 +196,7 @@ const UserManagement = () => {
 
         <button
           onClick={() => { setEditUser(null); setIsModalOpen(true); }}
-          className="ml-auto mt-6 flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded-full text-sm font-semibold shadow hover:bg-[#3a0303] transition-all"
+          className="sm:ml-auto mt-4 sm:mt-6 w-full sm:w-auto flex items-center justify-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded-full text-sm font-semibold shadow hover:bg-[#3a0303] transition-all"
         >
           Add User <PlusIcon className="w-4 h-4" />
         </button>
@@ -204,7 +204,8 @@ const UserManagement = () => {
 
       {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
           <thead>
             <tr className="border-b border-gray-100">
               <th className="px-4 py-3 text-left w-10">
@@ -237,7 +238,7 @@ const UserManagement = () => {
                     <td className="px-4 py-3 text-gray-800">{fullName}</td>
                     <td className="px-4 py-3 text-gray-800">{user.email}</td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-pup-dark-maroon">
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-pup-dark-maroon whitespace-nowrap">
                         {ROLE_MAP[user.role_id] || `Role ${user.role_id}`}
                       </span>
                     </td>
@@ -265,7 +266,8 @@ const UserManagement = () => {
               })
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
 
         {/* Pagination */}
         <div className="flex items-center justify-center gap-1 px-4 py-4 border-t border-gray-100">

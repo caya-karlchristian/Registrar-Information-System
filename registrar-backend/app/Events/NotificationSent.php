@@ -7,8 +7,7 @@ use App\Models\SystemUser;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-// use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -18,7 +17,6 @@ use Illuminate\Queue\SerializesModels;
 |--------------------------------------------------------------------------
 | This is the event that gets fired over WebSockets via Reverb.
 |
-| ShouldBroadcast interface:
 |   Tells Laravel this event should be sent over the broadcast driver
 |   (Reverb in our case) in addition to being fired internally.
 |   Without this interface, the event only exists in PHP memory.
@@ -39,7 +37,12 @@ use Illuminate\Queue\SerializesModels;
 |--------------------------------------------------------------------------
 */
 
-class NotificationSent implements ShouldBroadcastNow
+// ShouldBroadcast (queued) is used instead of ShouldBroadcastNow (synchronous)
+// so the WebSocket push is dispatched AFTER the DB transaction commits.
+// With ShouldBroadcastNow the push fires inside the transaction, meaning the
+// frontend can receive a real-time event for a row not yet visible to other
+// DB connections — a silent race condition on every notification send.
+class NotificationSent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -61,6 +64,19 @@ class NotificationSent implements ShouldBroadcastNow
             new PrivateChannel('notifications.' . $this->recipient->user_id),
         ];
     }
+    // -------------------------------------------------------
+    // WHICH QUEUE TO DISPATCH THE BROADCAST JOB ON
+    // -------------------------------------------------------
+    // Routing to a dedicated 'broadcasts' queue keeps WebSocket
+    // pushes from being delayed by slow or long-running default-queue
+    // jobs.  The broadcast-worker container drains this queue with a
+    // short sleep (1 s) and timeout (30 s) for low latency.
+    // -------------------------------------------------------
+    public function viaQueues(): array
+    {
+        return ['broadcasts'];
+    }
+
 
     // -------------------------------------------------------
     // WHAT DATA TO SEND TO THE FRONTEND
@@ -76,6 +92,9 @@ class NotificationSent implements ShouldBroadcastNow
             'request_id'   => $this->notification->request_id,
             'read_at'      => $this->notification->read_at,
             'created_at'   => $this->notification->created_at->toISOString(),
+            // Forward requirements checklist so the real-time toast/bell
+            // can show it immediately without a follow-up REST call.
+            'requirements' => $data['requirements'] ?? null,
             'announcement' => isset($data['announcement_id']) ? [
                 'id'      => $data['announcement_id'],
                 'title'   => $data['announcement_title'],
@@ -88,7 +107,7 @@ class NotificationSent implements ShouldBroadcastNow
     // EVENT NAME THE FRONTEND LISTENS FOR
     // -------------------------------------------------------
     // Without this, Laravel uses the full class name as the
-    // event name: "App\\Events\\NotificationSent" — ugly.
+    // event name: "App\Events\NotificationSent" — ugly.
     // This makes it clean: listen('.NotificationSent', ...)
     // The dot prefix tells Echo this is a custom event name.
     // -------------------------------------------------------

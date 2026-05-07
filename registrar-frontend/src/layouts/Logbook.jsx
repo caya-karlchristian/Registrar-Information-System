@@ -77,13 +77,16 @@ const LogbookRecords = () => {
   const docOptions = useMemo(() => Object.values(activeDocMap), [activeDocMap]);
 
   const filteredData = useMemo(() => {
-    if (!selectedDocTypeId) return data;
+    const completedOnly = data.filter(item =>
+      String(item.status?.status_name).toLowerCase() === 'completed'
+    );
+
+    if (!selectedDocTypeId) return completedOnly;
+
     const targetId = Number(selectedDocTypeId);
-    const filtered = data.filter(item =>
+    return completedOnly.filter(item =>
       item.documents?.some(d => Number(d.document_type_id) === targetId)
     );
-    console.log('Filtered data:', { selectedId: targetId, total: data.length, filtered: filtered.length });
-    return filtered;
   }, [selectedDocTypeId, data]);
 
   const sortedData = useMemo(() => {
@@ -216,9 +219,9 @@ const LogbookRecords = () => {
         <div className="p-4 sm:p-6 md:p-8 pb-0">
           <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end mb-6 gap-4 print:hidden">
             <div className="flex flex-col gap-2 text-left w-full sm:w-auto">
-              <div className="w-96">
+              <div className="px-4 w-full sm:w-80 lg:w-120">
                 <DropDown
-                  label="Document/Certification Type"
+                  label="Document Type"
                   name="docType"
                   value={activeDocMap[selectedDocTypeId] || ''}
                   labelColor="text-gray-700"

@@ -9,8 +9,7 @@ import {
 import risImage from "../assets/RIS1.png";
 import logoImage from "../assets/puplogoimage.png";
 import { getAnnouncements } from "../services/api";
-import { getEcho } from "../services/echo";
-import { useAuth } from "../context/AuthProvider";
+import { useNotificationsContext } from '../context/NotificationsContext';
 
 const ICON_CYCLE = [MegaphoneIcon, QuestionMarkCircleIcon, ClipboardDocumentListIcon];
 
@@ -23,7 +22,6 @@ const TEAM_MEMBERS = [
 
 const Tech4wardProfile = ({ bgImage }) => {
   const bg = bgImage || risImage;
-  const { user } = useAuth();
   const [announcementPage, setAnnouncementPage] = useState(0);
   const [announcements, setAnnouncements] = useState([]);
   const ITEMS_PER_PAGE = 3;
@@ -31,7 +29,6 @@ const Tech4wardProfile = ({ bgImage }) => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        // Fetch all pages and collect enabled announcements
         let page = 1;
         let all = [];
         while (true) {
@@ -49,21 +46,18 @@ const Tech4wardProfile = ({ bgImage }) => {
     fetchAll();
   }, []);
 
-  // Real-time listener — prepend new announcements instantly
+  // Real-time — reuse the shared notification context instead of a duplicate Echo subscription
+  const { notifications } = useNotificationsContext();
   useEffect(() => {
-    if (!user) return;
-    const echo = getEcho();
-    const handler = (e) => {
-      if (e.type !== 'announcement_published' || !e.announcement) return;
-      setAnnouncements(prev => {
-        if (prev.some(a => a.id === e.announcement.id)) return prev;
-        return [{ id: e.announcement.id, title: e.announcement.title, content: e.announcement.content, enabled: true }, ...prev];
-      });
-      setAnnouncementPage(0);
-    };
-    echo.private(`notifications.${user.user_id}`).listen('.NotificationSent', handler);
-    return () => { echo.leave(`notifications.${user.user_id}`); };
-  }, [user?.user_id]);
+    if (!notifications.length) return;
+    const latest = notifications[0];
+    if (latest?.type !== 'announcement_published' || !latest?.announcement) return;
+    setAnnouncements(prev => {
+      if (prev.some(a => a.id === latest.announcement.id)) return prev;
+      return [{ id: latest.announcement.id, title: latest.announcement.title, content: latest.announcement.content, enabled: true }, ...prev];
+    });
+    setAnnouncementPage(0);
+  }, [notifications[0]?.id]);
 
   const totalPages = Math.ceil(announcements.length / ITEMS_PER_PAGE);
   const startIndex = announcementPage * ITEMS_PER_PAGE;
@@ -151,7 +145,6 @@ const Tech4wardProfile = ({ bgImage }) => {
               </div>
 
               <div className="relative h-96 overflow-hidden bg-[#800000]">
-
                 <div className="absolute inset-0 flex items-center justify-center pb-20">
                   <div className="w-40 h-40 rounded-full border-4 border-white/20 overflow-hidden shadow-2xl bg-white/5">
                     <img
@@ -170,7 +163,6 @@ const Tech4wardProfile = ({ bgImage }) => {
                     {member.firstName}
                   </p>
                 </div>
-
               </div>
             </div>
           ))}

@@ -7,7 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui'], 
+        sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+        'lucida': ['"Lucida Fax"', 'serif'],
       },
     },
   },

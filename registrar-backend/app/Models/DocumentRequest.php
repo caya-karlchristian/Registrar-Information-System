@@ -3,18 +3,45 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class DocumentRequest extends Model
 {
     protected $table      = 'document_request';
     protected $primaryKey = 'request_id';
     public    $timestamps = false;
-    protected $guarded    = [];
+
+    protected $fillable = [
+        'user_id',
+        'status_id',
+        'request_purpose_id',
+        'or_number',
+        'receipt_date',
+        'requested_at',
+        'student_profile_id',
+        'student_academic_id',
+        'alumni_profile_id',
+        'alumni_academic_id',
+    ];
 
     protected $casts = [
         'requested_at' => 'datetime',
         'receipt_date' => 'date',
     ];
+
+    /**
+     * Auto-generate a UUID for every new request.
+     * The uuid is exposed in the UI instead of the integer PK
+     * to avoid leaking record counts and enabling enumeration.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (DocumentRequest $request) {
+            if (empty($request->uuid)) {
+                $request->uuid = (string) Str::uuid();
+            }
+        });
+    }
 
     public function user()
     {
@@ -46,7 +73,7 @@ class DocumentRequest extends Model
         return $this->belongsTo(RequestStatus::class, 'status_id');
     }
 
-    public function purpose()
+    public function requestPurpose()
     {
         return $this->belongsTo(RequestPurpose::class, 'request_purpose_id');
     }
@@ -56,7 +83,6 @@ class DocumentRequest extends Model
         return $this->hasMany(RequestDocument::class, 'request_id');
     }
 
-    // Rows in request_certificate — one per certificate type selected
     public function certificates()
     {
         return $this->hasMany(RequestCertificate::class, 'request_id');
@@ -65,5 +91,10 @@ class DocumentRequest extends Model
     public function history()
     {
         return $this->hasMany(RequestHistory::class, 'request_id');
+    }
+
+    public function notifications()
+    {
+        return $this->hasMany(Notification::class, 'request_id');
     }
 }

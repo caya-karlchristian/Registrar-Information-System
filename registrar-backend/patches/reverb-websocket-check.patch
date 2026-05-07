@@ -1,0 +1,11 @@
+--- a/src/Servers/Reverb/Http/Router.php
++++ b/src/Servers/Reverb/Http/Router.php
+@@ -68,7 +68,7 @@ class Router
+      */
+     protected function isWebSocketRequest(RequestInterface $request): bool
+     {
+-        return $request->getHeader('Upgrade')[0] ?? null === 'websocket';
++        return ($request->getHeader('Upgrade')[0] ?? null) === 'websocket';
+     }
+ 
+     /**

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import InputGroup from "../components/InputGroup.jsx";
 import { PrinterIcon } from "@heroicons/react/24/solid";
-import { getAcademicRecords, getCertifications, getCertificationLayouts, getDocumentTypes } from "../services/api";
+import { getAcademicRecords, getCertifications, getCertificationLayouts } from "../services/api";
 import { CertHeader, CertFooter, getTodayDate } from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import DropDown from "../components/DropDown.jsx";
@@ -13,12 +13,17 @@ const toCertificateRows = (raw) => {
   return [];
 };
 
-const toDocumentTypeRows = (raw) => {
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw?.data)) return raw.data;
-  return [];
-};
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  const timeoutRef = useRef(null);
 
+  useEffect(() => {
+    timeoutRef.current = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timeoutRef.current);
+  }, [value, delay]);
+
+  return debouncedValue;
+};
 
 const courses = [
   "BS in Electronics Engineering",
@@ -41,7 +46,7 @@ const yearNum     = ["2", "3", "4", "5"];
 const signeeOptions = ["Mhel P. Garcia", "Marissa B. Ferrer, DEM, RPsy"];
 
 const DEFAULT_FORM = {
-  docType: "Certificate of Graduation",
+  docType: null, // Will be set after fetching certifications
   fullName: "", 
   studentNum: "", 
   course: "", 
@@ -102,74 +107,136 @@ const FIELD_CONFIG = [
   ["nstpSerialNum",     "input",    "NSTP Serial Number",      { placeholder: "e.g. C-13-113719-16" }],
 ];
 
+// ─── Memoized Certificate Preview ───
+const CertificatePreview = React.memo(({ certConfig, activeLayout, debouncedFormData }) => (
+  <div
+    id="print-area"
+    className="bg-white shadow-2xl shadow-stone-300/70 mx-auto w-full max-w-full md:max-w-187.5 flex flex-col origin-top scale-100 md:scale-95 p-3 sm:p-6 md:p-8 ring-1 ring-stone-900/5 text-gray-800 print:scale-100 print:shadow-none print:ring-0 print:p-0"
+  >
+    {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
+    <div className="flex-1">{certConfig?.renderBody(debouncedFormData)}</div>
+    {!certConfig?.hideHeaderFooter && <CertFooter layout={activeLayout} />}
+  </div>
+));
+
+CertificatePreview.displayName = 'CertificatePreview';
+
 // ─── Component ───────
 
 const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onLoadingChange }) => {
+  const normalizeCertName = (name) => (typeof name === "string" ? name.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim() : "");
+
+  // Create a mapping from CERT_CONFIG ID to certificate name for display
+  const certIdToName = Object.entries(CERT_CONFIG).reduce((acc, [id, config]) => {
+    acc[id] = config.name;
+    return acc;
+  }, {});
+
+  // Create a mapping from database certificate_type_id to CERT_CONFIG ID
+  // For now, assuming database IDs match CERT_CONFIG IDs
+  const certTypeIdToCertConfigId = (dbId) => dbId;
+
   const [loading, setLoading] = useState(false);
+  const [printLoading, setPrintLoading] = useState(false);
   const [certifications, setCertifications] = useState([]);
   const [layoutsByCertId, setLayoutsByCertId] = useState({});
-  const [docTypeOptions, setDocTypeOptions] = useState(Object.keys(CERT_CONFIG));
+  const [docTypeOptions, setDocTypeOptions] = useState(Object.keys(CERT_CONFIG).map(Number));
+  const [certNameById, setCertNameById] = useState(certIdToName);
   const [formData, setFormData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
-  const requestedCertTypes = Array.isArray(initialData?.certificateNames)
-    ? initialData.certificateNames.filter((name) => typeof name === "string" && name.trim().length > 0)
-    : [];
-  const requestedDocType = typeof initialData?.docType === "string" ? initialData.docType.trim() : "";
-  const lockDocTypeToRequest = Boolean(initialData?.requestId && requestedCertTypes.length > 0);
+  const [savedData, setSavedData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
+  const requestedCertNames = Array.from(
+    new Set(
+      [
+        ...(Array.isArray(initialData?.certificateNames) ? initialData.certificateNames : []),
+        ...(typeof initialData?.certificateNames === "string" ? [initialData.certificateNames] : []),
+        ...(typeof initialData?.docType === "string" ? [initialData.docType] : []),
+      ]
+        .map(normalizeCertName)
+        .filter((name) => name.length > 0)
+    )
+  );
+  const requestedDocTypeId = Number(initialData?.docType);
+  const lockDocTypeToRequest = Boolean(initialData?.requestId && (requestedCertNames.length > 0 || Number.isInteger(requestedDocTypeId)));
 
   useEffect(() => {
     const fetchLayoutData = async () => {
+      if (lockDocTypeToRequest) {
+        const requestedIdsFromNames = requestedCertNames
+          .map((name) => {
+            return Object.entries(CERT_CONFIG).find(
+              ([_, config]) => normalizeCertName(config.name) === name
+            )?.[0];
+          })
+          .filter(Boolean)
+          .map(Number);
+
+        const requestedIds = Array.from(
+          new Set([
+            ...requestedIdsFromNames,
+            ...(Number.isInteger(requestedDocTypeId) && requestedDocTypeId in CERT_CONFIG ? [requestedDocTypeId] : []),
+          ])
+        );
+        
+        setDocTypeOptions(requestedIds);
+        setFormData((prev) => {
+          const prevDocType = Number(prev.docType);
+          const defaultId = requestedIds.includes(prevDocType) ? prevDocType : (requestedIds[0] ?? prevDocType ?? null);
+          return { ...prev, docType: defaultId };
+        });
+        setSavedData((prev) => {
+          const prevDocType = Number(prev.docType);
+          const defaultId = requestedIds.includes(prevDocType) ? prevDocType : (requestedIds[0] ?? prevDocType ?? null);
+          return { ...prev, docType: defaultId };
+        });
+        return;
+      }
+
       try {
-        const [certRes, layoutRes, documentTypeRes] = await Promise.all([
+        const [certRes, layoutRes] = await Promise.all([
           getCertifications(),
           getCertificationLayouts(),
-          getDocumentTypes(),
         ]);
         const certs = toCertificateRows(certRes?.data);
         const layouts = layoutRes?.data ?? [];
-        const documentTypes = toDocumentTypeRows(documentTypeRes?.data);
 
         const nextLayouts = {};
         layouts.forEach((layoutRow) => {
           nextLayouts[layoutRow.certificate_type_id] = normalizeCertificateLayout(layoutRow);
         });
 
-        const fetchedNames = certs
-          .map((item) => item?.certificate_name)
-          .filter((name) => typeof name === "string" && name.trim().length > 0);
-        const fetchedDocumentNames = documentTypes
-          .map((item) => item?.document_name)
-          .filter((name) => typeof name === "string" && name.trim().length > 0);
-        const fetchedDocTypes = Array.from(
-          new Set([
-            ...fetchedDocumentNames,
-            ...fetchedNames,
-            ...Object.keys(CERT_CONFIG),
-          ])
-        ).sort((a, b) => a.localeCompare(b));
-
-        setCertifications(
-          [...certs].sort((a, b) => String(a?.certificate_name ?? "").localeCompare(String(b?.certificate_name ?? "")))
-        );
-        setLayoutsByCertId(nextLayouts);
-        if (lockDocTypeToRequest) {
-          setDocTypeOptions(requestedCertTypes);
-        } else {
-          setDocTypeOptions(fetchedDocTypes);
-        }
-        setFormData((prev) => {
-          if (lockDocTypeToRequest) {
-            return {
-              ...prev,
-              docType: requestedCertTypes.includes(prev.docType)
-                ? prev.docType
-                : (requestedDocType || requestedCertTypes[0]),
-            };
+        // Create mapping from database certificate_type_id to CERT_CONFIG ID
+        const dbCertIdToCertConfigId = {};
+        const fetchedIds = [];
+        
+        certs.forEach((cert) => {
+          const normalizedName = normalizeCertName(cert?.certificate_name);
+          // Find matching CERT_CONFIG entry by name
+          const certConfigId = Object.entries(CERT_CONFIG).find(
+            ([_, config]) => normalizeCertName(config.name) === normalizedName
+          )?.[0];
+          
+          if (certConfigId) {
+            dbCertIdToCertConfigId[cert.certificate_type_id] = Number(certConfigId);
+            fetchedIds.push(Number(certConfigId));
           }
+        });
 
-          if (fetchedDocTypes.includes(prev.docType)) return prev;
+        setCertifications(certs);
+        setLayoutsByCertId(nextLayouts);
+        setDocTypeOptions(fetchedIds);
+
+        setFormData((prev) => {
+          if (fetchedIds.includes(prev.docType)) return prev;
           return {
             ...prev,
-            docType: fetchedDocTypes[0] ?? prev.docType,
+            docType: fetchedIds[0] ?? prev.docType,
+          };
+        });
+        setSavedData((prev) => {
+          if (fetchedIds.includes(prev.docType)) return prev;
+          return {
+            ...prev,
+            docType: fetchedIds[0] ?? prev.docType,
           };
         });
       } catch (err) {
@@ -178,13 +245,19 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
     };
 
     fetchLayoutData();
-  }, []);
+  }, [lockDocTypeToRequest, requestedCertNames, requestedDocTypeId]);
 
   useEffect(() => {
     if (typeof onLoadingChange === "function") {
       onLoadingChange(loading);
     }
   }, [loading, onLoadingChange]);
+
+  useEffect(() => {
+    if (initialData?.or_number) {
+      setFormData((prev) => ({ ...prev, officialReceiptNum: initialData.or_number }));
+    }
+  }, [initialData?.or_number]);
 
   useEffect(() => {
     if (formData.course && formData.studentNum) return;
@@ -194,7 +267,8 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
       try {
         setLoading(true);
         const res = await getAcademicRecords();
-        const record = res.data.find(
+        const records = Array.isArray(res?.data?.data) ? res.data.data : (Array.isArray(res?.data) ? res.data : []);
+        const record = records.find(
           (r) => r.student_number === studentNum || r.student_id === studentId
         );
         if (record) {
@@ -209,54 +283,89 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
       } catch (err) {
         console.error("Error fetching course data:", err);
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     };
     fetch();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData?.studentNum, initialData?.studentId]);
+
+  // Create display options (names) in the order of docTypeOptions
+  const docTypeDisplayOptions = useMemo(() =>
+    docTypeOptions.map((id) => certIdToName[id])
+  , [docTypeOptions, certIdToName]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // If this is the docType field, convert display name back to numeric ID
+    if (name === "docType") {
+      const selectedId = docTypeOptions.find((id) => certIdToName[id] === value);
+      const nextDocType = selectedId || value;
+      setFormData((prev) => ({ ...prev, [name]: nextDocType }));
+      // Always reflect doc type changes in preview so layout switches immediately.
+      setSavedData((prev) => ({ ...prev, [name]: nextDocType }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
-  const handlePrint = () => {
-    if (onCertificatePrinted && initialData?.requestId) {
-      const requestId = initialData.requestId;
-      const markPrinted = () => {
-        window.removeEventListener("afterprint", markPrinted);
-        onCertificatePrinted(requestId);
-      };
+  const handlePrint = async () => {
+    setPrintLoading(true);
 
-      window.addEventListener("afterprint", markPrinted, { once: true });
-      window.print();
-      return;
-    }
+    await new Promise(resolve => setTimeout(resolve, 0));
 
     window.print();
+
+    // Clear loading state after a brief delay (covers most print scenarios)
+    setTimeout(() => setPrintLoading(false), 1000);
+
+    // Also clear when print dialog closes (if user cancels)
+    const handleAfterPrint = () => {
+      setPrintLoading(false);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
+    window.addEventListener("afterprint", handleAfterPrint, { once: true });
+
+    if (onCertificatePrinted && initialData?.requestId) {
+      const requestId = initialData.requestId;
+      onCertificatePrinted(requestId);
+    }
   };
 
-  const certConfig = CERT_CONFIG[formData.docType];
-  const shouldShow = (fieldName) => certConfig?.fields.includes(fieldName);
-  const activeCertification = certifications.find((item) => item.certificate_name === formData.docType);
+  const formCertConfig = CERT_CONFIG[formData.docType];
+  const previewCertConfig = CERT_CONFIG[savedData.docType];
+  const shouldShow = useCallback((fieldName) => formCertConfig?.fields.includes(fieldName), [formCertConfig]);
+  
+  // Get the certificate name for display
+  const certDisplayName = certIdToName[savedData.docType] || "Certificate";
+
+  // Find active certification by matching against CERT_CONFIG name 
+  const activeCertification = useMemo(() => {
+    return certifications.find((item) => {
+      const normalizedDbName = (typeof item.certificate_name === "string"
+        ? item.certificate_name.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim()
+        : "");
+      return normalizedDbName === certDisplayName;
+    });
+  }, [certifications, certDisplayName]);
+  
   const activeLayout = activeCertification
     ? layoutsByCertId[activeCertification.certificate_type_id] ?? DEFAULT_CERTIFICATE_LAYOUT
     : DEFAULT_CERTIFICATE_LAYOUT;
 
   return (
-    <div className="mt-10 h-full min-h-0 flex flex-col overflow-y-auto bg-linear-to-br from-white via-stone-100 to-stone-200 print:mt-0 print:bg-white print:min-h-0 print:h-auto print:overflow-visible">
+    <div className="mt-15 h-screen flex flex-col bg-white">
 
       {/* Header Toolbar */}
-      <div className="w-full max-w-7xl mx-auto px-4 pt-5 pb-3 md:px-6 md:pt-6 md:pb-4 print:hidden">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 pt-12 pb-3 md:px-6 md:pt-10 md:pb-4 print:hidden">
         <div className="flex flex-col gap-4 rounded-2xl border border-stone-200/80 bg-white/90 px-4 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-white/70 md:flex-row md:items-end md:justify-between md:px-5 md:py-5">
-          <div className="w-full md:max-w-xs">
+          <div className="relative z-10 w-full md:max-w-xs">
             <DropDown
               label="Certification Type"
               name="docType"
-              value={formData.docType}
+              value={certIdToName[formData.docType] || "Certificate"}
               onChange={handleChange}
-              options={docTypeOptions}
+              options={docTypeDisplayOptions}
               labelColor="text-gray-600"
             />
           </div>
@@ -271,97 +380,101 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
             )}
             <button
               onClick={handlePrint}
-              className="w-full sm:w-auto flex-1 md:flex-none flex items-center justify-center gap-2 rounded-xl bg-pup-dark-maroon px-4 py-2 text-sm font-bold text-white shadow-lg shadow-stone-400/40 transition-all hover:bg-[#4a0000] active:scale-95 md:px-8 md:py-3 md:text-base"
+              disabled={printLoading}
+              className={`w-full sm:w-auto flex-1 md:flex-none flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-lg shadow-stone-400/40 transition-all md:px-8 md:py-3 md:text-base ${
+                printLoading
+                  ? 'bg-gray-400 cursor-not-allowed opacity-75'
+                  : 'bg-pup-dark-maroon hover:bg-[#4a0000] active:scale-95'
+              }`}
             >
               <PrinterIcon className="w-4 h-4 md:w-5 md:h-5" />
-              Print File
+              {printLoading ? 'Preparing...' : 'Print File'}
             </button>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row gap-6 items-start w-full max-w-7xl mx-auto px-4 md:px-6 pb-6 min-h-0 overflow-visible lg:overflow-visible print:block print:max-w-none print:px-0 print:pb-0 print:overflow-visible">
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 items-start w-full max-w-7xl mx-auto px-4 md:px-6 pb-6 overflow-visible lg:overflow-visible print:block print:max-w-none print:px-0 print:pb-0 print:overflow-visible">
 
         {/* Left Sidebar */}
-        <div className="w-full lg:w-88 xl:w-96 shrink-0 overflow-y-auto order-1 print:hidden">
-          <div className="rounded-2xl border border-stone-200/80 bg-white/95 p-4 shadow-md shadow-stone-200/60 md:p-6">
-            <h3 className="mb-6 text-base font-extrabold uppercase tracking-tight text-[#800000] md:text-lg">Edit Information</h3>
-            <form className={`space-y-4 md:space-y-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
-              {loading && <p className="text-xs md:text-sm text-stone-500 animate-pulse">Fetching academic records...</p>}
+        <div className="w-full lg:w-88 xl:w-96 shrink-0 order-1 print:hidden">
+          <div className="relative p-2 md:p-3">
+            <div className="rounded-2xl border border-stone-200/80 bg-white/95 p-4 shadow-md shadow-stone-200/60 md:p-6 overflow-visible">
+              <h3 className="mb-6 text-base font-extrabold uppercase tracking-tight text-[#800000] md:text-lg">Edit Information</h3>
+              <form className={`space-y-4 md:space-y-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
+                {loading && <p className="text-xs md:text-sm text-stone-500 animate-pulse">Fetching academic records...</p>}
 
-              {/* Dynamic fields */}
-              {FIELD_CONFIG.map(([name, type, label, props]) => {
-                if (!shouldShow(name)) return null;
-                if (type === "dropdown") {
+                {FIELD_CONFIG.map(([name, type, label, props]) => {
+                  if (!shouldShow(name)) return null;
+                  if (type === "dropdown") {
+                    return (
+                      <DropDown
+                        key={name}
+                        label={label}
+                        name={name}
+                        value={formData[name]}
+                        onChange={handleChange}
+                        options={props.options}
+                        labelColor="text-gray-600"
+                      />
+                    );
+                  }
                   return (
-                    <DropDown
+                    <InputGroup
                       key={name}
                       label={label}
                       name={name}
                       value={formData[name]}
                       onChange={handleChange}
-                      options={props.options}
-                      labelColor="text-gray-600"
+                      {...props}
+                      voiceEnabled={props.type !== "date"}
+                      labelColor="text-gray-600" 
                     />
                   );
-                }
-                return (
-                  <InputGroup
-                    key={name}
-                    label={label}
-                    name={name}
-                    value={formData[name]}
-                    onChange={handleChange}
-                    {...props}
-                    voiceEnabled={props.type !== "date"}
-                    labelColor="text-gray-600" 
-                  />
-                );
-              })}
+                })}
 
-              {/* Date Issued always visible */}
-              <InputGroup
-                label="Date Issued"
-                type="date"
-                name="date"
-                value={formData.date}
-                onChange={handleChange}
-                voiceEnabled={false}
-                labelColor="text-gray-600"
-                min={getTodayDate()}
-              />
+                <InputGroup
+                  label="Date Issued"
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleChange}
+                  voiceEnabled={false}
+                  labelColor="text-gray-600"
+                  min={getTodayDate()}
+                />
 
-              {/* Signee always visible */}
-              <DropDown
-                label="Signee"
-                name="signee"
-                value={formData.signee}
-                onChange={handleChange}
-                options={signeeOptions}
-                labelColor="text-gray-600"
-              />
+                <DropDown
+                  label="Signee"
+                  name="signee"
+                  value={formData.signee}
+                  onChange={handleChange}
+                  options={signeeOptions}
+                  labelColor="text-gray-600"
+                />
 
-            </form>
+                <button
+                  type="button"
+                  onClick={() => setSavedData({ ...formData })}
+                  className="w-full mt-6 rounded-lg bg-pup-dark-maroon hover:bg-[#4a0000] text-white font-semibold py-2.5 transition-all active:scale-95"
+                >
+                  Save Changes
+                </button>
+              </form>
+            </div>
           </div>
         </div>
 
         {/* Certificate Preview */}
-        <div className="relative order-2 flex flex-1 flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70 min-h-96 sm:min-h-120 lg:min-h-150 max-h-[78vh] lg:max-h-[82vh] print:bg-white print:rounded-none print:border-0 print:min-h-0 print:max-h-none print:overflow-visible">
+        <div className="relative order-2 flex flex-1 flex-col overflow-y-auto custom-scrollbar rounded-2xl border border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70 min-h-96 sm:min-h-120 lg:min-h-150 max-h-[78vh] lg:max-h-[80vh] print:bg-white print:rounded-none print:border-0 print:min-h-0 print:max-h-none print:overflow-visible">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(90,90,90,0.07),transparent_40%),radial-gradient(circle_at_85%_10%,rgba(120,120,120,0.06),transparent_35%)] print:hidden" />
           <div className="relative p-4 bg-white/95 border-b border-stone-200 shrink-0 print:hidden">
             <div className="flex items-center justify-between max-w-187.5 mx-auto w-full">
               <h2 className="text-lg font-extrabold uppercase tracking-tight text-stone-800">Certificate Preview</h2>
             </div>
           </div>
-          <div className="relative flex-1 min-h-0 overflow-y-auto overflow-x-auto p-3 sm:p-6 lg:p-8 print:p-0 print:overflow-visible">
-            <div
-              id="print-area"
-              className="bg-white shadow-2xl shadow-stone-300/70 mx-auto w-full max-w-full md:max-w-187.5 flex flex-col origin-top scale-100 md:scale-95 p-3 sm:p-6 md:p-8 ring-1 ring-stone-900/5 text-gray-800 print:scale-100 print:shadow-none print:ring-0 print:p-0"
-            >
-              {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
-              <div className="flex-1">{certConfig?.renderBody(formData)}</div>
-              {!certConfig?.hideHeaderFooter && <CertFooter layout={activeLayout} />}
-            </div>
+          <div className="relative flex-1 p-3 sm:p-6 lg:p-8 print:p-0 print:overflow-visible">
+            <CertificatePreview certConfig={previewCertConfig} activeLayout={activeLayout} debouncedFormData={savedData} />
           </div>
         </div>
       </div>
