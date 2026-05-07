@@ -32,12 +32,11 @@ services:
       REVERB_PORT: ${REVERB_PORT:-8080}
       REVERB_SCHEME: ${REVERB_SCHEME:-http}
       BROADCAST_CONNECTION: reverb
+      QUEUE_CONNECTION: database
       SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS}
       SESSION_DOMAIN: ${SESSION_DOMAIN}
     ports:
       - "8000:8000"
-    # volumes:
-    #   - ./registrar-backend:/var/www/html
     networks:
       - ris_network
 
@@ -63,14 +62,141 @@ services:
       REVERB_APP_ID: ${REVERB_APP_ID}
       REVERB_APP_KEY: ${REVERB_APP_KEY}
       REVERB_APP_SECRET: ${REVERB_APP_SECRET}
-      REVERB_HOST: 0.0.0.0
+      REVERB_HOST: reverb
       REVERB_PORT: 8080
       REVERB_SCHEME: ${REVERB_SCHEME:-http}
       BROADCAST_CONNECTION: reverb
+      REVERB_SCALING_ENABLED: ${REVERB_SCALING_ENABLED:-false}
+      REVERB_SCALING_CHANNEL: ${REVERB_SCALING_CHANNEL:-reverb}
     ports:
       - "8080:8080"
-    # volumes:
-      # - ./registrar-backend:/var/www/html
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - ris_network
+
+  # -------------------------------------------------------
+  # Queue Worker
+  # -------------------------------------------------------
+  worker:
+    image: ris_backend_image
+    container_name: ris_worker
+    restart: unless-stopped
+    command: >
+      php artisan queue:work
+        --queue=default
+        --sleep=3
+        --tries=3
+        --timeout=120
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL}
+      DB_CONNECTION: mysql
+      DB_HOST: ${DB_HOST}
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      QUEUE_CONNECTION: database
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: reverb
+      REVERB_PORT: ${REVERB_PORT:-8080}
+      REVERB_SCHEME: ${REVERB_SCHEME:-http}
+      BROADCAST_CONNECTION: reverb
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - ris_network
+
+  # -------------------------------------------------------
+  # Redis — shared cache + session store for horizontal scaling
+  # -------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: ris_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - ris_network
+
+  # -------------------------------------------------------
+  # Broadcast Worker — dedicated queue for WebSocket pushes
+  # -------------------------------------------------------
+  # Keeping broadcasts on a separate queue prevents slow DB jobs from
+  # delaying real-time notification delivery.  The worker is intentionally
+  # lightweight: short timeout, fast sleep, restarts immediately on exit.
+  # -------------------------------------------------------
+  broadcast-worker:
+    image: ris_backend_image
+    container_name: ris_broadcast_worker
+    restart: unless-stopped
+    command: >
+      php artisan queue:work
+        --queue=broadcasts
+        --sleep=1
+        --tries=3
+        --timeout=30
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL}
+      DB_CONNECTION: mysql
+      DB_HOST: ${DB_HOST}
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: reverb
+      REVERB_PORT: ${REVERB_PORT:-8080}
+      REVERB_SCHEME: ${REVERB_SCHEME:-http}
+      BROADCAST_CONNECTION: reverb
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - ris_network
+
+# -------------------------------------------------------
+# Scheduler — runs php artisan schedule:run every minute.
+# Handles: notifications:shred-expired-requests (08:00)
+#          notifications:send-unclaimed-reminders (08:05)
+# -------------------------------------------------------
+  scheduler:
+    image: ris_backend_image
+    container_name: ris_scheduler
+    restart: unless-stopped
+    command: >
+      sh -c "while true; do php artisan schedule:run --no-interaction >> /var/log/scheduler.log 2>&1; sleep 60; done"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL}
+      DB_CONNECTION: mysql
+      DB_HOST: ${DB_HOST}
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      QUEUE_CONNECTION: database
+      REVERB_APP_ID: ${REVERB_APP_ID}
+      REVERB_APP_KEY: ${REVERB_APP_KEY}
+      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
+      REVERB_HOST: reverb
+      REVERB_PORT: ${REVERB_PORT:-8080}
+      REVERB_SCHEME: ${REVERB_SCHEME:-http}
+      BROADCAST_CONNECTION: reverb
     depends_on:
       backend:
         condition: service_started

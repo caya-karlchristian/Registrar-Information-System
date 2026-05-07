@@ -30,8 +30,8 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
   }, [request]);
 
   if (!request) return null; //To identify the role of the user
-    const isStudent = request.student_profile !== null && request.student_profile !== undefined;
-    const isAlumni = user?.role_id === 2;
+    const isStudent = request.student_profile != null;
+    const isAlumni = request.alumni_profile != null; 
     const progress = PROGRESS_MAP[request.status_id] ?? 0;
 
   const getDocName = (doc) => {
@@ -47,15 +47,15 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
   const displayStatus = request.status?.status_name || request.status || 'N/A';
 
   return (
-    <div className="fixed inset-x-0 top-25 bottom-0 z-50 flex items-start justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm overflow-hidden lg:top-24 lg:left-72 lg:w-[calc(100vw-18rem)] lg:bottom-0 lg:items-start lg:justify-center">
-      <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-[95vw] sm:w-full sm:max-w-2xl lg:max-w-4xl flex flex-col h-full sm:h-auto max-h-full sm:max-h-[calc(100vh-110px)] lg:max-h-[calc(100vh-145px)] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none mx-auto my-0 sm:my-4 lg:my-4">
+    <div className="fixed inset-x-0 top-25 pt-10 md:pt-10 bottom-0 pb-5 z-50 flex items-start justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm overflow-hidden lg:top-24 lg:left-72 lg:w-[calc(100vw-18rem)] lg:bottom-0 lg:items-start lg:justify-center">
+      <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-[95vw] sm:w-full sm:max-w-2xl lg:max-w-4xl md:max-h-[calc(100vh-180px)] flex flex-col h-full sm:h-auto max-h-full sm:max-h-[calc(100vh-110px)] lg:max-h-[calc(100vh-180px)] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none mx-auto my-0 sm:my-4 lg:my-4">
 
         {/* Header */}
         <div className="relative bg-pup-maroon px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center shrink-0">
           <div>
             <h3 className="text-base sm:text-lg font-bold text-white">Request Details</h3>
             <p className="text-xs sm:text-sm text-yellow-200 wrap-break-word">
-              Transaction ID: {request.request_id}
+              Transaction ID: {request.uuid ?? `#${request.request_id}`}
             </p>
           </div>
           <button
@@ -114,26 +114,17 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <p className="wrap-break-word">
                   <strong>Full Name:</strong>{' '}
-                  {user?.alumni_profile
-                    ? `${user.alumni_profile.first_name} ${user.alumni_profile.middle_name ?? ''} ${user.alumni_profile.last_name}`
+                  {request?.alumni_profile
+                    ? `${request.alumni_profile.first_name} ${request.alumni_profile.middle_name ?? ''} ${request.alumni_profile.last_name}`
                     : 'N/A'}
                 </p>
-                <p className="wrap-break-word"><strong>Email:</strong> {user?.email ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Student Number:</strong> {request.alumni_academic_record?.student_number ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Year of Graduation:</strong> {request.alumni_academic_record?.year_of_graduation ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Course:</strong> {request.alumni_academic_record?.course ?? 'N/A'}</p>
               </div>
             </Section>
           )}
 
-          {/* Academic Records - only for students //NEED FETCHING IN BACKEND IN MODAL FK TO STUDENT ACAD ID
-          {isStudent && (
-            <Section title="Academic Records">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <p><strong>Student Number:</strong> {request.academic_record?.student_number ?? 'N/A'}</p>
-                <p><strong>Course:</strong> {request.academic_record?.course ?? 'N/A'}</p>
-                <p><strong>Year Level:</strong> {request.academic_record?.year_level ?? 'N/A'}</p>
-                <p><strong>Section:</strong> {request.academic_record?.section ?? 'N/A'}</p>
-              </div>
-            </Section>
-          )} */}
 
           {/* Request Information */}
           <Section title="Request Information">
@@ -200,8 +191,8 @@ const getProgressLabel = (progress) => {
   switch (progress) {
     case 0:   return "Request was forfeited";
     case 25:  return "Request received and under review";
-    case 75:  return "Preparing your document for pickup";
-    case 100: return "Document is ready to claim";
+    case 75:  return "Document is ready to claim";
+    case 100: return "Document Claimed";
     default:  return "Pending";
   }
 };

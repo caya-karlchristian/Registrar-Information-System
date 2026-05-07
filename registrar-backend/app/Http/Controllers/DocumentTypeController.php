@@ -15,40 +15,57 @@ class DocumentTypeController extends Controller
     public function show($id)
     {
         $docType = DocumentType::find($id);
-        if (!$docType) return response()->json(['message' => 'Document type not found'], 404);
+        if (!$docType) {
+            return response()->json(['message' => 'Document type not found'], 404);
+        }
 
         return response()->json($docType, 200);
     }
 
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'document_name'           => 'required|string|max:100',
             'document_description'    => 'nullable|string',
             'document_requirements'   => 'nullable|string',
-            'document_process_period' => 'nullable|string',
+            'document_process_period' => 'nullable|string|max:100',
             'access_id'               => 'nullable|integer',
         ]);
 
-        $docType = DocumentType::create($request->all());
+        $docType = DocumentType::create($validated);
+
         return response()->json($docType, 201);
     }
 
     public function update(Request $request, $id)
     {
         $docType = DocumentType::find($id);
-        if (!$docType) return response()->json(['message' => 'Document type not found'], 404);
+        if (!$docType) {
+            return response()->json(['message' => 'Document type not found'], 404);
+        }
 
-        $docType->update($request->all());
+        $validated = $request->validate([
+            'document_name'           => 'sometimes|string|max:100',
+            'document_description'    => 'nullable|string',
+            'document_requirements'   => 'nullable|string',
+            'document_process_period' => 'nullable|string|max:100',
+            'access_id'               => 'nullable|integer',
+        ]);
+
+        $docType->update($validated);
+
         return response()->json($docType, 200);
     }
 
     public function destroy($id)
     {
         $docType = DocumentType::find($id);
-        if (!$docType) return response()->json(['message' => 'Document type not found'], 404);
+        if (!$docType) {
+            return response()->json(['message' => 'Document type not found'], 404);
+        }
 
         $docType->delete();
+
         return response()->json(['message' => 'Document type deleted'], 200);
     }
 }

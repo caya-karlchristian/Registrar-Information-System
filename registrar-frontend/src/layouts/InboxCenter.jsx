@@ -55,7 +55,7 @@ const toMailItem = (n) => ({
   category: CATEGORY_MAP[n.type] ?? 'Notification',
   time:    n.created_at,
   unread:  n.is_unread ?? !n.read_at,
-  // Keep original for markAsRead
+  // Keep original for markAsRead and requirements checklist
   _raw: n,
 });
 
@@ -145,26 +145,14 @@ const InboxCenter = () => {
     if (name === 'composeSubject') setComposeSubject(value);
   };
 
+  // TODO: Email contact workflow is not yet implemented.
+  // The backend route, controller, and IdP email-update flow need to be
+  // built before this button can send anything. See bug checklist:
+  // 'New Email Contact Workflow'.
+  // Keeping the handler as a no-op so the compose layout is preserved
+  // and wiring it up later only requires filling in this function.
   const handleSendEmail = () => {
-    const toValue      = composeTo.trim();
-    const subjectValue = composeSubject.trim();
-    const messageValue = composeMessage.trim();
-    const emailRegex   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!emailRegex.test(toValue)) {
-      setErrorMessage('Please enter a valid email address.');
-      return;
-    }
-    if (!subjectValue || !messageValue) {
-      setErrorMessage('Subject and message are required before sending.');
-      return;
-    }
-
-    setErrorMessage('');
-    setComposeStatus(`Email sent to ${toValue}.`);
-    setComposeTo('');
-    setComposeSubject('');
-    setComposeMessage('');
+    setErrorMessage('Email sending is not yet available. This feature is coming soon.');
   };
 
   return (
@@ -263,24 +251,65 @@ const InboxCenter = () => {
 
                   <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-gray-50">
                     {rightPanelMode === 'preview' ? (
-                      <div className="rounded-lg border border-gray-200 bg-white px-4 py-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-2">
-                          Message Preview
-                        </p>
-                        <div className="space-y-2">
-                          <p className="text-sm text-gray-700">
-                            <span className="font-semibold text-gray-900">Sender:</span>{' '}
-                            {selectedMail.from}
+                      <div className="space-y-4">
+
+                        {/* ── Message body ── */}
+                        <div className="rounded-lg border border-gray-200 bg-white px-4 py-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-2">
+                            Message Preview
                           </p>
-                          <p className="text-sm text-gray-700">
-                            <span className="font-semibold text-gray-900">Time:</span>{' '}
-                            {formatTime(selectedMail.time)}
-                          </p>
-                          <p className="text-sm text-gray-700 leading-relaxed">
-                            <span className="font-semibold text-gray-900">Preview:</span>{' '}
-                            {selectedMail.preview}
-                          </p>
+                          <div className="space-y-2">
+                            <p className="text-sm text-gray-700">
+                              <span className="font-semibold text-gray-900">Sender:</span>{' '}
+                              {selectedMail.from}
+                            </p>
+                            <p className="text-sm text-gray-700">
+                              <span className="font-semibold text-gray-900">Time:</span>{' '}
+                              {formatTime(selectedMail.time)}
+                            </p>
+                            <p className="text-sm text-gray-700 leading-relaxed">
+                              <span className="font-semibold text-gray-900">Message:</span>{' '}
+                              {selectedMail.preview}
+                            </p>
+                          </div>
                         </div>
+
+                        {/* ── Requirements checklist (request_submitted only) ── */}
+                        {selectedMail._raw?.requirements?.length > 0 && (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-700 mb-3">
+                              Requirements Checklist
+                            </p>
+                            <p className="text-xs text-amber-800 mb-4">
+                              Please prepare the following for each item in your request before visiting the Registrar's Office.
+                            </p>
+                            <div className="space-y-4">
+                              {selectedMail._raw.requirements.map((req, idx) => (
+                                <div key={idx} className="rounded-md border border-amber-200 bg-white px-3 py-3">
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <p className="text-sm font-semibold text-gray-900">{req.item}</p>
+                                    <div className="flex gap-2 shrink-0">
+                                      {req.copies > 1 && (
+                                        <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                                          {req.copies}x copies
+                                        </span>
+                                      )}
+                                      {req.process_days && (
+                                        <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                          {req.process_days}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
+                                    {req.requirements}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                       </div>
                     ) : (
                       /* ── COMPOSE FORM ── */
@@ -323,7 +352,9 @@ const InboxCenter = () => {
                           <div className="flex items-center justify-between gap-3">
                             <button
                               onClick={handleSendEmail}
-                              className="inline-flex items-center gap-1.5 rounded-md bg-pup-dark-maroon px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#510400]"
+                              disabled
+                              title="Email sending is not yet available"
+                              className="inline-flex items-center gap-1.5 rounded-md bg-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed opacity-60"
                             >
                               <PaperAirplaneIcon className="w-4 h-4" />
                               Send Email

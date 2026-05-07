@@ -51,7 +51,7 @@ const AgreementPage = () => {
                 type="checkbox"
                 checked={agreed}
                 onChange={e => setAgreed(e.target.checked)}
-                className="w-5 h-4 accent-[#800000] cursor-pointer"
+                className="w-4 h-4 accent-[#800000] cursor-pointer"
               />
               <span className="text-[#800000] font-bold text-sm">
                 I Agree and acknowledge the

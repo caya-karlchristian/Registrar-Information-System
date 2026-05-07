@@ -6,7 +6,9 @@ use App\Events\NotificationSent;
 use App\Models\Notification;
 use App\Models\NotificationType;
 use App\Models\SystemUser;
+use App\Jobs\SendBulkNotificationJob;
 use Illuminate\Support\Facades\DB;
+use App\Contracts\NotificationServiceInterface;
 use Illuminate\Support\Facades\Log;
 
 /*
@@ -34,7 +36,7 @@ use Illuminate\Support\Facades\Log;
 |--------------------------------------------------------------------------
 */
 
-class NotificationService
+class NotificationService implements NotificationServiceInterface
 {
     // -------------------------------------------------------
     // SEND TO A SPECIFIC USER
@@ -51,7 +53,7 @@ class NotificationService
     // fails, the notification row is still saved (and vice versa
     // the row won't be orphaned if something goes wrong mid-save).
     // -------------------------------------------------------
-    public static function send(
+    public function send(
         SystemUser $recipient,
         string     $triggerEvent,
         array      $data      = [],
@@ -73,7 +75,7 @@ class NotificationService
             // Replace :placeholders in the template with actual values
             // e.g. "Payment verified for request #:request_id"
             //   → "Payment verified for request #42"
-            $message = self::buildMessage($type->message_template, $data);
+            $message = $this->buildMessage($type->message_template, $data);
 
             // Step 3 + 4: Save to DB and broadcast — atomically
             return DB::transaction(function () use (
@@ -121,40 +123,34 @@ class NotificationService
     // read_at state. The WebSocket push is just the real-time
     // alert on top of that persistent record.
     // -------------------------------------------------------
-    public static function sendToAllExcept(
+    public function sendToAllExcept(
         array  $excludedRoleIds,
         string $triggerEvent,
         array  $data      = [],
         ?int   $requestId = null,
     ): void {
-        $users = SystemUser::whereNotIn('role_id', $excludedRoleIds)
-            ->where('status', 'Activated')
-            ->get();
-        foreach ($users as $user) {
-            self::send(
-                recipient:    $user,
-                triggerEvent: $triggerEvent,
-                data:         $data,
-                requestId:    $requestId,
-            );
-        }
+        // Dispatch to queue — loop runs in background, HTTP response is instant.
+        dispatch(new SendBulkNotificationJob(
+            triggerEvent:    $triggerEvent,
+            data:            $data,
+            excludedRoleIds: $excludedRoleIds,
+            requestId:       $requestId,
+        ));
     }
-    public static function sendToAdmins(
+    public function sendToAdmins(
         string $triggerEvent,
         array  $data      = [],
         ?int   $requestId = null,
     ): void {
-        $admins = SystemUser::where('role_id', SystemUser::ROLE_ADMIN)
-            ->where('status', 'Activated')->get();
-
-        foreach ($admins as $admin) {
-            self::send(
-                recipient:    $admin,
-                triggerEvent: $triggerEvent,
-                data:         $data,
-                requestId:    $requestId,
-            );
-        }
+        // Dispatch to queue — loop runs in background, HTTP response is instant.
+        // Include ROLE_SUPER_ADMIN so super admins also receive admin notifications
+        // (e.g. new request submitted, payment verification needed).
+        dispatch(new SendBulkNotificationJob(
+            triggerEvent: $triggerEvent,
+            data:         $data,
+            onlyRoleIds:  [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN],
+            requestId:    $requestId,
+        ));
     }
 
     // -------------------------------------------------------
@@ -168,7 +164,7 @@ class NotificationService
     //   data:     ['request_id' => 42]
     //   result:   "Payment verified for request #42"
     // -------------------------------------------------------
-    private static function buildMessage(string $template, array $data): string
+    private function buildMessage(string $template, array $data): string
     {
         foreach ($data as $key => $value) {
             if (is_scalar($value)) {
@@ -184,7 +180,7 @@ class NotificationService
     // Used by the frontend bell icon badge.
     // Returns a simple integer — fast single-column query.
     // -------------------------------------------------------
-    public static function unreadCount(SystemUser $user): int
+    public function unreadCount(SystemUser $user): int
     {
         return Notification::where('notifiable_type', SystemUser::class)
             ->where('notifiable_id', $user->user_id)
@@ -196,7 +192,7 @@ class NotificationService
     // -------------------------------------------------------
     // MARK ALL AS READ FOR A USER
     // -------------------------------------------------------
-    public static function markAllAsRead(SystemUser $user): void
+    public function markAllAsRead(SystemUser $user): void
     {
         Notification::where('notifiable_type', SystemUser::class)
             ->where('notifiable_id', $user->user_id)

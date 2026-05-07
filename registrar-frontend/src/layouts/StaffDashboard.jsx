@@ -27,11 +27,23 @@ const STATUS_FALLBACK = {
   PENDING: 1,
   READY: 2,
   COMPLETED: 3,
-  FORFEITED: 6,
+  FORFEITED: 4,  // matches RequestStatusEnum::Forfeited = 4 on the backend
 };
 
 const ITEMS_PER_PAGE = 5;
 const PRINTED_CERTIFICATE_STORAGE_KEY = 'printed-certificate-request-ids';
+
+// Module-level constant — stable across renders, safe in useEffect deps.
+const DASHBOARD_REFETCH_TRIGGERS = new Set([
+  'admin_new_request',
+  'admin_payment_verification',
+  'admin_incomplete_request',
+  'status_updated',
+  'request_processing',
+  'ready_to_claim',
+  'request_completed',
+  'request_forfeited',
+]);
 
 const StaffDashboard = () => {
   const [requests, setRequests] = useState([]);
@@ -42,7 +54,7 @@ const StaffDashboard = () => {
   const [updatingId, setUpdatingId] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortOrder, setSortOrder] = useState('Descending');
+  const [sortOrder, setSortOrder] = useState('Recent Requests');
   const [selectedIds, setSelectedIds] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [certRequest, setCertRequest] = useState(null);
@@ -104,7 +116,7 @@ const StaffDashboard = () => {
         };
       })();
 
-      const formatted = (requestsRes.data || []).map(r => {
+      const formatted = (requestsRes.data?.data ?? requestsRes.data ?? []).map(r => {
         const requestDate = r.requested_at ? new Date(r.requested_at) : null;
         const now = new Date();
         const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
@@ -178,6 +190,7 @@ const StaffDashboard = () => {
           studentNumber: r.academic_record?.student_number
             ?? r.alumni_academic_record?.student_number
             ?? 'N/A',
+          userType: r.student_profile ? 'Student' : 'Alumni',
           certName: finalCertName,
           certificateNames: r.certificates?.map(c => c.certification_type?.certificate_name).filter(Boolean) ?? [],
           isCertificate,
@@ -192,6 +205,7 @@ const StaffDashboard = () => {
           dateGraduated: r.academic_record?.date_graduated ?? '',
           diplomaNum: r.academic_record?.diploma_number ?? '',
           eventTitle: r.event_title ?? '',
+          or_number: r.or_number ?? '',
 
           date: requestDate
             ? requestDate.toLocaleDateString('en-GB', {
@@ -221,10 +235,25 @@ const StaffDashboard = () => {
     fetchData();
   }, [fetchData]);
 
-  // Refetch whenever a new notification arrives (e.g. new request submitted)
+  // Refetch when a relevant notification arrives via WebSocket.
+  // DASHBOARD_REFETCH_TRIGGERS is defined at module scope so it is
+  // stable across renders and can safely be omitted from deps.
   useEffect(() => {
-    if (notifications.length > 0) fetchData();
-  }, [notifications.length]);
+    if (notifications.length === 0) return;
+    const latest = notifications[0];
+    if (latest && DASHBOARD_REFETCH_TRIGGERS.has(latest.type)) {
+      fetchData(false); // silent background refresh, no loading overlay
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifications[0]?.id, fetchData]);
+
+  // Polling fallback — keeps the dashboard eventually-consistent even when
+  // the WebSocket is down or the queue worker misses an event.
+  // 30 s is frequent enough to feel live without hammering the backend.
+  useEffect(() => {
+    const id = setInterval(() => fetchData(false), 30_000);
+    return () => clearInterval(id);
+  }, [fetchData]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -252,20 +281,13 @@ const StaffDashboard = () => {
   };
 
   /* ---------------- FILTERED + SORTED DATA ---------------- */
-  const statusFilterOptions = (() => {
-    const dbStatusNames = requestStatuses
+  const statusFilterOptions = [
+    'All',
+    ...requestStatuses
       .map(s => s?.status_name)
-      .filter(Boolean);
-
-    const visibleStatuses = dbStatusNames.filter(
-      name => !['completed', 'forfeited'].includes(String(name).toLowerCase())
-    );
-
-    const uniqueVisibleStatuses = [...new Set(visibleStatuses)];
-    return uniqueVisibleStatuses.length > 0
-      ? ['All', ...uniqueVisibleStatuses, 'Completed']
-      : ['All', 'Pending', 'Ready to claim', 'Completed'];
-  })();
+      .filter(Boolean)
+      .filter((name, index, self) => self.indexOf(name) === index),
+  ];
 
   const filteredData = requests
     .filter(r => {
@@ -279,7 +301,7 @@ const StaffDashboard = () => {
         r.id.toString().includes(searchTerm);
       return matchesStatus && matchesSearch;
     })
-    .sort((a, b) => (sortOrder === 'Ascending' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp));
+    .sort((a, b) => (sortOrder === 'Old Requests' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp));
 
   /* ---------------- PAGINATION ---------------- */
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
@@ -294,7 +316,7 @@ const StaffDashboard = () => {
   const getStatusBadge = status => {
     const normalizedStatus = String(status ?? '').trim().toLowerCase();
     const styles = {
-      pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      processing: 'bg-yellow-100 text-yellow-700 border-yellow-200',
       'ready to claim': 'bg-green-100 text-green-700 border-green-200',
       completed: 'bg-gray-200 text-gray-700 border-gray-300',
       forfeited: 'bg-red-100 text-red-700 border-red-200',
@@ -402,7 +424,7 @@ const StaffDashboard = () => {
               name="sortOrder"
               value={sortOrder}
               onChange={handleToolbarDropdownChange}
-              options={['Descending', 'Ascending']}
+              options={['Recent Requests', 'Old Requests']}
               labelColor="text-gray-600"
             />
           </div>
@@ -421,10 +443,11 @@ const StaffDashboard = () => {
                     checked={currentItems.length > 0 && selectedIds.length === currentItems.length}
                   />
                 </th>
-                <Th>Req ID</Th>
-                <Th>Student</Th>
-                <Th>Document</Th>
-                <Th>Date & Time</Th>
+                <Th center>Req ID</Th>
+                <Th center>Name</Th>
+                <Th center>Classification</Th>
+                <Th center>Document</Th>
+                <Th center>Date & Time</Th>
                 <Th center>No. of Copies</Th>
                 <Th center>Status</Th>
                 <Th center>Actions</Th>
@@ -441,9 +464,14 @@ const StaffDashboard = () => {
                       onChange={() => handleSelectOne(req.id)}
                     />
                   </td>
-                  <Td>{req.id}</Td>
+                  <Td center>{req.id}</Td>
                   <Td>
                     <div className="font-bold">{req.studentName}</div>
+                  </Td>
+                  <Td center>
+                    <span className="text-xs font-bold tracking-wide">
+                      {req.userType.toUpperCase()}
+                    </span>
                   </Td>
                   <Td>
                     <div className="flex flex-col gap-0.5">
@@ -458,7 +486,7 @@ const StaffDashboard = () => {
                       )}
                     </div>
                   </Td>
-                  <Td>
+                  <Td center>
                     <div className="text-xs text-gray-400">{req.date}</div>
                     <div className="text-xs text-gray-400">{req.time}</div>
                   </Td>

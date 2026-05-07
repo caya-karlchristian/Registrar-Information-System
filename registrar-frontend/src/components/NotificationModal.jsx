@@ -138,7 +138,7 @@ const NotificationModal = ({ isOpen, onClose }) => {
         shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]
         ring-1 ring-white/5 z-50
         animate-in fade-in slide-in-from-top-3 duration-200
-        sm:right-4 sm:w-95 sm:rounded-3xl
+        sm:right-4 sm:w-95 sm:rounded-3xl mt-2
       ">
         {/* Header */}
         <div className="px-4 py-4 bg-[#510400] border-b border-white/5 sm:p-5">

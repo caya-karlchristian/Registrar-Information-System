@@ -96,7 +96,7 @@ const NotificationToast = () => {
     if (toasts.length === 0) return null;
 
     return (
-        <div className="fixed top-30 right-4 md:right-8 lg:right-9 z-[9999] flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] pointer-events-none">
+        <div className="fixed top-26 lg:top-30 md:top-30 right-3 lg:right-5 md:right-5 z-9999 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] pointer-events-none">
             {toasts.map(toast => (
                 <div key={toast.id} className="pointer-events-auto">
                     <SingleToast toast={toast} onDismiss={dismissToast} />

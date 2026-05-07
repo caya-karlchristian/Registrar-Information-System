@@ -157,12 +157,12 @@ const DocumentManagement = () => {
   };
 
   return (
-    <div className="bg-[#F5F5F5] min-h-[200vh] font-sans">
+    <div className="bg-[#F5F5F5] min-h-screen font-sans px-4 sm:px-6">
 
       {/* Top bar */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start mb-6">
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start mb-6">
         <div className="w-full lg:max-w-sm">
-          <div className="w-95 max-w-full">
+          <div className="w-full">
             <VoiceSearchInput
               value={search}
               onChange={(value) => {
@@ -177,7 +177,7 @@ const DocumentManagement = () => {
         <div className="w-full lg:w-200 flex justify-start lg:justify-end">
           <button
             onClick={handleAdd}
-            className="flex items-center gap-2 bg-pup-dark-maroon text-white px-5 py-2.5 rounded-full text-sm font-semibold shadow hover:bg-[#3a0303] transition-all"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-pup-dark-maroon text-white px-5 py-2.5 rounded-full text-sm font-semibold shadow hover:bg-[#3a0303] transition-all"
           >
             Add Document <PlusIcon className="w-4 h-4" />
           </button>
@@ -188,7 +188,7 @@ const DocumentManagement = () => {
       <div className="flex flex-col lg:flex-row gap-6 items-start">
 
         {/* Left — Document List */}
-        <div className="bg-gray-200 rounded-xl w-full lg:max-w-sm flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 h-150">
+        <div className="bg-gray-200 rounded-xl w-full lg:max-w-sm flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150">
           <div className="px-6 pt-6 pb-3 text-center">
             <h2 className="text-pup-dark-maroon font-bold text-lg">List of Documents</h2>
             <hr className="mt-3 border-gray-400" />
@@ -258,7 +258,7 @@ const DocumentManagement = () => {
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40"
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40 whitespace-nowrap"
             >
               Next <ChevronRightIcon className="w-3 h-3" />
             </button>
@@ -266,7 +266,7 @@ const DocumentManagement = () => {
         </div>
 
         {/* Right — Always visible form */}
-        <form onSubmit={handleSave} className="bg-gray-200 rounded-xl p-10 py-4 lg:w-200 w-full flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 h-150">
+        <form onSubmit={handleSave} className="bg-gray-200 rounded-xl p-6 sm:p-10 py-4 lg:w-200 w-full flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150">
           <h2 className="text-pup-dark-maroon font-bold text-xl mb-2">
             {isAdding ? "Add Document" : "Edit Document"}
           </h2>
@@ -303,7 +303,7 @@ const DocumentManagement = () => {
             required
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InputGroup
               label="Process Period"
               name="document_process_period"
@@ -324,7 +324,7 @@ const DocumentManagement = () => {
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-end gap-3 pt-2">
             {!isAdding && (
               <button
                 type="button"
@@ -336,7 +336,7 @@ const DocumentManagement = () => {
             )}
             <button
               type="submit"
-              className="px-6 py-2.5 mt-9 rounded-full text-sm font-bold bg-pup-dark-maroon text-white hover:bg-[#3a0303] transition-all shadow"
+              className="px-6 py-2.5 rounded-full text-sm font-bold bg-pup-dark-maroon text-white hover:bg-[#3a0303] transition-all shadow"
             >
               {isAdding ? "Add Document" : "Save Changes"}
             </button>

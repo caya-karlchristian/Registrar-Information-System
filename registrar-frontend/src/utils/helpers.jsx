@@ -1,8 +1,8 @@
 import puplogoimage from "../assets/puplogoimage.png";
 import certificate_footer from "../assets/certificate_footer.png";
 import { formatDateFormal, formatDateOrdinal } from "./formatters.js";
+import { CURRENT_YEAR } from "./formatters.js";
 
-// --- Reusable UI Components ---
 export const TextBlock = ({ children, className = "" }) => (
   <div
     className={`mb-4 ${className} cert-editable-block`}
@@ -15,36 +15,31 @@ export const TextBlock = ({ children, className = "" }) => (
 );
 export const bold = (text) => <strong>{text}</strong>;
 
-/**
- * Displays value in bold, or a fill-in line if value is empty/falsy
- * Useful for certificates where blank fields need visual indicators
- */
-export const fillOrLine = (value, lineLength = 20) => {
+export const fillOrLine = (value, lineLength = 10) => {
   if (value && String(value).trim()) {
     return <strong>{value}</strong>;
   }
   return <span className="border-b border-gray-800" style={{ display: 'inline-block', minWidth: `${lineLength * 0.15}in` }}>&nbsp;</span>;
 };
 
-
 export const CertificateTitle = ({ title }) => (
   <div className="text-center mb-6 print:mb-7">
-    <h1 className="cert-title text-[12px] sm:text-[20px] md:text-[25px] font-bold uppercase tracking-[0.35em] sm:tracking-[0.5em] leading-tight text-black">
+    <TextBlock className="cert-title font-lucida text-[12px] sm:text-[20px] md:text-[25px] font-bold uppercase tracking-normal leading-tight text-black">
       {title}
-    </h1>
+    </TextBlock>
   </div>
 );
 
 export const SignatureBlock = ({ name, position }) => (
-  <div className="mb-4 flex justify-end">
-    <div className="inline-block text-center">
-      <p className="font-bold px-10 text-xs sm:text-sm uppercase font-serif text-gray-900 print:text-[10pt]">
+  <div className="mb-4 mt-10 flex justify-end print:mt-15">
+    <TextBlock className="inline-block text-center mb-0">
+      <p className="font-bold px-10 text-xs sm:text-sm uppercase font-lucida text-gray-900 print:text-[10pt]">
         {name}
       </p>
-      <p className="text-[8px] lg:text-[10px] print:text-[8pt]">
+      <p className="text-[8px] lg:text-[10px] print:text-[8pt] font-lucida">
         {position}
       </p>
-    </div>
+    </TextBlock>
   </div>
 );
 
@@ -67,7 +62,7 @@ export const getSigneeInfo = (signee, fallbackKey = "mhel") => {
 };
 
 export const FooterInfo = ({ diplomaNum, date }) => (
-  <div className="mt-3 pt-3">
+  <TextBlock className="mt-10 pt-3 print:mt-25 font-lucida">
     <p className="text-[6px] sm:text-[8px] print:text-[8pt] tracking-tighter mb-1">
       Not valid without University Dry Seal
     </p>
@@ -80,12 +75,12 @@ export const FooterInfo = ({ diplomaNum, date }) => (
     <p className="text-[6px] sm:text-[8px] print:text-[8pt] tracking-tighter mb-1">
       Date: {date}
     </p>
-    <p className="text-[5px] sm:text-[7px] print:text-[8pt] tracking-tighter">/shgsese2026</p>
-  </div>
+    <p className="text-[5px] sm:text-[7px] print:text-[8pt] tracking-tighter">/shgsese{CURRENT_YEAR}</p>
+  </TextBlock>
 );
 
 export const ReceiptInfo = ({ officialReceiptNum, date }) => (
-  <div className="mt-3 pt-3">
+  <TextBlock className="mt-15 pt-3 print:mt-25 font-lucida">
     <p className="text-[6px] sm:text-[8px] print:text-[8pt] tracking-tighter mb-1">
       Not valid without University Dry Seal
     </p>
@@ -98,8 +93,8 @@ export const ReceiptInfo = ({ officialReceiptNum, date }) => (
     <p className="text-[6px] sm:text-[8px] print:text-[8pt] tracking-tighter mb-1">
       Date: {date}
     </p>
-    <p className="text-[5px] sm:text-[7px] print:text-[8pt] tracking-tighter">/shgsese2026</p>
-  </div>
+    <p className="text-[5px] sm:text-[7px] print:text-[8pt] tracking-tighter">/shgsese{CURRENT_YEAR}</p>
+  </TextBlock>
 );
 
 export const CertHeader = ({ layout }) => (
@@ -112,7 +107,7 @@ export const CertHeader = ({ layout }) => (
           className="object-contain shrink-0"
           style={{ width: `${layout?.headerLogoSize ?? 120}px`, height: `${layout?.headerLogoSize ?? 120}px` }}
         />
-        <div className="cert-header-text pt-1 leading-tight text-black uppercase">
+        <div className="cert-header-text pt-1 leading-tight text-black uppercase font-lucida">
           <p className="text-[7px] sm:text-[9px] font-normal tracking-tight">REPUBLIC OF THE PHILIPPINES</p>
           <p className="text-[8px] sm:text-[15px] font-bold tracking-tight">
             Polytechnic University of the Philippines
@@ -137,11 +132,11 @@ export const CertHeader = ({ layout }) => (
 
 export const RegistrarDateTitle = ({ date }) => (
   <>
-    <TextBlock className="text-left cert-meta-line -mt-1 print:mt-0">
+    <TextBlock className="font-lucida text-left cert-meta-line -mt-1 print:mt-0">
       Office of the Campus Registrar
     </TextBlock>
 
-    <TextBlock className="text-right cert-meta-line mt-6 print:mt-7">
+    <TextBlock className="font-lucida text-right cert-meta-line mt-6 print:mt-7">
       {formatDateFormal(date)}
     </TextBlock>
   </>
@@ -155,7 +150,7 @@ export const CertFooter = ({ layout }) => (
         Direct Line: (02) 8837 5858 to 60 | Email: taguig@pup.edu.ph<br />
         Website: www.pup.edu.ph | Inquiries: https://bit.ly/PUPSINTA
       </div>
-      <div className="cert-footer-tagline text-[10px] sm:text-[15px] font-bold tracking-tight leading-tight uppercase text-black font-serif">
+      <div className="cert-footer-tagline text-[10px] sm:text-[15px] font-bold tracking-tight leading-tight uppercase text-black font-lucida">
         THE COUNTRY'S 1st POLYTECHNIC
       </div>
     </div>
@@ -193,24 +188,20 @@ export const DirectorSignature = ({ signee }) => {
   );
 };
 
-// ─── Composite Layouts ─────────────────────────────────────────────────────────
-
-/** Standard cert wrapper: date header + "Certification" title + "To Whom It May Concern" */
 export const StandardCertLayout = ({ date, children }) => (
   <>
     <RegistrarDateTitle date={date} />
-    <CertificateTitle title="Certification" />
+    <CertificateTitle title="C E R T I F I C A T I O N" />
     <div className="cert-body px-2 sm:px-4">
-      <TextBlock className="mb-5 cert-salutation">To Whom It May Concern:</TextBlock>
+      <TextBlock className="mb-5 cert-salutation font-lucida">To Whom It May Concern:</TextBlock>
       {children}
     </div>
   </>
 );
 
-/** Standard cert body paragraph (indented, justified, line-height 1.9) */
 export const CertParagraph = ({ children, className = "" }) => (
   <p
-    className={`cert-paragraph indent-8 ${className} cert-editable-block`}
+    className={`cert-paragraph indent-8 font-lucida ${className} cert-editable-block`}
     contentEditable
     suppressContentEditableWarning
     spellCheck
@@ -219,7 +210,6 @@ export const CertParagraph = ({ children, className = "" }) => (
   </p>
 );
 
-/** Closing line used by most certs */
 export const IssuedLine = ({ date }) => (
   <CertParagraph className="mb-10">
     This certification is issued this {formatDateOrdinal(date)} upon request 
@@ -227,7 +217,6 @@ export const IssuedLine = ({ date }) => (
   </CertParagraph>
 );
 
-/** Closing line variant used when "upon request of the aforementioned name" */
 export const IssuedLineAforementioned = ({ date }) => (
   <CertParagraph className="mb-10">
     This certification is issued this {formatDateOrdinal(date)} upon request of the aforementioned
@@ -235,12 +224,10 @@ export const IssuedLineAforementioned = ({ date }) => (
   </CertParagraph>
 );
 
-// ─── PUP Letterhead (used in CAV Request Letter, Endorsement Letter) ───────────
-
 export const PupLetterhead = ({ date }) => (
   <>
     <div className="flex items-center gap-3 mb-2">
-      <img src={puplogoimage} alt="PUP Logo" className="w-10 h-10 object-contain" />
+      <img src={puplogoimage} alt="PUP Logo" className="w-10 h-10 object-contain print:w-12 print:h-12" />
       <div className="text-[10px] leading-tight">
         <p>Republic of the Philippines</p>
         <p className="font-bold uppercase text-[11px]">Polytechnic University of the Philippines</p>
@@ -255,17 +242,15 @@ export const PupLetterhead = ({ date }) => (
   </>
 );
 
-// ─── Endorsement shared document list ─────────────────────────────────────────
-
 export const EndorsementNoteBlock = ({ items }) => (
-  <div className="text-[11px] sm:text-[12px]">
+  <TextBlock className="text-[11px] sm:text-[12px]">
     <p className="mb-2">Note: The following documents are attached:</p>
     <ol className="list-decimal list-inside ml-6 space-y-1">
       {items.map((item, i) => (
         <li key={i}>{item}</li>
       ))}
     </ol>
-  </div>
+  </TextBlock>
 );
 
 export const getTodayDate = () => {

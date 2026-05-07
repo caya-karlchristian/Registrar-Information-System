@@ -5,12 +5,14 @@ import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
 import ErrorToast from "../components/ErrorToast.jsx";
 import ImageUploader from "../components/ImageUploader.jsx";
-import axios from "../services/api.js";
-import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
+import { getDocumentTypes, getCertifications, getRequestPurposes, createDocumentRequest } from "../services/api.js";
+import { CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
+
+const ALUMNI_ACCESS_IDS = [2, 3];
 
 const AlumniRequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -18,6 +20,7 @@ const AlumniRequestForm = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [availableDocs, setAvailableDocs] = useState([]);
   const [availableCertifications, setAvailableCertifications] = useState([]);
+  const [availablePurposes, setAvailablePurposes] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
@@ -27,21 +30,27 @@ const AlumniRequestForm = () => {
     return date.toISOString().split('T')[0];
   };
   
-
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const docsRes = await axios.get("/document-types");
-        setAvailableDocs(docsRes.data);
+        const docsRes = await getDocumentTypes();
+        setAvailableDocs((docsRes.data ?? []).filter(doc => ALUMNI_ACCESS_IDS.includes(doc.access_id)));
       } catch (err) {
         console.warn("Failed to load document types.");
       }
 
       try {
-        const certRes = await axios.get("/certifications");
-        setAvailableCertifications(certRes.data);
+        const certRes = await getCertifications();
+        setAvailableCertifications((certRes.data ?? []).filter(cert => ALUMNI_ACCESS_IDS.includes(cert.access_id)));
       } catch (err) {
         console.warn("Certification types API unavailable, using constants.");
+      }
+
+      try {
+        const purposeRes = await getRequestPurposes();
+        setAvailablePurposes(purposeRes.data ?? []);
+      } catch (err) {
+        console.warn("Request purposes API unavailable.");
       }
     };
     loadOptions();
@@ -202,9 +211,10 @@ const AlumniRequestForm = () => {
     setIsLoading(true);
 
     try {
-      const purposeId = Object.keys(PURPOSE_MAP).find(
-        key => PURPOSE_MAP[key] === formData.purposeOfRequest
+      const selectedPurpose = availablePurposes.find(
+        p => p.purpose_name === formData.purposeOfRequest
       );
+      const purposeId = selectedPurpose?.request_purpose_id;
 
       // Map all selected certification names to their IDs
       const certificates = formData.certification
@@ -224,7 +234,7 @@ const AlumniRequestForm = () => {
         certificates: certificates,
       };
 
-      const response = await axios.post("/document-requests", payload);
+      const response = await createDocumentRequest(payload);
 
       console.log("Submission successful:", response.data);
       setIsSubmitted(true);
@@ -271,7 +281,9 @@ const AlumniRequestForm = () => {
       ? availableCertifications.map((c) => c.certificate_name)
       : Object.values(CERTIFICATION_MAP);
 
-  const purposeOptions = Object.values(PURPOSE_MAP);
+  const purposeOptions = availablePurposes.length > 0
+    ? availablePurposes.map(p => p.purpose_name)
+    : [];
 
 
   const documentOptions = availableDocs.length > 0
@@ -527,8 +539,14 @@ const AlumniRequestForm = () => {
                                 min="1"
                                 max="10"
                                 className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg outline-none transition-all duration-200 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
-                                value={formData.certCopies[certName] || 1}
-                                onChange={e => handleCertCopyChange(certName, e.target.value)}
+                                value={formData.certCopies[certName] === undefined ? '' : formData.certCopies[certName]}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  handleCertCopyChange(certName, val === '' ? '' : Math.max(1, Math.min(10, Number(val))));
+                                }}
+                                onBlur={e => {
+                                  if (e.target.value === '') handleCertCopyChange(certName, 1);
+                                }}
                               />
                             </div>
                           </div>
