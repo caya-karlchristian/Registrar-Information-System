@@ -7,7 +7,7 @@ const SuperAdminPage = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#F5F5F5]">
+    <div className="flex flex-col h-screen overflow-hidden bg-[#F5F5F5] pt-25">
       <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
 
       <div className="flex flex-1 overflow-hidden relative">

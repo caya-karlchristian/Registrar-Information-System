@@ -16,18 +16,24 @@ Broadcast::channel('notifications.{userId}', function (SystemUser $user, int $us
     return (int) $user->user_id === (int) $userId;
 });
 
+// admin.notifications channel removed — NotificationSent::broadcastOn()
+// only broadcasts to the personal notifications.{userId} channel.
+// Each admin receives their own copy via SendBulkNotificationJob.
+// Re-add this channel if you ever introduce a true shared admin broadcast.
+
+
 /*
 |--------------------------------------------------------------------------
 | PRIVATE CHANNEL: admin.notifications
 |--------------------------------------------------------------------------
-| Admin-only broadcast channel (new requests, payment verification, etc.)
-| Only role_id 3 (Admin) and role_id 4 (Super Admin) can subscribe.
-| Using the model's constants keeps this in sync if roles ever change.
+| Shared channel for all admin users.
+| Kept here as a defensive definition — channel auth will not 403
+| if the frontend accidentally subscribes. Only admin and super_admin
+| roles are authorised to join.
+| NotificationSent currently broadcasts to personal channels only;
+| this channel is available for future shared-admin broadcasts.
 |--------------------------------------------------------------------------
 */
 Broadcast::channel('admin.notifications', function (SystemUser $user) {
-    return in_array($user->role_id, [
-        SystemUser::ROLE_ADMIN,
-        SystemUser::ROLE_SUPER_ADMIN,
-    ]);
+    return $user->isAdmin() || $user->isSuperAdmin();
 });

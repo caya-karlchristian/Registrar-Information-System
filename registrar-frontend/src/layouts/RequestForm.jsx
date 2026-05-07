@@ -1,5 +1,5 @@
-import React, { useState, useEffect} from "react";
-import axios from "../services/api"
+import React, { useState, useEffect, useMemo } from "react";
+import { getDocumentTypes, getCertifications, getRequestPurposes, createDocumentRequest } from "../services/api"
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
@@ -11,6 +11,18 @@ import qrCode from "../assets/qrcode.png";
 import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 
+const STUDENT_ACCESS_IDS = [1, 3];
+
+const parseRequirements = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 const RequestForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -19,6 +31,7 @@ const RequestForm = () => {
   const [availableDocs, setAvailableDocs] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [availableCertifications, setAvailableCertifications] = useState([]);
+  const [availablePurposes, setAvailablePurposes] = useState([]);
 
   const getDateDaysAgo = (days) => {
     const date = new Date();
@@ -29,17 +42,24 @@ const RequestForm = () => {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const docsRes = await axios.get("/document-types");
-        setAvailableDocs(docsRes.data);
+        const docsRes = await getDocumentTypes();
+        setAvailableDocs((docsRes.data ?? []).filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id)));
       } catch (err) {
         console.warn("Failed to load document types.");
       }
 
       try {
-        const certRes = await axios.get("/certifications");
-        setAvailableCertifications(certRes.data);
+        const certRes = await getCertifications();
+        setAvailableCertifications((certRes.data ?? []).filter(cert => STUDENT_ACCESS_IDS.includes(cert.access_id)));
       } catch (err) {
         console.warn("Certification types API unavailable, using constants.");
+      }
+
+      try {
+        const purposeRes = await getRequestPurposes();
+        setAvailablePurposes(purposeRes.data ?? []);
+      } catch (err) {
+        console.warn("Request purposes API unavailable, using constants.");
       }
     };
     loadOptions();
@@ -160,9 +180,11 @@ const RequestForm = () => {
   setIsLoading(true);
 
   try {
-    const purposeId = Object.keys(PURPOSE_MAP).find(
-      key => PURPOSE_MAP[key] === formData.purposeOfRequest
+    const selectedPurpose = availablePurposes.find(
+      p => p.purpose_name === formData.purposeOfRequest
     );
+    const purposeId = selectedPurpose?.request_purpose_id
+      ?? Object.keys(PURPOSE_MAP).find(key => PURPOSE_MAP[key] === formData.purposeOfRequest);
 
     const certificates = formData.certification
       .map(name => ({
@@ -177,11 +199,21 @@ const RequestForm = () => {
       request_purpose_id: purposeId,
       or_number: formData.receiptNumber,
       receipt_date: formData.dateOfPayment,
-      documents: formData.documentsRequested.filter(name => !name.toLowerCase().includes("certif")).map(name => { const dbDoc = availableDocs.find(d => d.document_name === name); const id = dbDoc?.document_type_id ?? Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name); return { document_type_id: id, number_of_copies: parseInt(formData.documentCopies[name]) || 1 }; }).filter(doc => doc.document_type_id),
+      documents: formData.documentsRequested
+        .filter(name => !name.toLowerCase().includes("certif"))
+        .map(name => {
+          const id = docByName[name]?.document_type_id
+            ?? Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name);
+          return {
+            document_type_id: id,
+            number_of_copies: parseInt(formData.documentCopies[name]) || 1,
+          };
+        })
+        .filter(doc => doc.document_type_id),
       certificates: certificates,
     };
 
-    const response = await axios.post("/document-requests", payload);
+    const response = await createDocumentRequest(payload);
 
     console.log("Submission successful:", response.data);
     setIsSubmitted(true);
@@ -223,7 +255,9 @@ const RequestForm = () => {
     3: "Payment and Document Details",
   };
 
-  const purposeOptions = Object.values(PURPOSE_MAP);
+  const purposeOptions = availablePurposes.length > 0
+    ? availablePurposes.map(p => p.purpose_name)
+    : Object.values(PURPOSE_MAP);
 
   const certificationOptions = availableCertifications.length > 0
     ? availableCertifications.map((c) => c.certificate_name)
@@ -234,6 +268,16 @@ const RequestForm = () => {
     : Object.values(DOC_TYPE_MAP); 
 
   const certificationLabel = formData.certification.join(', ');
+
+  const docByName = useMemo(() => {
+    return availableDocs.reduce((acc, doc) => {
+      acc[doc.document_name] = {
+        ...doc,
+        requirementsParsed: parseRequirements(doc.document_requirements),
+      };
+      return acc;
+    }, {});
+  }, [availableDocs]);
 
   return (
     <>
@@ -288,26 +332,24 @@ const RequestForm = () => {
               {currentStep === 1 && (
                 <div className="space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px]">
                   <p><strong>A.</strong> In compliance with the Data Privacy Act (DPA) of 2012, and its implementing rules 
-                    and regulations (IRR), upon filling up this Google Form, I am hereby providing my 
-                    consent and authorization to use my personal data for this request."
+                    and regulations (IRR), upon filling up this request through the system constitutes, I am hereby providing my 
+                    consent and authorization to use my personal data for this request.
                   </p>
 
                   <p><strong>B.</strong> This request is only for ONSITE TRANSACTION with Official Receipt issued by the Cashier's Office</p>
 
                   <p><strong>C.</strong> All CERTIFICATIONS are processed within three (3) working days, while TOR is within 12 working days.</p>
 
-                  <p><strong>D.</strong> REMINDERS: For TOR (first copy), please bring one documentary stamp, 
-                    two colored 2x2 picture in academic grown, PUP ID, and dummy diploma 
-                    (in case of loss, please bring an affidavit of loss). 
-                    For TOR (second copy), please bring one documentary stamp (violet), 
-                    two colored 2x2 picture in formal attire with white background.
-                    For Honorable Dismissal and other certifications, please bring one 
-                    violet documentary stamp (or two brown documentary stamp) per requested document."</p>
+                  <p>
+                    <strong>D.</strong>REMINDERS:<br />
+                    • For TOR (First Copy): Bring one (1) documentary stamp, two (2) colored 2x2 ID pictures in academic gown, valid PUP ID, and dummy diploma. In case of loss, an Affidavit of Loss is required.<br />
+                    • For TOR (Second Copy): Bring one (1) violet documentary stamp and two (2) colored 2x2 ID pictures in formal attire with white background.<br />
+                    • For Honorable Dismissal and other Certifications: Bring one (1) violet documentary stamp (or two (2) brown documentary stamps) per requested document.
+                  </p>
 
-                  <p><strong>E.</strong> In compliance with R.A. No. 10173 (Data Privacy Act of 2012), representative must submit 
-                    a signed AUTHORIZATION LETTER if claimant is immediate family member or SPECIAL POWER OF ATTORNEY 
-                    if claimant is other than immediate family member with original valid ID of both owner/student and 
-                    representative upon claiming the requested documents.</p>
+                  <p>
+                    <strong>E.</strong> In compliance with R.A. No. 10173 (Data Privacy Act of 2012), representatives must present a signed Authorization Letter (for immediate family) or Special Power of Attorney (for non-family), along with valid IDs of both the student and the representative upon claiming documents.
+                  </p>
 
                   <p><strong>F.</strong> All documents unclaimed within 90 days on the date of request will be shredded automatically.</p>
 
@@ -429,8 +471,14 @@ const RequestForm = () => {
                                 min="1"
                                 max="10"
                                 className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg outline-none transition-all duration-200 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
-                                value={formData.certCopies[certName] || 1}
-                                onChange={e => handleCertCopyChange(certName, e.target.value)}
+                                value={formData.certCopies[certName] === undefined ? '' : formData.certCopies[certName]}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  handleCertCopyChange(certName, val === '' ? '' : Math.max(1, Math.min(10, Number(val))));
+                                }}
+                                onBlur={e => {
+                                  if (e.target.value === '') handleCertCopyChange(certName, 1);
+                                }}
                               />
                             </div>
                           </div>
@@ -441,13 +489,8 @@ const RequestForm = () => {
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar bg-white/10 p-2 rounded-lg border ">
                     {formData.documentsRequested.map((doc, index) => {
-
-                      const docData = availableDocs.find((d) => d.document_name === doc);
-                      const requirements = docData?.document_requirements
-                        ? (Array.isArray(docData.document_requirements)
-                            ? docData.document_requirements
-                            : docData.document_requirements.split(',').map(r => r.trim()).filter(Boolean))
-                        : [];
+                      const docData = docByName[doc];
+                      const requirements = docData?.requirementsParsed ?? [];
 
                       return (
                         <div
@@ -467,7 +510,7 @@ const RequestForm = () => {
                                 <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
                                   <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
 
-                                  <span className="flex-1 min-w-0 wrap-break-word whitespace-normal break-all max-w-full">
+                                  <span className="flex-1 min-w-0 whitespace-normal break-normal max-w-full">
                                     {req}
                                   </span>
                                 </li>
@@ -501,7 +544,7 @@ const RequestForm = () => {
                           href="https://pupsinta.freshservice.com/support/home"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="lg:mt-2 lg:text-sm text-[10px] text-[#FFC72C] underline text-center wrap-break-word hover:text-yellow-400 transition"
+                          className="lg:mt-2 lg:text-sm text-[10px] text-[#FFC72C] underline text-center whitespace-normal break-normal hover:text-yellow-400 transition"
                         >
                           https://pupsinta.freshservice.com/support/home
                         </a>
