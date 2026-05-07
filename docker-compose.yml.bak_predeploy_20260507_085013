@@ -167,42 +167,6 @@ services:
     networks:
       - ris_network
 
-# -------------------------------------------------------
-# Scheduler — runs php artisan schedule:run every minute.
-# Handles: notifications:shred-expired-requests (08:00)
-#          notifications:send-unclaimed-reminders (08:05)
-# -------------------------------------------------------
-  scheduler:
-    image: ris_backend_image
-    container_name: ris_scheduler
-    restart: unless-stopped
-    command: >
-      sh -c "while true; do php artisan schedule:run --no-interaction >> /var/log/scheduler.log 2>&1; sleep 60; done"
-    environment:
-      APP_ENV: ${APP_ENV:-production}
-      APP_KEY: ${APP_KEY}
-      APP_DEBUG: ${APP_DEBUG:-false}
-      APP_URL: ${APP_URL}
-      DB_CONNECTION: mysql
-      DB_HOST: ${DB_HOST}
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_DATABASE}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      QUEUE_CONNECTION: database
-      REVERB_APP_ID: ${REVERB_APP_ID}
-      REVERB_APP_KEY: ${REVERB_APP_KEY}
-      REVERB_APP_SECRET: ${REVERB_APP_SECRET}
-      REVERB_HOST: reverb
-      REVERB_PORT: ${REVERB_PORT:-8080}
-      REVERB_SCHEME: ${REVERB_SCHEME:-http}
-      BROADCAST_CONNECTION: reverb
-    depends_on:
-      backend:
-        condition: service_started
-    networks:
-      - ris_network
-
 volumes:
   ris_db_data:
 
