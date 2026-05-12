@@ -1,14 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ArrowLeftIcon,
-  PaperAirplaneIcon,
-} from '@heroicons/react/24/outline';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useLocation } from 'react-router-dom';
-import ErrorToast from '../components/ErrorToast.jsx';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
-import InputGroup from '../components/InputGroup.jsx';
-import VoiceTextareaInput from '../components/VoiceTextareaInput.jsx';
-import SuccessToast from '../components/SuccessToast.jsx';
 import { useNotificationsContext as useNotifications } from '../context/NotificationsContext';
 
 // -------------------------------------------------------
@@ -75,12 +68,6 @@ const InboxCenter = () => {
 
   const [searchText,      setSearchText]      = useState('');
   const [selectedId,      setSelectedId]      = useState(incomingNotificationId ?? null);
-  const [composeTo,       setComposeTo]       = useState('');
-  const [composeSubject,  setComposeSubject]  = useState('');
-  const [composeMessage,  setComposeMessage]  = useState('');
-  const [composeStatus,   setComposeStatus]   = useState('');
-  const [errorMessage,    setErrorMessage]    = useState('');
-  const [rightPanelMode,  setRightPanelMode]  = useState('preview');
 
   // Auto-select first email once loaded (or the one coming from toast/modal click)
   useEffect(() => {
@@ -109,20 +96,12 @@ const InboxCenter = () => {
 
   const selectedMail = emails.find((m) => m.id === selectedId) ?? filteredEmails[0] ?? null;
 
-  // When selected mail changes, reset right panel
   useEffect(() => {
     if (!selectedMail) return;
-    setRightPanelMode('preview');
-    setComposeTo('');
-    setComposeSubject('');
-    setComposeMessage('');
-    setComposeStatus('');
-    setErrorMessage('');
   }, [selectedMail?.id]);
 
   const handleSelectMail = async (mailId) => {
     setSelectedId(mailId);
-    setRightPanelMode('preview');
     // Mark as read on the backend
     const mail = emails.find((m) => m.id === mailId);
     if (mail?.unread) {
@@ -130,36 +109,8 @@ const InboxCenter = () => {
     }
   };
 
-  const openComposeMode = () => {
-    setComposeTo('');
-    setComposeSubject('');
-    setComposeMessage('');
-    setComposeStatus('');
-    setErrorMessage('');
-    setRightPanelMode('compose');
-  };
-
-  const handleComposeFieldChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'composeTo')      setComposeTo(value);
-    if (name === 'composeSubject') setComposeSubject(value);
-  };
-
-  // TODO: Email contact workflow is not yet implemented.
-  // The backend route, controller, and IdP email-update flow need to be
-  // built before this button can send anything. See bug checklist:
-  // 'New Email Contact Workflow'.
-  // Keeping the handler as a no-op so the compose layout is preserved
-  // and wiring it up later only requires filling in this function.
-  const handleSendEmail = () => {
-    setErrorMessage('Email sending is not yet available. This feature is coming soon.');
-  };
-
   return (
     <>
-      <SuccessToast message={composeStatus} onClose={() => setComposeStatus('')} />
-      <ErrorToast  message={errorMessage}  onClose={() => setErrorMessage('')} />
-
       <div className="w-full max-w-6xl mx-auto px-4">
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] min-h-[70vh]">
@@ -169,13 +120,6 @@ const InboxCenter = () => {
               <div className="px-4 py-4 border-b border-gray-200">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="text-gray-900 text-lg font-bold">Inbox</h2>
-                  <button
-                    onClick={openComposeMode}
-                    className="inline-flex items-center gap-1 rounded-md bg-pup-dark-maroon px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#510400]"
-                  >
-                    <PaperAirplaneIcon className="w-3.5 h-3.5" />
-                    Compose Email
-                  </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Select a message to view preview details.</p>
               </div>
@@ -235,23 +179,20 @@ const InboxCenter = () => {
             <section className="flex flex-col bg-white">
               {selectedMail ? (
                 <>
-                  {rightPanelMode === 'preview' && (
-                    <header className="px-4 md:px-6 py-4 border-b border-gray-200 bg-white">
-                      <p className="text-[11px] uppercase tracking-[0.2em] font-black text-[#6D0000]/55">
-                        Selected Inbox Message
-                      </p>
-                      <h3 className="text-lg md:text-xl font-bold text-gray-900 leading-tight mt-1">
-                        {selectedMail.subject}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        From {selectedMail.from} | {formatTime(selectedMail.time)}
-                      </p>
-                    </header>
-                  )}
+                  <header className="px-4 md:px-6 py-4 border-b border-gray-200 bg-white">
+                    <p className="text-[11px] uppercase tracking-[0.2em] font-black text-[#6D0000]/55">
+                      Selected Inbox Message
+                    </p>
+                    <h3 className="text-lg md:text-xl font-bold text-gray-900 leading-tight mt-1">
+                      {selectedMail.subject}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Date: {formatTime(selectedMail.time)}
+                    </p>
+                  </header>
 
                   <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-gray-50">
-                    {rightPanelMode === 'preview' ? (
-                      <div className="space-y-4">
+                    <div className="space-y-4">
 
                         {/* ── Message body ── */}
                         <div className="rounded-lg border border-gray-200 bg-white px-4 py-4">
@@ -264,7 +205,7 @@ const InboxCenter = () => {
                               {selectedMail.from}
                             </p>
                             <p className="text-sm text-gray-700">
-                              <span className="font-semibold text-gray-900">Time:</span>{' '}
+                              <span className="font-semibold text-gray-900">Date:</span>{' '}
                               {formatTime(selectedMail.time)}
                             </p>
                             <p className="text-sm text-gray-700 leading-relaxed">
@@ -283,7 +224,7 @@ const InboxCenter = () => {
                             <p className="text-xs text-amber-800 mb-4">
                               Please prepare the following for each item in your request before visiting the Registrar's Office.
                             </p>
-                            <div className="space-y-4">
+                            <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
                               {selectedMail._raw.requirements.map((req, idx) => (
                                 <div key={idx} className="rounded-md border border-amber-200 bg-white px-3 py-3">
                                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -311,64 +252,6 @@ const InboxCenter = () => {
                         )}
 
                       </div>
-                    ) : (
-                      /* ── COMPOSE FORM ── */
-                      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden min-h-140">
-                        <div className="px-4 py-3 bg-gray-100 text-gray-900 text-sm font-semibold">
-                          Compose Email
-                        </div>
-                        <div className="px-4 md:px-5 py-4 space-y-3">
-                          <InputGroup
-                            label="To"
-                            name="composeTo"
-                            type="email"
-                            value={composeTo}
-                            onChange={handleComposeFieldChange}
-                            placeholder="example@gmail.com"
-                            labelColor="text-gray-600"
-                            voiceEnabled
-                            language="en-US"
-                          />
-                          <InputGroup
-                            label="Subject"
-                            name="composeSubject"
-                            type="text"
-                            value={composeSubject}
-                            onChange={handleComposeFieldChange}
-                            placeholder="Write subject"
-                            labelColor="text-gray-600"
-                            voiceEnabled
-                            language="en-US"
-                          />
-                          <VoiceTextareaInput
-                            id="compose-message"
-                            label="Message"
-                            value={composeMessage}
-                            onChange={setComposeMessage}
-                            placeholder="Type your message here..."
-                            language="en-US"
-                            minHeightClass="min-h-64"
-                          />
-                          <div className="flex items-center justify-between gap-3">
-                            <button
-                              onClick={handleSendEmail}
-                              disabled
-                              title="Email sending is not yet available"
-                              className="inline-flex items-center gap-1.5 rounded-md bg-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed opacity-60"
-                            >
-                              <PaperAirplaneIcon className="w-4 h-4" />
-                              Send Email
-                            </button>
-                            <button
-                              onClick={() => setRightPanelMode('preview')}
-                              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-                            >
-                              Back To Preview
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </>
               ) : (
