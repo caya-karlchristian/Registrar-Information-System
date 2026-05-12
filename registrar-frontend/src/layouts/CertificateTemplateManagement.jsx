@@ -110,8 +110,8 @@ const UploadDropZone = ({ label, multiple = false, onFiles, disabled = false }) 
   );
 };
 
-const CertificatePreviewCanvas = ({ layout, certName }) => {
-  const certConfig = CERT_CONFIG[certName] || CERT_CONFIG["Certificate of Graduation"];
+const CertificatePreviewCanvas = ({ layout, certId }) => {
+  const certConfig = CERT_CONFIG[certId] || CERT_CONFIG[1];
 
   return (
     <div className="mx-auto w-full max-w-187.5 bg-white p-8 shadow-2xl ring-1 ring-black/5">
@@ -128,7 +128,7 @@ const CertificatePreviewCanvas = ({ layout, certName }) => {
   );
 };
 
-const PreviewModal = ({ isOpen, onClose, layout, certName }) => {
+const PreviewModal = ({ isOpen, onClose, layout, certId }) => {
   if (!isOpen) return null;
 
   return (
@@ -144,7 +144,7 @@ const PreviewModal = ({ isOpen, onClose, layout, certName }) => {
           </button>
         </div>
         <div className="flex-1 overflow-auto bg-gray-100 p-4 sm:p-8">
-          <CertificatePreviewCanvas layout={layout} certName={certName} />
+          <CertificatePreviewCanvas layout={layout} certId={certId} />
         </div>
       </div>
     </div>
@@ -185,9 +185,7 @@ const CertificateTemplateManagement = () => {
           layoutMap[row.certificate_type_id] = normalizeCertificateLayout(row);
         });
 
-        setCertifications(
-          [...certRows].sort((a, b) => String(a?.certificate_name ?? "").localeCompare(String(b?.certificate_name ?? "")))
-        );
+        setCertifications(certRows);
         setLayoutsByCertId(layoutMap);
 
         if (certRows.length) {
@@ -479,7 +477,7 @@ const CertificateTemplateManagement = () => {
             <div className="mb-3 flex items-center justify-between rounded-lg bg-white px-4 py-3">
               <h2 className="text-lg font-bold text-gray-800">Certificate Preview</h2>
             </div>
-            <CertificatePreviewCanvas layout={layout} certName={selectedCertification?.certificate_name} />
+            <CertificatePreviewCanvas layout={layout} certId={Number(selectedCertId)} />
           </section>
         </div>
 
@@ -487,7 +485,7 @@ const CertificateTemplateManagement = () => {
           isOpen={showModal}
           onClose={() => setShowModal(false)}
           layout={layout}
-          certName={selectedCertification?.certificate_name}
+          certId={Number(selectedCertId)}
         />
       </div>
     </div>
