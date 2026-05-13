@@ -41,7 +41,12 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => env('APP_URL').'/storage',
+            // Use a relative URL so Storage::url() returns /storage/... paths
+            // that work in every environment (local, staging, production) without
+            // hardcoding APP_URL. The frontend nginx proxies /storage/ to the
+            // backend, and the browser resolves the relative path against whatever
+            // host it is currently on — no env-specific config needed here.
+            'url' => '/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
