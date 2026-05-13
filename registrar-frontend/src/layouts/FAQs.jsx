@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import {
   ChevronDownIcon,
   FaceSmileIcon,
+  EnvelopeIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
 
@@ -144,11 +146,61 @@ const FAQPage = () => {
                   </li>
                 ))}
               </ul>
+
+             {/* Email Registrar Section */}
+              <div className="mt-5 overflow-hidden rounded-2xl bg-white border border-[#800000] shadow-xl transition-all duration-300 hover:shadow-2xl">
+                <a
+                 href="https://mail.google.com/mail/?view=cm&fs=1&to=registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern"
+                  className="group flex items-center gap-4 border-b border-gray-100 p-4 text-left transition-all duration-200 hover:bg-red-50"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-[#800000] transition-transform group-hover:scale-110">
+                    <EnvelopeIcon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-wide text-[#800000]">
+                      Compose Email
+                    </p>
+                    <p className="mt-0.5 text-xs font-bold text-gray-500 underline group-hover:text-[#800000]">
+                      registrar@pup.edu.ph
+                    </p>
+                  </div>
+                </a>
+
+                <div className="bg-gray-50 px-6 py-4">
+                  <div className="text-left">
+                    <InformationCircleIcon className="float-left mr-3 mt-1 h-6 w-6 text-amber-500" />
+                    <p className="text-justify text-xs font-medium text-gray-600 leading-relaxed">
+                      <span className="font-bold text-gray-900 text-xs">Submission Guide:</span> Ensure your message includes your <span className="text-[#800000]">full name</span>, <span className="text-[#800000]">student number</span>, and a detailed description of your <span className="text-[#800000]">concern or purpose</span> for faster processing.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </aside>
 
           {/* FAQ Accordion */}
           <main className="col-span-1 md:col-span-9 space-y-4">
+            <div className="md:hidden">
+              <h3 className="mb-3 text-sm font-black uppercase tracking-wider text-[#800000]">
+                Categories
+              </h3>
+              <div className="-mx-1 flex gap-2 overflow-x-auto pb-2 px-1">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold transition-all duration-200 ${
+                      activeCategory === cat
+                        ? 'bg-[#800000] text-white shadow-md'
+                        : 'bg-white text-gray-500 border border-gray-200 hover:border-[#800000] hover:text-[#800000]'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {filteredFAQs.length > 0 ? (
               filteredFAQs.map(({ id, question, answer, category }) => (
                 <div
@@ -207,6 +259,34 @@ const FAQPage = () => {
             )}
           </main>
 
+        </div>
+
+        <div className="mt-10 md:hidden overflow-hidden rounded-2xl bg-white border border-[#800000] shadow-xl transition-all duration-300 hover:shadow-2xl">
+          <a
+            href="https://mail.google.com/mail/?view=cm&fs=1&to=registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern"
+            className="group flex items-center gap-4 border-b border-gray-100 p-4 text-left transition-all duration-200 hover:bg-red-50"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-[#800000] transition-transform group-hover:scale-110">
+              <EnvelopeIcon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-wide text-[#800000]">
+                Compose Email
+              </p>
+              <p className="mt-0.5 text-xs font-bold text-gray-500 underline group-hover:text-[#800000]">
+                registrar@pup.edu.ph
+              </p>
+            </div>
+          </a>
+
+          <div className="bg-gray-50 px-6 py-4">
+            <div className="text-left">
+              <InformationCircleIcon className="float-left mr-3 mt-1 h-6 w-6 text-amber-500" />
+              <p className="text-justify text-xs font-medium text-gray-600 leading-relaxed">
+                <span className="font-bold text-gray-900 text-xs">Submission Guide:</span> Ensure your message includes your <span className="text-[#800000]">full name</span>, <span className="text-[#800000]">student number</span>, and a detailed description of your <span className="text-[#800000]">concern or purpose</span> for faster processing.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
   );
