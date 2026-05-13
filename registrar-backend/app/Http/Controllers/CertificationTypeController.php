@@ -160,7 +160,11 @@ class CertificationTypeController extends Controller
             'data'    => [
                 'slot' => $slot,
                 'path' => $path,
-                'url'  => Storage::url($path),
+                // Return the bare storage path, not an absolute URL.
+                // The CertificationType model accessor resolves it to a full
+                // URL at read-time using the current environment's APP_URL,
+                // so the same value works in local, staging, and production.
+                'url'  => $path,
             ],
         ], 201);
     }
