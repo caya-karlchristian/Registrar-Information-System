@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { XMarkIcon } from '@heroicons/react/24/solid';
+import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/NotificationToastContext';
 
 // -------------------------------------------------------
@@ -31,6 +32,7 @@ const CATEGORY_MAP = {
 const SingleToast = ({ toast, onDismiss }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { isDark } = useTheme();
     const meta = CATEGORY_MAP[toast.type] ?? { category: 'Notification', color: 'bg-blue-400' };
 
     const handleClick = () => {
@@ -49,14 +51,14 @@ const SingleToast = ({ toast, onDismiss }) => {
 
     return (
         <div
-            className="
+            className={`
                 flex items-start gap-3 w-full
-                bg-pup-dark-maroon border border-white/10
                 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)]
                 px-4 py-3 cursor-pointer
                 animate-in slide-in-from-right-4 fade-in duration-300
-                hover:border-white/20 transition-colors group
-            "
+                transition-colors group
+                ${isDark ? 'bg-[#242526] border border-[#3e4042] hover:border-[#4e4f50]' : 'bg-pup-dark-maroon border border-white/10 hover:border-white/20'}
+            `}
             onClick={handleClick}
         >
             {/* Color dot */}
@@ -64,13 +66,13 @@ const SingleToast = ({ toast, onDismiss }) => {
 
             {/* Text */}
             <div className="flex-1 min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-pup-yellow mb-0.5">
+                <p className={`text-[9px] font-black uppercase tracking-[0.15em] mb-0.5 ${isDark ? 'text-[#f5c542]' : 'text-pup-yellow'}`}>
                     {meta.category}
                 </p>
-                <p className="text-[12px] font-bold text-white leading-snug truncate">
+                <p className={`text-[12px] font-bold leading-snug truncate ${isDark ? 'text-[#e4e6eb]' : 'text-white'}`}>
                     {toast.title}
                 </p>
-                <p className="text-[11px] text-white/60 leading-normal line-clamp-2 mt-0.5">
+                <p className={`text-[11px] leading-normal line-clamp-2 mt-0.5 ${isDark ? 'text-[#b0b3b8]' : 'text-white/60'}`}>
                     {toast.message}
                 </p>
             </div>
@@ -78,9 +80,9 @@ const SingleToast = ({ toast, onDismiss }) => {
             {/* Dismiss button */}
             <button
                 onClick={(e) => { e.stopPropagation(); onDismiss(toast.id); }}
-                className="shrink-0 mt-0.5 p-0.5 rounded-full hover:bg-white/10 transition-colors"
+                className={`shrink-0 mt-0.5 p-0.5 rounded-full transition-colors ${isDark ? 'hover:bg-white/6' : 'hover:bg-white/10'}`}
             >
-                <XMarkIcon className="w-3.5 h-3.5 text-white/40 hover:text-white/80 transition-colors" />
+                <XMarkIcon className={`w-3.5 h-3.5 transition-colors ${isDark ? 'text-[#b0b3b8] hover:text-[#e4e6eb]' : 'text-white/40 hover:text-white/80'}`} />
             </button>
         </div>
     );
