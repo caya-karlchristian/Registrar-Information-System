@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDownIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/solid";
+import { useTheme } from "../context/ThemeContext";
 
 const MultiSelectDropdown = ({
   name,
@@ -10,6 +11,7 @@ const MultiSelectDropdown = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const { isDark } = useTheme();
 
   /* Close dropdown when clicking outside */
   useEffect(() => {
@@ -54,7 +56,7 @@ const MultiSelectDropdown = ({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full bg-white p-2.5 rounded border border-gray-300 cursor-pointer flex justify-between items-center min-h-[40px] focus:outline-none focus:ring-2 focus:ring-[#FFC72C] focus:border-pup-maroon text-left"
+        className="w-full bg-white p-2.5 rounded border border-gray-300 cursor-pointer flex justify-between items-center min-h-10 focus:outline-none focus:ring-2 focus:ring-[#FFC72C] focus:border-pup-maroon text-left"
       >
         <div className="flex flex-wrap gap-1">
           {selectedValues.length === 0 ? (
@@ -65,7 +67,7 @@ const MultiSelectDropdown = ({
             selectedValues.map((val) => (
               <span
                 key={val}
-                className="bg-pup-maroon text-white text-xs px-2 py-1 rounded flex items-center"
+                className={`text-xs px-2 py-1 rounded flex items-center ${isDark ? 'bg-pup-yellow text-pup-maroon' : 'bg-pup-maroon text-white'}`}
               >
                 {val}
                 <span
@@ -111,19 +113,23 @@ const MultiSelectDropdown = ({
                 <div
                   className={`w-4 h-4 rounded border flex items-center justify-center mr-3 shrink-0 ${
                     isSelected
-                      ? "bg-pup-maroon border-pup-maroon"
+                      ? isDark
+                        ? "bg-pup-yellow border-pup-yellow"
+                        : "bg-pup-maroon border-pup-maroon"
                       : "border-gray-300 bg-white"
                   }`}
                 >
                   {isSelected && (
-                    <CheckIcon className="w-3 h-3 text-white" />
+                    <CheckIcon className={`w-3 h-3 ${isDark ? 'text-pup-maroon' : 'text-white'}`} />
                   )}
                 </div>
 
                 <span
                   className={`text-sm ${
                     isSelected
-                      ? "font-semibold text-pup-maroon"
+                      ? isDark
+                        ? "font-semibold text-pup-yellow"
+                        : "font-semibold text-pup-maroon"
                       : "text-gray-700"
                   }`}
                 >

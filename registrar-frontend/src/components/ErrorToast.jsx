@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useTheme } from "../context/ThemeContext";
 
 const ErrorToast = ({ message, onClose }) => {
   const [duration, setDuration] = useState(5000);
   const toastRef = useRef(null);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     if (message) {
@@ -38,9 +40,9 @@ const ErrorToast = ({ message, onClose }) => {
   return (
     <div
       ref={toastRef}
-      className="fixed top-26 lg:top-30 right-3 lg:right-5 md:right-5 z-9999 flex items-center w-auto max-w-sm px-4 py-3 text-white bg-pup-maroon rounded-lg shadow-xl border border-white/20 animate-slide-in-right"
+      className={`fixed top-26 lg:top-30 right-3 lg:right-5 md:right-5 z-9999 flex items-center w-auto max-w-sm px-4 py-3 rounded-lg shadow-xl animate-slide-in-right ${isDark ? 'text-[#e4e6eb] bg-[#242526] border border-[#3e4042]' : 'text-white bg-pup-maroon border border-white/20'}`}
     >
-      <div className="flex items-center justify-center w-9 h-9 text-pup-maroon bg-white rounded-md">
+      <div className={`flex items-center justify-center w-9 h-9 rounded-md ${isDark ? 'text-[#FFC72C] bg-[#1a1b1e]' : 'text-pup-maroon bg-white'}`}>
         <ExclamationCircleIcon className="w-9 h-7" strokeWidth={2.5} />
       </div>
       <div className="ml-3 text-sm font-semibold leading-snug">
@@ -48,13 +50,13 @@ const ErrorToast = ({ message, onClose }) => {
       </div>
       <button 
         onClick={onClose}
-        className="ml-3 p-1.5 rounded-md hover:bg-white/10 transition-colors"
+        className={`ml-3 p-1.5 rounded-md transition-colors ${isDark ? 'hover:bg-white/6' : 'hover:bg-white/10'}`}
       >
         <XMarkIcon className="w-5 h-5" strokeWidth={2.5} />
       </button>
-      <div className="absolute bottom-0 left-0 h-0.75 bg-white/40 rounded-b-lg overflow-hidden w-full">
+      <div className={`absolute bottom-0 left-0 h-0.75 rounded-b-lg overflow-hidden w-full ${isDark ? 'bg-white/10' : 'bg-white/40'}`}>
         <div
-          className="h-full bg-white"
+          className={`h-full ${isDark ? 'bg-pup-yellow' : 'bg-white'}`}
           style={{
             width: '100%',
             animation: `shrink ${duration}ms linear forwards`
