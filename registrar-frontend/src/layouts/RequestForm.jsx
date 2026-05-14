@@ -10,6 +10,7 @@ import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
 import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
+import { useTheme } from '../context/ThemeContext';
 
 const STUDENT_ACCESS_IDS = [1, 3];
 
@@ -24,6 +25,7 @@ const parseRequirements = (value) => {
 };
 
 const RequestForm = () => {
+  const { isDark } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -285,7 +287,7 @@ const RequestForm = () => {
       <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
       {isSubmitted ? (
         <div className="max-w-4xl mx-auto ">
-          <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col items-center justify-center text-center px-10">
+          <div className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col items-center justify-center text-center px-10 ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}>
             <p className="mb-6 text-4xl font-bold text-white">
               Please be patient as we process your requested document.
             </p>
@@ -294,7 +296,7 @@ const RequestForm = () => {
             </p>
             <button
               onClick={handleConfirm}
-              className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md"
+              className={`w-32 font-bold py-2 px-6 rounded shadow-md transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
             >
               Confirm
             </button>
@@ -303,7 +305,7 @@ const RequestForm = () => {
       ) : (
         <div className="max-w-5xl mx-auto -mt-2">
           <form
-            className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative"
+            className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}
             onSubmit={handleSubmit}
             noValidate
           >
@@ -314,7 +316,7 @@ const RequestForm = () => {
                   <div
                     key={step}
                     className={`w-4 h-4 rounded-full border border-pup-yellow ${
-                      step <= currentStep ? "bg-pup-yellow" : "bg-white"
+                      step <= currentStep ? "bg-pup-yellow" : (isDark ? "bg-[#3a3b3c]" : "bg-white")
                     }`}
                   />
                 ))}
@@ -327,7 +329,7 @@ const RequestForm = () => {
               </h2>
             </div>
 
-            <div className="flex-1 px-4 sm:px-6 md:px-10 py-2 text-white ">
+            <div className={`flex-1 px-4 sm:px-6 md:px-10 py-2 text-white `}>
               {/* STEP 1 */}
               {currentStep === 1 && (
                 <div className="space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px]">
@@ -353,7 +355,7 @@ const RequestForm = () => {
 
                   <p><strong>F.</strong> All documents unclaimed within 90 days on the date of request will be shredded automatically.</p>
 
-                  <div className="mt-2 pt-4 border-t text-l border-white/10">
+                  <div className={`mt-2 pt-4 border-t text-l ${isDark ? 'border-white/20' : 'border-white/10'}`}>
                     <CheckboxItem
                       name="termsAgreed"
                       checked={formData.termsAgreed}
@@ -422,7 +424,7 @@ const RequestForm = () => {
                       voiceEnabled={false}
                     />
                   </div>
-                  <div className="bg-white/10 p-4 rounded-lg border -mb-1">
+                  <div className={`p-4 rounded-lg border -mb-1 ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
                     <h3 className="text-[#eebc48] font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
@@ -439,14 +441,12 @@ const RequestForm = () => {
                                 max="10"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg 
+                                className={`w-full p-2 text-sm rounded-lg 
                                   outline-none transition-all duration-200
-                                  focus:bg-white 
                                   focus:border-[#FFC72C] 
                                   focus:ring-2 
-                                  focus:ring-[#FFC72C]/30 
-                                  focus:text-black
-                                  appearance-auto"        
+                                  focus:ring-[#FFC72C]/30
+                                  appearance-auto ${isDark ? 'bg-[#1a1b1e] border border-[#3e4042] text-white focus:bg-[#1a1b1e]' : 'bg-gray-50 border border-gray-300 text-gray-700 focus:bg-white focus:text-black'}`}        
                                 value={formData.documentCopies[doc] === undefined ? '' : formData.documentCopies[doc]}
                                 onChange={e => {
                                   const val = e.target.value;
@@ -470,7 +470,7 @@ const RequestForm = () => {
                                 type="number"
                                 min="1"
                                 max="10"
-                                className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg outline-none transition-all duration-200 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
+                                className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 ${isDark ? 'bg-[#1a1b1e] border border-[#3e4042] text-white focus:bg-[#1a1b1e]' : 'bg-gray-50 border border-gray-300 text-gray-700 focus:bg-white focus:text-black'}`}
                                 value={formData.certCopies[certName] === undefined ? '' : formData.certCopies[certName]}
                                 onChange={e => {
                                   const val = e.target.value;
@@ -487,7 +487,7 @@ const RequestForm = () => {
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar bg-white/10 p-2 rounded-lg border ">
+                  <div className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
                     {formData.documentsRequested.map((doc, index) => {
                       const docData = docByName[doc];
                       const requirements = docData?.requirementsParsed ?? [];
@@ -495,7 +495,7 @@ const RequestForm = () => {
                       return (
                         <div
                           key={index}
-                          className="bg-white/10 p-4 rounded-lg border  px-4 py-3"
+                          className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'}`}
                         >
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
@@ -562,7 +562,7 @@ const RequestForm = () => {
                 <button
                   type="button"
                   onClick={prevStep}
-                  className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md w-32"
+                  className={`font-bold py-2 px-6 rounded shadow-md w-32 transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
                 >
                   Back
                 </button>
@@ -571,7 +571,7 @@ const RequestForm = () => {
               <button
                 type="button"
                 onClick={currentStep < 3 ? nextStep : handlePreSubmit}
-                className="font-bold py-2 px-6 rounded shadow-md w-32 ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
+                className={`font-bold py-2 px-6 rounded shadow-md w-32 ml-auto transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
               >
                 {currentStep < 3 ? "Next" : "Submit"}
               </button>

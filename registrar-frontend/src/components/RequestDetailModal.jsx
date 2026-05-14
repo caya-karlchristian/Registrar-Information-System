@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDownIcon, XCircleIcon } from '@heroicons/react/24/solid';
 import { getDocumentTypes } from "../services/api";
+import { useTheme } from '../context/ThemeContext';
 import { DOC_TYPE_MAP, PURPOSE_MAP, PROGRESS_MAP} from '../utils/constants';
 
 const RequestDetailsModal = ({ request, onClose, user }) => {
   const [docTypes, setDocTypes] = useState([]);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     const fetchTypes = async () => {
@@ -48,13 +50,13 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
 
   return (
     <div className="fixed inset-x-0 top-25 pt-10 md:pt-10 bottom-0 pb-5 z-50 flex items-start justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm overflow-hidden lg:top-24 lg:left-72 lg:w-[calc(100vw-18rem)] lg:bottom-0 lg:items-start lg:justify-center">
-      <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-[95vw] sm:w-full sm:max-w-2xl lg:max-w-4xl md:max-h-[calc(100vh-180px)] flex flex-col h-full sm:h-auto max-h-full sm:max-h-[calc(100vh-110px)] lg:max-h-[calc(100vh-180px)] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none mx-auto my-0 sm:my-4 lg:my-4">
+      <div className={`rounded-xl sm:rounded-2xl shadow-2xl w-[95vw] sm:w-full sm:max-w-2xl lg:max-w-4xl md:max-h-[calc(100vh-180px)] flex flex-col h-full sm:h-auto max-h-full sm:max-h-[calc(100vh-110px)] lg:max-h-[calc(100vh-180px)] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none mx-auto my-0 sm:my-4 lg:my-4 ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
         {/* Header */}
-        <div className="relative bg-pup-maroon px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center shrink-0">
+        <div className={`relative px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center shrink-0 ${isDark ? 'bg-[#3a3b3c]' : 'bg-pup-maroon'}`}>
           <div>
             <h3 className="text-base sm:text-lg font-bold text-white">Request Details</h3>
-            <p className="text-xs sm:text-sm text-yellow-200 wrap-break-word">
+            <p className={`text-xs sm:text-sm wrap-break-word ${isDark ? 'text-[#b0b3b8]' : 'text-yellow-200'}`}>
               Transaction ID: {request.uuid ?? `#${request.request_id}`}
             </p>
           </div>
@@ -69,11 +71,11 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-2 lg:space-y-6 print:p-0 print:mb-4">
+        <div className={`flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-2 lg:space-y-6 print:p-0 print:mb-4 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
           
-          <Section title="Document Request Progress">            
+          <Section title="Document Request Progress" isDark={isDark}>            
             <div className="w-full">
-              <div className="bg-gray-100 rounded-full h-2 sm:h-3 overflow-hidden">
+              <div className={`rounded-full h-2 sm:h-3 overflow-hidden ${isDark ? 'bg-[#3a3b3c]' : 'bg-gray-100'}`}>
                 <div
                   className="bg-yellow-500 h-2 sm:h-3 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${progress}%` }}
@@ -81,10 +83,10 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               </div>
                 
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mt-2">
-                <p className="font-bold text-pup-maroon text-sm sm:text-md wrap-break-word">
+                <p className={`font-bold text-sm sm:text-md wrap-break-word ${isDark ? 'text-white' : 'text-pup-maroon'}`}>
                     {getProgressLabel(progress)}
                 </p>
-                <span className="text-xs sm:text-sm font-semibold text-gray-500">
+                <span className={`text-xs sm:text-sm font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                     {progress}%
                 </span>
               </div>
@@ -92,7 +94,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
           </Section>
           {/* Student Information */}
           {isStudent && (
-            <Section title="Student Information">
+            <Section title="Student Information" isDark={isDark}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <p className="wrap-break-word">
                   <strong>Full Name:</strong>{' '}
@@ -110,7 +112,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
 
           {/* Alumni Information*/}
           {isAlumni && (
-            <Section title="Alumni Information">
+            <Section title="Alumni Information" isDark={isDark}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <p className="wrap-break-word">
                   <strong>Full Name:</strong>{' '}
@@ -127,7 +129,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
 
 
           {/* Request Information */}
-          <Section title="Request Information">
+          <Section title="Request Information" isDark={isDark}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <p className="wrap-break-word">
                 <strong>Date Requested:</strong>{' '}
@@ -139,14 +141,14 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
           </Section>
 
           {/* Documents Requested */}
-          <Section title="Documents Requested">
+          <Section title="Documents Requested" isDark={isDark}>
             <ul className="list-disc ml-4 sm:ml-5 space-y-2">
               {request.documents
                 ?.filter((doc) => !getDocName(doc).toLowerCase().includes('certif'))
                 .map((doc) => (
                   <li key={doc.request_document_id} className="wrap-break-word">
                     <strong className="block sm:inline">{getDocName(doc)}</strong>
-                    <span className="inline-flex mt-1 sm:mt-0 sm:ml-2 bg-yellow-200 text-xs font-semibold px-2 py-0.5 rounded-full">
+                    <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
                       {doc.number_of_copies || 1} {doc.number_of_copies > 1 ? 'Copies' : 'Copy'}
                     </span>
                   </li>
@@ -155,7 +157,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
                 <li key={`cert-${i}`} className="wrap-break-word">
                   <strong className="block sm:inline">CERTIFICATION: </strong>
                   {c.certification_type?.certificate_name ?? 'Unknown'}
-                  <span className="inline-flex mt-1 sm:mt-0 sm:ml-2 bg-yellow-200 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
                     {c.number_of_copies || 1} {(c.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}
                   </span>
                 </li>
@@ -164,7 +166,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
           </Section>
 
           {/* Payment Details */}
-          <Section title="Payment Details">
+          <Section title="Payment Details" isDark={isDark}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <p className="wrap-break-word">
                 <strong>OR Number:</strong>{' '}
@@ -197,15 +199,15 @@ const getProgressLabel = (progress) => {
   }
 };
 
-const Section = ({ title, children }) => {
+const Section = ({ title, children, isDark }) => {
   const [open, setOpen] = useState(true);
 
   return (
-    <div className="border rounded-lg overflow-hidden ">
+    <div className={`border rounded-lg overflow-hidden ${isDark ? 'border-[#3e4042]' : 'border-gray-200'}`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex justify-between items-center px-3 sm:px-4 py-3 bg-yellow-50 text-pup-maroon font-bold text-sm"
+        className={`w-full flex justify-between items-center px-3 sm:px-4 py-3 font-bold text-sm ${isDark ? 'bg-[#3a3b3c] text-white' : 'bg-yellow-50 text-pup-maroon'}`}
       >
         {title}
         <ChevronDownIcon
@@ -213,7 +215,7 @@ const Section = ({ title, children }) => {
         />
       </button>
 
-      {open && <div className="p-3 sm:p-4 bg-white text-sm">{children}</div>}
+      {open && <div className={`p-3 sm:p-4 text-sm ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>{children}</div>}
     </div>
   );
 };
