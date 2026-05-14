@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronDownIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/solid";
+import { useTheme } from "../context/ThemeContext";
 
 const MultiSelectDropdown = ({
   name,
@@ -10,6 +11,7 @@ const MultiSelectDropdown = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const { isDark } = useTheme();
 
   /* Close dropdown when clicking outside */
   useEffect(() => {
@@ -45,8 +47,8 @@ const MultiSelectDropdown = ({
   };
 
   return (
-    <div className="relative w-full text-black" ref={dropdownRef}>
-      <label className="block text-sm font-semibold mb-1 text-white">
+    <div className="relative w-full" ref={dropdownRef}>
+      <label className={`block text-sm font-semibold mb-1 ${isDark ? 'text-[#e4e6eb]' : 'text-white'}`}>
         {label}
       </label>
 
@@ -54,18 +56,18 @@ const MultiSelectDropdown = ({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full bg-white p-2.5 rounded border border-gray-300 cursor-pointer flex justify-between items-center min-h-[40px] focus:outline-none focus:ring-2 focus:ring-[#FFC72C] focus:border-pup-maroon text-left"
+        className={`w-full p-2.5 rounded border cursor-pointer flex justify-between items-center min-h-10 focus:outline-none focus:ring-2 focus:ring-[#FFC72C] focus:border-pup-maroon text-left ${isDark ? 'bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb]' : 'bg-white border-gray-300 text-gray-700'}`}
       >
         <div className="flex flex-wrap gap-1">
           {selectedValues.length === 0 ? (
-            <span className="text-gray-400 text-sm">
+            <span className={`text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
               Select documents...
             </span>
           ) : (
             selectedValues.map((val) => (
               <span
                 key={val}
-                className="bg-pup-maroon text-white text-xs px-2 py-1 rounded flex items-center"
+                className={`text-xs px-2 py-1 rounded flex items-center ${isDark ? 'bg-pup-yellow text-pup-maroon' : 'bg-pup-maroon text-white'}`}
               >
                 {val}
                 <span
@@ -85,7 +87,7 @@ const MultiSelectDropdown = ({
         </div>
 
         <ChevronDownIcon
-          className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${
+          className={`w-5 h-5 transition-transform duration-200 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'} ${
             isOpen ? "rotate-180" : ""
           }`}
         />
@@ -93,7 +95,7 @@ const MultiSelectDropdown = ({
 
       {/* Dropdown Options */}
       {isOpen && (
-        <div className="absolute z-50 w-full bg-white border border-gray-200 mt-1 rounded shadow-xl max-h-60 overflow-y-auto flex flex-col">
+        <div className={`absolute z-50 w-full border mt-1 rounded shadow-xl max-h-60 overflow-y-auto flex flex-col ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-white border-gray-200'}`}>
           {options.map((option) => {
             const isSelected = selectedValues.includes(option);
 
@@ -102,29 +104,33 @@ const MultiSelectDropdown = ({
                 key={option}
                 type="button"
                 onClick={() => toggleOption(option)}
-                className={`flex items-center w-full p-3 text-left border-b border-gray-50 last:border-0 transition-colors focus:outline-none focus:bg-gray-100 ${
+                className={`flex items-center w-full p-3 text-left border-b border-gray-50 last:border-0 transition-colors focus:outline-none ${
                   isSelected
-                    ? "bg-red-50"
-                    : "hover:bg-gray-100"
-                }`}
+                    ? (isDark ? 'bg-[#3a3b3c]' : 'bg-red-50')
+                    : (isDark ? 'hover:bg-[#3a3b3c]' : 'hover:bg-gray-100')
+                } ${isDark ? 'focus:bg-[#3a3b3c]' : 'focus:bg-gray-100'}`}
               >
                 <div
                   className={`w-4 h-4 rounded border flex items-center justify-center mr-3 shrink-0 ${
                     isSelected
-                      ? "bg-pup-maroon border-pup-maroon"
+                      ? isDark
+                        ? "bg-pup-yellow border-pup-yellow"
+                        : "bg-pup-maroon border-pup-maroon"
                       : "border-gray-300 bg-white"
                   }`}
                 >
                   {isSelected && (
-                    <CheckIcon className="w-3 h-3 text-white" />
+                    <CheckIcon className={`w-3 h-3 ${isDark ? 'text-pup-maroon' : 'text-white'}`} />
                   )}
                 </div>
 
                 <span
                   className={`text-sm ${
                     isSelected
-                      ? "font-semibold text-pup-maroon"
-                      : "text-gray-700"
+                      ? isDark
+                        ? "font-semibold text-pup-yellow"
+                        : "font-semibold text-pup-maroon"
+                      : (isDark ? 'text-[#e4e6eb]' : 'text-gray-700')
                   }`}
                 >
                   {option}
