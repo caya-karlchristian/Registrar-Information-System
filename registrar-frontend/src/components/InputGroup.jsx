@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { MicrophoneIcon, StopIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import useVoiceRecognition from "../utils/useVoiceRecognition.js";
+import { useTheme } from "../context/ThemeContext";
 
 const InputGroup = ({
   label,
@@ -20,6 +21,7 @@ const InputGroup = ({
   language = "en-US",
 }) => {
   const [manualEntryLocked, setManualEntryLocked] = useState(false);
+  const { isDark } = useTheme();
 
   const { isListening, transcript, interimTranscript, isSupported, toggle, reset } = useVoiceRecognition({
     language,
@@ -72,9 +74,9 @@ const InputGroup = ({
 
   return (
     <div className="w-full">
-      <label className={`block text-sm font-medium ${labelColor} mb-1.5`}>
+      <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-[#e4e6eb]' : labelColor}`}>
         {label}
-        {required && <span className="text-red-400 ml-1">*</span>}
+        {required && <span className={isDark ? 'text-[#FFC72C] ml-1' : 'text-red-400 ml-1'}>*</span>}
       </label>
 
       <div className="relative flex items-center">
@@ -89,11 +91,7 @@ const InputGroup = ({
           title={title}
           min={min}
           max={max}
-          className={`w-full px-3 py-3 bg-white rounded-lg text-sm font-medium text-gray-700 shadow-sm
-                     placeholder:font-normal placeholder:text-gray-400
-                     focus:outline-none focus:ring-2 focus:ring-[#FFC72C]
-                     transition-all duration-200
-                     ${voiceEnabled ? "pr-20" : ""}`}
+          className={`w-full px-3 py-3 rounded-lg text-sm font-medium shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#FFC72C] ${isDark ? 'bg-[#1f1f1f] text-[#e4e6eb] border border-[#3e4042] placeholder:text-[#8f949d]' : 'bg-white text-gray-700 border border-gray-200 placeholder:text-gray-400'} ${voiceEnabled ? "pr-20" : ""}`}
         />
 
         <div className="absolute right-2 flex items-center gap-1">
@@ -101,7 +99,7 @@ const InputGroup = ({
             <button
               type="button"
               onClick={handleReset}
-              className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+              className={`p-1 rounded-md transition-all ${isDark ? 'text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
               aria-label="Clear"
             >
               <XMarkIcon className="w-4 h-4" />
@@ -118,8 +116,8 @@ const InputGroup = ({
               aria-label={isListening ? "Stop listening" : "Start voice input"}
               className={`p-1 rounded-md transition-all duration-200 ${
                 isListening
-                  ? "text-[#800000] animate-pulse"
-                  : "text-gray-400 hover:text-[#800000]"
+                  ? (isDark ? "text-[#FFC72C] animate-pulse" : "text-[#800000] animate-pulse")
+                  : (isDark ? "text-[#b0b3b8] hover:text-[#e4e6eb]" : "text-gray-400 hover:text-[#800000]")
               }`}
             >
               {isListening

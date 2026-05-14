@@ -10,12 +10,14 @@ import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
+import { useTheme } from '../context/ThemeContext';
 
 import { useReferenceData } from '../context/ReferenceDataContext';
 const ALUMNI_ACCESS_IDS = [2, 3];
 
 const AlumniRequestForm = () => {
   const { docTypeName, purposeName, certName } = useReferenceData();
+  const { isDark } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -312,7 +314,7 @@ const AlumniRequestForm = () => {
         <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
     {isSubmitted ? (
       <div className="max-w-5xl mx-auto">
-        <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 items-center justify-center text-center px-10 flex flex-col relative ">
+        <div className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 items-center justify-center text-center px-10 flex flex-col relative ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}>
           <p className="mb-6 text-4xl text-center font-bold text-white mt-35">
             Please be patient as we process your requested document. 
           </p>
@@ -332,7 +334,7 @@ const AlumniRequestForm = () => {
       <div className="max-w-5xl mx-auto">
         <form 
         onSubmit={handleSubmit}
-        className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative"
+        className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}
         noValidate>
           
           <div className="flex flex-col items-center pt-8 pb-4">
@@ -341,7 +343,7 @@ const AlumniRequestForm = () => {
                 <div 
                   key={step}
                   className={`w-4 h-4 rounded-full border border-pup-yellow ${
-                    step <= currentStep ? 'bg-pup-yellow' : 'bg-white'
+                    step <= currentStep ? 'bg-pup-yellow' : (isDark ? 'bg-[#3a3b3c]' : 'bg-white')
                   }`}
                 />
               ))}
@@ -350,17 +352,17 @@ const AlumniRequestForm = () => {
               {currentStep} of {totalSteps}
             </p>
 
-          <h2 className="text-white text-xl font-semibold mt-2">
+          <h2 className={isDark ? 'text-[#e4e6eb] text-xl font-semibold mt-2' : 'text-white text-xl font-semibold mt-2'}>
             {stepLabels[currentStep - 1]}
           </h2>
 
           </div>
 
-          <div className="flex-1 px-4 sm:px-6 md:px-10 py-4 text-white">
+          <div className={`flex-1 px-4 sm:px-6 md:px-10 py-4 ${isDark ? 'text-[#e4e6eb]' : 'text-white'}`}>
             
             {/* STEP 1: TERMS & CONDITIONS */}
             {currentStep === 1 && (
-              <div className="space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px]">
+              <div className={`space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px] ${isDark ? 'text-[#e4e6eb]' : ''}`}>
                   <p><strong>A.</strong> In compliance with the Data Privacy Act (DPA) of 2012, and its implementing rules 
                     and regulations (IRR), upon filling up this Google Form, I am hereby providing my 
                     consent and authorization to use my personal data for this request.
@@ -385,7 +387,7 @@ const AlumniRequestForm = () => {
 
                   <p><strong>F.</strong>  All documents unclaimed within 90 days on the date of request will be shredded automatically.</p>
 
-                  <div className="mt-2 pt-4 border-t text-l border-white/10">
+                  <div className={`mt-2 pt-4 border-t text-l ${isDark ? 'border-[#3e4042]' : 'border-white/10'}`}>
                     <CheckboxItem
                       name="termsAgreed"
                       checked={formData.termsAgreed}
@@ -433,8 +435,8 @@ const AlumniRequestForm = () => {
             {currentStep === 3 && hasTOR && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 gap-6 w-full mt-10">
-                  <div className="space-y-3 p-4 ">
-                    <p className="text-sm text-justify lg:text-[15px] ">
+                  <div className={`space-y-3 p-4 rounded-lg border ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/10'}`}>
+                    <p className={`text-sm text-justify lg:text-[15px] ${isDark ? 'text-[#e4e6eb]' : ''}`}>
                       For TOR request for further studies, please secure an HONORABLE DISMISSAL first.
                       Once processed and submitted back to the University, you may request for TOR with copy for remarks.
                     </p>
@@ -450,7 +452,7 @@ const AlumniRequestForm = () => {
                       checked={formData.doneRequest}
                       onChange={handleCheckboxChange}
                     />
-                    <div className="mt-4 pt-4 bg-white/10 p-4 rounded-lg border">
+                    <div className={`mt-4 pt-4 p-4 rounded-lg border ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/10'}`}>
                       <ImageUploader
                         label="1x1 Size Photo (Required for TOR)"
                         name="torImage"
@@ -467,7 +469,7 @@ const AlumniRequestForm = () => {
             {/* STEP 6: SUBMIT */}
             {currentStep === (hasTOR ? 4 : 3) && (
               <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full -mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full -mt-6">
                   <InputGroup
                     name="receiptNumber"
                     label="Official Receipt Number"
@@ -492,7 +494,7 @@ const AlumniRequestForm = () => {
                   />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-1 w-full -mt-2">
-                  <div className="bg-white/10 p-4 rounded-lg border">
+                  <div className={`p-4 rounded-lg border ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/10'}`}>
                     <h3 className="text-pup-yellow font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
@@ -508,13 +510,7 @@ const AlumniRequestForm = () => {
                                   type="number"
                                   min="1"
                                   max="10"
-                                  className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg 
-                                  outline-none transition-all duration-200
-                                  focus:bg-white 
-                                  focus:border-[#FFC72C] 
-                                  focus:ring-2 
-                                  focus:ring-[#FFC72C]/30 
-                                  focus:text-black"    
+                                  className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${isDark ? 'bg-[#242526] border-[#3e4042] text-[#e4e6eb] focus:bg-[#2b2c2d] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30' : 'bg-gray-50 border-gray-300 text-gray-700 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black'}`}    
                                   value={formData.documentCopies[doc] === undefined ? '' : formData.documentCopies[doc]}
                                   onChange={e => {
                                     const val = e.target.value;
@@ -533,13 +529,13 @@ const AlumniRequestForm = () => {
                       {showCertificationDropdown && formData.certification.length > 0 &&
                         formData.certification.map((certName, index) => (
                           <div key={index} className="flex items-center justify-between gap-2">
-                            <label className="text-white text-sm flex-1">CERTIFICATION (<span className="text-[#FFC72C]">{certName}</span>)</label>
+                            <label className={`text-sm flex-1 ${isDark ? 'text-[#e4e6eb]' : 'text-white'}`}>CERTIFICATION (<span className="text-[#FFC72C]">{certName}</span>)</label>
                             <div className="w-24">
                               <input
                                 type="number"
                                 min="1"
                                 max="10"
-                                className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg outline-none transition-all duration-200 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
+                                className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${isDark ? 'bg-[#242526] border-[#3e4042] text-[#e4e6eb] focus:bg-[#2b2c2d] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30' : 'bg-gray-50 border-gray-300 text-gray-700 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black'}`}
                                 value={formData.certCopies[certName] === undefined ? '' : formData.certCopies[certName]}
                                 onChange={e => {
                                   const val = e.target.value;
@@ -557,7 +553,7 @@ const AlumniRequestForm = () => {
                   </div>
                 </div>
                 <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar bg-white/10 p-2 rounded-lg border -mt-2">
+                <div className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border -mt-2 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/10'}`}>
                   {formData.documentsRequested.map((doc, index) => {
 
                     const docData = availableDocs.find((d) => d.document_name === doc);
@@ -570,7 +566,7 @@ const AlumniRequestForm = () => {
                     return (
                       <div
                         key={index}
-                        className="bg-white/10 p-4 rounded-lg border  px-4 py-3"
+                        className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white/10 border-white/10'}`}
                       >
                         <div className="flex items-center gap-2 mb-3">
                           <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
@@ -582,7 +578,7 @@ const AlumniRequestForm = () => {
                         <ul className="flex flex-col gap-1.5 pl-1">
                           {requirements.length > 0 ? (
                             requirements.map((req, i) => (
-                              <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
+                              <li key={i} className={`flex items-start gap-2 text-xs leading-relaxed min-w-0 ${isDark ? 'text-[#b0b3b8]' : 'text-white/80'}`}>
                                 <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
 
                                 <span className="wrap-break-word whitespace-normal break-all max-w-full">
@@ -591,7 +587,7 @@ const AlumniRequestForm = () => {
                               </li>
                             ))
                           ) : (
-                            <li className="text-xs text-white/35 italic">No requirements available</li>
+                            <li className={`text-xs italic ${isDark ? 'text-[#b0b3b8]/60' : 'text-white/35'}`}>No requirements available</li>
                           )}
                         </ul>
                       </div>
@@ -601,7 +597,7 @@ const AlumniRequestForm = () => {
                 </div>
                   <div className="-mt-9 flex justify-center items-start">
                     <div className=" p-4 md:mt-4 lg:mt-5 w-full max-w-sm max-h-lg flex flex-col items-center">
-                      <p className="lg:mt-2 text-[10px] text-white/70 text-center leading-relaxed">
+                      <p className={`lg:mt-2 text-[10px] text-center leading-relaxed ${isDark ? 'text-[#b0b3b8]' : 'text-white/70'}`}>
                         <strong>REMINDER</strong>: Your feedback is important to us. Kindly take a moment to share your experience.
                       </p>
 
