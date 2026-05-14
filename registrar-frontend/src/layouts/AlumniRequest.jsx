@@ -322,7 +322,7 @@ const AlumniRequestForm = () => {
           </p>
           <button 
             onClick={handleConfirm}
-            className={`w-32 mt-70 font-bold py-2 px-6 rounded shadow-md transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
+            className="bg-pup-yellow mt-70 hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95"
           >
             Confirm 
           </button>
@@ -634,7 +634,7 @@ const AlumniRequestForm = () => {
                   <button
                     onClick={prevStep}
                     type="button"
-                    className={`font-bold py-2 px-6 rounded shadow-md w-full transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
+                    className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95 w-full"
                   >
                     Back
                   </button>
@@ -645,7 +645,7 @@ const AlumniRequestForm = () => {
                 <button
                   type="button"
                   onClick={currentStep < totalSteps ? nextStep : handlePreSubmit}
-                  className={`font-bold py-2 px-6 rounded shadow-md w-full ml-auto transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
+                  className="font-bold py-2 px-6 rounded shadow-md w-full ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
                 >
                   {currentStep < totalSteps ? "Next" : "Submit"}
                 </button>
