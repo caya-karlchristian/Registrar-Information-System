@@ -1,39 +1,30 @@
-export const DOC_TYPE_MAP = {
-  1: "New Identification",
-  2: "Replacement of Lost Identification Card",
-  3: "Consultation Service",
-  4: "Counselling Service",
-  5: "Recommendation Letter",
-  6: "Student/Alumni Referral and Recommendation",
-  7: "Permission to Conduct an Activity",
-  8: "Application for Graduation SIS and Non-SIS",
-  9: "Course/Subject Description",
-  10: "Correction of Entry of Grade, Completion of Incomplete Grade, Late Reporting of Grade",
-  11: "Course Accreditation (SHS to Bridge)",
-  12: "Course Accreditation (Transferees)",
-  13: "CERTIFICATION",
-  14: "CAV/APOSTILE",
-  15: "Transcript of Records (TOR)",
-  16: "Informative Copy of Grades",
-  17: "Request for Leave of Absences",
-  18: "Re-Admission",
-  19: "Good Moral Character",
-};
-
-export const PURPOSE_MAP = {
-  1: "DFA",
-  2: "Employment - Local",
-};
+/**
+ * constants.js
+ * ------------
+ * Static, presentation-only constants that are safe to hardcode because
+ * they are determined by the frontend design, not the database.
+ *
+ * NOTE: DOC_TYPE_MAP, CERTIFICATION_MAP, and PURPOSE_MAP have been removed.
+ * Those values now come from the API via ReferenceDataContext:
+ *
+ *   import { useReferenceData } from "../context/ReferenceDataContext";
+ *   const { documentTypes, certifications, docTypeName, certName } = useReferenceData();
+ *
+ * STATUS_CONFIG has also moved to ReferenceDataContext (statusConfig helper).
+ * The exports below are kept for components that have not yet been migrated —
+ * they will continue to work but should be updated to use the context.
+ */
 
 // Status IDs mirror RequestStatusEnum in the backend:
 //   1 = Processing  2 = ReadyToClaim  3 = Completed
 //   4 = Forfeited   5 = Cancelled
+// Keep in sync with backend Enums/RequestStatusEnum.php
 export const STATUS_CONFIG = {
   1: { label: "Processing",     classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  2: { label: "Ready to Claim", classes: "bg-green-100 text-green-700 border-green-200" },
-  3: { label: "Completed",      classes: "bg-gray-100 text-gray-700 border-gray-200" },
-  4: { label: "Forfeited",      classes: "bg-red-100 text-red-700 border-red-200" },
-  5: { label: "Cancelled",      classes: "bg-orange-100 text-orange-700 border-orange-200" },
+  2: { label: "Ready to Claim", classes: "bg-green-100 text-green-700 border-green-200"   },
+  3: { label: "Completed",      classes: "bg-gray-100 text-gray-700 border-gray-200"      },
+  4: { label: "Forfeited",      classes: "bg-red-100 text-red-700 border-red-200"         },
+  5: { label: "Cancelled",      classes: "bg-orange-100 text-orange-700 border-orange-200"},
 };
 
 export const TAB_MAP = {
@@ -45,51 +36,99 @@ export const TAB_MAP = {
 };
 
 export const TABS = [
-  { 
-    label: "Pending", 
-    value: "pending", 
-    active: "bg-yellow-50 border-yellow-500 text-yellow-900", 
-    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-yellow-50" 
+  {
+    label: "Pending",
+    value: "pending",
+    active:   "bg-yellow-50 border-yellow-500 text-yellow-900",
+    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-yellow-50",
   },
-  { 
-    label: "To Claim", 
-    value: "ready", 
-    active: "bg-green-50 border-green-500 text-green-900", 
-    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-green-50" 
+  {
+    label: "To Claim",
+    value: "ready",
+    active:   "bg-green-50 border-green-500 text-green-900",
+    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-green-50",
   },
-  { 
-    label: "History", 
-    value: "history", 
-    active: "bg-gray-100 border-gray-500 text-gray-900", 
-    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-gray-50" 
+  {
+    label: "History",
+    value: "history",
+    active:   "bg-gray-100 border-gray-500 text-gray-900",
+    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-gray-50",
   },
 ];
 
 export const PROGRESS_MAP = {
-  1: 25,  // Processing
-  2: 75,  // Ready to Claim
-  3: 100, // Completed
-  4: 0,   // Forfeited
-  5: 0,   // Cancelled
+  1: 25,   // Processing
+  2: 75,   // Ready to Claim
+  3: 100,  // Completed
+  4: 0,    // Forfeited
+  5: 0,    // Cancelled
+};
+
+// @deprecated-shims
+// ---------------------------------------------------------------------------
+// DEPRECATED — kept as fallback shims so existing components don't break.
+// These maps are now served from the API via ReferenceDataContext.
+//
+// To migrate a component:
+//   1. Replace: import { DOC_TYPE_MAP, PURPOSE_MAP, CERTIFICATION_MAP } from '../utils/constants';
+//      With:    import { useReferenceData } from '../context/ReferenceDataContext';
+//   2. Inside the component: const { docTypeName, certName, purposeName } = useReferenceData();
+//   3. Replace DOC_TYPE_MAP[id]      → docTypeName(id)
+//              PURPOSE_MAP[id]       → purposeName(id)
+//              CERTIFICATION_MAP[id] → certName(id)
+//   4. Remove the import below once all usages are gone.
+//
+// Files still using these shims (as of the fix):
+//   - src/layouts/RequestForm.jsx
+//   - src/layouts/RequestDetailModal.jsx  (via components/)
+//   - src/layouts/StudentDashboard.jsx
+//   - src/layouts/StaffDashboard.jsx
+//   - src/layouts/AlumniRequest.jsx
+//   - src/layouts/Logbook.jsx
+// ---------------------------------------------------------------------------
+
+export const DOC_TYPE_MAP = {
+  1:  "Recommendation Letter",
+  2:  "Course Subject Description",
+  3:  "Certificates",
+  4:  "CAV / Apostille",
+  5:  "Transcript of Records",
+  6:  "Certificate of Good Moral Character",
+  7:  "Academic Verification",
+  8:  "New Identification Card",
+  9:  "Replacement Identification Card",
+  10: "Consultation Service",
+  11: "Counseling Service",
+  12: "Permit to Conduct an Activity",
+  13: "Application for Graduation",
+  14: "Grade Correction",
+  15: "Name Correction",
+  16: "SHS Course Accreditation",
+  17: "Transferee Course Accreditation",
+  18: "Informative Copy of Grades",
+  19: "Leave of Absence",
+  20: "Re-Admission Certificate",
+};
+
+export const PURPOSE_MAP = {
+  1: "DFA",
+  2: "Employment - Local",
+  3: "Employment - Abroad",
+  4: "Further Studies",
+  5: "Board Exam",
+  6: "Scholarship",
+  7: "Personal Copy",
 };
 
 export const CERTIFICATION_MAP = {
-  1: "Certificate of GWA",
-  2: "Non Issuance of SO",
-  3: "Certification of Medium of Instruction",
-  4: "Certification of Medium of Instruction with Units",
-  5: "Certificate of Attendance",
-  6: "Certificate of Graduation",
-  7: "Certified True Copy of Records",
-  8: "Certificate of Graduate Honor",
-  9: "Consular Certification",
-  10: "Certificate of Enrollment - PRESENT",
-  11: "Certificate of Enrollment - UNDERGRAD",
-  12: "Certificate of Ladderized Course",
-  13: "CAV Request Letter",
-  14: "CAV",
-  15: "Certification of NSTP-CWTS",
-  16: "Endorsement Letter",
-  17: "Certificate of Eligibility to Transfer",
+  1:  "Certificate of Attendance",
+  2:  "Certificate of Graduation",
+  3:  "Medium of Instruction",
+  4:  "General Weighted Average",
+  5:  "Non-Issuance of Special Order",
+  6:  "Certified True Copy",
+  7:  "Good Moral Character",
+  8:  "Re-Admission Certificate",
+  9:  "Leave of Absence",
+  10: "Course Accreditation",
 };
-
