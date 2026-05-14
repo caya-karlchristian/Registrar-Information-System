@@ -36,18 +36,39 @@ export const TAB_MAP = {
 };
 
 export const TABS = [
+  { 
+    label: "Pending", 
+    value: "pending", 
+    active: "bg-yellow-50 border-yellow-500 text-yellow-900", 
+    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-yellow-50",
+    darkActive: "bg-yellow-900/20 border-yellow-600 text-yellow-400",
+    darkInactive: "bg-[#242526] border-[#3e4042] text-[#b0b3b8] hover:bg-[#3a3b3c] hover:text-[#e4e6eb]"
   {
     label: "Pending",
     value: "pending",
     active:   "bg-yellow-50 border-yellow-500 text-yellow-900",
     inactive: "bg-white border-gray-200 text-gray-500 hover:bg-yellow-50",
   },
+  { 
+    label: "To Claim", 
+    value: "ready", 
+    active: "bg-green-50 border-green-500 text-green-900", 
+    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-green-50",
+    darkActive: "bg-green-900/20 border-green-600 text-green-400",
+    darkInactive: "bg-[#242526] border-[#3e4042] text-[#b0b3b8] hover:bg-[#3a3b3c] hover:text-[#e4e6eb]"
   {
     label: "To Claim",
     value: "ready",
     active:   "bg-green-50 border-green-500 text-green-900",
     inactive: "bg-white border-gray-200 text-gray-500 hover:bg-green-50",
   },
+  { 
+    label: "History", 
+    value: "history", 
+    active: "bg-gray-100 border-gray-500 text-gray-900", 
+    inactive: "bg-white border-gray-200 text-gray-500 hover:bg-gray-50",
+    darkActive: "bg-gray-700/20 border-gray-400 text-gray-300",
+    darkInactive: "bg-[#242526] border-[#3e4042] text-[#b0b3b8] hover:bg-[#3a3b3c] hover:text-[#e4e6eb]"
   {
     label: "History",
     value: "history",
