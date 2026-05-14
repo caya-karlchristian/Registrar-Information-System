@@ -5,12 +5,10 @@ import RequestDetailsModal from '../components/RequestDetailModal';
 import LoadingOverlay from "../components/LoadingOverlay";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../context/AuthProvider';
-import { STATUS_CONFIG, TAB_MAP, TABS } from '../utils/constants';
+import { DOC_TYPE_MAP, PURPOSE_MAP, STATUS_CONFIG, TAB_MAP, TABS } from '../utils/constants';
 import { useNotificationsContext } from '../context/NotificationsContext';
 
-import { useReferenceData } from '../context/ReferenceDataContext';
 const StudentDashboard = () => {
-  const { docTypeName, purposeName, certName } = useReferenceData();
   const [activeTab, setActiveTab] = useState("pending");
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,12 +44,12 @@ const StudentDashboard = () => {
           label: r.status?.status_name ?? baseConfig.label
         };
 
-        const purposeLabel = r.request_purpose?.purpose_name ?? purposeName(r.request_purpose_id) ?? "N/A";
+        const purposeLabel = r.request_purpose?.purpose_name ?? PURPOSE_MAP[r.request_purpose_id] ?? "N/A";
 
         //Will check first the database, before proceeding to the constant
         const docNames = r.documents?.map(d => {
         const dynamicName = d.document_type?.document_name;
-        return dynamicName ?? docTypeName(d.document_type_id) ?? "Unknown Document";
+        return dynamicName ?? DOC_TYPE_MAP[d.document_type_id] ?? "Unknown Document";
       })
       .filter(Boolean) || [];
 

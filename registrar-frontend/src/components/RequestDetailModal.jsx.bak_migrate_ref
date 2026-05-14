@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDownIcon, XCircleIcon } from '@heroicons/react/24/solid';
 import { getDocumentTypes } from "../services/api";
-import { PROGRESS_MAP } from '../utils/constants';
+import { DOC_TYPE_MAP, PURPOSE_MAP, PROGRESS_MAP} from '../utils/constants';
 
-import { useReferenceData } from '../context/ReferenceDataContext';
 const RequestDetailsModal = ({ request, onClose, user }) => {
-  const { docTypeName, purposeName, certName } = useReferenceData();
   const [docTypes, setDocTypes] = useState([]);
 
   useEffect(() => {
@@ -42,7 +40,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
     // 3. Final fallback to the constant or "Unknown"
     return doc.document_type?.document_name ?? 
           docTypes.find(t => t.document_type_id === doc.document_type_id)?.document_name ?? 
-          docTypeName(doc.document_type_id) ?? 
+          DOC_TYPE_MAP[doc.document_type_id] ?? 
           "Unknown Document";
   };
 
@@ -136,7 +134,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
                   {request.requested_at ? new Date(request.requested_at).toLocaleDateString() : 'N/A'}
               </p>
               <p className="wrap-break-word"><strong>Status:</strong> {displayStatus}</p>
-              <p className="wrap-break-word"><strong>Purpose:</strong> {request.request_purpose?.purpose_name ?? purposeName(request.request_purpose_id) ?? 'N/A'}</p>
+              <p className="wrap-break-word"><strong>Purpose:</strong> {request.request_purpose?.purpose_name ?? PURPOSE_MAP[request.request_purpose_id] ?? 'N/A'}</p>
             </div>
           </Section>
 

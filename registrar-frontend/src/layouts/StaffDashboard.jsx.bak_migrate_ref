@@ -18,11 +18,11 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
 import LineLoading from '../components/LineLoading.jsx';
 import CertificateModal from '../components/CertificateModal.jsx';
+import { DOC_TYPE_MAP } from '../utils/constants';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
 import { useNotificationsContext } from '../context/NotificationsContext';
 import DropdownGroup from '../components/DropDown.jsx';
 
-import { useReferenceData } from '../context/ReferenceDataContext';
 const STATUS_FALLBACK = {
   PENDING: 1,
   READY: 2,
@@ -46,7 +46,6 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
 ]);
 
 const StaffDashboard = () => {
-  const { docTypeName, purposeName, certName } = useReferenceData();
   const [requests, setRequests] = useState([]);
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
@@ -144,7 +143,7 @@ const StaffDashboard = () => {
             r.documents?.some(d => {
               const name =
                 d.document_type?.document_name?.toLowerCase() ||
-                docTypeName(d.document_type_id)?.toLowerCase() ||
+                DOC_TYPE_MAP[d.document_type_id]?.toLowerCase() ||
                 '';
 
               return name.includes('cert');
@@ -153,7 +152,7 @@ const StaffDashboard = () => {
 
         const getDocName = d =>
           d.document_type?.document_name ||
-          docTypeName(d.document_type_id) ||
+          DOC_TYPE_MAP[d.document_type_id] ||
           `Unknown Doc (ID: ${d.document_type_id})`;
 
         const totalCopies = (r.documents?.reduce((sum, d) => sum + (Number(d.number_of_copies) || 1), 0) || 0) + (r.certificates?.reduce((sum, c) => sum + (Number(c.number_of_copies) || 1), 0) || 0) || 1;

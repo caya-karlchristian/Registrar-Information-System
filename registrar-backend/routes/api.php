@@ -37,7 +37,10 @@ Route::get('announcements/{announcement}', [AnnouncementController::class, 'show
 | PROTECTED ROUTES
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->group(function () {
+// General authenticated endpoints: 60 requests per minute.
+// Analytics endpoints get a tighter limit (10/min) because each call
+// can trigger heavy DB aggregation or a paid Anthropic API call.
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // ── OGOS student data ────────────────────────────────────────────────────
     Route::prefix('students')->group(function () {
@@ -123,7 +126,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('students',         StudentProfileController::class);
         Route::apiResource('academic-records', StudentAcademicRecordController::class);
 
-        Route::prefix('analytics')->group(function () {
+        Route::prefix('analytics')->middleware('throttle:10,1')->group(function () {
             Route::get('overview',         [AnalyticsController::class, 'overview']);
             Route::get('volume-trend',     [AnalyticsController::class, 'volumeTrend']);
             Route::get('by-document-type', [AnalyticsController::class, 'byDocumentType']);
