@@ -39,9 +39,6 @@ export const useNotifications = (onNewNotification = null) => {
             setNotifications(prev =>
                 prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
             );
-            // Fetch the authoritative count from the server rather than
-            // guessing — prevents drift when the notification was already
-            // read in another tab or via markAllAsRead.
             const { data } = await api.get('/notifications/unread-count');
             setUnreadCount(data.count ?? 0);
         } catch (err) {
@@ -64,13 +61,7 @@ export const useNotifications = (onNewNotification = null) => {
     const dismiss = useCallback(async (id) => {
         try {
             await api.delete(`/notifications/${id}`);
-            // Read the snapshot, then update both states at the same level —
-            // calling setState inside another setState's updater fn is unsafe
-            // in React's concurrent renderer (the inner call can be dropped
-            // if the updater is replayed).
             setNotifications(prev => prev.filter(n => n.id !== id));
-            // Sync the authoritative count from the server so we stay correct
-            // regardless of whether the dismissed notification was read or not.
             const { data } = await api.get('/notifications/unread-count');
             setUnreadCount(data.count ?? 0);
         } catch (err) {
@@ -78,26 +69,19 @@ export const useNotifications = (onNewNotification = null) => {
         }
     }, []);
 
-    // Track the previous user_id so we only reset Echo when the user
-    // actually changes (login/logout), not on every effect re-run.
     const prevUserIdRef = useRef(null);
 
     useEffect(() => {
         if (!user) return;
         fetchNotifications();
 
-        // Reset the singleton ONLY when the user identity changes so each
-        // new login gets a fresh WebSocket connection with the current token.
-        // Resetting on every run would cause a connect→disconnect→connect
-        // flap on re-renders and navigation, which drops in-flight events.
         if (prevUserIdRef.current !== user.user_id) {
             resetEcho();
             prevUserIdRef.current = user.user_id;
         }
+
         const echo = getEcho();
         if (!echo) {
-            // Env vars were missing at build time — see vite.config.js and Dockerfile.
-            // Notifications will still load via REST; real-time push is unavailable.
             console.error('[useNotifications] Echo unavailable — VITE_REVERB_HOST or VITE_REVERB_APP_KEY missing.');
             return;
         }
@@ -113,6 +97,11 @@ export const useNotifications = (onNewNotification = null) => {
 
         const channelName = `notifications.${user.user_id}`;
 
+        // Hoist the flag to effect scope so the cleanup return can always
+        // reach it — previously declared inside the else block, which put it
+        // out of scope of the return () => { ... } teardown function.
+        let unsubscribed = false;
+
         const subscribe = () => {
             console.info('[Echo] subscribing to', channelName);
             echo.private(channelName)
@@ -124,28 +113,13 @@ export const useNotifications = (onNewNotification = null) => {
 
         const connectionState = echo.connector.pusher.connection.state;
 
-        // Log all connection state transitions so failures are visible in DevTools.
         echo.connector.pusher.connection.bind('state_change', ({ current }) => {
             console.info(`[Echo] connection → ${current}`);
         });
 
         if (connectionState === 'connected') {
-            // Already connected (e.g. navigating between pages with same user) —
-            // subscribe immediately, no need to wait for the handshake.
             subscribe();
         } else {
-            // Connection is still being established (fresh login, page reload).
-            // Wait for the 'connected' event before subscribing to the private
-            // channel — subscribing too early causes the channel auth request
-            // (/api/broadcasting/auth) to race against the WS handshake and
-            // intermittently fail with a 401 even though the token is valid.
-            //
-            // unsubscribed flag: if the component unmounts before the WS
-            // handshake completes, the cleanup return below sets this to true
-            // and the onConnected callback becomes a no-op.  Without this guard
-            // the callback fires into a dead closure and can create a duplicate
-            // subscription when the component remounts (e.g. after SSO redirect).
-            let unsubscribed = false;
             const onConnected = () => {
                 echo.connector.pusher.connection.unbind('connected', onConnected);
                 if (!unsubscribed) subscribe();
@@ -155,9 +129,6 @@ export const useNotifications = (onNewNotification = null) => {
 
         return () => {
             unsubscribed = true;
-            // Remove the pending onConnected listener so it can never fire
-            // after cleanup — covers the race where unmount happens while the
-            // WS handshake is still in progress (common during SSO redirects).
             echo.connector.pusher.connection.unbind('connected');
             echo.leave(channelName);
         };

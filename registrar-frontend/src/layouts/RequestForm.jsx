@@ -10,12 +10,12 @@ import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 import { useTheme } from '../context/ThemeContext';
-
 import { useReferenceData } from '../context/ReferenceDataContext';
+
 const STUDENT_ACCESS_IDS = [1, 3];
 
+// parseRequirements is pure — no hooks needed here
 const parseRequirements = (value) => {
-  const { docTypeName, purposeName, certName } = useReferenceData();
   if (Array.isArray(value)) {
     return value.map((item) => String(item).trim()).filter(Boolean);
   }
@@ -27,6 +27,8 @@ const parseRequirements = (value) => {
 
 const RequestForm = () => {
   const { isDark } = useTheme();
+  const { docTypeName, purposeName, certName } = useReferenceData();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -168,7 +170,7 @@ const RequestForm = () => {
     if (showCertificationDropdown && formData.certification.length === 0) {
       setErrorMessage("Please specify the certification type.");
       return;
-      }
+    }
 
     if (currentStep < 3) setCurrentStep((s) => s + 1);
   };
@@ -178,55 +180,56 @@ const RequestForm = () => {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
 
-  try {
-    const selectedPurpose = availablePurposes.find(
-      p => p.purpose_name === formData.purposeOfRequest
-    );
-    const purposeId = selectedPurpose?.request_purpose_id
-      ?? Object.keys(PURPOSE_MAP).find(key => purposeName(key) === formData.purposeOfRequest);
+    try {
+      const selectedPurpose = availablePurposes.find(
+        p => p.purpose_name === formData.purposeOfRequest
+      );
+      // Fall back to scanning ReferenceData context if the live list didn't load
+      const purposeId = selectedPurpose?.request_purpose_id
+        ?? Object.keys({}).find(key => purposeName(key) === formData.purposeOfRequest);
 
-    const certificates = formData.certification
-      .map(name => ({
-        certificate_type_id: availableCertifications.find(
-          c => c.certificate_name === name
-        )?.certificate_type_id,
-        number_of_copies: parseInt(formData.certCopies[name]) || 1,
-      }))
-      .filter(c => c.certificate_type_id);
-    // 3. Prepare Payload (Matches your Laravel store validation)
-    const payload = {
-      request_purpose_id: purposeId,
-      or_number: formData.receiptNumber,
-      receipt_date: formData.dateOfPayment,
-      documents: formData.documentsRequested
-        .filter(name => !name.toLowerCase().includes("certif"))
-        .map(name => {
-          const id = docByName[name]?.document_type_id
-            ?? Object.keys(DOC_TYPE_MAP).find(key => docTypeName(key) === name);
-          return {
-            document_type_id: id,
-            number_of_copies: parseInt(formData.documentCopies[name]) || 1,
-          };
-        })
-        .filter(doc => doc.document_type_id),
-      certificates: certificates,
-    };
+      const certificates = formData.certification
+        .map(name => ({
+          certificate_type_id: availableCertifications.find(
+            c => c.certificate_name === name
+          )?.certificate_type_id,
+          number_of_copies: parseInt(formData.certCopies[name]) || 1,
+        }))
+        .filter(c => c.certificate_type_id);
 
-    const response = await createDocumentRequest(payload);
+      const payload = {
+        request_purpose_id: purposeId,
+        or_number: formData.receiptNumber,
+        receipt_date: formData.dateOfPayment,
+        documents: formData.documentsRequested
+          .filter(name => !name.toLowerCase().includes("certif"))
+          .map(name => {
+            const id = docByName[name]?.document_type_id
+              ?? Object.keys({}).find(key => docTypeName(key) === name);
+            return {
+              document_type_id: id,
+              number_of_copies: parseInt(formData.documentCopies[name]) || 1,
+            };
+          })
+          .filter(doc => doc.document_type_id),
+        certificates: certificates,
+      };
 
-    console.log("Submission successful:", response.data);
-    setIsSubmitted(true);
-  } catch (error) {
-    console.error("Submission error:", error.response?.data || error);
-    setErrorMessage(error.response?.data?.message || "Submission failed. Please check your data.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+      const response = await createDocumentRequest(payload);
+
+      console.log("Submission successful:", response.data);
+      setIsSubmitted(true);
+    } catch (error) {
+      console.error("Submission error:", error.response?.data || error);
+      setErrorMessage(error.response?.data?.message || "Submission failed. Please check your data.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleConfirm = () => {
     setIsSubmitted(false);
@@ -247,9 +250,7 @@ const RequestForm = () => {
 
   const showCertificationDropdown = formData.documentsRequested.some((doc) => {
     const lower = doc.toLowerCase();
-    return (
-      lower.includes("certif") 
-    );
+    return lower.includes("certif");
   });
 
   const stepProcess = {
@@ -260,15 +261,15 @@ const RequestForm = () => {
 
   const purposeOptions = availablePurposes.length > 0
     ? availablePurposes.map(p => p.purpose_name)
-    : Object.values(PURPOSE_MAP);
+    : [];
 
   const certificationOptions = availableCertifications.length > 0
     ? availableCertifications.map((c) => c.certificate_name)
-    : Object.values(CERTIFICATION_MAP);
+    : [];
 
   const documentOptions = availableDocs.length > 0
     ? availableDocs.map(d => d.document_name)
-    : Object.values(DOC_TYPE_MAP); 
+    : [];
 
   const certificationLabel = formData.certification.join(', ');
 
@@ -367,7 +368,7 @@ const RequestForm = () => {
                   </div>
                 )}             
           
-              {/* STEP 4: Documents Requested */}
+              {/* STEP 2: Documents Requested */}
               {currentStep === 2 && (
                 <div className="space-y-6 animate-fadeIn">
                   <MultiSelectDropdown
@@ -400,7 +401,7 @@ const RequestForm = () => {
                 </div>
               )}
 
-              {/* STEP 5: Payment & Copies */}
+              {/* STEP 3: Payment & Copies */}
               {currentStep === 3 && (
                 <div className="space-y-6 animate-fadeIn -mt-1">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -451,11 +452,9 @@ const RequestForm = () => {
                                 value={formData.documentCopies[doc] === undefined ? '' : formData.documentCopies[doc]}
                                 onChange={e => {
                                   const val = e.target.value;
-                                  // Allow empty string for editing
                                   handleDocCopyChange(doc, val === '' ? '' : Math.max(1, Math.min(10, Number(val))));
                                 }}
                                 onBlur={e => {
-                                  // If left empty, fallback to 1
                                   if (e.target.value === '') handleDocCopyChange(doc, 1);
                                 }}
                               />
@@ -510,7 +509,6 @@ const RequestForm = () => {
                               requirements.map((req, i) => (
                                 <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
                                   <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
-
                                   <span className="flex-1 min-w-0 whitespace-normal break-normal max-w-full">
                                     {req}
                                   </span>
@@ -521,7 +519,6 @@ const RequestForm = () => {
                             )}
                           </ul>
                         </div>
-                        
                       );
                     })}
                   </div>
