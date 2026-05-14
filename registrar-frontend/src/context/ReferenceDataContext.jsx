@@ -5,12 +5,13 @@ import {
   getRequestStatuses,
   getRequestPurposes,
 } from "../services/api";
+import { useAuth } from "./AuthProvider";
 
 /**
  * ReferenceDataContext
  * --------------------
- * Fetches all reference / lookup data from the API once on mount and makes it
- * available throughout the app.
+ * Fetches all reference / lookup data from the API once the user is
+ * authenticated and makes it available throughout the app.
  *
  * Why this replaces constants.js hardcoded maps:
  *   - The DB is the source of truth. If an admin adds a new document type,
@@ -18,12 +19,18 @@ import {
  *   - The old DOC_TYPE_MAP, CERTIFICATION_MAP, and PURPOSE_MAP were integer-keyed
  *     objects that would silently drift from the database.
  *
+ * Fix (2026-05-14): gated the fetch on auth readiness.
+ *   Previously the useEffect fired immediately on mount — before AuthProvider
+ *   had resolved the /me call — causing 401s on every reference data endpoint
+ *   at login time. Now we wait until `authLoading` is false AND `user` is set.
+ *
  * Usage:
  *   const { documentTypes, certifications, statuses, purposes, loading } = useReferenceData();
  *
  * Convenience helpers are also exported:
  *   docTypeName(id)   → string | undefined
  *   certName(id)      → string | undefined
+ *   purposeName(id)   → string | undefined
  *   statusConfig(id)  → { label, classes } | undefined
  */
 
@@ -42,6 +49,8 @@ const STATUS_DISPLAY = {
 const ReferenceDataContext = createContext(null);
 
 export const ReferenceDataProvider = ({ children }) => {
+  const { user, loading: authLoading } = useAuth();
+
   const [documentTypes,   setDocumentTypes]   = useState([]);
   const [certifications,  setCertifications]  = useState([]);
   const [statuses,        setStatuses]        = useState([]);
@@ -49,26 +58,43 @@ export const ReferenceDataProvider = ({ children }) => {
   const [loading,         setLoading]         = useState(true);
 
   useEffect(() => {
+    // Wait until AuthProvider has finished its /me check.
+    // - authLoading === true  → /me is still in-flight; do nothing yet.
+    // - authLoading === false, user === null → not logged in; skip fetch
+    //   (unauthenticated pages don't need reference data).
+    // - authLoading === false, user !== null → authenticated; safe to fetch.
+    if (authLoading) return;
+
+    if (!user) {
+      // Not authenticated — reset to empty defaults and mark done
+      // so consumers don't spin forever on the loading state.
+      setDocumentTypes([]);
+      setCertifications([]);
+      setStatuses([]);
+      setPurposes([]);
+      setLoading(false);
+      return;
+    }
+
     // Fetch all reference data in parallel. Individual failures are caught so
     // one unavailable endpoint cannot block the rest of the app from loading.
     const load = async () => {
+      setLoading(true);
       const results = await Promise.allSettled([
         getDocumentTypes(),
         getCertifications(),
         getRequestStatuses(),
         getRequestPurposes(),
       ]);
-
       if (results[0].status === "fulfilled") setDocumentTypes(results[0].value.data ?? []);
       if (results[1].status === "fulfilled") setCertifications(results[1].value.data ?? []);
       if (results[2].status === "fulfilled") setStatuses(results[2].value.data ?? []);
       if (results[3].status === "fulfilled") setPurposes(results[3].value.data ?? []);
-
       setLoading(false);
     };
 
     load();
-  }, []);
+  }, [authLoading, user]); // re-run if auth state changes (login / logout)
 
   // ── Convenience lookup helpers ───────────────────────────────────────────
 
