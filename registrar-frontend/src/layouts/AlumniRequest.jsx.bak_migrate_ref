@@ -6,16 +6,15 @@ import MultiSelectDropdown from '../components/MultiSelection.jsx';
 import ErrorToast from "../components/ErrorToast.jsx";
 import ImageUploader from "../components/ImageUploader.jsx";
 import { getDocumentTypes, getCertifications, getRequestPurposes, createDocumentRequest } from "../services/api.js";
+import { CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
 
-import { useReferenceData } from '../context/ReferenceDataContext';
 const ALUMNI_ACCESS_IDS = [2, 3];
 
 const AlumniRequestForm = () => {
-  const { docTypeName, purposeName, certName } = useReferenceData();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -231,7 +230,7 @@ const AlumniRequestForm = () => {
         request_purpose_id: purposeId,
         or_number: formData.receiptNumber,
         receipt_date: formData.dateOfPayment,
-        documents: formData.documentsRequested.filter(name => !name.toLowerCase().includes("certif")).map(name => { const dbDoc = availableDocs.find(d => d.document_name === name); const id = dbDoc?.document_type_id ?? Object.keys(DOC_TYPE_MAP).find(key => docTypeName(key) === name); return { document_type_id: id, number_of_copies: parseInt(formData.documentCopies[name]) || 1 }; }).filter(doc => doc.document_type_id),
+        documents: formData.documentsRequested.filter(name => !name.toLowerCase().includes("certif")).map(name => { const dbDoc = availableDocs.find(d => d.document_name === name); const id = dbDoc?.document_type_id ?? Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name); return { document_type_id: id, number_of_copies: parseInt(formData.documentCopies[name]) || 1 }; }).filter(doc => doc.document_type_id),
         certificates: certificates,
       };
 
