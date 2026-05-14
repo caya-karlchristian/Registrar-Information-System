@@ -3,6 +3,7 @@ import FieldGroup from '../components/FieldGroup';
 import { UserIcon } from '@heroicons/react/24/solid';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useAuth } from '../context/AuthProvider';
+import { useTheme } from '../context/ThemeContext';
 
 const ROLE_CONFIG = {
   student: {
@@ -53,6 +54,8 @@ const ProfilePage = ({ userType = "student" }) => {
 
   const { user } = useAuth();
   const config = ROLE_CONFIG[userType];
+
+  const { isDark } = useTheme();
 
   const [profileData, setProfileData] = useState({
     firstName: "",
@@ -122,7 +125,7 @@ const ProfilePage = ({ userType = "student" }) => {
 
   return (
     <div className="min-h-screen flex items-start justify-center font-sans py-2 lg:-mt-5">
-      <div className="w-full max-w-7xl bg-pup-dark-maroon shadow-2xl overflow-hidden flex flex-col relative rounded-sm min-h-157.5">
+      <div className={`w-full max-w-7xl shadow-2xl overflow-hidden flex flex-col relative rounded-sm min-h-157.5 ${isDark ? 'bg-[#18191a] border border-[#3e4042]' : 'bg-pup-dark-maroon'}`}>
         
         <div className="h-3 w-full bg-[#eebc48]"></div>
 
@@ -130,11 +133,11 @@ const ProfilePage = ({ userType = "student" }) => {
         <div className="px-8 py-10">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6 flex-1">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6 w-full">
-              <div className="w-24 h-24 rounded-full bg-[#222222] flex items-center justify-center shrink-0 border-2 border-[#4a1010] overflow-hidden">
-                <UserIcon className="text-gray-400 h-16 w-16 translate-y-2" />
+              <div className={`w-24 h-24 rounded-full flex items-center justify-center shrink-0 overflow-hidden border-2 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-[#222222] border-[#4a1010]'}`}>
+                <UserIcon className={`${isDark ? 'text-[#e4e6eb]' : 'text-gray-400'} h-16 w-16 translate-y-2`} />
               </div>
 
-              <div className="text-white space-y-1 mt-2 text-center md:text-left">
+              <div className={`${isDark ? 'text-[#e4e6eb]' : 'text-white'} space-y-1 mt-2 text-center md:text-left`}>
                 <h2 className="text-3xl font-bold tracking-wide flex flex-wrap gap-3 justify-center md:justify-start">
                   <span>{displayProfile.firstName}</span>
                   <span>{displayProfile.middleName}</span>
@@ -156,11 +159,11 @@ const ProfilePage = ({ userType = "student" }) => {
         </div>
 
         <div className="w-full px-8">
-            <div className="h-0.5 w-full bg-white"></div>
+            <div className={`h-0.5 w-full ${isDark ? 'bg-white/10' : 'bg-white'}`}></div>
         </div>
 
         <div className="p-8 grow flex flex-col">
-          <h3 className="text-3xl font-bold text-white text-center mb-8 tracking-wide uppercase">
+          <h3 className={`text-3xl font-bold text-center mb-8 tracking-wide uppercase ${isDark ? 'text-[#e4e6eb]' : 'text-white'}`}>
             {config.sectionTitle}
           </h3>
 
