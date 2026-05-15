@@ -7,9 +7,7 @@ import { logbookExcel } from '../utils/logbookExcel.js';
 import pupLogoSrc from '../assets/puplogoimage.png';
 import bpLogoSrc from '../assets/Bagong_Pilipinas_logo.png';
 
-import { useReferenceData } from '../context/ReferenceDataContext';
 const toRows = (raw) => {
-  const { docTypeName, purposeName, certName } = useReferenceData();
   if (Array.isArray(raw)) return raw;
   if (Array.isArray(raw?.data)) return raw.data;
   return [];
@@ -72,7 +70,7 @@ const LogbookRecords = () => {
     if (dbDocTypes.length > 0) {
       return Object.fromEntries(dbDocTypes.map(t => [t.document_type_id, t.document_name]));
     }
-    return DOC_TYPE_MAP;
+    return {};
   }, [dbDocTypes]);
 
   const docOptions = useMemo(() => Object.values(activeDocMap), [activeDocMap]);

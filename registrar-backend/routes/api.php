@@ -126,7 +126,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::apiResource('students',         StudentProfileController::class);
         Route::apiResource('academic-records', StudentAcademicRecordController::class);
 
-        Route::prefix('analytics')->middleware('throttle:10,1')->group(function () {
+        Route::prefix('analytics')->middleware('throttle:60,1')->group(function () {
             Route::get('overview',         [AnalyticsController::class, 'overview']);
             Route::get('volume-trend',     [AnalyticsController::class, 'volumeTrend']);
             Route::get('by-document-type', [AnalyticsController::class, 'byDocumentType']);
