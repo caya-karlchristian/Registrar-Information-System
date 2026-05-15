@@ -89,10 +89,10 @@ export const useNotifications = (onNewNotification = null) => {
         const handleNewNotification = (e) => {
             setNotifications(prev => {
                 if (prev.some(n => n.id === e.id)) return prev; // deduplicate
-                setUnreadCount(c => c + 1);
-                if (typeof onNewNotificationRef.current === 'function') onNewNotificationRef.current(e);
                 return [e, ...prev];
             });
+            setUnreadCount(c => c + 1);
+            if (typeof onNewNotificationRef.current === 'function') onNewNotificationRef.current(e);
         };
 
         const channelName = `notifications.${user.user_id}`;
