@@ -17,6 +17,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
+use App\Http\Controllers\AlumniSystemController;
 
 /*
 |--------------------------------------------------------------------------
@@ -48,6 +49,12 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('{studentNumber}/ogos',      [StudentProfileController::class, 'showByStudentNumber']);
         Route::get('{studentNumber}/personal-info', [StudentProfileController::class, 'personalInfo']);
         Route::get('{studentNumber}/addresses', [StudentProfileController::class, 'addresses']);
+    });
+
+    // ── Alumni System (PUPTAPS) integration ─────────────────────────────────────
+    Route::prefix('alumni-system')->group(function () {
+        Route::get('/',      [AlumniSystemController::class, 'index']);
+        Route::get('/{id}',  [AlumniSystemController::class, 'show']);
     });
 
     // Auth

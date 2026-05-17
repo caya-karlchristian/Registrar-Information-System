@@ -9,6 +9,7 @@ class AlumniType extends Model
     public $timestamps = false;
     protected $primaryKey = 'alumni_type_id';
     protected $guarded = [];
+    protected $table = 'alumni_type';
 
     public function alumni()
     {
