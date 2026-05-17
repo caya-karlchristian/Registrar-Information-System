@@ -43,6 +43,46 @@ class AlumniSystemClient
         return AlumniDTO::fromArray($this->get("/alumni/{$id}"));
     }
 
+        /**
+     * Safe lookup — returns null if Alumni System is unreachable or alumni not found.
+     * RIS continues normally with its own data when this returns null.
+     */
+    public function tryGetAlumni(string $id): ?AlumniDTO
+    {
+        try {
+            return $this->getAlumni($id);
+        } catch (AlumniSystemException $e) {
+            Log::warning('Alumni System unavailable — skipping enrichment', [
+                'id'    => $id,
+                'error' => $e->getMessage(),
+                'code'  => $e->getCode(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Safe list — returns empty array if Alumni System is unreachable.
+     */
+    public function tryListAlumni(array $filters = []): array
+    {
+        try {
+            return $this->listAlumni($filters);
+        } catch (AlumniSystemException $e) {
+            Log::warning('Alumni System unavailable — returning empty list', [
+                'filters' => $filters,
+                'error'   => $e->getMessage(),
+            ]);
+            return [
+                'data'         => [],
+                'total'        => 0,
+                'current_page' => 1,
+                'last_page'    => 1,
+                'per_page'     => 20,
+            ];
+        }
+    }
+
     // ── HTTP helpers ──────────────────────────────────────────
 
     private function get(string $path, array $query = []): array
