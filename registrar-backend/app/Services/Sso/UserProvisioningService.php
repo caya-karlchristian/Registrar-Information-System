@@ -7,15 +7,17 @@ use App\Models\Alumni;
 use App\Models\AlumniProfile;
 use App\Models\StudentProfile;
 use App\Models\SystemUser;
+use App\Services\Ocms\OcmsAdminService;
+use App\Services\Ogos\OgosStudentService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use App\Services\Ogos\OgosStudentService;
 
 class UserProvisioningService
 {
     public function __construct(
         private RoleResolver       $roleResolver,
         private OgosStudentService $ogosStudentService,
+        private OcmsAdminService   $ocmsAdminService,
     ) {}
 
     public function provision(array $profile): ProvisioningResult
@@ -58,10 +60,10 @@ class UserProvisioningService
 
     private function provisionProfile(
         SystemUser $user,
-        int $roleId,
-        ?string $firstName,
-        ?string $middleName,
-        ?string $lastName
+        int        $roleId,
+        ?string    $firstName,
+        ?string    $middleName,
+        ?string    $lastName
     ): bool {
         if ($roleId === SystemUser::ROLE_STUDENT) {
             return $this->provisionStudentProfile($user, $firstName, $middleName, $lastName);
@@ -69,6 +71,10 @@ class UserProvisioningService
 
         if ($roleId === SystemUser::ROLE_ALUMNI) {
             return $this->provisionAlumniProfile($user, $firstName, $middleName, $lastName);
+        }
+
+        if (in_array($roleId, [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN])) {
+            return $this->ocmsAdminService->provisionAdminProfile($user);
         }
 
         return false;
