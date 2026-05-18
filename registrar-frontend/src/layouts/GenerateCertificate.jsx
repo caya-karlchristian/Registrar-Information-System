@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import InputGroup from "../components/InputGroup.jsx";
+import { useTheme } from "../context/ThemeContext";
 import { PrinterIcon } from "@heroicons/react/24/solid";
 import { getAcademicRecords, getCertifications, getCertificationLayouts } from "../services/api";
 import { CertHeader, CertFooter, getTodayDate } from "../utils/helpers.jsx";
@@ -112,10 +113,10 @@ const FIELD_CONFIG = [
 ];
 
 // ─── Memoized Certificate Preview ───
-const CertificatePreview = React.memo(({ certConfig, activeLayout, debouncedFormData }) => (
+const CertificatePreview = React.memo(({ certConfig, activeLayout, debouncedFormData, isDark }) => (
   <div
     id="print-area"
-    className="bg-white shadow-2xl shadow-stone-300/70 mx-auto w-full max-w-full md:max-w-187.5 flex flex-col origin-top scale-100 md:scale-95 p-3 sm:p-6 md:p-8 ring-1 ring-stone-900/5 text-gray-800 print:scale-100 print:shadow-none print:ring-0 print:p-0"
+    className={`mx-auto w-full max-w-full md:max-w-187.5 flex flex-col origin-top scale-100 md:scale-95 p-3 sm:p-6 md:p-8 print:scale-100 print:shadow-none print:ring-0 print:p-0 ${isDark ? 'bg-[#242526] ring-1 ring-[#3e4042] text-[#e4e6eb]' : 'bg-white shadow-2xl shadow-stone-300/70 ring-1 ring-stone-900/5 text-gray-800'}`}
   >
     {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
     <div className="flex-1">{certConfig?.renderBody(debouncedFormData)}</div>
@@ -397,12 +398,14 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
     ? layoutsByCertId[activeCertification.certificate_type_id] ?? DEFAULT_CERTIFICATE_LAYOUT
     : DEFAULT_CERTIFICATE_LAYOUT;
 
+  const { isDark } = useTheme();
+
   return (
-    <div className="mt-15 h-screen flex flex-col bg-white">
+    <div className={`mt-15 lg:mt-10 md:mt-10 flex flex-col ${isDark ? 'bg-[#18191a]' : 'bg-white'}`}>
 
       {/* Header Toolbar */}
       <div className="relative z-10 w-full max-w-7xl mx-auto px-4 pt-12 pb-3 md:px-6 md:pt-10 md:pb-4 print:hidden">
-        <div className="flex flex-col gap-4 rounded-2xl border border-stone-200/80 bg-white/90 px-4 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-white/70 md:flex-row md:items-end md:justify-between md:px-5 md:py-5">
+        <div className={`flex flex-col gap-4 rounded-2xl px-4 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-white/10 md:flex-row md:items-end md:justify-between md:px-5 md:py-5 ${isDark ? 'border-[#3e4042] bg-[#0f0f0f]' : 'border-stone-200/80 bg-white/90'}`}>
           <div className="relative z-10 w-full md:max-w-xs">
             <DropDown
               label="Certification Type"
@@ -410,14 +413,14 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
               value={certIdToName[formData.docType] || "Certificate"}
               onChange={handleChange}
               options={docTypeDisplayOptions}
-              labelColor="text-gray-600"
+              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
             />
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
             {onClose && (
               <button
                 onClick={onClose}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-stone-300 bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm transition-all hover:bg-stone-200 active:scale-95 md:px-6 md:py-3 md:text-base"
+                className={`w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold shadow-sm transition-all active:scale-95 md:px-6 md:py-3 md:text-base ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb]' : 'border-stone-300 bg-stone-100 text-stone-700 hover:bg-stone-200'}`}
               >
                 ← Back
               </button>
@@ -425,10 +428,12 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
             <button
               onClick={handlePrint}
               disabled={printLoading}
-              className={`w-full sm:w-auto flex-1 md:flex-none flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-lg shadow-stone-400/40 transition-all md:px-8 md:py-3 md:text-base ${
+              className={`w-full sm:w-auto flex-1 md:flex-none flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold shadow-lg transition-all md:px-8 md:py-3 md:text-base ${
                 printLoading
-                  ? 'bg-gray-400 cursor-not-allowed opacity-75'
-                  : 'bg-pup-dark-maroon hover:bg-[#4a0000] active:scale-95'
+                  ? 'bg-gray-400 cursor-not-allowed opacity-75 text-white'
+                  : isDark
+                    ? 'bg-[#2a2a2f] hover:bg-[#353539] text-[#e4e6eb] border border-[#3e4042] active:scale-95'
+                    : 'bg-pup-dark-maroon hover:bg-[#4a0000] text-white active:scale-95 shadow-stone-400/40'
               }`}
             >
               <PrinterIcon className="w-4 h-4 md:w-5 md:h-5" />
@@ -443,8 +448,8 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
         {/* Left Sidebar */}
         <div className="w-full lg:w-88 xl:w-96 shrink-0 order-1 print:hidden">
           <div className="relative p-2 md:p-3">
-            <div className="rounded-2xl border border-stone-200/80 bg-white/95 p-4 shadow-md shadow-stone-200/60 md:p-6 overflow-visible">
-              <h3 className="mb-6 text-base font-extrabold uppercase tracking-tight text-[#800000] md:text-lg">Edit Information</h3>
+            <div className={`rounded-2xl p-4 md:p-6 overflow-visible ${isDark ? 'border-[#3e4042] bg-[#242526]/95 text-[#e4e6eb]' : 'border-stone-200/80 bg-white/95 shadow-md shadow-stone-200/60'}`}>
+              <h3 className={`mb-6 text-base font-extrabold uppercase tracking-tight md:text-lg ${isDark ? 'text-white' : 'text-[#800000]'}`}>Edit Information</h3>
               <form className={`space-y-4 md:space-y-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
                 {loading && <p className="text-xs md:text-sm text-stone-500 animate-pulse">Fetching academic records...</p>}
 
@@ -459,7 +464,7 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
                         value={formData[name]}
                         onChange={handleChange}
                         options={props.options}
-                        labelColor="text-gray-600"
+                        labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
                       />
                     );
                   }
@@ -472,7 +477,7 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
                       onChange={handleChange}
                       {...props}
                       voiceEnabled={props.type !== "date"}
-                      labelColor="text-gray-600" 
+                      labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} 
                     />
                   );
                 })}
@@ -484,7 +489,7 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
                   value={formData.date}
                   onChange={handleChange}
                   voiceEnabled={false}
-                  labelColor="text-gray-600"
+                  labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
                   min={getTodayDate()}
                 />
 
@@ -494,13 +499,17 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
                   value={formData.signee}
                   onChange={handleChange}
                   options={signeeOptions}
-                  labelColor="text-gray-600"
+                  labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
                 />
 
                 <button
                   type="button"
                   onClick={() => setSavedData({ ...formData })}
-                  className="w-full mt-6 rounded-lg bg-pup-dark-maroon hover:bg-[#4a0000] text-white font-semibold py-2.5 transition-all active:scale-95"
+                  className={`w-full mt-6 rounded-lg font-semibold py-2.5 transition-all active:scale-95 ${
+                    isDark
+                      ? 'bg-[#2a2a2f] hover:bg-[#353539] text-[#e4e6eb] border border-[#3e4042]'
+                      : 'bg-pup-dark-maroon hover:bg-[#4a0000] text-white'
+                  }`}
                 >
                   Save Changes
                 </button>
@@ -510,15 +519,15 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
         </div>
 
         {/* Certificate Preview */}
-        <div className="relative order-2 flex flex-1 flex-col overflow-y-auto custom-scrollbar rounded-2xl border border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70 min-h-96 sm:min-h-120 lg:min-h-150 max-h-[78vh] lg:max-h-[80vh] print:bg-white print:rounded-none print:border-0 print:min-h-0 print:max-h-none print:overflow-visible">
+        <div className={`relative order-2 flex flex-1 flex-col overflow-y-auto custom-scrollbar rounded-2xl min-h-96 sm:min-h-120 lg:min-h-150 max-h-[78vh] lg:max-h-[80vh] print:bg-white print:rounded-none print:border-0 print:min-h-0 print:max-h-none print:overflow-visible ${isDark ? 'border-[#3e4042] bg-[#242526]/90 text-[#e4e6eb]' : 'border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70'}`}>
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(90,90,90,0.07),transparent_40%),radial-gradient(circle_at_85%_10%,rgba(120,120,120,0.06),transparent_35%)] print:hidden" />
-          <div className="relative p-4 bg-white/95 border-b border-stone-200 shrink-0 print:hidden">
+          <div className={`relative p-4 border-b shrink-0 print:hidden ${isDark ? 'bg-[#242526]/95 border-[#3e4042]' : 'bg-white/95 border-stone-200'}`}>
             <div className="flex items-center justify-between max-w-187.5 mx-auto w-full">
-              <h2 className="text-lg font-extrabold uppercase tracking-tight text-stone-800">Certificate Preview</h2>
+              <h2 className={`text-lg font-extrabold uppercase tracking-tight ${isDark ? 'text-white' : 'text-stone-800'}`}>Certificate Preview</h2>
             </div>
           </div>
           <div className="relative flex-1 p-3 sm:p-6 lg:p-8 print:p-0 print:overflow-visible">
-            <CertificatePreview certConfig={previewCertConfig} activeLayout={activeLayout} debouncedFormData={savedData} />
+            <CertificatePreview certConfig={previewCertConfig} activeLayout={activeLayout} debouncedFormData={savedData} isDark={isDark} />
           </div>
         </div>
       </div>
