@@ -54,6 +54,11 @@ export const AuthProvider = ({ children }) => {
   // -------------------------------------------------------
   useEffect(() => {
     const initializeAuth = async () => {
+      if (window.location.pathname === '/auth/callback') {
+        setLoading(false);
+        return;
+      }
+
       try {
         const res      = await fetchCurrentUser();
         const userData = res.data.data;

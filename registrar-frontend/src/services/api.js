@@ -128,4 +128,11 @@ export const createAnnouncement = (data)     => api.post("/announcements", data)
 export const updateAnnouncement = (id, data) => api.put(`/announcements/${id}`, data);
 export const deleteAnnouncement = (id)       => api.delete(`/announcements/${id}`);
 
+// -------------------------------------------------------
+// ALUMNI SYSTEM (PUPTAPS) — proxied through RIS backend
+// read: all authenticated roles
+// -------------------------------------------------------
+export const getAlumniSystemList   = (params = {}) => api.get("/alumni-system",      { params });
+export const getAlumniSystemRecord = (id)          => api.get(`/alumni-system/${id}`);
+
 export default api;

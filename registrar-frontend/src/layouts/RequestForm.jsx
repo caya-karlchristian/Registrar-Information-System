@@ -8,11 +8,13 @@ import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
-import { PURPOSE_MAP, CERTIFICATION_MAP, DOC_TYPE_MAP } from '../utils/constants';
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
+import { useTheme } from '../context/ThemeContext';
+import { useReferenceData } from '../context/ReferenceDataContext';
 
 const STUDENT_ACCESS_IDS = [1, 3];
 
+// parseRequirements is pure — no hooks needed here
 const parseRequirements = (value) => {
   if (Array.isArray(value)) {
     return value.map((item) => String(item).trim()).filter(Boolean);
@@ -24,6 +26,9 @@ const parseRequirements = (value) => {
 };
 
 const RequestForm = () => {
+  const { isDark } = useTheme();
+  const { docTypeName, purposeName, certName } = useReferenceData();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -165,7 +170,7 @@ const RequestForm = () => {
     if (showCertificationDropdown && formData.certification.length === 0) {
       setErrorMessage("Please specify the certification type.");
       return;
-      }
+    }
 
     if (currentStep < 3) setCurrentStep((s) => s + 1);
   };
@@ -175,55 +180,56 @@ const RequestForm = () => {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
 
-  try {
-    const selectedPurpose = availablePurposes.find(
-      p => p.purpose_name === formData.purposeOfRequest
-    );
-    const purposeId = selectedPurpose?.request_purpose_id
-      ?? Object.keys(PURPOSE_MAP).find(key => PURPOSE_MAP[key] === formData.purposeOfRequest);
+    try {
+      const selectedPurpose = availablePurposes.find(
+        p => p.purpose_name === formData.purposeOfRequest
+      );
+      // Fall back to scanning ReferenceData context if the live list didn't load
+      const purposeId = selectedPurpose?.request_purpose_id
+        ?? Object.keys({}).find(key => purposeName(key) === formData.purposeOfRequest);
 
-    const certificates = formData.certification
-      .map(name => ({
-        certificate_type_id: availableCertifications.find(
-          c => c.certificate_name === name
-        )?.certificate_type_id,
-        number_of_copies: parseInt(formData.certCopies[name]) || 1,
-      }))
-      .filter(c => c.certificate_type_id);
-    // 3. Prepare Payload (Matches your Laravel store validation)
-    const payload = {
-      request_purpose_id: purposeId,
-      or_number: formData.receiptNumber,
-      receipt_date: formData.dateOfPayment,
-      documents: formData.documentsRequested
-        .filter(name => !name.toLowerCase().includes("certif"))
-        .map(name => {
-          const id = docByName[name]?.document_type_id
-            ?? Object.keys(DOC_TYPE_MAP).find(key => DOC_TYPE_MAP[key] === name);
-          return {
-            document_type_id: id,
-            number_of_copies: parseInt(formData.documentCopies[name]) || 1,
-          };
-        })
-        .filter(doc => doc.document_type_id),
-      certificates: certificates,
-    };
+      const certificates = formData.certification
+        .map(name => ({
+          certificate_type_id: availableCertifications.find(
+            c => c.certificate_name === name
+          )?.certificate_type_id,
+          number_of_copies: parseInt(formData.certCopies[name]) || 1,
+        }))
+        .filter(c => c.certificate_type_id);
 
-    const response = await createDocumentRequest(payload);
+      const payload = {
+        request_purpose_id: purposeId,
+        or_number: formData.receiptNumber,
+        receipt_date: formData.dateOfPayment,
+        documents: formData.documentsRequested
+          .filter(name => !name.toLowerCase().includes("certif"))
+          .map(name => {
+            const id = docByName[name]?.document_type_id
+              ?? Object.keys({}).find(key => docTypeName(key) === name);
+            return {
+              document_type_id: id,
+              number_of_copies: parseInt(formData.documentCopies[name]) || 1,
+            };
+          })
+          .filter(doc => doc.document_type_id),
+        certificates: certificates,
+      };
 
-    console.log("Submission successful:", response.data);
-    setIsSubmitted(true);
-  } catch (error) {
-    console.error("Submission error:", error.response?.data || error);
-    setErrorMessage(error.response?.data?.message || "Submission failed. Please check your data.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+      const response = await createDocumentRequest(payload);
+
+      console.log("Submission successful:", response.data);
+      setIsSubmitted(true);
+    } catch (error) {
+      console.error("Submission error:", error.response?.data || error);
+      setErrorMessage(error.response?.data?.message || "Submission failed. Please check your data.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleConfirm = () => {
     setIsSubmitted(false);
@@ -244,9 +250,7 @@ const RequestForm = () => {
 
   const showCertificationDropdown = formData.documentsRequested.some((doc) => {
     const lower = doc.toLowerCase();
-    return (
-      lower.includes("certif") 
-    );
+    return lower.includes("certif");
   });
 
   const stepProcess = {
@@ -257,15 +261,15 @@ const RequestForm = () => {
 
   const purposeOptions = availablePurposes.length > 0
     ? availablePurposes.map(p => p.purpose_name)
-    : Object.values(PURPOSE_MAP);
+    : [];
 
   const certificationOptions = availableCertifications.length > 0
     ? availableCertifications.map((c) => c.certificate_name)
-    : Object.values(CERTIFICATION_MAP);
+    : [];
 
   const documentOptions = availableDocs.length > 0
     ? availableDocs.map(d => d.document_name)
-    : Object.values(DOC_TYPE_MAP); 
+    : [];
 
   const certificationLabel = formData.certification.join(', ');
 
@@ -285,7 +289,7 @@ const RequestForm = () => {
       <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
       {isSubmitted ? (
         <div className="max-w-4xl mx-auto ">
-          <div className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col items-center justify-center text-center px-10">
+          <div className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col items-center justify-center text-center px-10 ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}>
             <p className="mb-6 text-4xl font-bold text-white">
               Please be patient as we process your requested document.
             </p>
@@ -294,7 +298,7 @@ const RequestForm = () => {
             </p>
             <button
               onClick={handleConfirm}
-              className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md"
+              className={`w-32 font-bold py-2 px-6 rounded shadow-md transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
             >
               Confirm
             </button>
@@ -303,7 +307,7 @@ const RequestForm = () => {
       ) : (
         <div className="max-w-5xl mx-auto -mt-2">
           <form
-            className="bg-pup-dark-maroon shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative"
+            className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}
             onSubmit={handleSubmit}
             noValidate
           >
@@ -314,7 +318,7 @@ const RequestForm = () => {
                   <div
                     key={step}
                     className={`w-4 h-4 rounded-full border border-pup-yellow ${
-                      step <= currentStep ? "bg-pup-yellow" : "bg-white"
+                      step <= currentStep ? "bg-pup-yellow" : (isDark ? "bg-[#3a3b3c]" : "bg-white")
                     }`}
                   />
                 ))}
@@ -327,7 +331,7 @@ const RequestForm = () => {
               </h2>
             </div>
 
-            <div className="flex-1 px-4 sm:px-6 md:px-10 py-2 text-white ">
+            <div className={`flex-1 px-4 sm:px-6 md:px-10 py-2 text-white `}>
               {/* STEP 1 */}
               {currentStep === 1 && (
                 <div className="space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px]">
@@ -353,7 +357,7 @@ const RequestForm = () => {
 
                   <p><strong>F.</strong> All documents unclaimed within 90 days on the date of request will be shredded automatically.</p>
 
-                  <div className="mt-2 pt-4 border-t text-l border-white/10">
+                  <div className={`mt-2 pt-4 border-t text-l ${isDark ? 'border-white/20' : 'border-white/10'}`}>
                     <CheckboxItem
                       name="termsAgreed"
                       checked={formData.termsAgreed}
@@ -364,7 +368,7 @@ const RequestForm = () => {
                   </div>
                 )}             
           
-              {/* STEP 4: Documents Requested */}
+              {/* STEP 2: Documents Requested */}
               {currentStep === 2 && (
                 <div className="space-y-6 animate-fadeIn">
                   <MultiSelectDropdown
@@ -397,7 +401,7 @@ const RequestForm = () => {
                 </div>
               )}
 
-              {/* STEP 5: Payment & Copies */}
+              {/* STEP 3: Payment & Copies */}
               {currentStep === 3 && (
                 <div className="space-y-6 animate-fadeIn -mt-1">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -422,7 +426,7 @@ const RequestForm = () => {
                       voiceEnabled={false}
                     />
                   </div>
-                  <div className="bg-white/10 p-4 rounded-lg border -mb-1">
+                  <div className={`p-4 rounded-lg border -mb-1 ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
                     <h3 className="text-[#eebc48] font-bold mb-3 uppercase text-sm tracking-wide">
                       Number of copies per document
                     </h3>
@@ -439,22 +443,18 @@ const RequestForm = () => {
                                 max="10"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg 
+                                className={`w-full p-2 text-sm rounded-lg 
                                   outline-none transition-all duration-200
-                                  focus:bg-white 
                                   focus:border-[#FFC72C] 
                                   focus:ring-2 
-                                  focus:ring-[#FFC72C]/30 
-                                  focus:text-black
-                                  appearance-auto"        
+                                  focus:ring-[#FFC72C]/30
+                                  appearance-auto ${isDark ? 'bg-[#1a1b1e] border border-[#3e4042] text-white focus:bg-[#1a1b1e]' : 'bg-gray-50 border border-gray-300 text-gray-700 focus:bg-white focus:text-black'}`}        
                                 value={formData.documentCopies[doc] === undefined ? '' : formData.documentCopies[doc]}
                                 onChange={e => {
                                   const val = e.target.value;
-                                  // Allow empty string for editing
                                   handleDocCopyChange(doc, val === '' ? '' : Math.max(1, Math.min(10, Number(val))));
                                 }}
                                 onBlur={e => {
-                                  // If left empty, fallback to 1
                                   if (e.target.value === '') handleDocCopyChange(doc, 1);
                                 }}
                               />
@@ -470,7 +470,7 @@ const RequestForm = () => {
                                 type="number"
                                 min="1"
                                 max="10"
-                                className="w-full p-2 bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg outline-none transition-all duration-200 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
+                                className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 ${isDark ? 'bg-[#1a1b1e] border border-[#3e4042] text-white focus:bg-[#1a1b1e]' : 'bg-gray-50 border border-gray-300 text-gray-700 focus:bg-white focus:text-black'}`}
                                 value={formData.certCopies[certName] === undefined ? '' : formData.certCopies[certName]}
                                 onChange={e => {
                                   const val = e.target.value;
@@ -487,7 +487,7 @@ const RequestForm = () => {
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar bg-white/10 p-2 rounded-lg border ">
+                  <div className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
                     {formData.documentsRequested.map((doc, index) => {
                       const docData = docByName[doc];
                       const requirements = docData?.requirementsParsed ?? [];
@@ -495,7 +495,7 @@ const RequestForm = () => {
                       return (
                         <div
                           key={index}
-                          className="bg-white/10 p-4 rounded-lg border  px-4 py-3"
+                          className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'}`}
                         >
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
@@ -509,7 +509,6 @@ const RequestForm = () => {
                               requirements.map((req, i) => (
                                 <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
                                   <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
-
                                   <span className="flex-1 min-w-0 whitespace-normal break-normal max-w-full">
                                     {req}
                                   </span>
@@ -520,7 +519,6 @@ const RequestForm = () => {
                             )}
                           </ul>
                         </div>
-                        
                       );
                     })}
                   </div>
@@ -562,7 +560,7 @@ const RequestForm = () => {
                 <button
                   type="button"
                   onClick={prevStep}
-                  className="bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon font-bold py-2 px-6 rounded shadow-md w-32"
+                  className={`font-bold py-2 px-6 rounded shadow-md w-32 transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
                 >
                   Back
                 </button>
@@ -571,7 +569,7 @@ const RequestForm = () => {
               <button
                 type="button"
                 onClick={currentStep < 3 ? nextStep : handlePreSubmit}
-                className="font-bold py-2 px-6 rounded shadow-md w-32 ml-auto bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon"
+                className={`font-bold py-2 px-6 rounded shadow-md w-32 ml-auto transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
               >
                 {currentStep < 3 ? "Next" : "Submit"}
               </button>

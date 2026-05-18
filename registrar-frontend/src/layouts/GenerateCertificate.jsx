@@ -5,7 +5,11 @@ import { getAcademicRecords, getCertifications, getCertificationLayouts } from "
 import { CertHeader, CertFooter, getTodayDate } from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import DropDown from "../components/DropDown.jsx";
-import { DEFAULT_CERTIFICATE_LAYOUT, normalizeCertificateLayout } from "../utils/certificateTemplateSettings.js";
+import {
+  CERT_TEMPLATE_LAYOUT_CHANGED,
+  DEFAULT_CERTIFICATE_LAYOUT,
+  normalizeCertificateLayout,
+} from "../utils/certificateTemplateSettings.js";
 
 const toCertificateRows = (raw) => {
   if (Array.isArray(raw)) return raw;
@@ -125,6 +129,22 @@ CertificatePreview.displayName = 'CertificatePreview';
 
 const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onLoadingChange }) => {
   const normalizeCertName = (name) => (typeof name === "string" ? name.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim() : "");
+
+  const resolveCertConfigId = useCallback(
+    (docType) => {
+      const numericDocType = Number(docType);
+      if (Number.isInteger(numericDocType) && CERT_CONFIG[numericDocType]) {
+        return numericDocType;
+      }
+
+      const normalizedDocType = normalizeCertName(docType);
+      if (!normalizedDocType) return null;
+
+      const matchedEntry = Object.entries(CERT_CONFIG).find(([, config]) => normalizeCertName(config.name) === normalizedDocType);
+      return matchedEntry ? Number(matchedEntry[0]) : null;
+    },
+    []
+  );
 
   // Create a mapping from CERT_CONFIG ID to certificate name for display
   const certIdToName = Object.entries(CERT_CONFIG).reduce((acc, [id, config]) => {
@@ -248,6 +268,27 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
   }, [lockDocTypeToRequest, requestedCertNames, requestedDocTypeId]);
 
   useEffect(() => {
+    const handleTemplateLayoutChanged = (event) => {
+      const certTypeId = Number(event?.detail?.certTypeId);
+      if (!Number.isFinite(certTypeId)) return;
+
+      const updatedLayout = normalizeCertificateLayout(event?.detail?.layout);
+
+      setLayoutsByCertId((prev) => ({
+        ...prev,
+        [certTypeId]: updatedLayout,
+        [String(certTypeId)]: updatedLayout,
+      }));
+    };
+
+    window.addEventListener(CERT_TEMPLATE_LAYOUT_CHANGED, handleTemplateLayoutChanged);
+
+    return () => {
+      window.removeEventListener(CERT_TEMPLATE_LAYOUT_CHANGED, handleTemplateLayoutChanged);
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof onLoadingChange === "function") {
       onLoadingChange(loading);
     }
@@ -332,12 +373,15 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
     }
   };
 
-  const formCertConfig = CERT_CONFIG[formData.docType];
-  const previewCertConfig = CERT_CONFIG[savedData.docType];
+  const resolvedFormDocTypeId = resolveCertConfigId(formData.docType);
+  const resolvedPreviewDocTypeId = resolveCertConfigId(savedData.docType);
+
+  const formCertConfig = resolvedFormDocTypeId ? CERT_CONFIG[resolvedFormDocTypeId] : undefined;
+  const previewCertConfig = resolvedPreviewDocTypeId ? CERT_CONFIG[resolvedPreviewDocTypeId] : undefined;
   const shouldShow = useCallback((fieldName) => formCertConfig?.fields.includes(fieldName), [formCertConfig]);
   
   // Get the certificate name for display
-  const certDisplayName = certIdToName[savedData.docType] || "Certificate";
+  const certDisplayName = previewCertConfig?.name || certIdToName[resolvedPreviewDocTypeId] || "Certificate";
 
   // Find active certification by matching against CERT_CONFIG name 
   const activeCertification = useMemo(() => {
