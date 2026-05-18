@@ -142,13 +142,12 @@ class NotificationService implements NotificationServiceInterface
         array  $data      = [],
         ?int   $requestId = null,
     ): void {
-        // Dispatch to queue — loop runs in background, HTTP response is instant.
-        // Include ROLE_SUPER_ADMIN so super admins also receive admin notifications
-        // (e.g. new request submitted, payment verification needed).
+        // Only send to ROLE_ADMIN — superadmins are not concerned
+        // with document request handling notifications
         dispatch(new SendBulkNotificationJob(
             triggerEvent: $triggerEvent,
             data:         $data,
-            onlyRoleIds:  [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN],
+            onlyRoleIds:  [SystemUser::ROLE_ADMIN],
             requestId:    $requestId,
         ));
     }

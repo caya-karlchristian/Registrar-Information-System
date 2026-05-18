@@ -48,6 +48,9 @@ RUN sed -i \
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
+# Copy PHP-FPM pool config — sets umask=0022 so uploaded files are world-readable
+COPY www.conf /usr/local/etc/php-fpm.d/www.conf
+
 # Copy nginx config
 COPY nginx.conf /etc/nginx/sites-available/default
 

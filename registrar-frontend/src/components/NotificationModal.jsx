@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { useNotificationsContext as useNotifications } from '../context/NotificationsContext';
+import { useTheme } from '../context/ThemeContext';
 
 // -------------------------------------------------------
 // Maps backend trigger_event → display category + color
@@ -43,11 +44,32 @@ const formatTime = (isoString) => {
 const NotificationItem = ({ notif, onClick }) => {
   const meta = CATEGORY_MAP[notif.type] ?? { category: 'System', color: 'bg-blue-400' };
   const isUnread = !notif.read_at;
+  const { isDark } = useTheme();
+
+  const rowClasses = isDark
+    ? 'hover:bg-white/3 border-white/3'
+    : 'hover:bg-white/3 border-white/3';
+
+  const categoryClasses = isDark
+    ? (isUnread ? 'text-pup-yellow' : 'text-white/20')
+    : (isUnread ? 'text-pup-yellow' : 'text-white/20');
+
+  const timeClasses = isDark
+    ? 'text-white/20 group-hover:text-white/40'
+    : 'text-white/20 group-hover:text-white/40';
+
+  const titleClasses = isDark
+    ? (isUnread ? 'text-white font-bold' : 'text-white/30 font-medium')
+    : (isUnread ? 'text-white font-bold' : 'text-white/30 font-medium');
+
+  const messageClasses = isDark
+    ? (isUnread ? 'text-white/80' : 'text-white/20')
+    : (isUnread ? 'text-white/80' : 'text-white/20');
 
   return (
     <div
       onClick={onClick}
-      className="flex items-start gap-3 px-4 py-3 hover:bg-white/3 cursor-pointer transition-all border-b border-white/3 group relative sm:px-5 sm:py-4"
+      className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-all border-b group relative sm:px-5 sm:py-4 ${rowClasses}`}
     >
       {/* Status Dot */}
       <div className="mt-1.5 shrink-0">
@@ -59,24 +81,18 @@ const NotificationItem = ({ notif, onClick }) => {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-start mb-1">
-          <span className={`text-[9px] font-black uppercase tracking-[0.15em] transition-colors ${
-            isUnread ? 'text-pup-yellow' : 'text-white/20'
-          }`}>
+          <span className={`text-[9px] font-black uppercase tracking-[0.15em] transition-colors ${categoryClasses}`}>
             {meta.category}
           </span>
-          <span className="text-[10px] font-bold text-white/20 ml-2 shrink-0 group-hover:text-white/40 transition-colors">
+          <span className={`text-[10px] font-bold ml-2 shrink-0 transition-colors ${timeClasses}`}>
             {formatTime(notif.created_at)}
           </span>
         </div>
 
-        <h3 className={`text-[12px] leading-snug mb-0.5 transition-colors sm:text-[13px] ${
-          isUnread ? 'text-white font-bold' : 'text-white/30 font-medium'
-        }`}>
+        <h3 className={`text-[12px] leading-snug mb-0.5 transition-colors sm:text-[13px] ${titleClasses}`}>
           {notif.title}
         </h3>
-        <p className={`text-[11px] leading-normal line-clamp-2 transition-colors sm:text-[12px] ${
-          isUnread ? 'text-white/80' : 'text-white/20'
-        }`}>
+        <p className={`text-[11px] leading-normal line-clamp-2 transition-colors sm:text-[12px] ${messageClasses}`}>
           {notif.message}
         </p>
       </div>
@@ -94,6 +110,7 @@ const NotificationModal = ({ isOpen, onClose }) => {
   const navigate  = useNavigate();
   const location  = useLocation();
   const [activeTab, setActiveTab] = useState('all');
+  const { isDark } = useTheme();
 
   const {
     notifications,
@@ -131,19 +148,20 @@ const NotificationModal = ({ isOpen, onClose }) => {
     <>
       <div className="fixed inset-0 z-40 bg-transparent" onClick={onClose} />
 
-      <div className="
+      <div className={`
         absolute top-full right-3 w-[min(350px,calc(100vw-1rem))]
         rounded-[1.25rem] overflow-hidden
-        bg-pup-dark-maroon border border-white/10
-        shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)]
-        ring-1 ring-white/5 z-50
+        border z-50 mt-2
         animate-in fade-in slide-in-from-top-3 duration-200
-        sm:right-4 sm:w-95 sm:rounded-3xl mt-2
-      ">
+        sm:right-4 sm:w-95 sm:rounded-3xl
+        ${isDark
+          ? 'bg-[#242526] border-[#3e4042] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] ring-1 ring-white/5'
+          : 'bg-pup-dark-maroon border-white/10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] ring-1 ring-white/5'}
+      `}>
         {/* Header */}
-        <div className="px-4 py-4 bg-[#510400] border-b border-white/5 sm:p-5">
+        <div className={`px-4 py-4 border-b sm:p-5 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-[#510400] border-white/5'}`}>
           <div className="flex justify-between items-center mb-3 sm:mb-4">
-            <h2 className="text-base font-black tracking-tight text-white flex items-center gap-2 sm:text-xl">
+            <h2 className={`text-base font-black tracking-tight flex items-center gap-2 sm:text-xl ${isDark ? 'text-[#e4e6eb]' : 'text-white'}`}>
               Notifications
               {unreadCount > 0 && (
                 <span className="bg-pup-yellow text-pup-maroon text-[10px] px-2 py-0.5 rounded-full font-bold">
@@ -152,7 +170,7 @@ const NotificationModal = ({ isOpen, onClose }) => {
               )}
             </h2>
             <button onClick={handleMarkAllAsRead} title="Mark all as read" className="hover:scale-110 transition-transform">
-              <CheckCircleIcon className="w-4 h-4 text-white hover:text-pup-yellow transition-colors sm:w-5 sm:h-5" />
+              <CheckCircleIcon className={`w-4 h-4 transition-colors sm:w-5 sm:h-5 ${isDark ? 'text-[#e4e6eb] hover:text-pup-yellow' : 'text-white hover:text-pup-yellow'}`} />
             </button>
           </div>
 
@@ -163,7 +181,7 @@ const NotificationModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* List */}
-        <div className="max-h-70 overflow-y-auto custom-scrollbar sm:max-h-105">
+        <div className={`max-h-70 overflow-y-auto custom-scrollbar sm:max-h-105 ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}>
           {loading ? (
             <LoadingState />
           ) : filteredNotifs.length > 0 ? (
@@ -180,7 +198,7 @@ const NotificationModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 bg-[#510400] border-t border-white/5 flex justify-center sm:p-4" />
+        <div className={`px-4 py-3 border-t flex justify-center sm:p-4 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-[#510400] border-white/5'}`} />
       </div>
     </>
   );
@@ -189,26 +207,43 @@ const NotificationModal = ({ isOpen, onClose }) => {
 /* =========================================
    UI HELPERS
    ========================================= */
-const TabButton = ({ label, active = false, onClick }) => (
-  <button onClick={onClick} className={`px-3 py-1 text-[10px] font-black rounded-xl uppercase tracking-wider transition-all sm:px-4 sm:py-1.5 sm:text-[11px] ${
-    active
-      ? "bg-pup-yellow text-pup-maroon shadow-lg shadow-pup-yellow/10"
-      : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
-  }`}>
-    {label}
-  </button>
-);
+const TabButton = ({ label, active = false, onClick }) => {
+  const { isDark } = useTheme();
 
-const EmptyState = () => (
-  <div className="p-8 text-center sm:p-10">
-    <p className="text-white/20 text-xs font-bold uppercase tracking-widest">No notifications</p>
-  </div>
-);
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1 text-[10px] font-black rounded-xl uppercase tracking-wider transition-all sm:px-4 sm:py-1.5 sm:text-[11px] ${
+        active
+          ? 'bg-pup-yellow text-pup-maroon shadow-lg shadow-pup-yellow/10'
+          : (isDark
+            ? 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+            : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white')
+      }`}
+    >
+      {label}
+    </button>
+  );
+};
 
-const LoadingState = () => (
-  <div className="p-8 text-center sm:p-10">
-    <p className="text-white/20 text-xs font-bold uppercase tracking-widest animate-pulse">Loading...</p>
-  </div>
-);
+const EmptyState = () => {
+  const { isDark } = useTheme();
+
+  return (
+    <div className="p-8 text-center sm:p-10">
+      <p className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>No notifications</p>
+    </div>
+  );
+};
+
+const LoadingState = () => {
+  const { isDark } = useTheme();
+
+  return (
+    <div className="p-8 text-center sm:p-10">
+      <p className={`text-xs font-bold uppercase tracking-widest animate-pulse ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>Loading...</p>
+    </div>
+  );
+};
 
 export default NotificationModal;

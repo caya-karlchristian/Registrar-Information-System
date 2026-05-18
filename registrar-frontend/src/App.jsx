@@ -38,13 +38,15 @@ import { NotificationToastProvider } from './context/NotificationToastContext.js
 import NotificationToast from './components/NotificationToast.jsx';
 
 import { NotificationsProvider } from './context/NotificationsContext.jsx';
+import { ReferenceDataProvider } from './context/ReferenceDataContext.jsx';
 import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
 
 
 const App = () => {
   return (
     <NotificationToastProvider>
-        <NotificationsProvider>
+        <ReferenceDataProvider>
+    <NotificationsProvider>
       <div className="flex flex-col min-h-screen">
         <Routes>
           <Route path="/" element={<MainPage />} />
@@ -133,6 +135,7 @@ const App = () => {
         <NotificationToast />
       </div>
     </NotificationsProvider>
+    </ReferenceDataProvider>
       </NotificationToastProvider>
   );
 };

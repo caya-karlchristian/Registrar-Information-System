@@ -52,6 +52,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       SESSION_SAME_SITE: none
+      ALUMNI_API_URL: http://host.docker.internal/api
+      ALUMNI_API_TOKEN: 1|lyXSPwWmlf5YYbHZVIbmTR1MhKHhS7F3eZUWU2Ur
     ports:
       - "8000:8000"
     networks:
