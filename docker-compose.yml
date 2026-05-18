@@ -51,6 +51,7 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      SESSION_SAME_SITE: none
     ports:
       - "8000:8000"
     networks:
@@ -100,6 +101,7 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      SESSION_SAME_SITE: none
     ports:
       - "8080:8080"
     depends_on:
@@ -156,6 +158,7 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      SESSION_SAME_SITE: none
     depends_on:
       backend:
         condition: service_started
@@ -225,6 +228,7 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      SESSION_SAME_SITE: none
     depends_on:
       backend:
         condition: service_started
@@ -277,6 +281,7 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      SESSION_SAME_SITE: none
     depends_on:
       backend:
         condition: service_started
