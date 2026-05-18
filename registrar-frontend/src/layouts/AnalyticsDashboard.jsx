@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTheme } from '../context/ThemeContext';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -39,6 +40,8 @@ const HOUR_COLOR  = '#800000';
 // ─── Component ────────────────────────────────────────────────────────────
 
 const AnalyticsDashboard = () => {
+  const { isDark } = useTheme();
+  
   // Filters
   const [dateRange, setDateRange]     = useState('This Month');
   const [customFrom, setCustomFrom]   = useState('');
@@ -156,7 +159,7 @@ const AnalyticsDashboard = () => {
   // ─────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 px-4 py-2 min-h-screen font-sans">
+    <div className={`space-y-6 px-4 py-2 min-h-screen font-sans ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'text-gray-900'}`}>
 
       {/* ── 1. FILTER BAR ── */}
       <div className="flex flex-col lg:flex-row items-start lg:items-end gap-3 w-full -mt-5">
@@ -185,20 +188,20 @@ const AnalyticsDashboard = () => {
 
           {/* Custom date inputs — only when Custom Range selected */}
           {dateRange === 'Custom Range' && (
-            <div className="flex items-center gap-2 bg-white border border-slate-200 p-1.5 rounded-lg shadow-sm w-full sm:w-auto">
+            <div className={`flex items-center gap-2 p-1.5 rounded-lg shadow-sm w-full sm:w-auto ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white border border-slate-200'}`}>
               <input
                 type="date"
                 value={customFrom}
                 onChange={e => setCustomFrom(e.target.value)}
-                className="text-xs font-bold text-slate-600 bg-slate-50 p-1.5 rounded-lg outline-none border border-slate-100 focus:border-[#800000] transition-all"
+                className={`text-xs font-bold p-1.5 rounded-lg outline-none border transition-all ${isDark ? 'text-[#e4e6eb] bg-[#3a3b3c] border-[#4e4f50] focus:border-[#f5c542]' : 'text-slate-600 bg-slate-50 border-slate-100 focus:border-[#800000]'}`}
               />
-              <div className="w-2 h-px bg-slate-300 shrink-0" />
+              <div className={`w-2 h-px shrink-0 ${isDark ? 'bg-[#4e4f50]' : 'bg-slate-300'}`} />
               <input
                 type="date"
                 value={customTo}
                 onChange={e => setCustomTo(e.target.value)}
                 min={customFrom}
-                className="text-xs font-bold text-slate-600 bg-slate-50 p-1.5 rounded-lg outline-none border border-slate-100 focus:border-[#800000] transition-all"
+                className={`text-xs font-bold p-1.5 rounded-lg outline-none border transition-all ${isDark ? 'text-[#e4e6eb] bg-[#3a3b3c] border-[#4e4f50] focus:border-[#f5c542]' : 'text-slate-600 bg-slate-50 border-slate-100 focus:border-[#800000]'}`}
               />
             </div>
           )}
@@ -214,6 +217,7 @@ const AnalyticsDashboard = () => {
           status={trend.status}
           icon={<DocumentTextIcon className="w-6 h-6" />}
           lightColor="bg-red-50" iconColor="text-[#800000]"
+          isDark={isDark}
         />
         <StatCard
           title="Pending Review"
@@ -222,6 +226,7 @@ const AnalyticsDashboard = () => {
           status="neutral"
           icon={<BellAlertIcon className="w-6 h-6" />}
           lightColor="bg-amber-50" iconColor="text-amber-700"
+          isDark={isDark}
         />
         <StatCard
           title="Claimed Docs"
@@ -230,6 +235,7 @@ const AnalyticsDashboard = () => {
           status={overview?.completion_rate >= 70 ? 'up' : 'down'}
           icon={<CheckCircleIcon className="w-6 h-6" />}
           lightColor="bg-blue-50" iconColor="text-blue-700"
+          isDark={isDark}
         />
         <StatCard
           title="Forfeited"
@@ -238,6 +244,7 @@ const AnalyticsDashboard = () => {
           status={overview?.forfeit_rate > 10 ? 'up' : 'neutral'}
           icon={<ClockIcon className="w-6 h-6" />}
           lightColor="bg-emerald-50" iconColor="text-emerald-700"
+          isDark={isDark}
         />
       </div>
 
@@ -247,8 +254,8 @@ const AnalyticsDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         {/* Request Volume */}
-        <div className="border border-slate-200 p-6 rounded-4xl bg-white shadow-sm">
-          <ChartHeader title="Request Volume" sub="Monthly Growth" />
+        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+          <ChartHeader title="Request Volume" sub="Monthly Growth" isDark={isDark} />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={volumeData}>
@@ -258,10 +265,10 @@ const AnalyticsDashboard = () => {
                     <stop offset="95%" stopColor="#800000" stopOpacity={0}   />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
                 <Area type="monotone" dataKey="total" stroke="#800000" strokeWidth={3} fillOpacity={1} fill="url(#colorMaroon)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -269,15 +276,15 @@ const AnalyticsDashboard = () => {
         </div>
 
         {/* Top Documents */}
-        <div className="border border-slate-200 p-6 rounded-4xl bg-white shadow-sm">
-          <ChartHeader title="Top Documents" sub="Most Requested" />
+        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+          <ChartHeader title="Top Documents" sub="Most Requested" isDark={isDark} />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={docTypeData.slice(0, 6)} barSize={40}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="document_name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700 }} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: 'transparent' }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                <XAxis dataKey="document_name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: isDark ? '#b0b3b8' : '#64748b' }} />
+                <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} cursor={{ fill: 'transparent' }} />
                 <Bar dataKey="total_requests" radius={[10, 10, 0, 0]}>
                   {docTypeData.slice(0, 6).map((_, i) => (
                     <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
@@ -289,8 +296,8 @@ const AnalyticsDashboard = () => {
         </div>
 
         {/* Request Status Donut */}
-        <div className="border border-slate-200 p-6 rounded-4xl bg-white shadow-sm flex flex-col">
-          <ChartHeader title="Request Status" sub="Distribution Breakdown" />
+        <div className={`border p-6 rounded-4xl shadow-sm flex flex-col ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+          <ChartHeader title="Request Status" sub="Distribution Breakdown" isDark={isDark} />
           <div className="h-64 relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -300,19 +307,19 @@ const AnalyticsDashboard = () => {
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} cornerRadius={10} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-3xl font-black text-slate-800">{successPct}%</span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Success</span>
+              <span className={`text-3xl font-black ${isDark ? 'text-[#e4e6eb]' : 'text-slate-800'}`}>{successPct}%</span>
+              <span className={`text-[10px] font-bold uppercase tracking-tighter ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>Success</span>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2">
             {statusData.map((row, i) => (
               <div key={row.status_id} className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{row.status_name}</span>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${isDark ? 'text-[#9a9a9a]' : 'text-slate-500'}`}>{row.status_name}</span>
               </div>
             ))}
           </div>
@@ -323,18 +330,18 @@ const AnalyticsDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         {/* Peak Hours Heatmap */}
-        <div className="border border-slate-200 p-6 rounded-4xl bg-white shadow-sm">
-          <ChartHeader title="Peak Hours" sub="Requests by Hour of Day" />
+        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+          <ChartHeader title="Peak Hours" sub="Requests by Hour of Day" isDark={isDark} />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={peakHoursData} barSize={14}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 600 }} axisLine={false} tickLine={false}
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false}
                   interval={3} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
                 <Tooltip
                   formatter={(val, name) => [val, 'Requests']}
-                  contentStyle={{ borderRadius: '12px', border: 'none' }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }}
                 />
                 <Bar dataKey="total" fill={HOUR_COLOR} radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -343,16 +350,16 @@ const AnalyticsDashboard = () => {
         </div>
 
         {/* Requests by Purpose */}
-        <div className="border border-slate-200 p-6 rounded-4xl bg-white shadow-sm">
-          <ChartHeader title="By Purpose" sub="Request Reason Breakdown" />
+        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+          <ChartHeader title="By Purpose" sub="Request Reason Breakdown" isDark={isDark} />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={purposeData} layout="vertical" barSize={18}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="purpose_name" tick={{ fontSize: 11, fontWeight: 600 }}
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="purpose_name" tick={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }}
                   axisLine={false} tickLine={false} width={110} />
-                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
+                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
                 <Bar dataKey="total" radius={[0, 6, 6, 0]}>
                   {purposeData.map((_, i) => (
                     <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
@@ -364,19 +371,19 @@ const AnalyticsDashboard = () => {
         </div>
 
         {/* Processing Time by Doc Type */}
-        <div className="border border-slate-200 p-6 rounded-4xl bg-white shadow-sm">
-          <ChartHeader title="Processing Time" sub="Avg Minutes by Document Type" />
+        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+          <ChartHeader title="Processing Time" sub="Avg Minutes by Document Type" isDark={isDark} />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={processingData.by_document_type ?? []} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="document_name" tick={{ fontSize: 10, fontWeight: 600 }}
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                <XAxis dataKey="document_name" tick={{ fontSize: 10, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }}
                   axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false}
-                  label={{ value: 'min', angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false}
+                  label={{ value: 'min', angle: -90, position: 'insideLeft', fontSize: 10, fill: isDark ? '#b0b3b8' : '#64748b' }} />
                 <Tooltip
                   formatter={(val) => [`${val} min`, 'Avg Time']}
-                  contentStyle={{ borderRadius: '12px', border: 'none' }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }}
                 />
                 <Bar dataKey="avg_minutes" radius={[8, 8, 0, 0]}>
                   {(processingData.by_document_type ?? []).map((_, i) => (
@@ -391,12 +398,12 @@ const AnalyticsDashboard = () => {
 
       {/* ── 5. ADMIN PROCESSING LEADERBOARD ── */}
       {(processingData.by_admin ?? []).length > 0 && (
-        <div className="border border-slate-200 p-6 rounded-4xl bg-white shadow-sm">
-          <ChartHeader title="Staff Performance" sub="Average Processing Time per Admin" />
+        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+          <ChartHeader title="Staff Performance" sub="Average Processing Time per Admin" isDark={isDark} />
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                <tr className={`text-left text-[10px] font-black uppercase tracking-widest border-b ${isDark ? 'text-[#9a9a9a] border-[#3e4042]' : 'text-slate-400 border-slate-100'}`}>
                   <th className="pb-3 pr-6">Staff Member</th>
                   <th className="pb-3 pr-6 text-right">Requests Handled</th>
                   <th className="pb-3 text-right">Avg Processing Time</th>
@@ -404,11 +411,11 @@ const AnalyticsDashboard = () => {
               </thead>
               <tbody>
                 {(processingData.by_admin ?? []).map((row, i) => (
-                  <tr key={row.user_id ?? i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                    <td className="py-3 pr-6 font-bold text-slate-700">
+                  <tr key={row.user_id ?? i} className={`border-b transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c]' : 'border-slate-50 hover:bg-slate-50'}`}>
+                    <td className={`py-3 pr-6 font-bold ${isDark ? 'text-[#e4e6eb]' : 'text-slate-700'}`}>
                       {row.display_name?.trim() || row.email || 'Unknown'}
                     </td>
-                    <td className="py-3 pr-6 text-right font-bold text-slate-500">
+                    <td className={`py-3 pr-6 text-right font-bold ${isDark ? 'text-[#b0b3b8]' : 'text-slate-500'}`}>
                       {row.requests_handled}
                     </td>
                     <td className="py-3 text-right">
@@ -445,14 +452,14 @@ const AnalyticsDashboard = () => {
 
 // ─── Sub-components ───────────────────────────────────────────────────────
 
-const ChartHeader = ({ title, sub }) => (
+const ChartHeader = ({ title, sub, isDark }) => (
   <div className="mb-4">
-    <h2 className="text-xl font-black text-[#800000] uppercase tracking-tight">{title}</h2>
-    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{sub}</p>
+    <h2 className={`text-xl font-black uppercase tracking-tight ${isDark ? 'text-white' : 'text-[#800000]'}`}>{title}</h2>
+    <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>{sub}</p>
   </div>
 );
 
-const StatCard = ({ title, value, trend, status, icon, lightColor, iconColor }) => {
+const StatCard = ({ title, value, trend, status, icon, lightColor, iconColor, isDark }) => {
   const chip = {
     up:      'bg-emerald-100 text-emerald-700',
     down:    'bg-rose-100 text-rose-700',
@@ -460,11 +467,11 @@ const StatCard = ({ title, value, trend, status, icon, lightColor, iconColor }) 
   }[status] ?? 'bg-slate-100 text-slate-500';
 
   return (
-    <div className="relative bg-white p-6 rounded-4xl border border-slate-200 shadow-sm">
+    <div className={`relative p-6 rounded-4xl border shadow-sm ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-slate-200'}`}>
       <div className="flex justify-between items-start">
         <div className="space-y-1">
-          <p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.12em]">{title}</p>
-          <h3 className="text-4xl font-black text-slate-800 tracking-tighter">{value}</h3>
+          <p className={`text-[11px] font-black uppercase tracking-[0.12em] ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>{title}</p>
+          <h3 className={`text-4xl font-black tracking-tighter ${isDark ? 'text-[#e4e6eb]' : 'text-slate-800'}`}>{value}</h3>
         </div>
         <div className={`p-3 ${lightColor} ${iconColor} rounded-2xl shadow-sm`}>{icon}</div>
       </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import { useTheme } from '../context/ThemeContext';
 import { getDocumentRequests, getDocumentTypes, getRequestHistory } from "../services/api"; 
 import LoadingOverlay from "../components/LoadingOverlay"; 
 import DropDown from '../components/DropDown';
@@ -14,6 +15,7 @@ const toRows = (raw) => {
 };
 
 const LogbookRecords = () => {
+  const { isDark } = useTheme();
   const [data, setData] = useState([]);
   const [dbDocTypes, setDbDocTypes] = useState([]);
   const [historyByRequestId, setHistoryByRequestId] = useState({});
@@ -210,10 +212,10 @@ const LogbookRecords = () => {
   };
 
   return (
-    <div className="relative min-h-screen font-sans text-left z-20">
+    <div className={`relative min-h-screen font-sans text-left z-20 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>
       <LoadingOverlay isVisible={loading} message="Fetching Registrar Records" />
 
-      <div className="max-w-350 mx-auto bg-white shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none">
+      <div className={`max-w-350 mx-auto shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
         <div className="p-4 sm:p-6 md:p-8 pb-0">
           <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end mb-6 gap-4 print:hidden">
@@ -223,7 +225,7 @@ const LogbookRecords = () => {
                   label="Document Type"
                   name="docType"
                   value={activeDocMap[selectedDocTypeId] || ''}
-                  labelColor="text-gray-700"
+                  labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
                   onChange={(e) => {
                     const id = Object.keys(activeDocMap).find(key => activeDocMap[key] === e.target.value) || '';
                     setSelectedDocTypeId(id);
@@ -236,16 +238,14 @@ const LogbookRecords = () => {
             <button
               onClick={handleExportExcel}
               disabled={loading || sortedData.length === 0}
-              className={`px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto ${
-                loading || sortedData.length === 0 ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-pup-dark-maroon hover:bg-[#4a0000] text-white'
-              }`}
+              className={`px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto ${loading || sortedData.length === 0 ? (isDark ? 'bg-[#4e4f50] cursor-not-allowed text-[#9a9a9a]' : 'bg-gray-300 cursor-not-allowed text-gray-500') : (isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-dark-maroon hover:bg-[#4a0000] text-white')}`}
             >
               <span>Export to Excel</span>
             </button>
           </div>
 
-          <div className="w-full text-center border-b border-gray-300 pb-4 mb-0">
-            <h2 className="text-[#4a0000] text-lg sm:text-xl md:text-2xl font-black uppercase tracking-widest leading-tight">
+          <div className={`w-full text-center border-b pb-4 mb-0 ${isDark ? 'border-[#3e4042]' : 'border-gray-300'}`}>
+            <h2 className={`text-lg sm:text-xl md:text-2xl font-black uppercase tracking-widest leading-tight ${isDark ? 'text-[#f5c542]' : 'text-[#4a0000]'}`}>
               Processing of Application for <br className="sm:hidden" /> {selectedDocLabel}
             </h2>
           </div>
@@ -254,7 +254,7 @@ const LogbookRecords = () => {
         <div className="flex-1 overflow-x-auto px-4 sm:px-6 md:px-8">
           <table className="w-full border-collapse min-w-200">
             <thead>
-              <tr className="border-b-2 border-gray-300 text-gray-400 uppercase text-center">
+              <tr className={`border-b-2 uppercase text-center ${isDark ? 'border-[#3e4042] text-[#9a9a9a]' : 'border-gray-300 text-gray-400'}`}>
                 <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Requested</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[15%]">Client Name</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[12%]">Course</th>
@@ -271,7 +271,7 @@ const LogbookRecords = () => {
                   const claimedAt = getClaimedAt(row);
 
                   return (
-                <tr key={row.request_id || row.id} className="border-b border-gray-200 hover:bg-gray-50 text-[11px] sm:text-[12px] text-gray-700 transition-colors">
+                <tr key={row.request_id || row.id} className={`border-b text-[11px] sm:text-[12px] transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
 
                   <td className="p-3 sm:p-4 text-center">
                     {formatDateLong(row.requested_at) || 'N/A'}
@@ -316,7 +316,7 @@ const LogbookRecords = () => {
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-4 sm:px-8 py-4 bg-gray-50 text-[11px] sm:text-sm text-gray-500 flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t border-gray-200">
+        <div className={`px-4 sm:px-8 py-4 text-[11px] sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t ${isDark ? 'bg-[#242526] text-[#9a9a9a] border-[#3e4042]' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
           <span className="text-center sm:text-left">
             Showing {sortedData.length > 0 ? indexOfFirstItem + 1 : 0} to{" "}
             {Math.min(indexOfLastItem, sortedData.length)} of {sortedData.length} results
@@ -326,23 +326,19 @@ const LogbookRecords = () => {
             <button
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              className={`p-1 rounded transition-colors ${
-                currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`p-1 rounded transition-colors ${currentPage === 1 ? (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')}`}
             >
               <ChevronLeftIcon className="w-5 h-5" />
             </button>
 
-            <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+            <span className={`text-xs font-semibold whitespace-nowrap ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>
               Page {currentPage} of {totalPages}
             </span>
 
             <button
               onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages || totalPages === 0}
-              className={`p-1 rounded transition-colors ${
-                currentPage === totalPages || totalPages === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`p-1 rounded transition-colors ${(currentPage === totalPages || totalPages === 0) ? (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')}`}
             >
               <ChevronRightIcon className="w-5 h-5" />
             </button>
