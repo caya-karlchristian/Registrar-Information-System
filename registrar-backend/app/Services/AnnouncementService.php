@@ -14,6 +14,10 @@ use App\Models\SystemUser;
  */
 class AnnouncementService
 {
+    public function __construct(
+        private NotificationService $notificationService,
+    ) {}
+
     public function create(array $validated, SystemUser $author): Announcement
     {
         $announcement = Announcement::create([
@@ -23,7 +27,7 @@ class AnnouncementService
             'created_by' => $author->user_id,
         ]);
 
-        NotificationService::sendToAllExcept(
+        $this->notificationService->sendToAllExcept(
             excludedRoleIds: [SystemUser::ROLE_SUPER_ADMIN],
             triggerEvent:    'announcement_published',
             data: [

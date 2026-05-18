@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, ClockIcon  } from '@heroicons/react/24/outline';
 import { getDocumentTypes } from '../services/api';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
+import { useTheme } from '../context/ThemeContext';
 
 const ensureArray = (data) => {
     if (Array.isArray(data)) return data; // Already an array
@@ -18,6 +19,7 @@ const AlumniDocumentList = () => {
   const contentRefs = useRef({}); 
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -39,20 +41,20 @@ const AlumniDocumentList = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/50 font-sans relative">
+    <div className={`min-h-screen font-sans relative ${isDark ? 'bg-[#18191a]' : 'bg-gray-50/50'}`}>
       <LoadingOverlay isVisible={loading} message="Loading Documents..." />
       <div className="max-w-6xl mx-auto px-4 pt-4 pb-10">
         {/* --- HEADER --- */}
-        <div className="mb-8 border-b-2 border-[#4a120e]/10 pb-6">
-          <h1 className="text-3xl font-black text-gray-800 uppercase tracking-tighter">
-            Document List <span className="text-[#4a120e]">&</span> Requirements
+        <div className={`mb-8 border-b-2 pb-6 ${isDark ? 'border-yellow-600/30' : 'border-[#4a120e]/10'}`}>
+          <h1 className={`text-3xl font-black uppercase tracking-tighter ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+            Document List <span className={isDark ? 'text-yellow-400' : 'text-[#4a120e]'}>&</span> Requirements
           </h1>
         </div>
 
         {/* --- FIXED GRID LAYOUT --- */}
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {documents.length === 0 && !loading ? (
-            <p className="text-gray-400 italic col-span-2">No documents available.</p>
+            <p className={`italic col-span-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>No documents available.</p>
           ) : (
           documents.map((doc) => {
             const id = doc.document_type_id;
@@ -64,26 +66,26 @@ const AlumniDocumentList = () => {
             return (
               <div
                 key={id}
-                className={`transition-all duration-300 bg-white h-fit border rounded-4xl overflow-hidden ${
+                className={`transition-all duration-300 h-fit border rounded-4xl overflow-hidden ${
                   isOpen
-                    ? 'border-[#4a120e] shadow-xl ring-1 ring-[#4a120e]/10'
-                    : 'border-gray-200 shadow-sm hover:border-gray-300'
+                    ? `border-[#4a120e] shadow-xl ring-1 ring-[#4a120e]/10 ${isDark ? 'bg-[#242526]' : 'bg-white'}`
+                    : `shadow-sm ${isDark ? 'bg-[#242526] border-[#3e4042] hover:border-[#4e4f50]' : 'bg-white border-gray-200 hover:border-gray-300'}`
                 }`}
               >
                 <button
                   type="button"
                   onClick={() => toggleAccordion(id)}
                   className={`w-full flex justify-between items-center p-7 text-left focus:outline-none transition-colors ${
-                    isOpen ? 'bg-[#4a120e]/5' : 'bg-white'
+                    isOpen ? (isDark ? 'bg-[#4a120e]/10' : 'bg-[#4a120e]/5') : (isDark ? 'bg-[#242526]' : 'bg-white')
                   }`}
                 >
                   <div className="flex-1 pr-4">
-                    <h4 className={`text-base font-black tracking-tight leading-tight ${isOpen ? 'text-[#4a120e]' : 'text-gray-800'}`}>
+                    <h4 className={`text-base font-black tracking-tight leading-tight ${isOpen ? (isDark ? 'text-white' : 'text-[#4a120e]') : (isDark ? 'text-[#e4e6eb]' : 'text-gray-800')}`}>
                       {doc.document_name}
                     </h4>
                     {/* Compact Processing Period Preview */}
                     {isOpen && doc.document_process_period && (
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-1 mt-1">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 mt-1 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
                         <ClockIcon className="w-3 h-3" /> {doc.document_process_period} processing day/s
                       </span>
                     )}
@@ -93,7 +95,7 @@ const AlumniDocumentList = () => {
                     className={`p-2 rounded-full transition-all duration-300 shrink-0 ${
                       isOpen
                         ? 'bg-[#4a120e] text-white rotate-180'
-                        : 'bg-gray-100 text-gray-400'
+                        : (isDark ? 'bg-[#3a3b3c] text-[#b0b3b8]' : 'bg-gray-100 text-gray-400')
                     }`}
                   >
                     <ChevronDownIcon className="w-4 h-4" />
@@ -108,18 +110,18 @@ const AlumniDocumentList = () => {
                   className="transition-all duration-500 ease-in-out overflow-hidden"
                 >
                   <div className="px-7 pb-7 pt-0">
-                    <div className="h-px bg-gray-100 mb-5" />
+                    <div className={`h-px mb-5 ${isDark ? 'bg-[#3e4042]' : 'bg-gray-100'}`} />
                     <div className="space-y-5">
                       <div>
-                        <h5 className="text-[9px] font-black text-[#4a120e] uppercase tracking-[0.2em] mb-2">
+                        <h5 className={`text-[9px] font-black uppercase tracking-[0.2em] mb-2 ${isDark ? 'text-white' : 'text-[#4a120e]'}`}>
                           Description
                         </h5>
-                        <p className="text-gray-600 italic text-[13px] leading-relaxed">
+                        <p className={`italic text-[13px] leading-relaxed ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
                           {doc.document_description || "No description provided."}
                         </p>
                       </div>
-                      <div className="bg-gray-50 rounded-3xl p-5 border border-gray-100">
-                        <h5 className="text-[9px] font-black text-[#4a120e] uppercase tracking-[0.2em] mb-4">
+                      <div className={`rounded-3xl p-5 border ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-gray-50 border-gray-100'}`}>
+                        <h5 className={`text-[9px] font-black uppercase tracking-[0.2em] mb-4 ${isDark ? 'text-white' : 'text-[#4a120e]'}`}>
                           Requirements
                         </h5>
                         <ul className="space-y-3">
@@ -127,14 +129,14 @@ const AlumniDocumentList = () => {
                             requirements.map((req, i) => (
                               <li
                                 key={i}
-                                className="flex items-start gap-3 text-[12px] text-gray-700 font-bold"
+                                className={`flex items-start gap-3 text-[12px] font-bold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}
                               >
                                 <div className="w-1.5 h-1.5 rounded-full bg-[#4a120e] mt-1.5 shrink-0" />
                                 <span className="flex-1 leading-snug">{req}</span>
                               </li>
                             ))
                           ) : (
-                            <li className="text-[12px] text-gray-400 italic">No specific requirements listed.</li>
+                            <li className={`text-[12px] italic ${isDark ? 'text-[#b0b3b8]/60' : 'text-gray-400'}`}>No specific requirements listed.</li>
                           )}
                         </ul>
                       </div>
