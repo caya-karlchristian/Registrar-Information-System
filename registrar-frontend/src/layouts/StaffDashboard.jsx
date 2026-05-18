@@ -23,6 +23,7 @@ import { useNotificationsContext } from '../context/NotificationsContext';
 import DropdownGroup from '../components/DropDown.jsx';
 
 import { useReferenceData } from '../context/ReferenceDataContext';
+import { useTheme } from '../context/ThemeContext';
 const STATUS_FALLBACK = {
   PENDING: 1,
   READY: 2,
@@ -47,6 +48,7 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
 
 const StaffDashboard = () => {
   const { docTypeName, purposeName, certName } = useReferenceData();
+  const { isDark } = useTheme();
   const [requests, setRequests] = useState([]);
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
@@ -316,14 +318,23 @@ const StaffDashboard = () => {
   /* ---------------- STATUS BADGE ---------------- */
   const getStatusBadge = status => {
     const normalizedStatus = String(status ?? '').trim().toLowerCase();
-    const styles = {
-      processing: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      'ready to claim': 'bg-green-100 text-green-700 border-green-200',
-      completed: 'bg-gray-200 text-gray-700 border-gray-300',
-      forfeited: 'bg-red-100 text-red-700 border-red-200',
-    };
+    const styles = isDark
+      ? {
+          processing: 'bg-yellow-900/20 text-yellow-400 border-yellow-600',
+          'ready to claim': 'bg-green-900/20 text-green-400 border-green-600',
+          completed: 'bg-gray-700/20 text-gray-300 border-gray-400',
+          forfeited: 'bg-gray-700/20 text-gray-300 border-gray-400',
+          cancelled: 'bg-gray-700/20 text-gray-300 border-gray-400',
+        }
+      : {
+          processing: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+          'ready to claim': 'bg-green-100 text-green-700 border-green-200',
+          completed: 'bg-gray-100 text-gray-700 border-gray-200',
+          forfeited: 'bg-gray-100 text-gray-700 border-gray-200',
+          cancelled: 'bg-gray-100 text-gray-700 border-gray-200',
+        };
     return (
-      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${styles[normalizedStatus] ?? 'bg-gray-100 text-gray-600'}`}>
+      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${styles[normalizedStatus] ?? (isDark ? 'bg-gray-700/20 text-gray-300 border-gray-400' : 'bg-gray-100 text-gray-600')}`}>
         {status ?? 'Unknown'}
       </span>
     );
@@ -375,8 +386,8 @@ const StaffDashboard = () => {
   };
 
   return (
-    <div className="relative min-h-screen pb-10 z-20">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6">
+    <div className={`relative min-h-screen pb-10 z-20 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5] text-gray-900'}`}>
+      <main className={`max-w-7xl mx-auto px-4 sm:px-6 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
         <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
         <LineLoading isVisible={actionLoading} />
 
@@ -387,11 +398,11 @@ const StaffDashboard = () => {
         </div>
 
         {/* ---------------- TOOLBAR ---------------- */}
-        <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-end">
+        <div className={`p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-end ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white border border-gray-100'}`}>
           
           {selectedIds.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-3 bg-red-50 p-2 rounded-lg border border-red-100 w-full md:w-auto">
-              <span className="text-red-700 font-bold text-sm ml-2">{selectedIds.length} Selected</span>
+            <div className={`flex flex-wrap items-center gap-3 p-2 rounded-lg border w-full md:w-auto ${isDark ? 'bg-red-900/15 border-red-900/20' : 'bg-red-50 border-red-100'}`}>
+              <span className={`font-bold text-sm ml-2 ${isDark ? 'text-red-300' : 'text-red-700'}`}>{selectedIds.length} Selected</span>
               <button 
                 onClick={handleDeleteSelected}
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
@@ -417,7 +428,7 @@ const StaffDashboard = () => {
               value={filterStatus}
               onChange={handleToolbarDropdownChange}
               options={statusFilterOptions}
-              labelColor="text-gray-600"
+              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
             />
 
             <DropdownGroup
@@ -426,20 +437,20 @@ const StaffDashboard = () => {
               value={sortOrder}
               onChange={handleToolbarDropdownChange}
               options={['Recent Requests', 'Old Requests']}
-              labelColor="text-gray-600"
+              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
             />
           </div>
         </div>
 
         {/* ---------------- TABLE ---------------- */}
-        <div className="bg-white rounded-xl shadow border border-gray-100 overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100">
-            <thead className="bg-gray-50">
+        <div className={`rounded-xl shadow overflow-x-auto border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-100'}`}>
+          <table className={`min-w-full divide-y ${isDark ? 'divide-[#3e4042]' : 'divide-gray-100'}`}>
+            <thead className={isDark ? 'bg-[#18191a]/80' : 'bg-gray-50'}>
               <tr>
                 <th className="px-6 py-4 w-10 text-center">
                   <input 
                     type="checkbox" 
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    className={`w-4 h-4 rounded cursor-pointer ${isDark ? 'border-[#4e4f50] text-blue-400 focus:ring-blue-400 bg-[#242526]' : 'border-gray-300 text-blue-600 focus:ring-blue-500'}`}
                     onChange={handleSelectAll}
                     checked={currentItems.length > 0 && selectedIds.length === currentItems.length}
                   />
@@ -454,13 +465,13 @@ const StaffDashboard = () => {
                 <Th center>Actions</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className={isDark ? 'divide-y divide-[#3e4042]' : 'divide-y divide-gray-100'}>
               {currentItems.map(req => (
-                <tr key={req.id} className={`hover:bg-gray-50 ${selectedIds.includes(req.id) ? 'bg-blue-50' : ''}`}>
+                <tr key={req.id} className={`transition-colors ${isDark ? 'hover:bg-[#3a3b3c]' : 'hover:bg-gray-50'} ${selectedIds.includes(req.id) ? (isDark ? 'bg-blue-900/15' : 'bg-blue-50') : ''}`}>
                   <td className="px-6 py-4 text-center">
                     <input 
                       type="checkbox" 
-                      className="w-4 h-4 rounded border-gray-300 cursor-pointer"
+                      className={`w-4 h-4 rounded cursor-pointer ${isDark ? 'border-[#4e4f50] bg-[#242526]' : 'border-gray-300'}`}
                       checked={selectedIds.includes(req.id)}
                       onChange={() => handleSelectOne(req.id)}
                     />
@@ -481,17 +492,17 @@ const StaffDashboard = () => {
                       </span>
 
                       {req.documentDetailsArray.length > 1 && (
-                        <span className="text-xs text-gray-400">
+                          <span className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>
                           +{req.documentDetailsArray.length - 1} more
                         </span>
                       )}
                     </div>
                   </Td>
                   <Td center>
-                    <div className="text-xs text-gray-400">{req.date}</div>
-                    <div className="text-xs text-gray-400">{req.time}</div>
+                      <div className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>{req.date}</div>
+                      <div className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>{req.time}</div>
                   </Td>
-                  <Td center><span className="font-semibold text-gray-700">{req.copies}</span></Td>
+                    <Td center><span className={isDark ? 'font-semibold text-[#e4e6eb]' : 'font-semibold text-gray-700'}>{req.copies}</span></Td>
                   <Td center>{getStatusBadge(req.statusName)}</Td>
                   <Td center>
                     <div className="flex flex-wrap sm:flex-nowrap items-center justify-center sm:justify-end gap-1.5 sm:gap-2 min-w-0 sm:min-w-37.5">
@@ -501,7 +512,7 @@ const StaffDashboard = () => {
                           onClick={() => {
                             setCertRequest(req);
                           }}
-                          className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                          className={isDark ? 'p-2 text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}
                         >
                           <ArrowDownTrayIcon className="w-5 h-5" />
                         </button>
@@ -516,7 +527,7 @@ const StaffDashboard = () => {
                             }
                             handleStatusUpdate(req.id, resolvedStatusIds.READY);
                           }}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
                           title={
                             req.isCertificate && !printedCertificateIds.includes(req.id)
                               ? 'Print certificate first'
@@ -532,7 +543,7 @@ const StaffDashboard = () => {
                         <button
                           disabled={updatingId === req.id}
                           onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50"
+                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 ${isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'}`}
                         >
                           <CheckCircleIcon className="w-4 h-4" /> Done
                         </button>
@@ -540,7 +551,7 @@ const StaffDashboard = () => {
                       <button
                         title="View Details"
                         onClick={() => setSelectedRequest(req.rawRequest)}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                        className={isDark ? 'p-2 text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}
                       >
                         <EyeIcon className="w-5 h-5" />
                       </button>                     
@@ -552,7 +563,7 @@ const StaffDashboard = () => {
           </table>
 
           {/* ---------------- PAGINATION ---------------- */}
-          <div className="sticky left-0 bottom-0 w-full px-4 sm:px-8 py-4 bg-gray-50 text-[11px] sm:text-sm text-gray-500 flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t border-gray-200 z-10">
+          <div className={`sticky left-0 bottom-0 w-full px-4 sm:px-8 py-4 text-[11px] sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t z-10 ${isDark ? 'bg-[#18191a] text-[#b0b3b8] border-[#3e4042]' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
             <span className="text-center sm:text-left whitespace-nowrap">
               Showing {filteredData.length > 0 ? indexOfFirstItem + 1 : 0} to {Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} results
             </span>
@@ -562,13 +573,13 @@ const StaffDashboard = () => {
                 onClick={handlePrevPage}
                 disabled={currentPage === 1}
                 className={`p-1 rounded transition-colors ${
-                  currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'
+                  currentPage === 1 ? (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')
                 }`}
               >
                 <ChevronLeftIcon className="w-4 sm:w-5 h-4 sm:h-5" />
               </button>
 
-              <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+              <span className={`text-xs font-semibold whitespace-nowrap ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>
                 Page {currentPage} of {totalPages}
               </span>
 
@@ -576,7 +587,7 @@ const StaffDashboard = () => {
                 onClick={handleNextPage}
                 disabled={currentPage === totalPages || totalPages === 0}
                 className={`p-1 rounded transition-colors ${
-                  currentPage === totalPages || totalPages === 0 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-200'
+                  currentPage === totalPages || totalPages === 0 ? (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')
                 }`}
               >
                 <ChevronRightIcon className="w-4 sm:w-5 h-4 sm:h-5" />
@@ -608,25 +619,32 @@ const StaffDashboard = () => {
 
 /* ---------------- REUSABLE COMPONENTS ---------------- */
 const StatCard = ({ title, count, color }) => {
+  const { isDark } = useTheme();
   const colors = {
-    yellow: 'border-yellow-400 text-yellow-500',
-    blue: 'border-blue-500 text-blue-500',
-    green: 'border-green-500 text-green-500',
+    yellow: isDark ? 'border-yellow-400 text-yellow-400' : 'border-yellow-400 text-yellow-500',
+    blue: isDark ? 'border-blue-400 text-blue-400' : 'border-blue-500 text-blue-500',
+    green: isDark ? 'border-green-400 text-green-400' : 'border-green-500 text-green-500',
   };
   return (
-    <div className={`bg-white p-6 rounded-xl shadow border-l-4 ${colors[color]}`}>
-      <div className="text-xs uppercase text-gray-400 font-bold">{title}</div>
-      <div className="text-3xl font-extrabold mt-1">{count}</div>
+    <div className={`p-6 rounded-xl shadow border-l-4 ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white'} ${colors[color]}`}>
+      <div className={`text-xs uppercase font-bold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>{title}</div>
+      <div className={`text-3xl font-extrabold mt-1 ${isDark ? 'text-[#e4e6eb]' : 'text-inherit'}`}>{count}</div>
     </div>
   );
 };
 
-const Th = ({ children, center }) => (
-  <th className={`px-6 py-4 text-xs uppercase font-bold text-gray-500 ${center ? 'text-center' : 'text-left'}`}>{children}</th>
-);
+const Th = ({ children, center }) => {
+  const { isDark } = useTheme();
+  return (
+    <th className={`px-6 py-4 text-xs uppercase font-bold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'} ${center ? 'text-center' : 'text-left'}`}>{children}</th>
+  );
+};
 
-const Td = ({ children, center }) => (
-  <td className={`px-6 py-4 text-sm ${center ? 'text-center' : 'text-left'}`}>{children}</td>
-);
+const Td = ({ children, center }) => {
+  const { isDark } = useTheme();
+  return (
+    <td className={`px-6 py-4 text-sm ${isDark ? 'text-[#e4e6eb]' : 'text-inherit'} ${center ? 'text-center' : 'text-left'}`}>{children}</td>
+  );
+};
 
 export default StaffDashboard;
