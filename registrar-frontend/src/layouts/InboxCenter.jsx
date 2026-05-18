@@ -1,15 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ArrowLeftIcon,
-  PaperAirplaneIcon,
-} from '@heroicons/react/24/outline';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useLocation } from 'react-router-dom';
-import ErrorToast from '../components/ErrorToast.jsx';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
-import InputGroup from '../components/InputGroup.jsx';
-import VoiceTextareaInput from '../components/VoiceTextareaInput.jsx';
-import SuccessToast from '../components/SuccessToast.jsx';
 import { useNotificationsContext as useNotifications } from '../context/NotificationsContext';
+import { useTheme } from '../context/ThemeContext';
 
 // -------------------------------------------------------
 // Maps backend trigger_event → human-readable category
@@ -62,6 +56,7 @@ const toMailItem = (n) => ({
 const InboxCenter = () => {
   const location = useLocation();
   const incomingNotificationId = location.state?.selectedNotificationId;
+  const { isDark } = useTheme();
 
   const {
     notifications,
@@ -75,12 +70,6 @@ const InboxCenter = () => {
 
   const [searchText,      setSearchText]      = useState('');
   const [selectedId,      setSelectedId]      = useState(incomingNotificationId ?? null);
-  const [composeTo,       setComposeTo]       = useState('');
-  const [composeSubject,  setComposeSubject]  = useState('');
-  const [composeMessage,  setComposeMessage]  = useState('');
-  const [composeStatus,   setComposeStatus]   = useState('');
-  const [errorMessage,    setErrorMessage]    = useState('');
-  const [rightPanelMode,  setRightPanelMode]  = useState('preview');
 
   // Auto-select first email once loaded (or the one coming from toast/modal click)
   useEffect(() => {
@@ -109,20 +98,12 @@ const InboxCenter = () => {
 
   const selectedMail = emails.find((m) => m.id === selectedId) ?? filteredEmails[0] ?? null;
 
-  // When selected mail changes, reset right panel
   useEffect(() => {
     if (!selectedMail) return;
-    setRightPanelMode('preview');
-    setComposeTo('');
-    setComposeSubject('');
-    setComposeMessage('');
-    setComposeStatus('');
-    setErrorMessage('');
   }, [selectedMail?.id]);
 
   const handleSelectMail = async (mailId) => {
     setSelectedId(mailId);
-    setRightPanelMode('preview');
     // Mark as read on the backend
     const mail = emails.find((m) => m.id === mailId);
     if (mail?.unread) {
@@ -130,57 +111,22 @@ const InboxCenter = () => {
     }
   };
 
-  const openComposeMode = () => {
-    setComposeTo('');
-    setComposeSubject('');
-    setComposeMessage('');
-    setComposeStatus('');
-    setErrorMessage('');
-    setRightPanelMode('compose');
-  };
-
-  const handleComposeFieldChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'composeTo')      setComposeTo(value);
-    if (name === 'composeSubject') setComposeSubject(value);
-  };
-
-  // TODO: Email contact workflow is not yet implemented.
-  // The backend route, controller, and IdP email-update flow need to be
-  // built before this button can send anything. See bug checklist:
-  // 'New Email Contact Workflow'.
-  // Keeping the handler as a no-op so the compose layout is preserved
-  // and wiring it up later only requires filling in this function.
-  const handleSendEmail = () => {
-    setErrorMessage('Email sending is not yet available. This feature is coming soon.');
-  };
-
   return (
     <>
-      <SuccessToast message={composeStatus} onClose={() => setComposeStatus('')} />
-      <ErrorToast  message={errorMessage}  onClose={() => setErrorMessage('')} />
-
       <div className="w-full max-w-6xl mx-auto px-4">
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className={`overflow-hidden rounded-xl border shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
           <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] min-h-[70vh]">
 
             {/* ── LEFT PANEL: inbox list ── */}
-            <aside className="border-r border-gray-200 bg-white">
-              <div className="px-4 py-4 border-b border-gray-200">
+            <aside className={`border-r ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
+              <div className={`px-4 py-4 border-b ${isDark ? 'border-[#3e4042]' : 'border-gray-200'}`}>
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-gray-900 text-lg font-bold">Inbox</h2>
-                  <button
-                    onClick={openComposeMode}
-                    className="inline-flex items-center gap-1 rounded-md bg-pup-dark-maroon px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#510400]"
-                  >
-                    <PaperAirplaneIcon className="w-3.5 h-3.5" />
-                    Compose Email
-                  </button>
+                  <h2 className={`text-lg font-bold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>Inbox</h2>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Select a message to view preview details.</p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Select a message to view preview details.</p>
               </div>
 
-              <div className="p-3 border-b border-gray-200">
+              <div className={`p-3 border-b ${isDark ? 'border-[#3e4042]' : 'border-gray-200'}`}>
                 <VoiceSearchInput
                   value={searchText}
                   onChange={setSearchText}
@@ -191,11 +137,11 @@ const InboxCenter = () => {
 
               <div className="max-h-[60vh] lg:max-h-[calc(72vh-130px)] overflow-y-auto">
                 {loading ? (
-                  <div className="p-8 text-center text-gray-400 text-sm animate-pulse">
+                  <div className={`p-8 text-center text-sm animate-pulse ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
                     Loading notifications…
                   </div>
                 ) : filteredEmails.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500 text-sm">
+                  <div className={`p-8 text-center text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                     No messages found.
                   </div>
                 ) : (
@@ -207,20 +153,20 @@ const InboxCenter = () => {
                         onClick={() => handleSelectMail(mail.id)}
                         className={`w-full text-left px-4 py-3 border-b border-gray-200 transition-colors ${
                           isActive
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'hover:bg-gray-50 text-gray-800'
+                            ? (isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] border-[#3e4042]' : 'bg-gray-100 text-gray-900')
+                            : (isDark ? 'hover:bg-[#3a3b3c] text-[#e4e6eb] border-[#3e4042]' : 'hover:bg-gray-50 text-gray-800')
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-semibold text-sm truncate">{mail.from}</p>
-                          <span className="text-[11px] text-gray-500 shrink-0">
+                          <span className={`text-[11px] shrink-0 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                             {formatTime(mail.time)}
                           </span>
                         </div>
-                        <p className="text-xs mt-0.5 text-gray-700 truncate">{mail.subject}</p>
-                        <p className="text-xs mt-1 line-clamp-2 text-gray-500">{mail.preview}</p>
+                        <p className={`text-xs mt-0.5 truncate ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>{mail.subject}</p>
+                        <p className={`text-xs mt-1 line-clamp-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{mail.preview}</p>
                         {mail.unread && !isActive && (
-                          <span className="inline-block mt-2 text-[10px] font-semibold text-gray-700">
+                          <span className={`inline-block mt-2 text-[10px] font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>
                             Unread
                           </span>
                         )}
@@ -232,43 +178,40 @@ const InboxCenter = () => {
             </aside>
 
             {/* ── RIGHT PANEL: preview / compose ── */}
-            <section className="flex flex-col bg-white">
+            <section className={`flex flex-col ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
               {selectedMail ? (
                 <>
-                  {rightPanelMode === 'preview' && (
-                    <header className="px-4 md:px-6 py-4 border-b border-gray-200 bg-white">
-                      <p className="text-[11px] uppercase tracking-[0.2em] font-black text-[#6D0000]/55">
-                        Selected Inbox Message
-                      </p>
-                      <h3 className="text-lg md:text-xl font-bold text-gray-900 leading-tight mt-1">
-                        {selectedMail.subject}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        From {selectedMail.from} | {formatTime(selectedMail.time)}
-                      </p>
-                    </header>
-                  )}
+                  <header className={`px-4 md:px-6 py-4 border-b ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
+                    <p className={`text-[11px] uppercase tracking-[0.2em] font-black ${isDark ? 'text-pup-yellow/70' : 'text-[#6D0000]/55'}`}>
+                      Selected Inbox Message
+                    </p>
+                    <h3 className={`text-lg md:text-xl font-bold leading-tight mt-1 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
+                      {selectedMail.subject}
+                    </h3>
+                    <p className={`text-sm mt-1 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                      Date: {formatTime(selectedMail.time)}
+                    </p>
+                  </header>
 
-                  <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-gray-50">
-                    {rightPanelMode === 'preview' ? (
-                      <div className="space-y-4">
+                  <div className={`flex-1 overflow-y-auto p-4 md:p-6 space-y-4 ${isDark ? 'bg-[#1a1b1e]' : 'bg-gray-50'}`}>
+                    <div className="space-y-4">
 
                         {/* ── Message body ── */}
-                        <div className="rounded-lg border border-gray-200 bg-white px-4 py-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-2">
+                        <div className={`rounded-lg border px-4 py-4 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
+                          <p className={`text-[11px] font-semibold uppercase tracking-widest mb-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                             Message Preview
                           </p>
                           <div className="space-y-2">
-                            <p className="text-sm text-gray-700">
-                              <span className="font-semibold text-gray-900">Sender:</span>{' '}
+                            <p className={`text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>
+                              <span className={`font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>Sender:</span>{' '}
                               {selectedMail.from}
                             </p>
-                            <p className="text-sm text-gray-700">
-                              <span className="font-semibold text-gray-900">Time:</span>{' '}
+                            <p className={`text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>
+                              <span className={`font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>Date:</span>{' '}
                               {formatTime(selectedMail.time)}
                             </p>
-                            <p className="text-sm text-gray-700 leading-relaxed">
-                              <span className="font-semibold text-gray-900">Message:</span>{' '}
+                            <p className={`text-sm leading-relaxed ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>
+                              <span className={`font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>Message:</span>{' '}
                               {selectedMail.preview}
                             </p>
                           </div>
@@ -276,32 +219,32 @@ const InboxCenter = () => {
 
                         {/* ── Requirements checklist (request_submitted only) ── */}
                         {selectedMail._raw?.requirements?.length > 0 && (
-                          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-700 mb-3">
+                          <div className={`rounded-lg border px-4 py-4 ${isDark ? 'border-[#5d4c17] bg-[#1a1b1e]' : 'border-amber-200 bg-amber-50'}`}>
+                            <p className={`text-[11px] font-semibold uppercase tracking-widest mb-3 ${isDark ? 'text-pup-yellow' : 'text-amber-700'}`}>
                               Requirements Checklist
                             </p>
-                            <p className="text-xs text-amber-800 mb-4">
+                            <p className={`text-xs mb-4 ${isDark ? 'text-[#e4e6eb]' : 'text-amber-800'}`}>
                               Please prepare the following for each item in your request before visiting the Registrar's Office.
                             </p>
-                            <div className="space-y-4">
+                            <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
                               {selectedMail._raw.requirements.map((req, idx) => (
-                                <div key={idx} className="rounded-md border border-amber-200 bg-white px-3 py-3">
+                                <div key={idx} className={`rounded-md border px-3 py-3 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-amber-200 bg-white'}`}>
                                   <div className="flex items-start justify-between gap-2 mb-2">
-                                    <p className="text-sm font-semibold text-gray-900">{req.item}</p>
+                                    <p className={`text-sm font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>{req.item}</p>
                                     <div className="flex gap-2 shrink-0">
                                       {req.copies > 1 && (
-                                        <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${isDark ? 'bg-[#3a3b3c] text-[#e4e6eb]' : 'bg-gray-100 text-gray-600'}`}>
                                           {req.copies}x copies
                                         </span>
                                       )}
                                       {req.process_days && (
-                                        <span className="inline-block rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${isDark ? 'bg-[#3a3b3c] text-pup-yellow' : 'bg-blue-100 text-blue-700'}`}>
                                           {req.process_days}
                                         </span>
                                       )}
                                     </div>
                                   </div>
-                                  <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
+                                  <p className={`text-xs leading-relaxed whitespace-pre-line ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
                                     {req.requirements}
                                   </p>
                                 </div>
@@ -311,70 +254,12 @@ const InboxCenter = () => {
                         )}
 
                       </div>
-                    ) : (
-                      /* ── COMPOSE FORM ── */
-                      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden min-h-140">
-                        <div className="px-4 py-3 bg-gray-100 text-gray-900 text-sm font-semibold">
-                          Compose Email
-                        </div>
-                        <div className="px-4 md:px-5 py-4 space-y-3">
-                          <InputGroup
-                            label="To"
-                            name="composeTo"
-                            type="email"
-                            value={composeTo}
-                            onChange={handleComposeFieldChange}
-                            placeholder="example@gmail.com"
-                            labelColor="text-gray-600"
-                            voiceEnabled
-                            language="en-US"
-                          />
-                          <InputGroup
-                            label="Subject"
-                            name="composeSubject"
-                            type="text"
-                            value={composeSubject}
-                            onChange={handleComposeFieldChange}
-                            placeholder="Write subject"
-                            labelColor="text-gray-600"
-                            voiceEnabled
-                            language="en-US"
-                          />
-                          <VoiceTextareaInput
-                            id="compose-message"
-                            label="Message"
-                            value={composeMessage}
-                            onChange={setComposeMessage}
-                            placeholder="Type your message here..."
-                            language="en-US"
-                            minHeightClass="min-h-64"
-                          />
-                          <div className="flex items-center justify-between gap-3">
-                            <button
-                              onClick={handleSendEmail}
-                              disabled
-                              title="Email sending is not yet available"
-                              className="inline-flex items-center gap-1.5 rounded-md bg-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed opacity-60"
-                            >
-                              <PaperAirplaneIcon className="w-4 h-4" />
-                              Send Email
-                            </button>
-                            <button
-                              onClick={() => setRightPanelMode('preview')}
-                              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-                            >
-                              Back To Preview
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </>
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">
+                <div className={`h-full flex items-center justify-center ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                   <div className="text-center px-4">
-                    <ArrowLeftIcon className="w-10 h-10 mx-auto mb-3 text-gray-400" />
+                    <ArrowLeftIcon className={`w-10 h-10 mx-auto mb-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
                     <p className="font-medium">
                       {loading
                         ? 'Loading your notifications…'

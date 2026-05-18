@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import {
   ChevronDownIcon,
   FaceSmileIcon,
+  EnvelopeIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
+import { useTheme } from '../context/ThemeContext';
 
 const categories = [
   "All",
@@ -85,6 +88,7 @@ const faqData = [
 ];
 
 const FAQPage = () => {
+  const { isDark } = useTheme();
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [openId, setOpenId] = useState(null);
@@ -99,7 +103,7 @@ const FAQPage = () => {
   const toggleAccordion = (id) => setOpenId((prev) => (prev === id ? null : id));
 
   return (
-    <div className="min-h-screen font-sans pb-20">
+    <div className={`min-h-screen font-sans pb-20 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : ''}`}>
       <div className="max-w-lg mx-auto ">
         {/* Search Bar */}
         <div className="max-w-2xl mx-auto mb-16">
@@ -125,7 +129,7 @@ const FAQPage = () => {
           {/* Sidebar */}
           <aside className="hidden md:block md:col-span-3">
             <div className="sticky top-10">
-              <h3 className="text-[#800000] font-black text-xl uppercase tracking-wider mb-6 border-l-4 border-[#800000] pl-4">
+              <h3 className={`${isDark ? 'text-[#eebc48] border-l-4 border-[#eebc48]' : 'text-[#800000] border-l-4 border-[#800000]'} font-black text-xl uppercase tracking-wider mb-6 pl-4`}>
                 Categories
               </h3>
               <ul className="space-y-2">
@@ -133,10 +137,10 @@ const FAQPage = () => {
                   <li key={cat}>
                     <button
                       onClick={() => setActiveCategory(cat)}
-                      className={`w-full text-left px-5 py-4 rounded-xl transition-all duration-200 text-base font-bold ${
-                        activeCategory === cat
-                          ? 'bg-[#800000] text-white shadow-lg translate-x-2'
-                          : 'text-gray-500 hover:text-[#800000] hover:bg-white hover:shadow-sm'
+                          className={`w-full text-left px-5 py-4 rounded-xl text-base font-bold ${
+                          activeCategory === cat
+                            ? (isDark ? 'bg-[#3a3b3c] text-[#e4e6eb]' : 'bg-pup-dark-maroon text-white')
+                            : (isDark ? 'text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#242526]' : 'text-[#700000] hover:bg-black/5 hover:text-[#5c0000]')
                       }`}
                     >
                       {cat}
@@ -144,34 +148,84 @@ const FAQPage = () => {
                   </li>
                 ))}
               </ul>
+
+             {/* Email Registrar Section */}
+              <div className={`${isDark ? 'mt-5 overflow-hidden rounded-2xl bg-[#242526] border border-[#3e4042] shadow-xl' : 'mt-5 overflow-hidden rounded-2xl bg-white border border-[#800000] shadow-xl'} transition-all duration-300 hover:shadow-2xl`}>
+                <a
+                 href="https://mail.google.com/mail/?view=cm&fs=1&to=registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern"
+                  className="group flex items-center gap-4 border-b border-gray-100 p-4 text-left transition-all duration-200 hover:bg-red-50"
+                >
+                  <div className={`${isDark ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#3a3b3c] text-[#eebc48]' : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-[#800000]'} transition-transform group-hover:scale-110`}>
+                    <EnvelopeIcon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-wide text-[#800000]">
+                      Compose Email
+                    </p>
+                    <p className="mt-0.5 text-xs font-bold text-gray-500 underline group-hover:text-[#800000]">
+                      registrar@pup.edu.ph
+                    </p>
+                  </div>
+                </a>
+
+                <div className={`${isDark ? 'bg-[#18191a] px-6 py-4' : 'bg-gray-50 px-6 py-4'}`}>
+                  <div className="text-left">
+                    <InformationCircleIcon className="float-left mr-3 mt-1 h-6 w-6 text-amber-500" />
+                    <p className={`${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} text-justify text-xs font-medium leading-relaxed`}>
+                      <span className={`${isDark ? 'font-bold text-[#e4e6eb] text-xs' : 'font-bold text-gray-900 text-xs'}`}>Submission Guide:</span> Ensure your message includes your <span className="text-[#800000]">full name</span>, <span className="text-[#800000]">student number</span>, and a detailed description of your <span className="text-[#800000]">concern or purpose</span> for faster processing.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </aside>
 
           {/* FAQ Accordion */}
           <main className="col-span-1 md:col-span-9 space-y-4">
+            <div className="md:hidden">
+              <h3 className="mb-3 text-sm font-black uppercase tracking-wider text-[#800000]">
+                Categories
+              </h3>
+              <div className="-mx-1 flex gap-2 overflow-x-auto pb-2 px-1">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(cat)}
+                    className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold ${
+                      activeCategory === cat
+                        ? (isDark ? 'bg-[#3a3b3c] text-[#e4e6eb]' : 'bg-pup-dark-maroon text-white')
+                        : (isDark ? 'bg-[#242526] text-[#b0b3b8] border border-[#3e4042] hover:text-[#e4e6eb] hover:bg-[#242526]' : 'bg-white text-[#700000] border border-gray-200 hover:bg-black/5 hover:text-[#5c0000]')
+                    }`} 
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {filteredFAQs.length > 0 ? (
               filteredFAQs.map(({ id, question, answer, category }) => (
                 <div
                   key={id}
                   className={`group border rounded-2xl overflow-hidden transition-all duration-300 ${
                     openId === id
-                      ? 'border-[#800000] shadow-xl ring-1 ring-[#800000]/10'
-                      : 'border-gray-200 bg-white hover:border-gray-300 shadow-sm'
+                      ? (isDark ? 'border-[#800000] shadow-xl ring-1 ring-[#800000]/10 bg-[#242526]' : 'border-[#800000] shadow-xl ring-1 ring-[#800000]/10')
+                      : (isDark ? 'border-[#3e4042] bg-[#242526] hover:border-[#4e4f50] shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300 shadow-sm')
                   }`}
                 >
                   <button
                     onClick={() => toggleAccordion(id)}
                     className={`w-full flex justify-between items-center p-6 text-left focus:outline-none transition-colors ${
-                      openId === id ? 'bg-red-50/50' : 'bg-white'
+                      openId === id ? (isDark ? 'bg-[#3a3b3c]/60' : 'bg-red-50/50') : (isDark ? 'bg-[#242526]' : 'bg-white')
                     }`}
                   >
-                    <span className={`text-lg font-bold pr-4 ${openId === id ? 'text-[#800000]' : 'text-gray-800'}`}>
+                    <span className={`text-lg font-bold pr-4 ${openId === id ? 'text-[#800000]' : (isDark ? 'text-[#e4e6eb]' : 'text-gray-800')}`}>
                       {question}
                     </span>
                     <span className={`shrink-0 p-2 rounded-full transition-all duration-300 ${
                       openId === id
                         ? 'bg-[#800000] text-white rotate-180'
-                        : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'
+                        : (isDark ? 'bg-[#2b2c2d] text-[#b0b3b8] group-hover:bg-[#333435]' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200')
                     }`}>
                       <ChevronDownIcon className="w-5 h-5" />
                     </span>
@@ -181,9 +235,9 @@ const FAQPage = () => {
                     openId === id ? 'max-h-125 opacity-100' : 'max-h-0 opacity-0'
                   }`}>
                     <div className="px-6 pb-8 pt-2">
-                      <div className="h-px bg-gray-100 mb-6" />
-                      <p className="text-gray-600 text-lg leading-relaxed">{answer}</p>
-                      <div className="mt-6 inline-flex items-center px-3 py-1 rounded-md bg-gray-100 text-gray-500 text-xs font-bold uppercase tracking-widest">
+                      <div className={`h-px mb-6 ${isDark ? 'bg-white/6' : 'bg-gray-100'}`} />
+                      <p className={`${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} text-lg leading-relaxed`}>{answer}</p>
+                      <div className={`mt-6 inline-flex items-center px-3 py-1 rounded-md ${isDark ? 'bg-[#1a1b1e] text-[#b0b3b8]' : 'bg-gray-100 text-gray-500'} text-xs font-bold uppercase tracking-widest`}>
                         {category}
                       </div>
                     </div>
@@ -191,15 +245,15 @@ const FAQPage = () => {
                 </div>
               ))
             ) : (
-              <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300">
-                <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FaceSmileIcon className="w-10 h-10 text-gray-300" />
+              <div className={`${isDark ? 'text-center py-24 bg-[#242526] rounded-3xl border border-dashed border-[#3e4042]' : 'text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300'}`}>
+                <div className={`${isDark ? 'bg-[#1a1b1e] w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4' : 'bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4'}`}>
+                  <FaceSmileIcon className={`${isDark ? 'w-10 h-10 text-[#b0b3b8]' : 'w-10 h-10 text-gray-300'}`} />
                 </div>
-                <h3 className="text-xl font-bold text-gray-800">No results found</h3>
-                <p className="text-gray-500 mt-2">Try adjusting your search or category filters.</p>
+                <h3 className={`${isDark ? 'text-[#e4e6eb]' : 'text-xl font-bold text-gray-800'}`}>No results found</h3>
+                <p className={`${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'} mt-2`}>Try adjusting your search or category filters.</p>
                 <button
                   onClick={() => { setSearchQuery(''); setActiveCategory('All'); }}
-                  className="mt-6 text-[#800000] font-bold hover:underline"
+                  className={`mt-6 font-bold ${isDark ? 'text-[#eebc48] hover:underline' : 'text-[#800000] hover:underline'}`}
                 >
                   Clear all filters
                 </button>
@@ -207,6 +261,34 @@ const FAQPage = () => {
             )}
           </main>
 
+        </div>
+
+        <div className={`${isDark ? 'mt-10 md:hidden overflow-hidden rounded-2xl bg-[#242526] border border-[#3e4042] shadow-xl transition-all duration-300 hover:shadow-2xl' : 'mt-10 md:hidden overflow-hidden rounded-2xl bg-white border border-[#800000] shadow-xl transition-all duration-300 hover:shadow-2xl'}`}>
+          <a
+            href="https://mail.google.com/mail/?view=cm&fs=1&to=registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern"
+            className={`${isDark ? 'group flex items-center gap-4 border-b border-[#3e4042] p-4 text-left transition-all duration-200 hover:bg-[#3a3b3c]' : 'group flex items-center gap-4 border-b border-gray-100 p-4 text-left transition-all duration-200 hover:bg-red-50'}`}
+          >
+            <div className={`${isDark ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#3a3b3c] text-[#eebc48] transition-transform group-hover:scale-110' : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-[#800000] transition-transform group-hover:scale-110'}`}>
+              <EnvelopeIcon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className={`${isDark ? 'text-xs font-black uppercase tracking-wide text-[#eebc48]' : 'text-xs font-black uppercase tracking-wide text-[#800000]'}`}>
+                Compose Email
+              </p>
+              <p className={`${isDark ? 'mt-0.5 text-xs font-bold text-[#b0b3b8] underline group-hover:text-[#e4e6eb]' : 'mt-0.5 text-xs font-bold text-gray-500 underline group-hover:text-[#800000]'}`}>
+                registrar@pup.edu.ph
+              </p>
+            </div>
+          </a>
+
+          <div className={`${isDark ? 'bg-[#18191a] px-6 py-4' : 'bg-gray-50 px-6 py-4'}`}>
+            <div className="text-left">
+              <InformationCircleIcon className={`${isDark ? 'float-left mr-3 mt-1 h-6 w-6 text-[#eebc48]' : 'float-left mr-3 mt-1 h-6 w-6 text-amber-500'}`} />
+              <p className={`${isDark ? 'text-justify text-xs font-medium text-[#b0b3b8] leading-relaxed' : 'text-justify text-xs font-medium text-gray-600 leading-relaxed'}`}>
+                <span className={`${isDark ? 'font-bold text-[#e4e6eb] text-xs' : 'font-bold text-gray-900 text-xs'}`}>Submission Guide:</span> Ensure your message includes your <span className="text-[#800000]">full name</span>, <span className="text-[#800000]">student number</span>, and a detailed description of your <span className="text-[#800000]">concern or purpose</span> for faster processing.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
   );

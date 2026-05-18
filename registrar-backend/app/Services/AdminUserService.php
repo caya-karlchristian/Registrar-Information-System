@@ -6,6 +6,7 @@ use App\Exceptions\IdpException;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
 use App\Services\AuditLogger;
+use App\Services\Ocms\OcmsAdminService;
 use App\Services\Sso\IdpClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,16 +22,21 @@ use Illuminate\Support\Facades\Log;
  * All mutations are wrapped in DB transactions so a failed IdP
  * call never leaves the local DB in a partial state.
  *
+ * OCMS sync: profile changes are pushed to the OCMS hub AFTER a
+ * successful local update. An OCMS failure logs a warning but does
+ * NOT rollback the local change.
+ *
  * Bug fixed: array_filter() previously used the default callback
  * which drops all falsy values (0, '', false). Changed to an
  * explicit !== null check so legitimate falsy values are kept.
  */
 class AdminUserService
 {
-public function __construct(
-    private IdpClient   $idpClient,
-    private AuditLogger $auditLogger,
-) {}
+    public function __construct(
+        private IdpClient        $idpClient,
+        private AuditLogger      $auditLogger,
+        private OcmsAdminService $ocmsAdminService,
+    ) {}
 
     // -------------------------------------------------------------------------
     // Create
@@ -99,9 +105,8 @@ public function __construct(
                 'user_id' => $user->user_id,
                 'email'   => $user->email,
             ]);
-            // Optionally throw so the caller knows:
-            // throw new \RuntimeException('User is not linked to the identity provider.');
         }
+
         if ($user->idp_user_id) {
             $adminToken = $this->idpClient->getSuperAdminToken();
 
@@ -116,8 +121,6 @@ public function __construct(
         }
 
         $user = DB::transaction(function () use ($user, $validated) {
-            // FIX: was array_filter($arr) — default callback drops falsy values
-            // like 0 or ''. Using !== null keeps all intentionally-set values.
             $userFields = array_filter([
                 'email'    => $validated['email']    ?? null,
                 'password' => isset($validated['password']) ? Hash::make($validated['password']) : null,
@@ -130,6 +133,8 @@ public function __construct(
                 'middle_name' => $validated['middle_name'] ?? null,
                 'last_name'   => $validated['last_name']   ?? null,
                 'suffix'      => $validated['suffix']      ?? null,
+                'office'      => $validated['office']      ?? null,
+                'contact_no'  => $validated['contact_no']  ?? null,
             ], fn ($v) => !is_null($v));
 
             if (!empty($userFields)) {
@@ -146,6 +151,10 @@ public function __construct(
         });
 
         $this->auditLogger->log($request, $user, AuditLog::ACTION_ADMIN_UPDATED);
+
+        // Push profile changes back to OCMS hub — runs OUTSIDE the DB transaction
+        // so an OCMS failure cannot rollback a successful local update.
+        $this->ocmsAdminService->pushProfileToOcms($user, $validated);
 
         return $user;
     }

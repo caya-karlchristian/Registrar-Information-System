@@ -6,7 +6,6 @@ import DropDown from '../components/DropDown';
 import { logbookExcel } from '../utils/logbookExcel.js';
 import pupLogoSrc from '../assets/puplogoimage.png';
 import bpLogoSrc from '../assets/Bagong_Pilipinas_logo.png';
-import { DOC_TYPE_MAP } from '../utils/constants';
 
 const toRows = (raw) => {
   if (Array.isArray(raw)) return raw;
@@ -71,7 +70,7 @@ const LogbookRecords = () => {
     if (dbDocTypes.length > 0) {
       return Object.fromEntries(dbDocTypes.map(t => [t.document_type_id, t.document_name]));
     }
-    return DOC_TYPE_MAP;
+    return {};
   }, [dbDocTypes]);
 
   const docOptions = useMemo(() => Object.values(activeDocMap), [activeDocMap]);

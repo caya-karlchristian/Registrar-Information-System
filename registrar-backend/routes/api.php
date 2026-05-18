@@ -17,6 +17,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
+use App\Http\Controllers\AlumniSystemController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,7 +38,10 @@ Route::get('announcements/{announcement}', [AnnouncementController::class, 'show
 | PROTECTED ROUTES
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->group(function () {
+// General authenticated endpoints: 60 requests per minute.
+// Analytics endpoints get a tighter limit (10/min) because each call
+// can trigger heavy DB aggregation or a paid Anthropic API call.
+Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // ── OGOS student data ────────────────────────────────────────────────────
     Route::prefix('students')->group(function () {
@@ -45,6 +49,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('{studentNumber}/ogos',      [StudentProfileController::class, 'showByStudentNumber']);
         Route::get('{studentNumber}/personal-info', [StudentProfileController::class, 'personalInfo']);
         Route::get('{studentNumber}/addresses', [StudentProfileController::class, 'addresses']);
+    });
+
+    // ── Alumni System (PUPTAPS) integration ─────────────────────────────────────
+    Route::prefix('alumni-system')->group(function () {
+        Route::get('/',      [AlumniSystemController::class, 'index']);
+        Route::get('/{id}',  [AlumniSystemController::class, 'show']);
     });
 
     // Auth
@@ -123,7 +133,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('students',         StudentProfileController::class);
         Route::apiResource('academic-records', StudentAcademicRecordController::class);
 
-        Route::prefix('analytics')->group(function () {
+        Route::prefix('analytics')->middleware('throttle:60,1')->group(function () {
             Route::get('overview',         [AnalyticsController::class, 'overview']);
             Route::get('volume-trend',     [AnalyticsController::class, 'volumeTrend']);
             Route::get('by-document-type', [AnalyticsController::class, 'byDocumentType']);
