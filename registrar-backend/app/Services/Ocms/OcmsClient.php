@@ -27,9 +27,9 @@ class OcmsClient
 
     public function __construct()
     {
-        $this->baseUrl      = rtrim(config('ocms.base_url', ''), '/');
-        $this->clientId     = config('ocms.client_id', '');
-        $this->clientSecret = config('ocms.client_secret', '');
+        $this->baseUrl = rtrim((string) config('ocms.base_url', ''), '/');
+        $this->clientId     = (string) config('ocms.client_id', '');
+        $this->clientSecret = (string) config('ocms.client_secret', '');    
     }
 
     // ── Endpoint methods ──────────────────────────────────────

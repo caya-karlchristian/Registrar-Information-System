@@ -54,6 +54,9 @@ services:
       SESSION_SAME_SITE: none
       ALUMNI_API_URL: http://host.docker.internal/api
       ALUMNI_API_TOKEN: 1|lyXSPwWmlf5YYbHZVIbmTR1MhKHhS7F3eZUWU2Ur
+      OCMS_BASE_URL: ${OCMS_BASE_URL}
+      OCMS_CLIENT_ID: ${OCMS_CLIENT_ID}
+      OCMS_CLIENT_SECRET: ${OCMS_CLIENT_SECRET}
     ports:
       - "8000:8000"
     networks:
