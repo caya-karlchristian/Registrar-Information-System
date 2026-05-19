@@ -14,6 +14,7 @@ import { getDocumentTypes, createDocumentType, updateDocumentType, deleteDocumen
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
+import { useTheme } from "../context/ThemeContext";
 
 //REMOVE THIS LATER, JUST FOR DEMO PURPOSES
 const EXCLUSIVE_FOR = ["Student", "Alumni", "All"];
@@ -33,6 +34,7 @@ const EMPTY_FORM = {
 };
 
 const DocumentManagement = () => {
+  const { isDark } = useTheme();
   const [search, setSearch]           = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selected, setSelected]       = useState(null);
@@ -157,7 +159,7 @@ const DocumentManagement = () => {
   };
 
   return (
-    <div className="bg-[#F5F5F5] min-h-screen font-sans px-4 sm:px-6">
+    <div className={`min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
 
       {/* Top bar */}
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start mb-6">
@@ -177,7 +179,7 @@ const DocumentManagement = () => {
         <div className="w-full lg:w-200 flex justify-start lg:justify-end">
           <button
             onClick={handleAdd}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-pup-dark-maroon text-white px-5 py-2.5 rounded-full text-sm font-semibold shadow hover:bg-[#3a0303] transition-all"
+            className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow transition-all ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
           >
             Add Document <PlusIcon className="w-4 h-4" />
           </button>
@@ -188,15 +190,15 @@ const DocumentManagement = () => {
       <div className="flex flex-col lg:flex-row gap-6 items-start">
 
         {/* Left — Document List */}
-        <div className="bg-gray-200 rounded-xl w-full lg:max-w-sm flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150">
+        <div className={`rounded-xl w-full lg:max-w-sm flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
           <div className="px-6 pt-6 pb-3 text-center">
-            <h2 className="text-pup-dark-maroon font-bold text-lg">List of Documents</h2>
-            <hr className="mt-3 border-gray-400" />
+            <h2 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>List of Documents</h2>
+            <hr className={`mt-3 ${isDark ? 'border-[#3e4042]' : 'border-gray-400'}`} />
           </div>
 
           <div className="px-3 py-2 mb-2 flex items-center justify-between">
-            <span className="font-bold text-gray-800 text-sm">Document Name</span>
-            <div className="flex gap-2 text-gray-400">
+            <span className={`font-bold text-sm ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>Document Name</span>
+            <div className={`flex gap-2 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
               <PencilSquareIcon className="w-5 h-5" />
               <TrashIcon className="w-5 h-5" />
             </div>
@@ -204,29 +206,29 @@ const DocumentManagement = () => {
 
       
           {loading ? (
-            <p className="text-center text-gray-400 text-sm py-8 animate-pulse">Loading...</p>
+            <p className={`text-center text-sm py-8 animate-pulse ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>Loading...</p>
           ) : paginated.length === 0 ? (
-            <p className="text-center text-gray-400 text-sm py-8">No documents found.</p>
+            <p className={`text-center text-sm py-8 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>No documents found.</p>
           ) : (
             paginated.map((doc) => (
               <div
                 key={doc.document_type_id}
                 className={`flex items-center justify-between px-3 py-4 rounded-lg mb-1 transition-colors
-                  ${selected?.document_type_id === doc.document_type_id ? "bg-white shadow-sm" : "hover:bg-gray-100"}`}
+                  ${selected?.document_type_id === doc.document_type_id ? (isDark ? 'bg-[#2a2a2f] shadow-sm border border-[#3e4042]' : 'bg-white shadow-sm') : (isDark ? 'hover:bg-[#2a2a2f]' : 'hover:bg-gray-100')}`}
               >
-                <span className="text-sm text-gray-700 font-medium truncate flex-1">{doc.document_name}</span>
+                <span className={`text-sm font-medium truncate flex-1 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>{doc.document_name}</span>
                 <div className="flex gap-2 ml-2">
                   <button
                     type="button"
                     onClick={() => handleEdit(doc)}
-                    className="hover:text-yellow-500 text-gray-400 transition-colors"
+                    className={`transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-yellow-300' : 'text-gray-400 hover:text-yellow-500'}`}
                   >
                     <PencilSquareIcon className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
                     onClick={() => confirmDelete(doc.document_type_id)}
-                    className="p-1 hover:text-red-600 text-gray-400 transition-colors"
+                    className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-red-300' : 'text-gray-400 hover:text-red-600'}`}
                   >
                     <TrashIcon className="w-4 h-4" />
                   </button>
@@ -235,11 +237,11 @@ const DocumentManagement = () => {
             ))
           )}
 
-          <div className="flex items-center justify-center gap-1 px-4 py-3 border-t border-gray-300 mt-auto">
+          <div className={`flex items-center justify-center gap-1 px-4 py-3 border-t mt-auto ${isDark ? 'border-[#3e4042]' : 'border-gray-300'}`}>
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={safePage === 1}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40"
+              className={`flex items-center gap-1 text-xs px-2 py-1 disabled:opacity-40 ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
             >
               <ChevronLeftIcon className="w-3 h-3" /> Previous
             </button>
@@ -249,7 +251,7 @@ const DocumentManagement = () => {
                 onClick={() => typeof p === "number" && setCurrentPage(p)}
                 disabled={p === "..."}
                 className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors
-                  ${safePage === p ? "bg-yellow-400 text-white" : "text-gray-500 hover:bg-gray-300"}
+                  ${safePage === p ? "bg-yellow-400 text-white" : (isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-500 hover:bg-gray-300')}
                   ${p === "..." ? "cursor-default pointer-events-none" : ""}`}
               >
                 {p}
@@ -258,7 +260,7 @@ const DocumentManagement = () => {
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40 whitespace-nowrap"
+              className={`flex items-center gap-1 text-xs px-2 py-1 disabled:opacity-40 whitespace-nowrap ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
             >
               Next <ChevronRightIcon className="w-3 h-3" />
             </button>
@@ -266,8 +268,8 @@ const DocumentManagement = () => {
         </div>
 
         {/* Right — Always visible form */}
-        <form onSubmit={handleSave} className="bg-gray-200 rounded-xl p-6 sm:p-10 py-4 lg:w-200 w-full flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150">
-          <h2 className="text-pup-dark-maroon font-bold text-xl mb-2">
+        <form onSubmit={handleSave} className={`rounded-xl p-6 sm:p-10 py-4 lg:w-200 w-full flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
+          <h2 className={`font-bold text-xl mb-2 ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>
             {isAdding ? "Add Document" : "Edit Document"}
           </h2>
 
@@ -278,7 +280,7 @@ const DocumentManagement = () => {
             onChange={handleChange}
             placeholder="e.g. ICOG"
             required
-            labelColor="text-gray-600"
+            labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
           />
 
           <div className="mt-2">
@@ -290,6 +292,7 @@ const DocumentManagement = () => {
               placeholder="Text"
               minHeightClass="min-h-26"
               required
+              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
             />
           </div>
 
@@ -301,6 +304,7 @@ const DocumentManagement = () => {
             placeholder="Text"
             minHeightClass="min-h-26"
             required
+            labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -310,7 +314,7 @@ const DocumentManagement = () => {
               value={form.document_process_period}
               onChange={handleChange}
               placeholder="e.g. 3 days"
-              labelColor="text-gray-600"
+              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
               required
             />
             <DropDown
@@ -319,7 +323,7 @@ const DocumentManagement = () => {
               value={form.access_id}
               onChange={handleChange}
               options={EXCLUSIVE_FOR}
-              labelColor="text-gray-600"
+              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
               required
             />
           </div>
@@ -329,14 +333,14 @@ const DocumentManagement = () => {
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-5 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
+                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-600 hover:bg-gray-100'}`}
               >
                 Cancel
               </button>
             )}
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-full text-sm font-bold bg-pup-dark-maroon text-white hover:bg-[#3a0303] transition-all shadow"
+              className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
             >
               {isAdding ? "Add Document" : "Save Changes"}
             </button>

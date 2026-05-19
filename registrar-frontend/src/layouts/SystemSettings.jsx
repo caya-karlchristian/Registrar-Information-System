@@ -8,11 +8,13 @@ import {
   updateAnnouncement,
   deleteAnnouncement,
 } from "../services/api";
+import { useTheme } from "../context/ThemeContext";
 
 const PER_PAGE = 4;
 const EMPTY_FORM = { title: "", content: "" };
 
 const SystemSettings = () => {
+  const { isDark } = useTheme();
   const [announcements, setAnnouncements] = useState([]);
   const [meta, setMeta]                   = useState({ current_page: 1, last_page: 1 });
   const [academicYear, setAcademicYear]   = useState("");
@@ -111,7 +113,7 @@ const SystemSettings = () => {
   };
 
   return (
-    <div className="bg-[#F5F5F5] min-h-screen font-sans px-4 sm:px-6">
+    <div className={`min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
       <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 items-start">
         {/* Left Panel */}
         <div className="w-full lg:w-105 shrink-0">
@@ -122,36 +124,35 @@ const SystemSettings = () => {
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
               placeholder="e.g. 2025-2026"
-              labelColor="text-gray-600"
+              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
             />
           </div>
-          <div className="bg-gray-200 rounded-xl w-full lg:max-w-lg flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150">
+          <div className={`rounded-xl w-full lg:max-w-lg flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
             <div className="px-6 pt-5 pb-3 text-center">
-              <h2 className="text-pup-dark-maroon font-bold text-lg">List of Announcements</h2>
-              <hr className="mt-3 border-gray-300" />
+              <h2 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>List of Announcements</h2>
+              <hr className={`mt-3 ${isDark ? 'border-[#3e4042]' : 'border-gray-300'}`} />
             </div>
             <div className="px-4 pb-4 space-y-3 flex-1 overflow-y-auto">
-              {loading && <p className="text-center text-gray-400 text-sm py-8">Loading...</p>}
+              {loading && <p className={`text-center text-sm py-8 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>Loading...</p>}
               {error && <p className="text-center text-red-400 text-sm py-8">{error}</p>}
               {!loading && announcements.length === 0 && (
-                <p className="text-center text-gray-400 text-sm py-8">No announcements found.</p>
+                <p className={`text-center text-sm py-8 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>No announcements found.</p>
               )}
               {!loading && announcements.map((ann) => (
                 <div
                   key={ann.id}
                   onClick={() => handleCardClick(ann)}
-                  className={`bg-white rounded-xl px-4 py-4 shadow-sm cursor-pointer transition-all
-                    ${selected?.id === ann.id ? "ring-2 ring-yellow-400" : "hover:shadow-md"}`}
+                  className={`rounded-xl px-4 py-4 shadow-sm cursor-pointer transition-all ${selected?.id === ann.id ? 'ring-2 ring-yellow-400' : 'hover:shadow-md'} ${isDark ? 'bg-[#1f1f1f] border border-[#3e4042]' : 'bg-white'}`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-bold text-gray-800">{ann.title}</span>
+                    <span className={`text-sm font-bold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>{ann.title}</span>
                     <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-xs text-gray-500">Enable</span>
+                      <span className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Enable</span>
                       <button
                         type="button"
                         onClick={() => handleToggle(ann)}
                         className={`relative inline-flex w-10 h-6 rounded-full transition-colors duration-200 focus:outline-none
-                          ${ann.enabled ? "bg-gray-700" : "bg-gray-300"}`}
+                          ${ann.enabled ? (isDark ? 'bg-green-900/20' : 'bg-gray-700') : (isDark ? 'bg-[#3e4042]' : 'bg-gray-300')}`}
                       >
                         <span className={`inline-block w-4 h-4 mt-1 rounded-full bg-white shadow transform transition-transform duration-200
                           ${ann.enabled ? "translate-x-5" : "translate-x-1"}`}
@@ -159,15 +160,15 @@ const SystemSettings = () => {
                       </button>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">{ann.content}</p>
+                  <p className={`text-xs leading-relaxed line-clamp-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{ann.content}</p>
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-center gap-1 px-4 py-3 border-t border-gray-300">
+            <div className={`flex items-center justify-center gap-1 px-4 py-3 border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-300'}`}>
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={meta.current_page === 1}
-                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40"
+                className={`flex items-center gap-1 text-xs px-2 py-1 disabled:opacity-40 ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
               >
                 <ChevronLeftIcon className="w-3 h-3" /> Previous
               </button>
@@ -177,7 +178,7 @@ const SystemSettings = () => {
                   onClick={() => typeof p === "number" && setCurrentPage(p)}
                   disabled={p === "..."}
                   className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors
-                    ${meta.current_page === p ? "bg-yellow-400 text-white" : "text-gray-500 hover:bg-gray-300"}
+                    ${meta.current_page === p ? 'bg-yellow-400 text-white' : (isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-500 hover:bg-gray-300')}
                     ${p === "..." ? "cursor-default pointer-events-none" : ""}`}
                 >
                   {p}
@@ -186,7 +187,7 @@ const SystemSettings = () => {
               <button
                 onClick={() => setCurrentPage((p) => Math.min(meta.last_page, p + 1))}
                 disabled={meta.current_page === meta.last_page}
-                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40"
+                className={`flex items-center gap-1 text-xs px-2 py-1 disabled:opacity-40 ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
               >
                 Next <ChevronRightIcon className="w-3 h-3" />
               </button>
@@ -195,9 +196,9 @@ const SystemSettings = () => {
         </div>
 
         {/* Right Panel */}
-        <div className="lg:flex-1 w-full bg-gray-200 rounded-2xl p-6 sm:p-8 mt-6 lg:mt-28 shadow-sm h-max">
+        <div className={`lg:flex-1 w-full rounded-2xl p-6 sm:p-8 mt-6 lg:mt-28 shadow-sm h-max ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
           <form onSubmit={handleSave} className="flex flex-col gap-5">
-            <h2 className="font-bold text-2xl">
+            <h2 className={`font-bold text-2xl ${isDark ? 'text-white' : ''}`}>
               {isAdding ? "Announcement Creation" : "Edit Announcement"}
             </h2>
             {error && <p className="text-red-500 text-sm">{error}</p>}
@@ -209,7 +210,7 @@ const SystemSettings = () => {
                 onChange={handleChange}
                 placeholder="Text"
                 required
-                labelColor="text-gray-600"
+                labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
               />
             </div>
             <div>
@@ -229,14 +230,14 @@ const SystemSettings = () => {
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="px-5 py-2.5 rounded-full text-sm font-semibold text-gray-600 border border-gray-300 hover:bg-gray-100 transition-colors"
+                    className={`px-5 py-2.5 rounded-full text-sm font-semibold border transition-colors ${isDark ? 'text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f]' : 'text-gray-600 border-gray-300 hover:bg-gray-100'}`}
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={handleDelete}
-                    className="px-5 py-2.5 rounded-full text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors"
+                    className={`px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-colors ${isDark ? 'bg-red-900/40 hover:bg-red-900/60' : 'bg-red-500 hover:bg-red-600'}`}
                   >
                     Delete
                   </button>
@@ -244,7 +245,7 @@ const SystemSettings = () => {
               )}
               <button
                 type="submit"
-                className="px-8 py-2.5 rounded-full text-sm font-bold bg-pup-dark-maroon text-white hover:bg-[#3a0303] transition-all shadow"
+                className={`px-8 py-2.5 rounded-full text-sm font-bold transition-all shadow ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
               >
                 {isAdding ? "Add Announcement" : "Save Changes"}
               </button>
