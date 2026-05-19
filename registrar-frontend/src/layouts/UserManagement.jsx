@@ -13,6 +13,7 @@ import ConfirmationModal from "../components/ConfirmationModal";
 import { getSystemUsers, createSystemUser, updateSystemUser, deleteSystemUser } from "../services/api";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import { useTheme } from "../context/ThemeContext";
 
 const ROLE_MAP     = { 3: "Admin", 4: "Super Admin" };
 const ROLE_FILTERS = ["All", "Admin", "Super Admin"];
@@ -27,7 +28,30 @@ const formatDate = (dateStr) => {
   });
 };
 
+const getRoleBadgeClasses = (roleName, isDark) => {
+  if (isDark) {
+    return 'bg-[#3a2b2b]/20 text-[#ffb3b3] border-[#7a4b4b]';
+  }
+
+  return 'bg-red-50 text-pup-dark-maroon border-red-200';
+};
+
+const getStatusBadgeClasses = (status, isDark) => {
+  const normalized = String(status ?? "").trim().toLowerCase();
+
+  if (isDark) {
+    return normalized === 'activated'
+      ? 'bg-green-900/20 text-green-400 border-green-600'
+      : 'bg-gray-700/20 text-gray-300 border-gray-400';
+  }
+
+  return normalized === 'activated'
+    ? 'bg-green-100 text-green-700 border-green-200'
+    : 'bg-gray-100 text-gray-700 border-gray-200';
+};
+
 const UserManagement = () => {
+  const { isDark } = useTheme();
   const [search, setSearch]           = useState("");
   const [roleFilter, setRoleFilter]   = useState("All");
   const [dateOrder, setDateOrder]     = useState("Newest");
@@ -154,7 +178,7 @@ const UserManagement = () => {
   };
 
   return (
-    <div className="bg-[#F5F5F5] min-h-screen font-sans px-4 sm:px-6">
+    <div className={`min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-6">
@@ -174,7 +198,7 @@ const UserManagement = () => {
           <DropDown label="Role" name="roleFilter"
             value={roleFilter === "All" ? "" : roleFilter}
             onChange={(e) => { setRoleFilter(e.target.value || "All"); handleFilterChange(); }}
-            options={ROLE_FILTERS} labelColor="text-gray-700"
+            options={ROLE_FILTERS} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
           />
         </div>
 
@@ -182,7 +206,7 @@ const UserManagement = () => {
           <DropDown label="Status" name="statusFilter"
             value={statusFilter === "All" ? "" : statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value || "All"); handleFilterChange(); }}
-            options={STATUS_FILTERS} labelColor="text-gray-700"
+            options={STATUS_FILTERS} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
           />
         </div>
 
@@ -190,38 +214,38 @@ const UserManagement = () => {
           <DropDown label="Date" name="dateOrder"
             value={dateOrder}
             onChange={(e) => { setDateOrder(e.target.value); handleFilterChange(); }}
-            options={DATE_OPTIONS} labelColor="text-gray-700"
+            options={DATE_OPTIONS} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
           />
         </div>
 
         <button
           onClick={() => { setEditUser(null); setIsModalOpen(true); }}
-          className="sm:ml-auto mt-4 sm:mt-6 w-full sm:w-auto flex items-center justify-center gap-2 bg-pup-dark-maroon text-white px-5 py-2 rounded-full text-sm font-semibold shadow hover:bg-[#3a0303] transition-all"
+          className={`sm:ml-auto mt-4 sm:mt-6 w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-full text-sm font-semibold shadow transition-all ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
         >
           Add User <PlusIcon className="w-4 h-4" />
         </button>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-[#242526] border border-[#3e4042] shadow-none' : 'bg-white shadow-sm border border-gray-100'}`}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-190 text-sm">
           <thead>
-            <tr className="border-b border-gray-100">
+            <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
               <th className="px-4 py-3 text-left w-10">
                 <input type="checkbox" checked={allSelected} onChange={toggleAll}
-                  className="rounded border-gray-300 accent-pup-dark-maroon" />
+                  className={`rounded accent-pup-dark-maroon ${isDark ? 'border-[#4e4f50] bg-[#1f1f1f]' : 'border-gray-300'}`} />
               </th>
               {["Name", "Email", "Role", "Joined Date", "Status", "Actions"].map((h) => (
-                <th key={h} className="px-4 py-3 text-center text-gray-500 font-medium">{h}</th>
+                <th key={h} className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="text-center py-16 text-gray-400 text-sm">Loading...</td></tr>
+              <tr><td colSpan={7} className={`text-center py-16 text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>Loading...</td></tr>
             ) : paginated.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-16 text-gray-400 text-sm">No users found.</td></tr>
+              <tr><td colSpan={7} className={`text-center py-16 text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>No users found.</td></tr>
             ) : (
               paginated.map((user) => {
                 const profile = user.admin_profile;
@@ -229,34 +253,33 @@ const UserManagement = () => {
                   ? [profile.first_name, profile.last_name].filter(Boolean).join(" ")
                   : "—";
                 return (
-                  <tr key={user.user_id} className="border-b text-center border-gray-50 hover:bg-gray-50 transition-colors">
+                  <tr key={user.user_id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
                     <td className="px-4 py-3">
                       <input type="checkbox" checked={selected.includes(user.user_id)}
                         onChange={() => toggleOne(user.user_id)}
-                        className="rounded border-gray-300 accent-pup-dark-maroon" />
+                        className={`rounded accent-pup-dark-maroon ${isDark ? 'border-[#4e4f50] bg-[#1f1f1f]' : 'border-gray-300'}`} />
                     </td>
-                    <td className="px-4 py-3 text-gray-800">{fullName}</td>
-                    <td className="px-4 py-3 text-gray-800">{user.email}</td>
+                    <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>{fullName}</td>
+                    <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>{user.email}</td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-pup-dark-maroon whitespace-nowrap">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(ROLE_MAP[user.role_id] || `Role ${user.role_id}`, isDark)}`}>
                         {ROLE_MAP[user.role_id] || `Role ${user.role_id}`}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{formatDate(user.created_at)}</td>
+                    <td className={`px-4 py-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{formatDate(user.created_at)}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold
-                        ${user.status === "Activated" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(user.status, isDark)}`}>
                         {user.status}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 justify-center">
                         <button onClick={() => { setEditUser(user); setIsModalOpen(true); }}
-                          className="p-1 hover:text-pup-dark-maroon text-gray-400 transition-colors">
+                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
                           <PencilSquareIcon className="w-4 h-4" />
                         </button>
                         <button onClick={() => setDeleteTarget(user)}
-                          className="p-1 hover:text-red-600 text-gray-400 transition-colors">
+                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-red-300' : 'text-gray-400 hover:text-red-600'}`}>
                           <TrashIcon className="w-4 h-4" />
                         </button>
                       </div>
@@ -270,28 +293,28 @@ const UserManagement = () => {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-center gap-1 px-4 py-4 border-t border-gray-100">
+        <div className={`flex items-center justify-center gap-1 px-4 py-4 border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
           <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40">
+            className={`flex items-center gap-1 text-sm px-2 py-1 disabled:opacity-40 ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>
             <ChevronLeftIcon className="w-4 h-4" /> Previous
           </button>
           {pageNumbers().map((p, i) => (
             <button key={i} onClick={() => typeof p === "number" && setCurrentPage(p)} disabled={p === "..."}
               className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors
-                ${safePage === p ? "bg-yellow-400 text-white" : "text-gray-500 hover:bg-gray-100"}
+                ${safePage === p ? 'bg-yellow-400 text-white' : (isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-500 hover:bg-gray-100')}
                 ${p === "..." ? "cursor-default pointer-events-none" : ""}`}>
               {p}
             </button>
           ))}
           <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40">
+            className={`flex items-center gap-1 text-sm px-2 py-1 disabled:opacity-40 ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>
             Next <ChevronRightIcon className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {selected.length > 0 && (
-        <div className="mt-3 text-xs text-gray-500">
+        <div className={`mt-3 text-xs ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>
           {selected.length} user{selected.length > 1 ? "s" : ""} selected
         </div>
       )}
