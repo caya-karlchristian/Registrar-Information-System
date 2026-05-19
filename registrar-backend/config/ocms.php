@@ -10,6 +10,6 @@ return [
     | All values must be set in .env — never hard-code secrets here.
     */
     'base_url'      => env('OCMS_BASE_URL', ''),
-    'client_id'     => env('OCMS_CLIENT_ID'),
-    'client_secret' => env('OCMS_CLIENT_SECRET'),
+    'client_id'     => env('OCMS_CLIENT_ID', ''),
+    'client_secret' => env('OCMS_CLIENT_SECRET', ''),
 ];

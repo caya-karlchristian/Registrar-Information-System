@@ -8,10 +8,12 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import { getAuditLogs, getAuditLogFilters } from "../services/api";
 import ErrorToast from "../components/ErrorToast";
+import { useTheme } from "../context/ThemeContext";
 
 const PER_PAGE = 10;
 
 const ReportManagement = () => {
+  const { isDark } = useTheme();
   const [search, setSearch]             = useState("");
   const [roleFilter, setRoleFilter]     = useState("All");
   const [actionFilter, setActionFilter] = useState("All");
@@ -98,11 +100,11 @@ const ReportManagement = () => {
   };
 
   return (
-    <div className="bg-[#F5F5F5] mt-5 min-h-screen font-sans px-4 sm:px-6">
+    <div className={`mt-5 min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
 
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-6">
 
-        <div className="mt-6 sm:mt-12 flex-1 min-w-0 sm:min-w-[11.25rem] sm:max-w-xs">
+        <div className="mt-6 sm:mt-12 flex-1 min-w-0 sm:min-w-45 sm:max-w-xs">
           <VoiceSearchInput
             value={search}
             onChange={(value) => {
@@ -113,77 +115,77 @@ const ReportManagement = () => {
           />
         </div>
 
-        <div className="mt-2 sm:mt-6 flex-1 min-w-0 sm:min-w-[11.25rem] sm:max-w-xs">
+        <div className="mt-2 sm:mt-6 flex-1 min-w-0 sm:min-w-45 sm:max-w-xs">
           <DropDown label="Role" name="roleFilter"
             value={roleFilter === "All" ? "" : roleFilter}
             onChange={(e) => { setRoleFilter(e.target.value || "All"); handleFilterChange(); }}
-            options={roleOptions} labelColor="text-gray-700"
+            options={roleOptions} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
           />
         </div>
 
-        <div className="mt-2 sm:mt-6 flex-1 min-w-0 sm:min-w-[11.25rem] sm:max-w-xs">
+        <div className="mt-2 sm:mt-6 flex-1 min-w-0 sm:min-w-45 sm:max-w-xs">
           <DropDown label="Action" name="actionFilter"
             value={actionFilter === "All" ? "" : actionFilter}
             onChange={(e) => { setActionFilter(e.target.value || "All"); handleFilterChange(); }}
-            options={actionOptions} labelColor="text-gray-700"
+            options={actionOptions} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
           />
         </div>
 
         <button
           onClick={() => setShowConfirm(true)}
-          className="mt-4 sm:mt-12 w-full sm:w-auto px-5 py-2 rounded-full text-sm font-semibold border border-red-200 text-red-600 bg-white hover:bg-red-50 shadow-sm transition-all"
+          className={`mt-4 sm:mt-12 w-full sm:w-auto px-5 py-2 rounded-full text-sm font-semibold border shadow-sm transition-all ${isDark ? 'border-red-900/50 text-red-300 bg-[#2a2a2f] hover:bg-[#353539]' : 'border-red-200 text-red-600 bg-white hover:bg-red-50'}`}
         >
           Clear Logs
         </button>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-[#242526] border border-[#3e4042] shadow-none' : 'bg-white shadow-sm border border-gray-100'}`}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-180 text-sm">
           <thead>
-            <tr className="border-b border-gray-100">
+            <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
               {["Timestamp", "User", "Role", "Action", "Browser"].map((h) => (
-                <th key={h} className="px-4 py-3 text-center text-gray-500 font-medium">{h}</th>
+                <th key={h} className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="text-center py-16 text-gray-400 text-sm">
+                <td colSpan={5} className={`text-center py-16 text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
                   Loading...
                 </td>
               </tr>
             ) : logs.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-16 text-gray-400 text-sm">
+                <td colSpan={5} className={`text-center py-16 text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
                   No logs found.
                 </td>
               </tr>
             ) : (
               logs.map((log) => (
-                <tr key={log.id} className="border-b text-center border-gray-50 hover:bg-gray-50 transition-colors">
+                <tr key={log.id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
 
-                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                  <td className={`px-4 py-3 text-xs whitespace-nowrap ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                     {log.date} {log.time}
                   </td>
 
-                  <td className="px-4 py-3 text-gray-800">{log.user}</td>
+                  <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>{log.user}</td>
 
                   <td className="px-4 py-3">
-                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-pup-dark-maroon whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${isDark ? 'bg-[#3a2b2b]/20 text-[#ffb3b3] border-[#7a4b4b]' : 'bg-red-50 text-pup-dark-maroon border-red-200'}`}>
                       {log.role}
                     </span>
                   </td>
 
                   <td className="px-4 py-3">
-                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 whitespace-nowrap">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] border-[#3e4042]' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                       {log.action}
                     </span>
                   </td>
 
-                  <td className="px-4 py-3 text-gray-500 text-xs">{log.browser ?? "—"}</td>
+                  <td className={`px-4 py-3 text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{log.browser ?? "—"}</td>
 
                 </tr>
               ))
@@ -193,21 +195,21 @@ const ReportManagement = () => {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-center gap-1 px-4 py-4 border-t border-gray-100">
+        <div className={`flex items-center justify-center gap-1 px-4 py-4 border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
           <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40">
+            className={`flex items-center gap-1 text-sm px-2 py-1 disabled:opacity-40 ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>
             <ChevronLeftIcon className="w-4 h-4" /> Previous
           </button>
           {pageNumbers().map((p, i) => (
             <button key={i} onClick={() => typeof p === "number" && setCurrentPage(p)} disabled={p === "..."}
               className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors
-                ${currentPage === p ? "bg-yellow-400 text-white" : "text-gray-500 hover:bg-gray-100"}
+                ${currentPage === p ? 'bg-yellow-400 text-white' : (isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-500 hover:bg-gray-100')}
                 ${p === "..." ? "cursor-default pointer-events-none" : ""}`}>
               {p}
             </button>
           ))}
           <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 px-2 py-1 disabled:opacity-40">
+            className={`flex items-center gap-1 text-sm px-2 py-1 disabled:opacity-40 ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}>
             Next <ChevronRightIcon className="w-4 h-4" />
           </button>
         </div>
