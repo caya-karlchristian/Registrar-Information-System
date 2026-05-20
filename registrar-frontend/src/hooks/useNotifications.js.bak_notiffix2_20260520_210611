@@ -181,16 +181,5 @@ export const useNotifications = (onNewNotification = null) => {
         };
     }, [user?.user_id, fetchNotifications]);
 
-    return {
-        notifications,
-        unreadCount,
-        loading,
-        loadingMore,
-        hasMore,
-        loadMore,
-        markAsRead,
-        markAllAsRead,
-        dismiss,
-        refetch: fetchNotifications,
-    };
+    return { notifications, unreadCount, loading, markAsRead, markAllAsRead, dismiss, refetch: fetchNotifications };
 };
