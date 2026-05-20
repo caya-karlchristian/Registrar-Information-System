@@ -60,10 +60,10 @@ export const useNotifications = (onNewNotification = null) => {
 
     const dismiss = useCallback(async (id) => {
         try {
-            // Controller now returns unread_count — no need for a second fetch.
-            const { data } = await api.delete(`/notifications/${id}`);
+            await api.delete(`/notifications/${id}`);
             setNotifications(prev => prev.filter(n => n.id !== id));
-            setUnreadCount(data.unread_count ?? 0);
+            const { data } = await api.get('/notifications/unread-count');
+            setUnreadCount(data.count ?? 0);
         } catch (err) {
             console.error('[useNotifications] dismiss failed:', err);
         }
