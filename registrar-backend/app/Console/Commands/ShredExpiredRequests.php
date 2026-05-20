@@ -46,12 +46,16 @@ class ShredExpiredRequests extends Command
     {
         $cutoff = Carbon::now()->subDays(90);
 
+        // Use the MOST RECENT ReadyToClaim history row, not the oldest.
+        // If a request was ever cycled back through Processing and then
+        // set ReadyToClaim again, the 90-day clock should restart from the
+        // latest transition — not from the original one.
         $requests = DocumentRequest::query()
             ->where('status_id', RequestStatusEnum::ReadyToClaim->value)
-            ->whereNull('deleted_at')
             ->whereHas('history', function ($q) use ($cutoff) {
                 $q->where('new_status_id', RequestStatusEnum::ReadyToClaim->value)
-                  ->where('changed_at', '<=', $cutoff);
+                  ->havingRaw('MAX(changed_at) <= ?', [$cutoff])
+                  ->groupBy('request_id');
             })
             ->with('user')
             ->get();
@@ -77,9 +81,12 @@ class ShredExpiredRequests extends Command
                 /** @var SystemUser $owner */
                 $owner = $request->user;
                 if ($owner instanceof SystemUser) {
+                    // Use 'request_forfeited' — documents have already been
+                    // shredded at this point, so the message must be past-tense.
+                    // 'reminder_final_warning' (future-tense) was incorrect here.
                     $notificationService->send(
                         recipient:    $owner,
-                        triggerEvent: 'reminder_final_warning',
+                        triggerEvent: 'request_forfeited',
                         data:         ['request_id' => $request->request_id],
                         requestId:    $request->request_id,
                     );

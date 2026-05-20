@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DocumentRequest;
 use App\Models\RequestDocument;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Request document line-items.
@@ -33,6 +35,13 @@ class RequestDocumentController extends Controller
             'document_type_id' => 'required|integer|exists:document_type,document_type_id',
             'number_of_copies' => 'required|integer|min:1|max:10',
         ]);
+
+        // Ensure the authenticated student/alumni owns the parent request.
+        // Without this check any student could append line-items to another
+        // student's request by guessing the integer request_id.
+        DocumentRequest::where('request_id', $validated['request_id'])
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
 
         $reqDoc = RequestDocument::create($validated);
         return response()->json($reqDoc, 201);
