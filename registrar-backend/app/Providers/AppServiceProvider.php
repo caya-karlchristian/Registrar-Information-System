@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Contracts\NotificationServiceInterface;
+use App\Models\NotificationType;
+use App\Observers\NotificationTypeObserver;
 use App\Services\AuditLogger;
 use App\Services\DocumentRequestService;
 use App\Services\NotificationService;
@@ -41,6 +43,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Invalidate the NotificationType cache whenever a type is saved or
+        // deleted. Without this, admin edits to notification templates would
+        // have no effect for up to 6 hours (the cache TTL in NotificationService).
+        NotificationType::observe(NotificationTypeObserver::class);
     }
 }

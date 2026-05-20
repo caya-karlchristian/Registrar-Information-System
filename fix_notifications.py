@@ -1,60 +1,49 @@
 #!/usr/bin/env python3
 """
-fix_notifications.py
-====================
+fix_notifications_followup.py
+==============================
 Run from the project ROOT (the directory that contains
 registrar-backend/ and registrar-frontend/).
 
-Applies five targeted fixes to the notification stack:
+NOTE: Run fix_notifications.py first if you haven't already.
+      This script assumes those patches are applied.
 
-  FIX 1 – CRITICAL  viaQueues() → broadcastQueue() in NotificationSent.php
-           Real cause of slow / missing real-time notifications.
-           Laravel 12's BroadcastEvent wrapper job looks for broadcastQueue()
-           on the event. viaQueues() is the Queueable-trait method for regular
-           ShouldQueue jobs and is silently ignored for ShouldBroadcast events.
-           Result: every broadcast job lands on the 'default' queue, which the
-           general worker drains mixed with slow document-processing jobs.
-           The dedicated broadcast-worker drains the 'broadcasts' queue —
-           which has been empty the whole time.
+Applies two follow-up fixes:
 
-  FIX 2 – HIGH      broadcastWith() lazy-load eliminated in NotificationSent.php
-           SerializesModels strips eager-loaded relations before queuing.
-           When BroadcastEvent runs, $notification->type is null and must be
-           lazy-loaded, adding an extra DB round-trip per notification under
-           load and silently failing if the connection is slow.
-           Fix: pass title/trigger_event into the event constructor and use
-           those scalar values in broadcastWith() instead.
+  FIX 1 – NotificationType cache observer
+           The NotificationType cache introduced in fix_notifications.py
+           has a 6-hour TTL but no invalidation trigger. If an admin edits
+           a notification template title or message via the UI, the stale
+           cached value bakes into every broadcast for up to 6 hours.
 
-  FIX 3 – HIGH      unbind('connected') race in useNotifications.js
-           Calling unbind('connected') with no handler reference removes ALL
-           'connected' listeners — including Pusher-js's own internal reconnect
-           handler. On the "two users, same machine" test scenario this fires
-           when the second tab mounts, blinding the first tab's connection to
-           reconnect events. The fix stores the handler reference and unbinds
-           only that specific listener.
+           This fix creates app/Observers/NotificationTypeObserver.php and
+           registers it in AppServiceProvider::boot(). The observer calls
+           Cache::forget("notif_type:{trigger_event}") on saved and deleted,
+           so any admin edit takes effect on the very next send().
 
-  FIX 4 – MEDIUM    Return unread_count from mutation endpoints
-           markAsRead and destroy both fire a second GET /notifications/unread-count
-           after their mutation. The controller already has the count after the
-           update. The fix returns it inline, cutting each interaction from two
-           HTTP round-trips to one.
+  FIX 2 – InboxCenter pagination
+           The backend paginates at 20 per page but the frontend calls
+           GET /notifications with no page parameter and never fetches
+           further pages. Users with more than 20 notifications silently
+           see only the first page forever.
 
-  FIX 5 – MEDIUM    CATEGORY_MAP deduplication
-           NotificationModal.jsx and NotificationToast.jsx each maintain an
-           identical CATEGORY_MAP. Adding a new trigger_event means editing two
-           files and they can silently drift. The fix extracts the map to
-           src/constants/notificationCategories.js and imports it in both.
+           Backend: unchanged — paginate(20) is already correct.
+           Frontend changes:
+             • useNotifications: adds hasMore / loadMore / loadingMore state.
+               Initial fetch loads page 1. loadMore() appends page 2, 3, …
+               New real-time notifications are prepended as before.
+             • InboxCenter: adds a "Load more" button at the bottom of the
+               list, shown only when hasMore is true. Shows a spinner while
+               loading. CATEGORY_MAP local copy is also removed and replaced
+               with the shared import (it was missed in fix_notifications.py).
 
 Usage:
-    python3 fix_notifications.py [--dry-run]
-
-    --dry-run   Print what would change without writing any files.
+    python3 fix_notifications_followup.py [--dry-run]
 """
 
 import sys
 import os
 import shutil
-import textwrap
 import argparse
 from pathlib import Path
 from datetime import datetime
@@ -62,7 +51,7 @@ from datetime import datetime
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 DRY_RUN = False
-BACKUP_SUFFIX = f".bak_notiffix_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+BACKUP_SUFFIX = f".bak_notiffix2_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 _applied: list[str] = []
 _skipped: list[str] = []
 
@@ -88,16 +77,8 @@ def write(path: Path, content: str) -> None:
 
 
 def replace_exact(path: Path, old: str, new: str, label: str) -> bool:
-    """
-    Replace the first (and only expected) occurrence of `old` with `new`.
-    Returns True if the replacement was made, False if `old` wasn't found
-    (meaning the fix was already applied or the file changed).
-    """
     content = read(path)
     if old not in content:
-        return False
-    if new in content and old not in content:
-        # already patched
         return False
     updated = content.replace(old, new, 1)
     backup(path)
@@ -105,10 +86,6 @@ def replace_exact(path: Path, old: str, new: str, label: str) -> bool:
     log(f"  ✅ {label}")
     _applied.append(label)
     return True
-
-
-def already_contains(path: Path, needle: str) -> bool:
-    return needle in read(path)
 
 
 def create_file(path: Path, content: str, label: str) -> None:
@@ -123,13 +100,10 @@ def create_file(path: Path, content: str, label: str) -> None:
     _applied.append(label)
 
 
-# ── root detection ────────────────────────────────────────────────────────────
-
 def find_root() -> Path:
     cwd = Path.cwd()
     if (cwd / "registrar-backend").is_dir() and (cwd / "registrar-frontend").is_dir():
         return cwd
-    # allow running from one level inside
     parent = cwd.parent
     if (parent / "registrar-backend").is_dir() and (parent / "registrar-frontend").is_dir():
         return parent
@@ -139,696 +113,483 @@ def find_root() -> Path:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# FIX 1 + 2  –  NotificationSent.php
-#   Fix 1: viaQueues() → broadcastQueue()
-#   Fix 2: eliminate lazy type relation in broadcastWith()
+# FIX 1a — NotificationTypeObserver.php (new file)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def fix_notification_sent(root: Path) -> None:
-    path = root / "registrar-backend/app/Events/NotificationSent.php"
-    log(f"\n[FIX 1+2] {path.relative_to(root)}")
+OBSERVER_CONTENT = """\
+<?php
 
-    if not path.exists():
-        log("  ⚠️  file not found — skipping")
-        _skipped.append("FIX 1+2: NotificationSent.php")
-        return
+namespace App\\Observers;
 
-    # ── Fix 1: replace viaQueues() with broadcastQueue() ──────────────────────
-    # viaQueues() is a Queueable-trait method for ShouldQueue regular jobs.
-    # ShouldBroadcast events need broadcastQueue() — that's what BroadcastEvent
-    # calls when it decides which queue to put the job on.
-    old_via = """\
-    // -------------------------------------------------------
-    // WHICH QUEUE TO DISPATCH THE BROADCAST JOB ON
-    // -------------------------------------------------------
-    // Routing to a dedicated 'broadcasts' queue keeps WebSocket
-    // pushes from being delayed by slow or long-running default-queue
-    // jobs.  The broadcast-worker container drains this queue with a
-    // short sleep (1 s) and timeout (30 s) for low latency.
-    // -------------------------------------------------------
-    public function viaQueues(): array
-    {
-        return ['broadcasts'];
-    }"""
-
-    new_via = """\
-    // -------------------------------------------------------
-    // WHICH QUEUE TO DISPATCH THE BROADCAST JOB ON
-    // -------------------------------------------------------
-    // broadcastQueue() is the method Laravel 10+ BroadcastEvent reads to
-    // decide which queue the broadcast job lands on.
-    // viaQueues() is the Queueable-trait method for regular ShouldQueue jobs
-    // and is silently ignored for ShouldBroadcast events — using it was the
-    // root cause of all broadcast jobs landing on 'default' instead of here.
-    // The broadcast-worker container drains 'broadcasts' with --sleep=1 and
-    // --timeout=30 for low-latency delivery.
-    // -------------------------------------------------------
-    public function broadcastQueue(): string
-    {
-        return 'broadcasts';
-    }"""
-
-    ok1 = replace_exact(path, old_via, new_via, "FIX 1: viaQueues() → broadcastQueue()")
-    if not ok1:
-        if "public function broadcastQueue" in read(path):
-            log("  ⏭  FIX 1 already applied")
-            _skipped.append("FIX 1: viaQueues() → broadcastQueue()")
-        else:
-            log("  ⚠️  FIX 1: expected block not found — inspect manually")
-            _skipped.append("FIX 1: viaQueues() → broadcastQueue()")
-
-    # ── Fix 2: pass title + trigger_event through constructor, use scalars ─────
-    # SerializesModels strips loaded Eloquent relations before queuing.
-    # When BroadcastEvent executes, $notification->type is unloaded, causing
-    # either a lazy N+1 query or a null-dereference if the DB is slow.
-    # We pass the two strings we need as plain constructor args instead.
-
-    # Step 2a — update constructor to accept the extra scalars
-    old_constructor = """\
-    public function __construct(
-        public readonly Notification $notification,
-        public readonly SystemUser   $recipient,
-    ) {}"""
-
-    new_constructor = """\
-    public function __construct(
-        public readonly Notification $notification,
-        public readonly SystemUser   $recipient,
-        // Pass title and trigger_event as plain strings rather than reading
-        // them from the relation inside broadcastWith().
-        // SerializesModels strips loaded relations before queuing, so
-        // $notification->type would be null (or trigger a lazy-load) when
-        // BroadcastEvent runs. Scalars survive serialization untouched.
-        public readonly string       $typeTitle        = '',
-        public readonly string       $typeTriggerEvent = '',
-    ) {}"""
-
-    ok2a = replace_exact(path, old_constructor, new_constructor,
-                         "FIX 2a: add typeTitle/typeTriggerEvent constructor args")
-    if not ok2a:
-        if "typeTriggerEvent" in read(path):
-            log("  ⏭  FIX 2a already applied")
-            _skipped.append("FIX 2a: constructor scalar args")
-        else:
-            log("  ⚠️  FIX 2a: expected constructor not found — inspect manually")
-            _skipped.append("FIX 2a: constructor scalar args")
-
-    # Step 2b — update broadcastWith() to use the scalar fields
-    old_broadcast_with = """\
-    public function broadcastWith(): array
-    {
-        $data = $this->notification->data ?? [];
-        return [
-            'id'           => $this->notification->id,
-            'title'        => $this->notification->type->title,
-            'message'      => $data['message'] ?? '',
-            'type'         => $this->notification->type->trigger_event,
-            'request_id'   => $this->notification->request_id,
-            'read_at'      => $this->notification->read_at,
-            'created_at'   => $this->notification->created_at->toISOString(),
-            // Forward requirements checklist so the real-time toast/bell
-            // can show it immediately without a follow-up REST call.
-            'requirements' => $data['requirements'] ?? null,
-            'announcement' => isset($data['announcement_id']) ? [
-                'id'      => $data['announcement_id'],
-                'title'   => $data['announcement_title'],
-                'content' => $data['announcement_content'],
-            ] : null,
-        ];
-    }"""
-
-    new_broadcast_with = """\
-    public function broadcastWith(): array
-    {
-        $data = $this->notification->data ?? [];
-        return [
-            'id'           => $this->notification->id,
-            // Use the scalar fields passed at construction time instead of
-            // accessing the relation. SerializesModels strips loaded relations
-            // before the job is queued, so $notification->type would be null
-            // (or fire a lazy load) when this runs inside BroadcastEvent.
-            'title'        => $this->typeTitle,
-            'message'      => $data['message'] ?? '',
-            'type'         => $this->typeTriggerEvent,
-            'request_id'   => $this->notification->request_id,
-            'read_at'      => $this->notification->read_at,
-            'created_at'   => $this->notification->created_at->toISOString(),
-            // Forward requirements checklist so the real-time toast/bell
-            // can show it immediately without a follow-up REST call.
-            'requirements' => $data['requirements'] ?? null,
-            'announcement' => isset($data['announcement_id']) ? [
-                'id'      => $data['announcement_id'],
-                'title'   => $data['announcement_title'],
-                'content' => $data['announcement_content'],
-            ] : null,
-        ];
-    }"""
-
-    ok2b = replace_exact(path, old_broadcast_with, new_broadcast_with,
-                         "FIX 2b: broadcastWith() uses scalar fields, no relation access")
-    if not ok2b:
-        if "$this->typeTitle" in read(path):
-            log("  ⏭  FIX 2b already applied")
-            _skipped.append("FIX 2b: broadcastWith() scalar fields")
-        else:
-            log("  ⚠️  FIX 2b: expected broadcastWith() block not found — inspect manually")
-            _skipped.append("FIX 2b: broadcastWith() scalar fields")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# FIX 1+2 companion — NotificationService.php
-# broadcast() call must now pass typeTitle and typeTriggerEvent
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def fix_notification_service(root: Path) -> None:
-    path = root / "registrar-backend/app/Services/NotificationService.php"
-    log(f"\n[FIX 2c] {path.relative_to(root)} — pass scalar fields to NotificationSent")
-
-    if not path.exists():
-        log("  ⚠️  file not found — skipping")
-        _skipped.append("FIX 2c: NotificationService.php broadcast call")
-        return
-
-    # Add Cache import alongside existing imports
-    old_imports = """\
-use Illuminate\\Support\\Facades\\DB;
-use App\\Contracts\\NotificationServiceInterface;
-use Illuminate\\Support\\Facades\\Log;"""
-
-    new_imports = """\
+use App\\Models\\NotificationType;
 use Illuminate\\Support\\Facades\\Cache;
-use Illuminate\\Support\\Facades\\DB;
-use App\\Contracts\\NotificationServiceInterface;
-use Illuminate\\Support\\Facades\\Log;"""
 
-    # Guard: if Cache facade is already imported, don't touch the imports block at all.
-    if "use Illuminate\\Support\\Facades\\Cache;" in read(path):
-        log("  ⏭  Cache import already present")
-        _skipped.append("FIX 2c-import: Cache facade")
-    else:
-        ok_import = replace_exact(path, old_imports, new_imports,
-                                   "FIX 2c-import: add Cache facade import")
-        if not ok_import:
-            log("  ⚠️  FIX 2c-import: expected imports block not found — inspect manually")
-            _skipped.append("FIX 2c-import: Cache facade")
-
-    # Update broadcast() call to pass the two new scalar constructor args,
-    # and switch the NotificationType lookup to use the cache.
-    old_send_inner = """\
-            // Step 1: Find the notification template
-            $type = NotificationType::where('trigger_event', $triggerEvent)
-                ->where('is_active', true)
-                ->first();
-
-            if (! $type) {
-                Log::warning(\"NotificationService: unknown trigger_event '{$triggerEvent}'\");
-                return null;
-            }
-
-            // Step 2: Build the final message
-            // Replace :placeholders in the template with actual values
-            // e.g. \"Payment verified for request #:request_id\"
-            //   → \"Payment verified for request #42\"
-            $message = $this->buildMessage($type->message_template, $data);
-
-            // Step 3 + 4: Save to DB and broadcast — atomically
-            return DB::transaction(function () use (
-                $recipient, $type, $message, $data, $requestId
-            ) {
-                $notification = Notification::create([
-                    'notification_type_id' => $type->notification_type_id,
-                    'notifiable_type'      => SystemUser::class,
-                    'notifiable_id'        => $recipient->user_id,
-                    'data'                 => array_merge($data, ['message' => $message]),
-                    'request_id'           => $requestId,
-                ]);
-
-                // Load the type relation so broadcastWith() can access
-                // $notification->type->title without an extra query
-                $notification->load('type');
-
-                // Fire the broadcast event — Reverb picks this up and
-                // pushes it to the frontend over WebSockets instantly
-                broadcast(new NotificationSent($notification, $recipient));
-
-                return $notification;
-            });"""
-
-    new_send_inner = """\
-            // Step 1: Find the notification template
-            // Cache the lookup — notification types change only via seeder/admin,
-            // so a 6-hour TTL is safe and avoids a DB hit on every send().
-            $type = Cache::remember(
-                "notif_type:{$triggerEvent}",
-                now()->addHours(6),
-                fn () => NotificationType::where('trigger_event', $triggerEvent)
-                             ->where('is_active', true)
-                             ->first()
-            );
-
-            if (! $type) {
-                Log::warning(\"NotificationService: unknown trigger_event '{$triggerEvent}'\");
-                return null;
-            }
-
-            // Step 2: Build the final message
-            // Replace :placeholders in the template with actual values
-            // e.g. \"Payment verified for request #:request_id\"
-            //   → \"Payment verified for request #42\"
-            $message = $this->buildMessage($type->message_template, $data);
-
-            // Capture scalar values from the type NOW, before the transaction,
-            // so we don't rely on a loaded relation inside the queued broadcast job.
-            // SerializesModels strips loaded relations from the event before queuing.
-            $typeTitle        = $type->title;
-            $typeTriggerEvent = $type->trigger_event;
-
-            // Step 3 + 4: Save to DB and broadcast — atomically
-            return DB::transaction(function () use (
-                $recipient, $type, $typeTitle, $typeTriggerEvent, $message, $data, $requestId
-            ) {
-                $notification = Notification::create([
-                    'notification_type_id' => $type->notification_type_id,
-                    'notifiable_type'      => SystemUser::class,
-                    'notifiable_id'        => $recipient->user_id,
-                    'data'                 => array_merge($data, ['message' => $message]),
-                    'request_id'           => $requestId,
-                ]);
-
-                // Fire the broadcast event — Reverb picks this up and
-                // pushes it to the frontend over WebSockets instantly.
-                // We pass typeTitle + typeTriggerEvent as plain strings so
-                // broadcastWith() never touches the relation (which would be
-                // stripped by SerializesModels before the job runs).
-                broadcast(new NotificationSent($notification, $recipient, $typeTitle, $typeTriggerEvent));
-
-                return $notification;
-            });"""
-
-    ok_service = replace_exact(path, old_send_inner, new_send_inner,
-                                "FIX 2c: pass scalar type fields, cache NotificationType lookup")
-    if not ok_service:
-        if "$typeTitle" in read(path):
-            log("  ⏭  FIX 2c already applied")
-            _skipped.append("FIX 2c: NotificationService send() update")
-        else:
-            log("  ⚠️  FIX 2c: expected send() block not found — inspect manually")
-            _skipped.append("FIX 2c: NotificationService send() update")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# FIX 3  –  useNotifications.js — unbind race condition
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def fix_use_notifications(root: Path) -> None:
-    path = root / "registrar-frontend/src/hooks/useNotifications.js"
-    log(f"\n[FIX 3+4] {path.relative_to(root)}")
-
-    if not path.exists():
-        log("  ⚠️  file not found — skipping")
-        _skipped.append("FIX 3+4: useNotifications.js")
-        return
-
-    # ── Fix 3: save onConnected ref, unbind only that listener on cleanup ──────
-    # unbind('connected') with no handler removes ALL 'connected' listeners,
-    # including Pusher-js's own internal reconnect listener. On the two-tabs
-    # same-machine scenario, the second tab's effect cleanup fires and strips
-    # the first tab's connection from ever receiving reconnect events.
-    old_subscribe_block = """\
-        const subscribe = () => {
-            console.info('[Echo] subscribing to', channelName);
-            echo.private(channelName)
-                .listen('.NotificationSent', handleNewNotification)
-                .error((err) => {
-                    console.error('[Echo] private channel auth failed:', err);
-                });
-        };
-
-        const connectionState = echo.connector.pusher.connection.state;
-
-        echo.connector.pusher.connection.bind('state_change', ({ current }) => {
-            console.info(`[Echo] connection → ${current}`);
-        });
-
-        if (connectionState === 'connected') {
-            subscribe();
-        } else {
-            const onConnected = () => {
-                echo.connector.pusher.connection.unbind('connected', onConnected);
-                if (!unsubscribed) subscribe();
-            };
-            echo.connector.pusher.connection.bind('connected', onConnected);
-        }
-
-        return () => {
-            unsubscribed = true;
-            echo.connector.pusher.connection.unbind('connected');
-            echo.leave(channelName);
-        };"""
-
-    new_subscribe_block = """\
-        const subscribe = () => {
-            console.info('[Echo] subscribing to', channelName);
-            echo.private(channelName)
-                .listen('.NotificationSent', handleNewNotification)
-                .error((err) => {
-                    console.error('[Echo] private channel auth failed:', err);
-                });
-        };
-
-        const connectionState = echo.connector.pusher.connection.state;
-
-        echo.connector.pusher.connection.bind('state_change', ({ current }) => {
-            console.info(`[Echo] connection → ${current}`);
-        });
-
-        // Store the onConnected handler outside the else block so the cleanup
-        // function can unbind it by reference. Previously unbind('connected')
-        // was called with no second argument, which removes ALL 'connected'
-        // listeners — including Pusher-js's own internal reconnect handler.
-        // On the two-tabs-same-machine scenario this caused the first tab's
-        // connection to stop receiving reconnect events after the second tab
-        // mounted or unmounted, making notifications appear only intermittently.
-        let pendingConnectedHandler = null;
-
-        if (connectionState === 'connected') {
-            subscribe();
-        } else {
-            pendingConnectedHandler = () => {
-                echo.connector.pusher.connection.unbind('connected', pendingConnectedHandler);
-                pendingConnectedHandler = null;
-                if (!unsubscribed) subscribe();
-            };
-            echo.connector.pusher.connection.bind('connected', pendingConnectedHandler);
-        }
-
-        return () => {
-            unsubscribed = true;
-            // Unbind only OUR listener by reference — never the bare
-            // unbind('connected') which strips every listener on the connection.
-            if (pendingConnectedHandler) {
-                echo.connector.pusher.connection.unbind('connected', pendingConnectedHandler);
-                pendingConnectedHandler = null;
-            }
-            echo.leave(channelName);
-        };"""
-
-    ok3 = replace_exact(path, old_subscribe_block, new_subscribe_block,
-                        "FIX 3: unbind by handler reference, not bare unbind('connected')")
-    if not ok3:
-        if "pendingConnectedHandler" in read(path):
-            log("  ⏭  FIX 3 already applied")
-            _skipped.append("FIX 3: unbind handler reference")
-        else:
-            log("  ⚠️  FIX 3: expected subscription block not found — inspect manually")
-            _skipped.append("FIX 3: unbind handler reference")
-
-    # ── Fix 4: eliminate second GET /notifications/unread-count calls ──────────
-    # markAsRead currently:  POST /read  →  GET /unread-count  (2 round trips)
-    # dismiss currently:     DELETE      →  GET /unread-count  (2 round trips)
-    # The controller will return unread_count in the mutation response.
-    old_mark_as_read = """\
-    const markAsRead = useCallback(async (id) => {
-        try {
-            await api.post(`/notifications/${id}/read`);
-            setNotifications(prev =>
-                prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
-            );
-            const { data } = await api.get('/notifications/unread-count');
-            setUnreadCount(data.count ?? 0);
-        } catch (err) {
-            console.error('[useNotifications] markAsRead failed:', err);
-        }
-    }, []);"""
-
-    new_mark_as_read = """\
-    const markAsRead = useCallback(async (id) => {
-        try {
-            // Controller now returns unread_count — no need for a second fetch.
-            const { data } = await api.post(`/notifications/${id}/read`);
-            setNotifications(prev =>
-                prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
-            );
-            setUnreadCount(data.unread_count ?? 0);
-        } catch (err) {
-            console.error('[useNotifications] markAsRead failed:', err);
-        }
-    }, []);"""
-
-    ok4a = replace_exact(path, old_mark_as_read, new_mark_as_read,
-                         "FIX 4a: markAsRead — remove second GET /unread-count")
-    if not ok4a:
-        if "data.unread_count" in read(path) and "markAsRead" in read(path):
-            log("  ⏭  FIX 4a already applied")
-            _skipped.append("FIX 4a: markAsRead single round-trip")
-        else:
-            log("  ⚠️  FIX 4a: expected markAsRead block not found — inspect manually")
-            _skipped.append("FIX 4a: markAsRead single round-trip")
-
-    old_dismiss = """\
-    const dismiss = useCallback(async (id) => {
-        try {
-            await api.delete(`/notifications/${id}`);
-            setNotifications(prev => prev.filter(n => n.id !== id));
-            const { data } = await api.get('/notifications/unread-count');
-            setUnreadCount(data.count ?? 0);
-        } catch (err) {
-            console.error('[useNotifications] dismiss failed:', err);
-        }
-    }, []);"""
-
-    new_dismiss = """\
-    const dismiss = useCallback(async (id) => {
-        try {
-            // Controller now returns unread_count — no need for a second fetch.
-            const { data } = await api.delete(`/notifications/${id}`);
-            setNotifications(prev => prev.filter(n => n.id !== id));
-            setUnreadCount(data.unread_count ?? 0);
-        } catch (err) {
-            console.error('[useNotifications] dismiss failed:', err);
-        }
-    }, []);"""
-
-    ok4b = replace_exact(path, old_dismiss, new_dismiss,
-                         "FIX 4b: dismiss — remove second GET /unread-count")
-    if not ok4b:
-        if "data.unread_count" in read(path) and "dismiss" in read(path):
-            log("  ⏭  FIX 4b already applied")
-            _skipped.append("FIX 4b: dismiss single round-trip")
-        else:
-            log("  ⚠️  FIX 4b: expected dismiss block not found — inspect manually")
-            _skipped.append("FIX 4b: dismiss single round-trip")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# FIX 4 companion — NotificationController.php
-# Return unread_count from markAsRead and destroy
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def fix_notification_controller(root: Path) -> None:
-    path = root / "registrar-backend/app/Http/Controllers/NotificationController.php"
-    log(f"\n[FIX 4c] {path.relative_to(root)} — return unread_count from mutations")
-
-    if not path.exists():
-        log("  ⚠️  file not found — skipping")
-        _skipped.append("FIX 4c: NotificationController.php")
-        return
-
-    old_mark_as_read = """\
-        $notification->markAsRead();
-
-        return response()->json(['message' => 'Notification marked as read.']);
-    }"""
-
-    new_mark_as_read = """\
-        $notification->markAsRead();
-
-        return response()->json([
-            'message'      => 'Notification marked as read.',
-            // Return the updated count so the frontend doesn't need a second
-            // GET /notifications/unread-count request after this mutation.
-            'unread_count' => $this->notificationService->unreadCount($user),
-        ]);
-    }"""
-
-    ok_mark = replace_exact(path, old_mark_as_read, new_mark_as_read,
-                             "FIX 4c: markAsRead returns unread_count")
-    if not ok_mark:
-        if "unread_count" in read(path):
-            log("  ⏭  FIX 4c (markAsRead) already applied")
-            _skipped.append("FIX 4c: markAsRead unread_count")
-        else:
-            log("  ⚠️  FIX 4c (markAsRead): expected block not found — inspect manually")
-            _skipped.append("FIX 4c: markAsRead unread_count")
-
-    old_destroy = """\
-        $notification->delete();
-
-        return response()->json(['message' => 'Notification dismissed.']);
+/**
+ * Invalidates the NotificationType cache whenever a type is created,
+ * updated, or deleted via the admin UI or seeder.
+ *
+ * Context: NotificationService caches NotificationType lookups under the key
+ * "notif_type:{trigger_event}" with a 6-hour TTL to avoid a DB hit on every
+ * send(). Without this observer, an admin editing a notification template
+ * title or message_template would have no effect for up to 6 hours because
+ * every broadcast job would still read the stale cached value.
+ *
+ * With this observer, any write to notification_types immediately clears the
+ * relevant cache key, so the next send() fetches the fresh value from DB and
+ * re-populates the cache.
+ *
+ * Registered in AppServiceProvider::boot().
+ */
+class NotificationTypeObserver
+{
+    /**
+     * Forget the cache key after any create or update.
+     * 'saved' fires for both — no need to hook 'created' and 'updated' separately.
+     */
+    public function saved(NotificationType $type): void
+    {
+        Cache::forget("notif_type:{$type->trigger_event}");
     }
-}"""
 
-    new_destroy = """\
-        $notification->delete();
-
-        return response()->json([
-            'message'      => 'Notification dismissed.',
-            // Return the updated count so the frontend doesn't need a second
-            // GET /notifications/unread-count request after this mutation.
-            'unread_count' => $this->notificationService->unreadCount($user),
-        ]);
+    /**
+     * Forget the cache key when a type is soft- or hard-deleted.
+     */
+    public function deleted(NotificationType $type): void
+    {
+        Cache::forget("notif_type:{$type->trigger_event}");
     }
-}"""
 
-    ok_destroy = replace_exact(path, old_destroy, new_destroy,
-                                "FIX 4d: destroy returns unread_count")
-    if not ok_destroy:
-        if "unread_count" in read(path):
-            log("  ⏭  FIX 4d (destroy) already applied")
-            _skipped.append("FIX 4d: destroy unread_count")
-        else:
-            log("  ⚠️  FIX 4d (destroy): expected block not found — inspect manually")
-            _skipped.append("FIX 4d: destroy unread_count")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# FIX 5  –  CATEGORY_MAP deduplication
-# Create shared constants file; update imports in both components
-# ═══════════════════════════════════════════════════════════════════════════════
-
-CATEGORY_MAP_CONTENT = """\
-// src/constants/notificationCategories.js
-// -------------------------------------------------------
-// Single source of truth for notification category labels
-// and their badge colors. Both NotificationModal and
-// NotificationToast import from here.
-//
-// To add a new trigger_event: add one entry here only.
-// -------------------------------------------------------
-export const CATEGORY_MAP = {
-  // Student / Alumni
-  request_submitted:          { category: 'Submitted',   color: 'bg-blue-400' },
-  payment_verified:            { category: 'Payment',     color: 'bg-green-400' },
-  payment_invalid:             { category: 'Payment',     color: 'bg-rose-600' },
-  status_updated:              { category: 'Update',      color: 'bg-blue-400' },
-  request_processing:          { category: 'Processing',  color: 'bg-blue-400' },
-  action_needed:               { category: 'Action',      color: 'bg-rose-600' },
-  ready_to_claim:              { category: 'Ready',       color: 'bg-green-400' },
-  request_completed:           { category: 'Completed',   color: 'bg-green-400' },
-  request_forfeited:           { category: 'Forfeited',   color: 'bg-rose-600' },
-  reminder_claim:              { category: 'Reminder',    color: 'bg-pup-yellow' },
-  reminder_final_warning:      { category: 'Warning',     color: 'bg-rose-600' },
-  request_closed:              { category: 'Closed',      color: 'bg-white/40' },
-  request_auto_archived:       { category: 'Archived',    color: 'bg-white/40' },
-  // Admin
-  admin_new_request:           { category: 'Important',   color: 'bg-rose-600' },
-  admin_payment_verification:  { category: 'Payment',     color: 'bg-pup-yellow' },
-  admin_incomplete_request:    { category: 'Incomplete',  color: 'bg-rose-600' },
-  admin_deadline_warning:      { category: 'Deadline',    color: 'bg-pup-yellow' },
-};
+    /**
+     * Forget the cache key when a soft-deleted type is restored.
+     * Prevents the restored type from being shadowed by a stale null entry.
+     */
+    public function restored(NotificationType $type): void
+    {
+        Cache::forget("notif_type:{$type->trigger_event}");
+    }
+}
 """
 
 
-def fix_category_map(root: Path) -> None:
-    constants_path = root / "registrar-frontend/src/constants/notificationCategories.js"
-    modal_path     = root / "registrar-frontend/src/components/NotificationModal.jsx"
-    toast_path     = root / "registrar-frontend/src/components/NotificationToast.jsx"
+# ═══════════════════════════════════════════════════════════════════════════════
+# FIX 1b — Register observer in AppServiceProvider::boot()
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    log(f"\n[FIX 5] CATEGORY_MAP deduplication")
+def fix_observer(root: Path) -> None:
+    observer_path = root / "registrar-backend/app/Observers/NotificationTypeObserver.php"
+    provider_path = root / "registrar-backend/app/Providers/AppServiceProvider.php"
 
-    # Create the shared file
-    create_file(constants_path, CATEGORY_MAP_CONTENT,
-                "FIX 5a: create src/constants/notificationCategories.js")
+    log(f"\n[FIX 1] NotificationType cache observer")
 
-    # ── NotificationModal.jsx ──────────────────────────────────────────────────
-    if not modal_path.exists():
-        log("  ⚠️  NotificationModal.jsx not found — skipping")
-        _skipped.append("FIX 5b: NotificationModal.jsx import")
-    else:
-        modal_old_map = """\
+    # 1a — create the observer file
+    create_file(observer_path, OBSERVER_CONTENT,
+                "FIX 1a: create app/Observers/NotificationTypeObserver.php")
+
+    # 1b — register it in AppServiceProvider
+    if not provider_path.exists():
+        log("  ⚠️  AppServiceProvider.php not found — skipping registration")
+        _skipped.append("FIX 1b: register observer in AppServiceProvider")
+        return
+
+    # Add the two use statements after the existing ones
+    old_uses = """\
+use App\\Contracts\\DocumentRequestServiceInterface;
+use App\\Contracts\\NotificationServiceInterface;
+use App\\Services\\AuditLogger;
+use App\\Services\\DocumentRequestService;
+use App\\Services\\NotificationService;
+use Illuminate\\Support\\ServiceProvider;"""
+
+    new_uses = """\
+use App\\Contracts\\DocumentRequestServiceInterface;
+use App\\Contracts\\NotificationServiceInterface;
+use App\\Models\\NotificationType;
+use App\\Observers\\NotificationTypeObserver;
+use App\\Services\\AuditLogger;
+use App\\Services\\DocumentRequestService;
+use App\\Services\\NotificationService;
+use Illuminate\\Support\\ServiceProvider;"""
+
+    ok_uses = replace_exact(provider_path, old_uses, new_uses,
+                             "FIX 1b-imports: add NotificationType + observer use statements")
+    if not ok_uses:
+        if "NotificationTypeObserver" in read(provider_path):
+            log("  ⏭  FIX 1b-imports already applied")
+            _skipped.append("FIX 1b-imports: use statements")
+        else:
+            log("  ⚠️  FIX 1b-imports: expected use block not found — inspect manually")
+            _skipped.append("FIX 1b-imports: use statements")
+
+    # Register in boot()
+    old_boot = """\
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        //
+    }"""
+
+    new_boot = """\
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        // Invalidate the NotificationType cache whenever a type is saved or
+        // deleted. Without this, admin edits to notification templates would
+        // have no effect for up to 6 hours (the cache TTL in NotificationService).
+        NotificationType::observe(NotificationTypeObserver::class);
+    }"""
+
+    ok_boot = replace_exact(provider_path, old_boot, new_boot,
+                             "FIX 1b-boot: register NotificationTypeObserver")
+    if not ok_boot:
+        if "NotificationTypeObserver" in read(provider_path) and "observe(" in read(provider_path):
+            log("  ⏭  FIX 1b-boot already applied")
+            _skipped.append("FIX 1b-boot: observer registration")
+        else:
+            log("  ⚠️  FIX 1b-boot: expected boot() block not found — inspect manually")
+            _skipped.append("FIX 1b-boot: observer registration")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FIX 2a — useNotifications.js: add hasMore / loadMore / loadingMore
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def fix_use_notifications_pagination(root: Path) -> None:
+    path = root / "registrar-frontend/src/hooks/useNotifications.js"
+    log(f"\n[FIX 2a] {path.relative_to(root)} — add loadMore pagination")
+
+    if not path.exists():
+        log("  ⚠️  file not found — skipping")
+        _skipped.append("FIX 2a: useNotifications pagination")
+        return
+
+    # Add hasMore and loadingMore state, update fetchNotifications to track
+    # pagination meta, and add the loadMore function.
+
+    old_state = """\
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount]     = useState(0);
+    const [loading, setLoading]             = useState(true);"""
+
+    new_state = """\
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount]     = useState(0);
+    const [loading, setLoading]             = useState(true);
+    const [loadingMore, setLoadingMore]     = useState(false);
+    const [hasMore, setHasMore]             = useState(false);
+    const pageRef                           = useRef(1);"""
+
+    ok_state = replace_exact(path, old_state, new_state,
+                              "FIX 2a-state: add loadingMore, hasMore, pageRef")
+    if not ok_state:
+        if "loadingMore" in read(path):
+            log("  ⏭  FIX 2a-state already applied")
+            _skipped.append("FIX 2a-state: pagination state")
+        else:
+            log("  ⚠️  FIX 2a-state: expected state block not found — inspect manually")
+            _skipped.append("FIX 2a-state: pagination state")
+
+    # Update fetchNotifications to reset page and capture last_page
+    old_fetch = """\
+    const fetchNotifications = useCallback(async () => {
+        try {
+            const [notifRes, countRes] = await Promise.all([
+                api.get('/notifications'),
+                api.get('/notifications/unread-count'),
+            ]);
+            setNotifications(notifRes.data.data ?? []);
+            setUnreadCount(countRes.data.count ?? 0);
+        } catch (err) {
+            console.error('[useNotifications] fetch failed:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);"""
+
+    new_fetch = """\
+    const fetchNotifications = useCallback(async () => {
+        try {
+            // Reset to page 1 on every full refresh (login, user switch, refetch).
+            pageRef.current = 1;
+            const [notifRes, countRes] = await Promise.all([
+                api.get('/notifications', { params: { page: 1 } }),
+                api.get('/notifications/unread-count'),
+            ]);
+            const meta = notifRes.data.meta ?? {};
+            setNotifications(notifRes.data.data ?? []);
+            setUnreadCount(countRes.data.count ?? 0);
+            // hasMore is true when the backend has at least one more page.
+            setHasMore((meta.current_page ?? 1) < (meta.last_page ?? 1));
+        } catch (err) {
+            console.error('[useNotifications] fetch failed:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Append the next page of notifications to the existing list.
+    // Keeps real-time items that arrived via WebSocket at the top untouched.
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
+        try {
+            setLoadingMore(true);
+            const nextPage = pageRef.current + 1;
+            const { data } = await api.get('/notifications', { params: { page: nextPage } });
+            const meta = data.meta ?? {};
+            // Deduplicate: WebSocket may have prepended items already on this page.
+            setNotifications(prev => {
+                const existingIds = new Set(prev.map(n => n.id));
+                const fresh = (data.data ?? []).filter(n => !existingIds.has(n.id));
+                return [...prev, ...fresh];
+            });
+            pageRef.current = nextPage;
+            setHasMore((meta.current_page ?? nextPage) < (meta.last_page ?? nextPage));
+        } catch (err) {
+            console.error('[useNotifications] loadMore failed:', err);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [loadingMore, hasMore]);"""
+
+    ok_fetch = replace_exact(path, old_fetch, new_fetch,
+                              "FIX 2a-fetch: fetchNotifications resets page, captures meta; add loadMore")
+    if not ok_fetch:
+        if "loadMore" in read(path):
+            log("  ⏭  FIX 2a-fetch already applied")
+            _skipped.append("FIX 2a-fetch: fetchNotifications + loadMore")
+        else:
+            log("  ⚠️  FIX 2a-fetch: expected fetchNotifications block not found — inspect manually")
+            _skipped.append("FIX 2a-fetch: fetchNotifications + loadMore")
+
+    # Update the return value to expose hasMore, loadMore, loadingMore
+    old_return = """\
+    return { notifications, unreadCount, loading, markAsRead, markAllAsRead, dismiss, refetch: fetchNotifications };"""
+
+    new_return = """\
+    return {
+        notifications,
+        unreadCount,
+        loading,
+        loadingMore,
+        hasMore,
+        loadMore,
+        markAsRead,
+        markAllAsRead,
+        dismiss,
+        refetch: fetchNotifications,
+    };"""
+
+    ok_return = replace_exact(path, old_return, new_return,
+                               "FIX 2a-return: expose hasMore, loadMore, loadingMore")
+    if not ok_return:
+        if "loadMore" in read(path) and "hasMore" in read(path):
+            log("  ⏭  FIX 2a-return already applied")
+            _skipped.append("FIX 2a-return: hook return value")
+        else:
+            log("  ⚠️  FIX 2a-return: expected return statement not found — inspect manually")
+            _skipped.append("FIX 2a-return: hook return value")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FIX 2b — InboxCenter.jsx: wire up loadMore button + fix CATEGORY_MAP
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def fix_inbox_center(root: Path) -> None:
+    path = root / "registrar-frontend/src/layouts/InboxCenter.jsx"
+    log(f"\n[FIX 2b] {path.relative_to(root)} — Load more button + CATEGORY_MAP import")
+
+    if not path.exists():
+        log("  ⚠️  file not found — skipping")
+        _skipped.append("FIX 2b: InboxCenter.jsx")
+        return
+
+    # Fix the local CATEGORY_MAP — it was missed in fix_notifications.py
+    # because it only stores category labels, not colors (different shape).
+    # Replace with a shared import from notificationCategories.js.
+    # InboxCenter only uses the .category field, so CATEGORY_MAP[n.type]?.category works.
+    old_category_map = """\
 // -------------------------------------------------------
-// Maps backend trigger_event → display category + color
+// Maps backend trigger_event → human-readable category
 // -------------------------------------------------------
 const CATEGORY_MAP = {
-  // Student/Alumni
-  request_submitted:       { category: 'Submitted',   color: 'bg-blue-400' },
-  payment_verified:        { category: 'Payment',     color: 'bg-green-400' },
-  payment_invalid:         { category: 'Payment',     color: 'bg-rose-600' },
-  status_updated:          { category: 'Update',      color: 'bg-blue-400' },
-  request_processing:      { category: 'Processing',  color: 'bg-blue-400' },
-  action_needed:           { category: 'Action',      color: 'bg-rose-600' },
-  ready_to_claim:          { category: 'Ready',       color: 'bg-green-400' },
-  request_completed:       { category: 'Completed',   color: 'bg-green-400' },
-  request_forfeited:       { category: 'Forfeited',   color: 'bg-rose-600' },
-  reminder_claim:          { category: 'Reminder',    color: 'bg-pup-yellow' },
-  reminder_final_warning:  { category: 'Warning',     color: 'bg-rose-600' },
-  request_closed:          { category: 'Closed',      color: 'bg-white/40' },
-  request_auto_archived:   { category: 'Archived',    color: 'bg-white/40' },
-  // Admin
-  admin_new_request:          { category: 'Important', color: 'bg-rose-600' },
-  admin_payment_verification: { category: 'Payment',   color: 'bg-pup-yellow' },
-  admin_incomplete_request:   { category: 'Incomplete',color: 'bg-rose-600' },
-  admin_deadline_warning:     { category: 'Deadline',  color: 'bg-pup-yellow' },
+  request_submitted:          'Submitted',
+  payment_verified:           'Payment',
+  payment_invalid:            'Payment',
+  status_updated:             'Update',
+  request_processing:         'Processing',
+  action_needed:              'Action',
+  ready_to_claim:             'Ready',
+  request_completed:          'Completed',
+  request_forfeited:          'Forfeited',
+  reminder_claim:             'Reminder',
+  reminder_final_warning:     'Warning',
+  request_closed:             'Closed',
+  request_auto_archived:      'Archived',
+  admin_new_request:          'Important',
+  admin_payment_verification: 'Payment',
+  admin_incomplete_request:   'Incomplete',
+  admin_deadline_warning:     'Deadline',
 };"""
 
-        modal_new_map = """\
+    new_category_map = """\
 // CATEGORY_MAP lives in src/constants/notificationCategories.js
-// — edit it there; changes apply to both NotificationModal and NotificationToast.
+// InboxCenter only uses the .category label from each entry.
 import { CATEGORY_MAP } from '../constants/notificationCategories';"""
 
-        ok5b = replace_exact(modal_path, modal_old_map, modal_new_map,
-                             "FIX 5b: NotificationModal.jsx — replace inline map with import")
-        if not ok5b:
-            if "notificationCategories" in read(modal_path):
-                log("  ⏭  FIX 5b already applied")
-                _skipped.append("FIX 5b: NotificationModal.jsx import")
-            else:
-                log("  ⚠️  FIX 5b: CATEGORY_MAP block not found in NotificationModal.jsx — inspect manually")
-                _skipped.append("FIX 5b: NotificationModal.jsx import")
+    ok_map = replace_exact(path, old_category_map, new_category_map,
+                           "FIX 2b-map: replace inline CATEGORY_MAP with shared import")
+    if not ok_map:
+        if "notificationCategories" in read(path):
+            log("  ⏭  FIX 2b-map already applied")
+            _skipped.append("FIX 2b-map: CATEGORY_MAP import")
+        else:
+            log("  ⚠️  FIX 2b-map: inline CATEGORY_MAP not found — inspect manually")
+            _skipped.append("FIX 2b-map: CATEGORY_MAP import")
 
-    # ── NotificationToast.jsx ──────────────────────────────────────────────────
-    if not toast_path.exists():
-        log("  ⚠️  NotificationToast.jsx not found — skipping")
-        _skipped.append("FIX 5c: NotificationToast.jsx import")
-    else:
-        toast_old_map = """\
-// -------------------------------------------------------
-// CATEGORY_MAP — mirrors NotificationModal.jsx exactly
-// -------------------------------------------------------
-const CATEGORY_MAP = {
-    request_submitted:          { category: 'Submitted',   color: 'bg-blue-400' },
-    payment_verified:           { category: 'Payment',     color: 'bg-green-400' },
-    payment_invalid:            { category: 'Payment',     color: 'bg-rose-600' },
-    status_updated:             { category: 'Update',      color: 'bg-blue-400' },
-    request_processing:         { category: 'Processing',  color: 'bg-blue-400' },
-    action_needed:              { category: 'Action',      color: 'bg-rose-600' },
-    ready_to_claim:             { category: 'Ready',       color: 'bg-green-400' },
-    request_completed:          { category: 'Completed',   color: 'bg-green-400' },
-    request_forfeited:          { category: 'Forfeited',   color: 'bg-rose-600' },
-    reminder_claim:             { category: 'Reminder',    color: 'bg-pup-yellow' },
-    reminder_final_warning:     { category: 'Warning',     color: 'bg-rose-600' },
-    request_closed:             { category: 'Closed',      color: 'bg-white/40' },
-    request_auto_archived:      { category: 'Archived',    color: 'bg-white/40' },
-    admin_new_request:          { category: 'Important',   color: 'bg-rose-600' },
-    admin_payment_verification: { category: 'Payment',     color: 'bg-pup-yellow' },
-    admin_incomplete_request:   { category: 'Incomplete',  color: 'bg-rose-600' },
-    admin_deadline_warning:     { category: 'Deadline',    color: 'bg-pup-yellow' },
-};"""
+    # Update toMailItem to use .category from the shared map object
+    # (the shared map entries are objects {category, color} not plain strings)
+    old_to_mail = """\
+  category: CATEGORY_MAP[n.type] ?? 'Notification',"""
 
-        toast_new_map = """\
-// CATEGORY_MAP lives in src/constants/notificationCategories.js
-// — edit it there; changes apply to both NotificationModal and NotificationToast.
-import { CATEGORY_MAP } from '../constants/notificationCategories';"""
+    new_to_mail = """\
+  category: CATEGORY_MAP[n.type]?.category ?? 'Notification',"""
 
-        ok5c = replace_exact(toast_path, toast_old_map, toast_new_map,
-                             "FIX 5c: NotificationToast.jsx — replace inline map with import")
-        if not ok5c:
-            if "notificationCategories" in read(toast_path):
-                log("  ⏭  FIX 5c already applied")
-                _skipped.append("FIX 5c: NotificationToast.jsx import")
-            else:
-                log("  ⚠️  FIX 5c: CATEGORY_MAP block not found in NotificationToast.jsx — inspect manually")
-                _skipped.append("FIX 5c: NotificationToast.jsx import")
+    ok_mail = replace_exact(path, old_to_mail, new_to_mail,
+                            "FIX 2b-toMailItem: use .category from shared map object")
+    if not ok_mail:
+        if "?.category" in read(path):
+            log("  ⏭  FIX 2b-toMailItem already applied")
+            _skipped.append("FIX 2b-toMailItem: .category accessor")
+        else:
+            log("  ⚠️  FIX 2b-toMailItem: expected line not found — inspect manually")
+            _skipped.append("FIX 2b-toMailItem: .category accessor")
+
+    # Destructure loadMore, hasMore, loadingMore from the context
+    old_destructure = """\
+  const {
+    notifications,
+    loading,
+    markAsRead,
+    dismiss,
+  } = useNotifications();"""
+
+    new_destructure = """\
+  const {
+    notifications,
+    loading,
+    loadingMore,
+    hasMore,
+    loadMore,
+    markAsRead,
+    dismiss,
+  } = useNotifications();"""
+
+    ok_dest = replace_exact(path, old_destructure, new_destructure,
+                            "FIX 2b-destructure: add loadMore/hasMore/loadingMore from context")
+    if not ok_dest:
+        if "loadMore" in read(path):
+            log("  ⏭  FIX 2b-destructure already applied")
+            _skipped.append("FIX 2b-destructure: context destructure")
+        else:
+            log("  ⚠️  FIX 2b-destructure: expected destructure block not found — inspect manually")
+            _skipped.append("FIX 2b-destructure: context destructure")
+
+    # Add the Load more button after the filteredEmails.map() closing paren,
+    # inside the scrollable list div.
+    # We target the closing tag of the scrollable div that wraps the email list.
+    old_list_close = """\
+                  filteredEmails.map((mail) => {
+                    const isActive = selectedMail?.id === mail.id;
+                    return (
+                      <button
+                        key={mail.id}
+                        onClick={() => handleSelectMail(mail.id)}
+                        className={`w-full text-left px-4 py-3 border-b border-gray-200 transition-colors ${\
+                          isActive
+                            ? (isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] border-[#3e4042]' : 'bg-gray-100 text-gray-900')
+                            : (isDark ? 'hover:bg-[#3a3b3c] text-[#e4e6eb] border-[#3e4042]' : 'hover:bg-gray-50 text-gray-800')
+                        }`}
+                      >
+                        <div className=\"flex items-center justify-between gap-2\">
+                          <p className=\"font-semibold text-sm truncate\">{mail.from}</p>
+                          <span className={`text-[11px] shrink-0 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                            {formatTime(mail.time)}
+                          </span>
+                        </div>
+                        <p className={`text-xs mt-0.5 truncate ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>{mail.subject}</p>
+                        <p className={`text-xs mt-1 line-clamp-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{mail.preview}</p>
+                        {mail.unread && !isActive && (
+                          <span className={`inline-block mt-2 text-[10px] font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>
+                            Unread
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>"""
+
+    new_list_close = """\
+                  filteredEmails.map((mail) => {
+                    const isActive = selectedMail?.id === mail.id;
+                    return (
+                      <button
+                        key={mail.id}
+                        onClick={() => handleSelectMail(mail.id)}
+                        className={`w-full text-left px-4 py-3 border-b border-gray-200 transition-colors ${\
+                          isActive
+                            ? (isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] border-[#3e4042]' : 'bg-gray-100 text-gray-900')
+                            : (isDark ? 'hover:bg-[#3a3b3c] text-[#e4e6eb] border-[#3e4042]' : 'hover:bg-gray-50 text-gray-800')
+                        }`}
+                      >
+                        <div className=\"flex items-center justify-between gap-2\">
+                          <p className=\"font-semibold text-sm truncate\">{mail.from}</p>
+                          <span className={`text-[11px] shrink-0 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                            {formatTime(mail.time)}
+                          </span>
+                        </div>
+                        <p className={`text-xs mt-0.5 truncate ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>{mail.subject}</p>
+                        <p className={`text-xs mt-1 line-clamp-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{mail.preview}</p>
+                        {mail.unread && !isActive && (
+                          <span className={`inline-block mt-2 text-[10px] font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>
+                            Unread
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+
+                {/* Load more — only shown when the backend has more pages */}
+                {hasMore && (
+                  <div className=\"px-4 py-3\">
+                    <button
+                      onClick={loadMore}
+                      disabled={loadingMore}
+                      className={`w-full text-xs font-semibold py-2 rounded-lg transition-colors disabled:opacity-50 ${
+                        isDark
+                          ? 'bg-[#3a3b3c] text-[#e4e6eb] hover:bg-[#4a4b4c]'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {loadingMore ? 'Loading…' : 'Load more'}
+                    </button>
+                  </div>
+                )}
+              </div>"""
+
+    ok_btn = replace_exact(path, old_list_close, new_list_close,
+                           "FIX 2b-button: add Load more button below notification list")
+    if not ok_btn:
+        if "Load more" in read(path):
+            log("  ⏭  FIX 2b-button already applied")
+            _skipped.append("FIX 2b-button: Load more button")
+        else:
+            log("  ⚠️  FIX 2b-button: expected list close block not found — inspect manually")
+            _skipped.append("FIX 2b-button: Load more button")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -852,11 +613,9 @@ def main() -> None:
     log(f"📁 Project root: {root}\n")
     log("=" * 66)
 
-    fix_notification_sent(root)
-    fix_notification_service(root)
-    fix_use_notifications(root)
-    fix_notification_controller(root)
-    fix_category_map(root)
+    fix_observer(root)
+    fix_use_notifications_pagination(root)
+    fix_inbox_center(root)
 
     log("\n" + "=" * 66)
     log(f"\n✅ Applied : {len(_applied)}")
@@ -873,28 +632,24 @@ def main() -> None:
 Next steps
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Backend — rebuild and restart:
+Backend — no migration needed. Rebuild and restart:
   docker compose build backend
-  docker compose up -d backend reverb worker broadcast-worker
+  docker compose up -d backend
 
-  Or if you run artisan directly:
-  php artisan cache:clear   ← clears the notif_type:* cache keys
+  Verify the observer is wired:
+    docker compose exec backend php artisan tinker
+    >>> \\App\\Models\\NotificationType::first()->update(['title' => 'Test']);
+    >>> cache('notif_type:request_submitted');   // should be null
+    >>> // re-trigger a send() and confirm it re-populates
 
 Frontend — rebuild:
   cd registrar-frontend && npm run build
-  (or let your dev server hot-reload automatically)
+  (or let your dev server hot-reload)
 
-Verify the fix worked:
-  1. Trigger a notification (submit a request, change a status).
-  2. In the backend container logs you should see BroadcastEvent
-     dispatched to the 'broadcasts' queue, not 'default'.
-  3. The broadcast-worker container should log the job being picked up
-     within ~1 second.
-  4. Open two browser tabs (student + admin) on the same machine —
-     both should receive their notifications in real time.
-
-If you have Redis available, switching QUEUE_CONNECTION=redis gives
-sub-second broadcast pickup vs the ~1-2 s database polling interval.
+  Verify pagination:
+    Open InboxCenter as a user with >20 notifications.
+    The "Load more" button should appear at the bottom of the list.
+    Clicking it appends the next page without losing real-time items.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """)
 
