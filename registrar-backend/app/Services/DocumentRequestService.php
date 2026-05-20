@@ -9,6 +9,7 @@ use App\Models\SystemUser;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Contracts\NotificationServiceInterface;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Encapsulates all business logic for document requests.
@@ -116,13 +117,23 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      * Update a document request (status, OR number, receipt date).
      * Writes history on status change and notifies the owner.
      * Notifies admins on OR number change (payment verification).
+     *
+     * Runs inside a DB transaction with a row-level lock so that
+     * concurrent admin updates cannot race on the same request.
      */
     public function updateRequest(DocumentRequest $documentRequest, array $validated): DocumentRequest
     {
-        $oldStatusId = $documentRequest->status_id;
-        $oldOrNumber = $documentRequest->or_number;
+        return DB::transaction(function () use ($documentRequest, $validated) {
+            // Re-fetch with a row-level lock so concurrent admin updates
+            // cannot race: the second request will block here until the
+            // first transaction commits, then re-read the committed state.
+            $documentRequest = DocumentRequest::lockForUpdate()
+                ->findOrFail($documentRequest->request_id);
 
-        // Guard: transitioning to ReadyToClaim on a *certificate* request
+            $oldStatusId = $documentRequest->status_id;
+            $oldOrNumber = $documentRequest->or_number;
+
+            // Guard: transitioning to ReadyToClaim on a *certificate* request
         // requires that at least one certificate row already exists in
         // request_certificate (i.e. it has been generated/printed).
         //
@@ -130,57 +141,67 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         // zero rows in request_certificate by design — they must NOT be blocked.
         // Only requests that were submitted WITH certificate items are checked.
         //
-        // Flow:
-        //   1. Does this request have any certificate items? (hasCertificateItems)
-        //   2. If yes, has at least one been generated?     (certCount > 0)
-        //   3. If both fail → 422.  Otherwise → allow.
-        if (
-            isset($validated['status_id']) &&
-            (int) $validated['status_id'] === RequestStatusEnum::ReadyToClaim->value &&
-            (int) $oldStatusId            === RequestStatusEnum::Processing->value
-        ) {
-            // Count rows in request_certificate that were submitted as part of
-            // this request (created during store(), referencing certificate_type).
-            // A non-zero count means the request includes certificate items.
-            $submittedCertCount = $documentRequest->certificates()->count();
+            // Flow:
+            //   1. Does this request have any certificate items? (hasCertificateItems)
+            //   2. If yes, has at least one been generated?     (certCount > 0)
+            //   3. If both fail → 422.  Otherwise → allow.
+            if (
+                isset($validated['status_id']) &&
+                (int) $validated['status_id'] === RequestStatusEnum::ReadyToClaim->value &&
+                (int) $oldStatusId            === RequestStatusEnum::Processing->value
+            ) {
+                // Count rows in request_certificate that were submitted as part of
+                // this request (created during store(), referencing certificate_type).
+                // A non-zero count means the request includes certificate items.
+                $submittedCertCount = $documentRequest->certificates()->count();
 
-            // Only enforce the print-first rule when this request actually
-            // includes certificate items. Document-only requests skip this guard.
-            if ($submittedCertCount > 0) {
-                // All certificate items must have been generated before claiming.
-                // Currently: if the row exists it has been generated (the modal
-                // creates the row). Adjust this condition if a "generated" flag
-                // is added to the model later.
-                $generatedCount = $documentRequest->certificates()
-                    ->whereNotNull('certificate_type_id')
-                    ->count();
+                // Only enforce the print-first rule when this request actually
+                // includes certificate items. Document-only requests skip this guard.
+                if ($submittedCertCount > 0) {
+                    // All certificate items must have been generated before claiming.
+                    // Currently: if the row exists it has been generated (the modal
+                    // creates the row). Adjust this condition if a "generated" flag
+                    // is added to the model later.
+                    $generatedCount = $documentRequest->certificates()
+                        ->whereNotNull('certificate_type_id')
+                        ->count();
 
-                if ($generatedCount === 0) {
-                    abort(422, 'Certificate must be generated before marking as Ready to Claim.');
+                    if ($generatedCount === 0) {
+                        abort(422, 'Certificate must be generated before marking as Ready to Claim.');
+                    }
                 }
             }
-        }
 
-        $documentRequest->update($validated);
+            // Enforce allowed status transitions (see RequestStatusEnum::allowedTransitions).
+            if (isset($validated['status_id'])) {
+                $currentStatus = RequestStatusEnum::from((int) $oldStatusId);
+                $targetStatus  = RequestStatusEnum::from((int) $validated['status_id']);
+                if (!in_array($targetStatus, $currentStatus->allowedTransitions(), true)) {
+                    abort(422, "Transition from {$currentStatus->name} to {$targetStatus->name} is not allowed.");
+                }
+            }
 
-        if (isset($validated['status_id']) && (int) $validated['status_id'] !== (int) $oldStatusId) {
-            $this->recordStatusHistory($documentRequest, $oldStatusId);
-            $this->notifyOwnerOfStatusChange($documentRequest);
-        }
+            $documentRequest->update($validated);
 
-        if (
-            isset($validated['or_number']) &&
-            $documentRequest->or_number !== $oldOrNumber &&
-            !empty($documentRequest->or_number)
-        ) {
-            $this->notificationService->sendToAdmins(
-                triggerEvent: 'admin_payment_verification',
-                data:         ['request_id' => $documentRequest->request_id],
-                requestId:    $documentRequest->request_id,
-            );
-        }
+            if (isset($validated['status_id']) && (int) $validated['status_id'] !== (int) $oldStatusId) {
+                $this->recordStatusHistory($documentRequest, $oldStatusId);
+                $this->notifyOwnerOfStatusChange($documentRequest);
+            }
 
-        return $documentRequest;
+            if (
+                isset($validated['or_number']) &&
+                $documentRequest->or_number !== $oldOrNumber &&
+                !empty($documentRequest->or_number)
+            ) {
+                $this->notificationService->sendToAdmins(
+                    triggerEvent: 'admin_payment_verification',
+                    data:         ['request_id' => $documentRequest->request_id],
+                    requestId:    $documentRequest->request_id,
+                );
+            }
+
+            return $documentRequest;
+        }); // end DB::transaction
     }
 
     // -------------------------------------------------------------------------
