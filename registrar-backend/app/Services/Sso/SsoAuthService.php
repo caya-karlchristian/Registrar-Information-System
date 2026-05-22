@@ -3,6 +3,7 @@
 namespace App\Services\Sso;
 
 use App\Exceptions\IdpException;
+use App\Exceptions\IdpUnavailableException;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
 use Illuminate\Http\Request;
@@ -75,9 +76,20 @@ class SsoAuthService
         string  $password,
         Request $request,
     ): array {
-        $code        = $this->idpClient->loginAndGetCode($email, $password);
-        $accessToken = $this->idpClient->exchangeCode($code);
-        $profile     = $this->idpClient->fetchUserProfile($accessToken);
+        try {
+            $code        = $this->idpClient->loginAndGetCode($email, $password);
+            $accessToken = $this->idpClient->exchangeCode($code);
+            $profile     = $this->idpClient->fetchUserProfile($accessToken);
+        } catch (IdpException $e) {
+            // Re-throw connectivity errors as a distinct type so the
+            // caller can fall back to local auth without treating a genuine
+            // "wrong password" from the IDP as a connectivity issue.
+            if ($this->idpClient->lastErrorWasConnectivity()) {
+                throw new IdpUnavailableException($e->getMessage(), $e->getCode(), $e);
+            }
+            throw $e;
+        }
+
         $idpResponse = array_merge($profile, [
             'access_token' => $accessToken,
             'user_id'      => $profile['id'] ?? null,
