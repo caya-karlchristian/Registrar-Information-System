@@ -115,14 +115,9 @@ export const AuthProvider = ({ children }) => {
     resetEcho();
     setUser(null);
     try {
-      // logoutRequest() handles the redirect internally:
-      //   · IDP session  → window.location.href = idp_logout_url
-      //   · Local session → window.location.href = "/"
-      // We still catch errors so the user is never stuck on a broken state.
       await logoutRequest();
     } catch (err) {
       console.error("Logout request failed:", err);
-      // Fallback: navigate home via React Router so at least the UI resets.
       navigate("/", { replace: true });
     }
   };

@@ -53,7 +53,10 @@ class AuthController extends Controller
             $result = $this->ssoAuthService->loginWithCredentials($email, $password, $request);
 
             $user  = $result['user'];
-            $token = $result['token'];
+            // Re-issue with a name that encodes the auth method so
+            // logout() can skip the IdP call for local sessions.
+            $user->tokens()->delete();
+            $token = $user->createToken('sanctum-idp')->plainTextToken;
 
             $user->loadIdentityRelations();
 
@@ -98,7 +101,8 @@ class AuthController extends Controller
         }
 
         $user->loadIdentityRelations();
-        $token = $user->createToken('sanctum')->plainTextToken;
+        // Stamp 'sanctum-local' so logout() knows to skip the IdP redirect.
+        $token = $user->createToken('sanctum-local')->plainTextToken;
 
         $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGIN);
 
@@ -141,10 +145,18 @@ class AuthController extends Controller
     // -------------------------------------------------------------------------
     public function logout(Request $request)
     {
-        $logoutUrl = $this->ssoAuthService->logout($request->user(), $request);
+        // Determine whether this session was established via the IdP or local
+        // auth by reading the Sanctum token name stamped at login time.
+        // 'sanctum-local' → local auth (explicit or IDP-fallback).
+        // 'sanctum-idp'   → full IDP login.
+        // Any other value is treated as IDP to stay safe.
+        $tokenName  = $request->user()->currentAccessToken()?->name ?? 'sanctum-idp';
+        $authMethod = str_starts_with($tokenName, 'sanctum-local') ? 'local' : 'idp';
+
+        $logoutUrl = $this->ssoAuthService->logout($request->user(), $request, $authMethod);
 
         return response()
-            ->json(['logout_url' => $logoutUrl])
+            ->json(['logout_url' => $logoutUrl])   // null for local-auth sessions
             ->withCookie(\Illuminate\Support\Facades\Cookie::make(
                 name:     'token',
                 value:    '',
