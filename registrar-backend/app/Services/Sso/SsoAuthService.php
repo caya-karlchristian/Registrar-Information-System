@@ -112,13 +112,22 @@ class SsoAuthService
     /**
      * Log the user out.
      *
-     * @return string  The IdP logout URL to redirect the frontend to.
+     * @param  string $authMethod  'idp' or 'local'.  When 'local', the IdP
+     *                             revocation call is skipped (the IDP never
+     *                             issued a session for this login) and null
+     *                             is returned so the frontend redirects to "/"
+     *                             instead of the IdP logout page.
+     * @return string|null  IdP logout URL, or null for local-auth sessions.
      */
-    public function logout(SystemUser $user, Request $request): string
+    public function logout(SystemUser $user, Request $request, string $authMethod = 'idp'): ?string
     {
         $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGOUT);
 
-        if ($user->idp_access_token) {
+        $isLocal = $authMethod === 'local';
+
+        // Only call the IdP when this session was established through it.
+        // Local-auth sessions have no IdP token to revoke.
+        if (!$isLocal && $user->idp_access_token) {
             try {
                 $this->idpClient->logout($user->idp_access_token, $user->idp_user_id);
             } catch (\Exception $e) {
@@ -127,6 +136,13 @@ class SsoAuthService
         }
 
         $user->tokens()->delete();
+
+        if ($isLocal) {
+            Log::info('SSO: local-auth logout — skipping IdP redirect', [
+                'user_id' => $user->user_id,
+            ]);
+            return null;
+        }
 
         // post_logout_redirect_uri tells the IdP where to send the browser after
         // it clears its own session.  Without it the IdP logs:
