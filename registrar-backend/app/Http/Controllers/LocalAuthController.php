@@ -56,7 +56,8 @@ class LocalAuthController extends Controller
         }
 
         $user->loadIdentityRelations();
-        $token = $user->createToken('sanctum')->plainTextToken;
+        // Stamp 'sanctum-local' so logout() knows to skip the IdP redirect.
+        $token = $user->createToken('sanctum-local')->plainTextToken;
 
         $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGIN);
 
