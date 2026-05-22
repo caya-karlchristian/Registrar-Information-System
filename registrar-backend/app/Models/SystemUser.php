@@ -43,9 +43,10 @@ class SystemUser extends Authenticatable
         'email',
         'password',
         'role_id',   // needed when creating users programmatically
-        'status', 
-        'idp_user_id',  
+        'status',
+        'idp_user_id',
         'idp_access_token',
+        'local_auth_enabled', // 1 = local bcrypt password is active and usable as IDP fallback
     ];
 
     protected $hidden = [
