@@ -7,6 +7,7 @@ use App\Models\Notification;
 use App\Models\NotificationType;
 use App\Models\SystemUser;
 use App\Jobs\SendBulkNotificationJob;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use App\Contracts\NotificationServiceInterface;
 use Illuminate\Support\Facades\Log;
@@ -62,9 +63,15 @@ class NotificationService implements NotificationServiceInterface
 
         try {
             // Step 1: Find the notification template
-            $type = NotificationType::where('trigger_event', $triggerEvent)
-                ->where('is_active', true)
-                ->first();
+            // Cache the lookup — notification types change only via seeder/admin,
+            // so a 6-hour TTL is safe and avoids a DB hit on every send().
+            $type = Cache::remember(
+                "notif_type:{$triggerEvent}",
+                now()->addHours(6),
+                fn () => NotificationType::where('trigger_event', $triggerEvent)
+                             ->where('is_active', true)
+                             ->first()
+            );
 
             if (! $type) {
                 Log::warning("NotificationService: unknown trigger_event '{$triggerEvent}'");
@@ -77,9 +84,15 @@ class NotificationService implements NotificationServiceInterface
             //   → "Payment verified for request #42"
             $message = $this->buildMessage($type->message_template, $data);
 
+            // Capture scalar values from the type NOW, before the transaction,
+            // so we don't rely on a loaded relation inside the queued broadcast job.
+            // SerializesModels strips loaded relations from the event before queuing.
+            $typeTitle        = $type->title;
+            $typeTriggerEvent = $type->trigger_event;
+
             // Step 3 + 4: Save to DB and broadcast — atomically
             return DB::transaction(function () use (
-                $recipient, $type, $message, $data, $requestId
+                $recipient, $type, $typeTitle, $typeTriggerEvent, $message, $data, $requestId
             ) {
                 $notification = Notification::create([
                     'notification_type_id' => $type->notification_type_id,
@@ -89,13 +102,12 @@ class NotificationService implements NotificationServiceInterface
                     'request_id'           => $requestId,
                 ]);
 
-                // Load the type relation so broadcastWith() can access
-                // $notification->type->title without an extra query
-                $notification->load('type');
-
                 // Fire the broadcast event — Reverb picks this up and
-                // pushes it to the frontend over WebSockets instantly
-                broadcast(new NotificationSent($notification, $recipient));
+                // pushes it to the frontend over WebSockets instantly.
+                // We pass typeTitle + typeTriggerEvent as plain strings so
+                // broadcastWith() never touches the relation (which would be
+                // stripped by SerializesModels before the job runs).
+                broadcast(new NotificationSent($notification, $recipient, $typeTitle, $typeTriggerEvent));
 
                 return $notification;
             });

@@ -42,9 +42,6 @@ const InboxCenter = () => {
   const {
     notifications,
     loading,
-    loadingMore,
-    hasMore,
-    loadMore,
     markAsRead,
     dismiss,
   } = useNotifications();
