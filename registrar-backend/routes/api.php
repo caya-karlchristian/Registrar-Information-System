@@ -159,3 +159,20 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::delete('announcements/{announcement}',     [AnnouncementController::class, 'destroy']);
     });
 });
+/*
+|--------------------------------------------------------------------------
+| LOCAL AUTH ROUTES  (added by apply_local_auth.py)
+|--------------------------------------------------------------------------
+| POST /api/auth/local-login         — always local, bypasses IDP
+| POST /api/auth/local-password      — superadmin: set a user's local pwd
+| GET  /api/auth/local-auth-status   — superadmin: list local-auth coverage
+*/
+use App\Http\Controllers\LocalAuthController;
+
+Route::post('/auth/local-login', [LocalAuthController::class, 'login'])
+    ->middleware('throttle:10,1');
+
+Route::middleware(['auth:sanctum', 'role:4'])->group(function () {
+    Route::post('/auth/local-password',    [LocalAuthController::class, 'setPassword']);
+    Route::get('/auth/local-auth-status',  [LocalAuthController::class, 'status']);
+});
