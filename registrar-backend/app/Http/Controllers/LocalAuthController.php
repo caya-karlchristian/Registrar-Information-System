@@ -68,14 +68,15 @@ class LocalAuthController extends Controller
         return response()
             ->json(['user' => new UserResource($user)])
             ->cookie(
-                name:     'token',
-                value:    $token,
-                minutes:  60 * 24 * 7,
-                path:     '/',
-                domain:   config('session.domain'),
-                secure:   config('session.secure_cookie'),
-                httpOnly: true,
-                sameSite: config('session.same_site'),
+                    'token',
+                    $token,
+                    60 * 24 * 7,
+                    '/',
+                    config('session.domain'),
+                    config('session.secure_cookie'),
+                    true,
+                    false,
+                    config('session.same_site'),
             );
     }
 

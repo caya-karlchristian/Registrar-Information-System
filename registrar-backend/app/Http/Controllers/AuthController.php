@@ -61,14 +61,15 @@ class AuthController extends Controller
                 ->json(['user' => new UserResource($user)])
                 ->header('X-Auth-Method', 'idp')
                 ->cookie(
-                    name:     'token',
-                    value:    $token,
-                    minutes:  60 * 24 * 7,
-                    path:     '/',
-                    domain:   config('session.domain'),
-                    secure:   config('session.secure_cookie'),
-                    httpOnly: true,
-                    sameSite: config('session.same_site'),
+                    'token',
+                    $token,
+                    60 * 24 * 7,
+                    '/',
+                    config('session.domain'),
+                    config('session.secure_cookie'),
+                    true,
+                    false,
+                    config('session.same_site'),
                 );
 
         } catch (IdpUnavailableException $e) {
@@ -113,14 +114,15 @@ class AuthController extends Controller
             ])
             ->header('X-Auth-Method', 'local')
             ->cookie(
-                name:     'token',
-                value:    $token,
-                minutes:  60 * 24 * 7,
-                path:     '/',
-                domain:   config('session.domain'),
-                secure:   config('session.secure_cookie'),
-                httpOnly: true,
-                sameSite: config('session.same_site'),
+                'token',
+                $token,
+                60 * 24 * 7,
+                '/',
+                config('session.domain'),
+                config('session.secure_cookie'),
+                true,
+                false,
+                config('session.same_site'),
             );
     }
 
