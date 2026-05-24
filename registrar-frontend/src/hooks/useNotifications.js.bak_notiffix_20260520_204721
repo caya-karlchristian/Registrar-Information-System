@@ -8,9 +8,6 @@ export const useNotifications = (onNewNotification = null) => {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount]     = useState(0);
     const [loading, setLoading]             = useState(true);
-    const [loadingMore, setLoadingMore]     = useState(false);
-    const [hasMore, setHasMore]             = useState(false);
-    const pageRef                           = useRef(1);
 
     // Keep a ref that always points at the latest callback so the Echo
     // subscription effect does not need to depend on it — this prevents
@@ -23,47 +20,18 @@ export const useNotifications = (onNewNotification = null) => {
 
     const fetchNotifications = useCallback(async () => {
         try {
-            // Reset to page 1 on every full refresh (login, user switch, refetch).
-            pageRef.current = 1;
             const [notifRes, countRes] = await Promise.all([
-                api.get('/notifications', { params: { page: 1 } }),
+                api.get('/notifications'),
                 api.get('/notifications/unread-count'),
             ]);
-            const meta = notifRes.data.meta ?? {};
             setNotifications(notifRes.data.data ?? []);
             setUnreadCount(countRes.data.count ?? 0);
-            // hasMore is true when the backend has at least one more page.
-            setHasMore((meta.current_page ?? 1) < (meta.last_page ?? 1));
         } catch (err) {
             console.error('[useNotifications] fetch failed:', err);
         } finally {
             setLoading(false);
         }
     }, []);
-
-    // Append the next page of notifications to the existing list.
-    // Keeps real-time items that arrived via WebSocket at the top untouched.
-    const loadMore = useCallback(async () => {
-        if (loadingMore || !hasMore) return;
-        try {
-            setLoadingMore(true);
-            const nextPage = pageRef.current + 1;
-            const { data } = await api.get('/notifications', { params: { page: nextPage } });
-            const meta = data.meta ?? {};
-            // Deduplicate: WebSocket may have prepended items already on this page.
-            setNotifications(prev => {
-                const existingIds = new Set(prev.map(n => n.id));
-                const fresh = (data.data ?? []).filter(n => !existingIds.has(n.id));
-                return [...prev, ...fresh];
-            });
-            pageRef.current = nextPage;
-            setHasMore((meta.current_page ?? nextPage) < (meta.last_page ?? nextPage));
-        } catch (err) {
-            console.error('[useNotifications] loadMore failed:', err);
-        } finally {
-            setLoadingMore(false);
-        }
-    }, [loadingMore, hasMore]);
 
     const markAsRead = useCallback(async (id) => {
         try {
@@ -92,10 +60,10 @@ export const useNotifications = (onNewNotification = null) => {
 
     const dismiss = useCallback(async (id) => {
         try {
-            // Controller now returns unread_count — no need for a second fetch.
-            const { data } = await api.delete(`/notifications/${id}`);
+            await api.delete(`/notifications/${id}`);
             setNotifications(prev => prev.filter(n => n.id !== id));
-            setUnreadCount(data.unread_count ?? 0);
+            const { data } = await api.get('/notifications/unread-count');
+            setUnreadCount(data.count ?? 0);
         } catch (err) {
             console.error('[useNotifications] dismiss failed:', err);
         }
@@ -181,16 +149,5 @@ export const useNotifications = (onNewNotification = null) => {
         };
     }, [user?.user_id, fetchNotifications]);
 
-    return {
-        notifications,
-        unreadCount,
-        loading,
-        loadingMore,
-        hasMore,
-        loadMore,
-        markAsRead,
-        markAllAsRead,
-        dismiss,
-        refetch: fetchNotifications,
-    };
+    return { notifications, unreadCount, loading, markAsRead, markAllAsRead, dismiss, refetch: fetchNotifications };
 };

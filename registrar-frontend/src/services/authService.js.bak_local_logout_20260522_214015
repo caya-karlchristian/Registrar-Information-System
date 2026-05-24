@@ -16,16 +16,7 @@ export const logoutRequest = async () => {
   try {
     const response  = await api.post("/logout");
     const logoutUrl = response.data?.logout_url;
-
-    setTimeout(() => {
-      if (logoutUrl) {
-        // IDP session — let the IdP clear its own cookies then redirect back.
-        window.location.href = logoutUrl;
-      } else {
-        // Local-auth session — no IdP involved, go straight home.
-        window.location.href = "/";
-      }
-    }, 0);
+    setTimeout(() => { window.location.href = logoutUrl || "/"; }, 0);
   } catch {
     // Backend unreachable — still navigate home so the user is never trapped.
     setTimeout(() => { window.location.href = "/"; }, 0);

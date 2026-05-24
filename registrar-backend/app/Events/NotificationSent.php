@@ -49,6 +49,13 @@ class NotificationSent implements ShouldBroadcast
     public function __construct(
         public readonly Notification $notification,
         public readonly SystemUser   $recipient,
+        // Pass title and trigger_event as plain strings rather than reading
+        // them from the relation inside broadcastWith().
+        // SerializesModels strips loaded relations before queuing, so
+        // $notification->type would be null (or trigger a lazy-load) when
+        // BroadcastEvent runs. Scalars survive serialization untouched.
+        public readonly string       $typeTitle        = '',
+        public readonly string       $typeTriggerEvent = '',
     ) {}
 
     // -------------------------------------------------------
@@ -67,14 +74,17 @@ class NotificationSent implements ShouldBroadcast
     // -------------------------------------------------------
     // WHICH QUEUE TO DISPATCH THE BROADCAST JOB ON
     // -------------------------------------------------------
-    // Routing to a dedicated 'broadcasts' queue keeps WebSocket
-    // pushes from being delayed by slow or long-running default-queue
-    // jobs.  The broadcast-worker container drains this queue with a
-    // short sleep (1 s) and timeout (30 s) for low latency.
+    // broadcastQueue() is the method Laravel 10+ BroadcastEvent reads to
+    // decide which queue the broadcast job lands on.
+    // viaQueues() is the Queueable-trait method for regular ShouldQueue jobs
+    // and is silently ignored for ShouldBroadcast events — using it was the
+    // root cause of all broadcast jobs landing on 'default' instead of here.
+    // The broadcast-worker container drains 'broadcasts' with --sleep=1 and
+    // --timeout=30 for low-latency delivery.
     // -------------------------------------------------------
-    public function viaQueues(): array
+    public function broadcastQueue(): string
     {
-        return ['broadcasts'];
+        return 'broadcasts';
     }
 
 
@@ -86,9 +96,13 @@ class NotificationSent implements ShouldBroadcast
         $data = $this->notification->data ?? [];
         return [
             'id'           => $this->notification->id,
-            'title'        => $this->notification->type->title,
+            // Use the scalar fields passed at construction time instead of
+            // accessing the relation. SerializesModels strips loaded relations
+            // before the job is queued, so $notification->type would be null
+            // (or fire a lazy load) when this runs inside BroadcastEvent.
+            'title'        => $this->typeTitle,
             'message'      => $data['message'] ?? '',
-            'type'         => $this->notification->type->trigger_event,
+            'type'         => $this->typeTriggerEvent,
             'request_id'   => $this->notification->request_id,
             'read_at'      => $this->notification->read_at,
             'created_at'   => $this->notification->created_at->toISOString(),

@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 class DocumentRequest extends Model
 {
+    use SoftDeletes;
+
     protected $table      = 'document_request';
     protected $primaryKey = 'request_id';
     public    $timestamps = false;
@@ -27,6 +30,7 @@ class DocumentRequest extends Model
     protected $casts = [
         'requested_at' => 'datetime',
         'receipt_date' => 'date',
+        'deleted_at'   => 'datetime',
     ];
 
     /**
