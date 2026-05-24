@@ -51,7 +51,8 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      SESSION_SAME_SITE: none
+      SESSION_SAME_SITE: lax        
+      SESSION_SECURE_COOKIE: false  
       ALUMNI_API_URL: http://host.docker.internal/api
       ALUMNI_API_TOKEN: 1|lyXSPwWmlf5YYbHZVIbmTR1MhKHhS7F3eZUWU2Ur
       OCMS_BASE_URL: ${OCMS_BASE_URL}
@@ -106,7 +107,8 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      SESSION_SAME_SITE: none
+      SESSION_SAME_SITE: lax        
+      SESSION_SECURE_COOKIE: false  
     ports:
       - "8080:8080"
     depends_on:
@@ -163,7 +165,8 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      SESSION_SAME_SITE: none
+      SESSION_SAME_SITE: lax        
+      SESSION_SECURE_COOKIE: false  
     depends_on:
       backend:
         condition: service_started
@@ -233,7 +236,8 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      SESSION_SAME_SITE: none
+      SESSION_SAME_SITE: lax        
+      SESSION_SECURE_COOKIE: false  
     depends_on:
       backend:
         condition: service_started
@@ -286,7 +290,8 @@ services:
       AWS_BUCKET: ${AWS_BUCKET}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      SESSION_SAME_SITE: none
+      SESSION_SAME_SITE: lax        
+      SESSION_SECURE_COOKIE: false  
     depends_on:
       backend:
         condition: service_started
