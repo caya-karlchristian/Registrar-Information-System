@@ -1,14 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import InputGroup from '../components/InputGroup.jsx';
 import CheckboxItem from '../components/Checkbox.jsx';
 import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
 import ErrorToast from "../components/ErrorToast.jsx";
-import ImageUploader from "../components/ImageUploader.jsx";
 import { getDocumentTypes, getCertifications, getRequestPurposes, createDocumentRequest } from "../services/api.js";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 import { getTodayDate } from "../utils/helpers";
+import { DOC_TYPE_MAP, CERTIFICATION_MAP } from '../utils/constants';
 import qrCode from "../assets/qrcode.png";
 import { useTheme } from '../context/ThemeContext';
 
@@ -16,7 +17,7 @@ import { useReferenceData } from '../context/ReferenceDataContext';
 const ALUMNI_ACCESS_IDS = [2, 3];
 
 const AlumniRequestForm = () => {
-  const { docTypeName, purposeName, certName } = useReferenceData();
+  const { docTypeName, certName, purposes: referencePurposes } = useReferenceData();
   const { isDark } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -53,7 +54,7 @@ const AlumniRequestForm = () => {
         const purposeRes = await getRequestPurposes();
         setAvailablePurposes(purposeRes.data ?? []);
       } catch (err) {
-        console.warn("Request purposes API unavailable.");
+        console.warn("Request purposes API unavailable, using reference data context.");
       }
     };
     loadOptions();
@@ -70,7 +71,6 @@ const AlumniRequestForm = () => {
     dateOfPayment: '',
     documentCopies: {},
     certCopies: {},
-    torImage: null,
   });
 
   // Helper to update text inputs
@@ -101,10 +101,6 @@ const AlumniRequestForm = () => {
 
       return { ...prev, [name]: checked };
     });
-  };
-
-  const handleImageChange = (name, file) => {
-    setFormData(prev => ({ ...prev, [name]: file }));
   };
 
   const handlePreSubmit = (e) => {
@@ -196,11 +192,6 @@ const AlumniRequestForm = () => {
       return;
     }
 
-    if (currentStep === 3 && hasTOR && !formData.torImage) {
-      setErrorMessage("Please upload your 1x1 size photo for TOR request.");
-      return;
-    }
-
     if (currentStep < finalStep) setCurrentStep(currentStep + 1);
   };
 
@@ -217,7 +208,8 @@ const AlumniRequestForm = () => {
       const selectedPurpose = availablePurposes.find(
         p => p.purpose_name === formData.purposeOfRequest
       );
-      const purposeId = selectedPurpose?.request_purpose_id;
+      const purposeId = selectedPurpose?.request_purpose_id
+        ?? referencePurposes.find(p => p.purpose_name === formData.purposeOfRequest)?.request_purpose_id;
 
       // Map all selected certification names to their IDs
       const certificates = formData.certification
@@ -263,7 +255,6 @@ const AlumniRequestForm = () => {
       dateOfPayment: "",
       documentCopies: {},
       certCopies: {},
-      torImage: null,
     });
     setErrorMessage("");
     setIsLoading(false);
@@ -286,7 +277,7 @@ const AlumniRequestForm = () => {
 
   const purposeOptions = availablePurposes.length > 0
     ? availablePurposes.map(p => p.purpose_name)
-    : [];
+    : referencePurposes.map(p => p.purpose_name);
 
 
   const documentOptions = availableDocs.length > 0
@@ -400,7 +391,7 @@ const AlumniRequestForm = () => {
             
             {currentStep === 2 && (
               <div className="space-y-6 animate-fadeIn ">
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-10">
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-5">
                   <MultiSelectDropdown 
                     name="documentsRequested"
                     label="Documents Requested (You may select multiple)"
@@ -452,15 +443,6 @@ const AlumniRequestForm = () => {
                       checked={formData.doneRequest}
                       onChange={handleCheckboxChange}
                     />
-                    <div className={`mt-4 pt-4 p-4 rounded-lg border ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/10'}`}>
-                      <ImageUploader
-                        label="1x1 Size Photo (Required for TOR)"
-                        name="torImage"
-                        required={true}
-                        value={formData.torImage}
-                        onChange={handleImageChange}
-                      />
-                    </div>
                   </div>
                 </div>
               </div>

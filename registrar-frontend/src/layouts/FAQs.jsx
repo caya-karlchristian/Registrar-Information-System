@@ -152,18 +152,18 @@ const FAQPage = () => {
              {/* Email Registrar Section */}
               <div className={`${isDark ? 'mt-5 overflow-hidden rounded-2xl bg-[#242526] border border-[#3e4042] shadow-xl' : 'mt-5 overflow-hidden rounded-2xl bg-white border border-[#800000] shadow-xl'} transition-all duration-300 hover:shadow-2xl`}>
                 <a
-                 href="https://mail.google.com/mail/?view=cm&fs=1&to=registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern"
+                 href="https://mail.google.com/mail/?view=cm&fs=1&to=taguig@pup.edu.ph%2Ctaguig.registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern"
                   className="group flex items-center gap-4 border-b border-gray-100 p-4 text-left transition-all duration-200 hover:bg-red-50"
                 >
                   <div className={`${isDark ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#3a3b3c] text-[#eebc48]' : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-[#800000]'} transition-transform group-hover:scale-110`}>
                     <EnvelopeIcon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-black uppercase tracking-wide text-[#800000]">
+                    <p className={`${isDark ? 'text-xs font-black uppercase tracking-wide text-[#e4e6eb]' : 'text-xs font-black uppercase tracking-wide text-[#800000]'}`}>
                       Compose Email
                     </p>
                     <p className="mt-0.5 text-xs font-bold text-gray-500 underline group-hover:text-[#800000]">
-                      registrar@pup.edu.ph
+                      taguig@pup.edu.ph and taguig.registrar@pup.edu.ph
                     </p>
                   </div>
                 </a>
@@ -172,7 +172,7 @@ const FAQPage = () => {
                   <div className="text-left">
                     <InformationCircleIcon className="float-left mr-3 mt-1 h-6 w-6 text-amber-500" />
                     <p className={`${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} text-justify text-xs font-medium leading-relaxed`}>
-                      <span className={`${isDark ? 'font-bold text-[#e4e6eb] text-xs' : 'font-bold text-gray-900 text-xs'}`}>Submission Guide:</span> Ensure your message includes your <span className="text-[#800000]">full name</span>, <span className="text-[#800000]">student number</span>, and a detailed description of your <span className="text-[#800000]">concern or purpose</span> for faster processing.
+                      <span className={`${isDark ? 'font-bold text-[#e4e6eb] text-xs' : 'font-bold text-gray-900 text-xs'}`}>Submission Guide:</span> Ensure your message includes your <span className={`${isDark ? 'text-[#e4e6eb]' : 'text-[#800000]'}`}>full name</span>, <span className={`${isDark ? 'text-[#e4e6eb]' : 'text-[#800000]'}`}>student number</span>, and a detailed description of your <span className={`${isDark ? 'text-[#e4e6eb]' : 'text-[#800000]'}`}>concern or purpose</span> for faster processing.
                     </p>
                   </div>
                 </div>
@@ -265,18 +265,18 @@ const FAQPage = () => {
 
         <div className={`${isDark ? 'mt-10 md:hidden overflow-hidden rounded-2xl bg-[#242526] border border-[#3e4042] shadow-xl transition-all duration-300 hover:shadow-2xl' : 'mt-10 md:hidden overflow-hidden rounded-2xl bg-white border border-[#800000] shadow-xl transition-all duration-300 hover:shadow-2xl'}`}>
           <a
-            href="https://mail.google.com/mail/?view=cm&fs=1&to=registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern"
+            href="https://mail.google.com/mail/?view=cm&fs=1&to=taguig@pup.edu.ph%2Ctaguig.registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern"
             className={`${isDark ? 'group flex items-center gap-4 border-b border-[#3e4042] p-4 text-left transition-all duration-200 hover:bg-[#3a3b3c]' : 'group flex items-center gap-4 border-b border-gray-100 p-4 text-left transition-all duration-200 hover:bg-red-50'}`}
           >
             <div className={`${isDark ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#3a3b3c] text-[#eebc48] transition-transform group-hover:scale-110' : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-[#800000] transition-transform group-hover:scale-110'}`}>
               <EnvelopeIcon className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className={`${isDark ? 'text-xs font-black uppercase tracking-wide text-[#eebc48]' : 'text-xs font-black uppercase tracking-wide text-[#800000]'}`}>
+              <p className={`${isDark ? 'text-xs font-black uppercase tracking-wide text-[#e4e6eb]' : 'text-xs font-black uppercase tracking-wide text-[#800000]'}`}>
                 Compose Email
               </p>
               <p className={`${isDark ? 'mt-0.5 text-xs font-bold text-[#b0b3b8] underline group-hover:text-[#e4e6eb]' : 'mt-0.5 text-xs font-bold text-gray-500 underline group-hover:text-[#800000]'}`}>
-                registrar@pup.edu.ph
+                taguig@pup.edu.ph and taguig.registrar@pup.edu.ph
               </p>
             </div>
           </a>
@@ -285,7 +285,7 @@ const FAQPage = () => {
             <div className="text-left">
               <InformationCircleIcon className={`${isDark ? 'float-left mr-3 mt-1 h-6 w-6 text-[#eebc48]' : 'float-left mr-3 mt-1 h-6 w-6 text-amber-500'}`} />
               <p className={`${isDark ? 'text-justify text-xs font-medium text-[#b0b3b8] leading-relaxed' : 'text-justify text-xs font-medium text-gray-600 leading-relaxed'}`}>
-                <span className={`${isDark ? 'font-bold text-[#e4e6eb] text-xs' : 'font-bold text-gray-900 text-xs'}`}>Submission Guide:</span> Ensure your message includes your <span className="text-[#800000]">full name</span>, <span className="text-[#800000]">student number</span>, and a detailed description of your <span className="text-[#800000]">concern or purpose</span> for faster processing.
+                <span className={`${isDark ? 'font-bold text-[#e4e6eb] text-xs' : 'font-bold text-gray-900 text-xs'}`}>Submission Guide:</span> Ensure your message includes your <span className={`${isDark ? 'text-[#e4e6eb]' : 'text-[#800000]'}`}>full name</span>, <span className={`${isDark ? 'text-[#e4e6eb]' : 'text-[#800000]'}`}>student number</span>, and a detailed description of your <span className={`${isDark ? 'text-[#e4e6eb]' : 'text-[#800000]'}`}>concern or purpose</span> for faster processing.
               </p>
             </div>
           </div>
