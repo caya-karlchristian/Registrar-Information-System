@@ -147,15 +147,22 @@ const LandingPage = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 px-4 bg-pup-dark-maroon hover:bg-[#600000] disabled:opacity-60 text-white font-bold rounded-lg shadow-md transition-all transform active:scale-95"
-            >
-              Sign In
-            </button>
+            <div className="mt-3 space-y-3">
+              <button
+                type="button"
+                onClick={handleLocalLogin}
+                disabled={loading}
+                className="w-full py-3.5 px-4 bg-[#800000] hover:bg-[#4a0000] disabled:opacity-60 text-white font-bold rounded-lg shadow-md transition-all transform active:scale-95"
+              >
+                Sign In Locally
+              </button>
+              <p className="text-center text-gray-400 text-[11px] leading-snug">
+                Local login uses your RIS password directly — no IDP required.
+                Only available if your account has local auth enabled.
+              </p>
+            </div>
           </form>
-
+          
           <div className="w-full flex items-center my-4">
             <div className="flex-1 border-t border-gray-300" />
             <span className="px-3 text-xs text-gray-400 font-medium">OR</span>
@@ -169,26 +176,6 @@ const LandingPage = () => {
           >
             Log in with IDP
           </a>
-
-          {/* Local-only login (shown when IDP may be down) */}
-          <details className="w-full mt-4 text-xs text-gray-400">
-            <summary className="cursor-pointer hover:text-gray-600 select-none text-center">
-              Having trouble? Use local login
-            </summary>
-            <form onSubmit={handleLocalLogin} className="mt-3 space-y-3">
-              <p className="text-center text-gray-400 text-[11px] leading-snug">
-                Local login uses your RIS password directly — no IDP required.
-                Only available if your account has local auth enabled.
-              </p>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 px-4 bg-gray-700 hover:bg-gray-800 disabled:opacity-60 text-white font-bold rounded-lg shadow-md transition-all transform active:scale-95 text-sm"
-              >
-                Sign In Locally
-              </button>
-            </form>
-          </details>
 
           <div className="mt-5 text-[10px] text-gray-400 leading-tight text-center">
             <p>
