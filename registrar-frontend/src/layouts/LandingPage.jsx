@@ -34,8 +34,17 @@ const LandingPage = () => {
   // ── IDP-first Sign In ────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    // client-side: show one validation error at a time
     setLoginError(null);
+    if (!email) {
+      setLoginError("Email is required.");
+      return;
+    }
+    if (!password) {
+      setLoginError("Password is required.");
+      return;
+    }
+    setLoading(true);
     setAuthMode(null);
     try {
       await login(email, password);
@@ -60,8 +69,16 @@ const LandingPage = () => {
   // ── Explicit local-only login ────────────────────────────────────────────
   const handleLocalLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setLoginError(null);
+    if (!email) {
+      setLoginError("Email is required.");
+      return;
+    }
+    if (!password) {
+      setLoginError("Password is required.");
+      return;
+    }
+    setLoading(true);
     setAuthMode(null);
     try {
       await localLogin(email, password);
@@ -136,14 +153,12 @@ const LandingPage = () => {
             <InputField
               type="email"
               placeholder="Email Address"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
             <InputField
               type="password"
               placeholder="Password"
-              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -206,7 +221,7 @@ const LandingPage = () => {
   );
 };
 
-const InputField = ({ type, placeholder, required, value, onChange }) => {
+const InputField = ({ type, placeholder, value, onChange }) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
   const inputType  = isPassword ? (showPassword ? "text" : "password") : type;
@@ -218,7 +233,6 @@ const InputField = ({ type, placeholder, required, value, onChange }) => {
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        required={required}
         className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#eebc48] focus:bg-white transition-all text-sm text-gray-700 placeholder-gray-400 shadow-sm pr-11"
       />
       {isPassword && (
