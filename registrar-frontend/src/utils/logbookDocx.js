@@ -1,0 +1,403 @@
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle, ImageRun, Header, Footer, PageOrientation, VerticalAlign } from 'docx';
+import { saveAs } from 'file-saver';
+import certificate_footer from '../assets/certificate_footer.png';
+
+const fetchImageData = async (src) => {
+  if (!src) return null;
+  try {
+    const res = await fetch(src);
+    return await res.arrayBuffer();
+  } catch (e) {
+    console.error('Failed to fetch image', src, e);
+    return null;
+  }
+};
+
+const makeFont = (size, extra = {}) => ({ size, font: 'Lucida Fax', ...extra });
+
+const formatDateLong = (value, includeTime = false) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const datePart = date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: '2-digit',
+    year: 'numeric',
+  });
+
+  if (!includeTime) return datePart;
+
+  const timePart = date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  return `${datePart} ${timePart}`;
+};
+
+const formatMinutesDuration = (minutesValue) => {
+  if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
+
+  const totalMinutes = Number(minutesValue);
+  if (Number.isNaN(totalMinutes) || totalMinutes < 0) return '---';
+
+  const wholeMinutes = Math.floor(totalMinutes);
+  const days = Math.floor(wholeMinutes / 1440);
+  const hours = Math.floor((wholeMinutes % 1440) / 60);
+  const minutes = wholeMinutes % 60;
+  const minuteLabel = minutes === 1 ? 'min' : 'mins';
+
+  if (days > 0) {
+    return `${days}day${days > 1 ? 's' : ''} ${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+  }
+
+  if (hours > 0) {
+    return `${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+  }
+
+  return `${minutes}${minuteLabel}`;
+};
+
+const getFullName = (row) => {
+  const p = row.student_profile || row.alumni_profile || row.user?.student_profile || row.user?.alumni_profile;
+  if (!p) return 'Walk-in Client';
+  const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
+  const last = p.last_name || p.lastname || '';
+  const first = p.first_name || p.firstname || '';
+  return `${last}, ${first}${middle}`.trim();
+};
+
+const getCourse = (row) => (
+  row.student_profile?.academic_records?.[0]?.course
+  || row.student_profile?.course
+  || row.academic_record?.course
+  || row.alumni_academic_record?.course
+  || '---'
+);
+
+const getEmail = (row) => row.user?.email || row.student_profile?.email || '---';
+
+const getHistoryRows = (row, historyByRequestId = {}) => {
+  const fromMap = historyByRequestId?.[row.request_id];
+  const base = Array.isArray(fromMap) ? fromMap : (Array.isArray(row.history) ? row.history : []);
+  return [...base].sort((a, b) => new Date(b?.changed_at || 0).getTime() - new Date(a?.changed_at || 0).getTime());
+};
+
+const getProcessedAt = (row, historyByRequestId) => {
+  const history = getHistoryRows(row, historyByRequestId);
+  if (history.length === 0) return null;
+  return history[0]?.changed_at || null;
+};
+
+const getMinutesProcessed = (row, historyByRequestId) => {
+  const history = getHistoryRows(row, historyByRequestId);
+  if (history.length === 0) return null;
+  return history[0]?.minutes_processed ?? null;
+};
+
+const getClaimedAt = (row, historyByRequestId) => {
+  const history = getHistoryRows(row, historyByRequestId);
+  if (history.length === 0) return null;
+  const claimEntry = history.find((h) => h.new_status_id === 3);
+  return claimEntry?.changed_at || null;
+};
+
+const noBorder = {
+  top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+};
+
+const DEFAULT_TEXT_SIZE = 18;
+const HEADER_TEXT_SIZE = 18;
+const DEFAULT_CELL_MARGINS = { top: 90, bottom: 90, left: 100, right: 100 };
+
+const cell = (text, options = {}) => new TableCell({
+  width: { size: options.width ?? 20, type: WidthType.PERCENTAGE },
+  shading: options.shading,
+  borders: {
+    top: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+    bottom: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+    left: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+    right: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+  },
+  margins: options.margins ?? DEFAULT_CELL_MARGINS,
+  verticalAlign: options.verticalAlign ?? VerticalAlign.CENTER,
+  children: [
+    new Paragraph({
+      alignment: options.align ?? AlignmentType.CENTER,
+      spacing: { before: 0, after: 0 },
+      children: [
+        new TextRun({
+          text: text === null || text === undefined ? '' : String(text),
+          bold: options.bold ?? false,
+          size: options.size ?? DEFAULT_TEXT_SIZE,
+          color: options.color ?? '000000',
+          font: options.font ?? 'Lucida Fax',
+        }),
+      ],
+    }),
+  ],
+});
+
+const buildHeader = async (pupLogoSrc, bpLogoSrc) => {
+  const [leftLogo, rightLogo] = await Promise.all([
+    fetchImageData(pupLogoSrc),
+    fetchImageData(bpLogoSrc),
+  ]);
+
+  return new Header({
+    children: [
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+          top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 12, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [
+                  new Paragraph({ alignment: AlignmentType.RIGHT, children: leftLogo ? [new ImageRun({ data: leftLogo, transformation: { width: 72, height: 72 } })] : [] }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 68, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [
+                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'REPUBLIC OF THE PHILIPPINES', size: 16, font: 'Lucida Fax' })] }),
+                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'POLYTECHNIC UNIVERSITY OF THE PHILIPPINES', size: 22, color: '000000', bold: true, font: 'Lucida Fax' })] }),
+                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'OFFICE OF THE VICE PRESIDENT FOR CAMPUSES', size: 15, font: 'Lucida Fax' })] }),
+                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'TAGUIG CAMPUS', size: 22, bold: true, color: '000000', font: 'Lucida Fax' })] }),
+                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'Office of the Campus Registrar', size: 15, italics: true, color: '666666', font: 'Lucida Fax' })] }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 20, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: rightLogo ? [new ImageRun({ data: rightLogo, transformation: { width: 72, height: 72 } })] : [] })],
+              }),
+            ],
+          }),
+        ],
+      }),
+      new Paragraph({ spacing: { after: 0 } }),
+    ],
+  });
+};
+
+const buildFooter = async () => {
+  const footerLogo = await fetchImageData(certificate_footer);
+
+  return new Footer({
+    children: [
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+          top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+          insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+        },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 70, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [
+                  new Paragraph({ children: [ new TextRun({ text: 'General Santos Avenue, Lower Bicutan, Taguig City, Philippines 1632', size: 18, font: 'Lucida Fax' }) ] }),
+                  new Paragraph({ children: [ new TextRun({ text: 'Direct Line: (02) 8837 5858 to 60 | Email: taguig@pup.edu.ph', size: 18, font: 'Lucida Fax' }) ] }),
+                  new Paragraph({ children: [ new TextRun({ text: 'Website: www.pup.edu.ph | Inquiries: https://bit.ly/PUPSINTA', size: 18, font: 'Lucida Fax' }) ] }),
+                  new Paragraph({ spacing: { before: 120 }, children: [ new TextRun({ text: "THE COUNTRY'S 1st POLYTECHNIC", bold: true, size: 18, font: 'Lucida Fax' }) ] }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 30, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [ new Paragraph({ alignment: AlignmentType.RIGHT, children: [ new ImageRun({ data: new Uint8Array(footerLogo || []), transformation: { width: 240, height: 80 } }) ] }) ],
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  });
+};
+
+export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc = null, historyByRequestId = {}) => {
+  const header = await buildHeader(pupLogoSrc, bpLogoSrc);
+  const footer = await buildFooter();
+
+  const headerCellBorders = {
+    top: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+    bottom: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+    left: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+    right: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+  };
+
+  const buildHeaderRowCell = (text, width) => cell(String(text).toUpperCase(), {
+    bold: true,
+    shading: { fill: '7F0000' },
+    color: 'FFFFFF',
+    width,
+    size: HEADER_TEXT_SIZE,
+    align: AlignmentType.CENTER,
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 50, bottom: 50, left: 110, right: 110 },
+    font: 'Lucida Fax',
+  });
+
+  // Use consistent column widths (equal distribution with small rounding adjustment)
+  const DEFAULT_COL_WIDTH = 14; // percent
+  const LAST_COL_WIDTH = 100 - DEFAULT_COL_WIDTH * 6; // remaining percent
+  const colWidths = [DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, LAST_COL_WIDTH];
+
+  const headerRow = new TableRow({
+    tableHeader: true,
+    height: { value: 720, rule: 'exact' },
+    children: [
+      buildHeaderRowCell('Date Requested', colWidths[0]),
+      buildHeaderRowCell('Client Name', colWidths[1]),
+      buildHeaderRowCell('Course/Year & Section', colWidths[2]),
+      buildHeaderRowCell('Email Address/Contact', colWidths[3]),
+      buildHeaderRowCell('Date/Time Processed', colWidths[4]),
+      buildHeaderRowCell('No. of Minutes Processed', colWidths[5]),
+      buildHeaderRowCell('Date Claimed', colWidths[6]),
+    ],
+  });
+
+  const normalizeSections = () => {
+    if (Array.isArray(sectionsOrRows) && sectionsOrRows.length > 0 && Array.isArray(sectionsOrRows[0]?.rows)) {
+      return sectionsOrRows.map((section) => {
+        const rawTitle = section?.title ?? 'All Document';
+        const title = String(rawTitle).trim() || 'Unspecified';
+        return {
+          title,
+          rows: Array.isArray(section?.rows) ? section.rows : [],
+        };
+      });
+    }
+
+    return [{ title: 'All Document', rows: Array.isArray(sectionsOrRows) ? sectionsOrRows : [] }];
+  };
+
+  const sections = normalizeSections();
+
+  const buildRows = (rows) => {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return [new TableRow({
+        children: [
+          new TableCell({
+            columnSpan: colWidths.length,
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+              left: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+              right: { style: BorderStyle.SINGLE, size: 1, color: 'D9D9D9' },
+            },
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [new TextRun({ text: 'No data requests available', italics: true, size: DEFAULT_TEXT_SIZE, font: 'Lucida Fax' })],
+              }),
+            ],
+          }),
+        ],
+      })];
+    }
+
+    return rows.map((row) => new TableRow({
+    children: [
+      cell(formatDateLong(row.requested_at) || 'N/A', { width: colWidths[0], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
+      cell(getFullName(row), { width: colWidths[1], align: AlignmentType.LEFT, size: DEFAULT_TEXT_SIZE }),
+      cell(getCourse(row), { width: colWidths[2], align: AlignmentType.LEFT, size: DEFAULT_TEXT_SIZE }),
+      cell(getEmail(row), { width: colWidths[3], align: AlignmentType.LEFT, size: DEFAULT_TEXT_SIZE }),
+      cell(formatDateLong(getProcessedAt(row, historyByRequestId), true) || '---', { width: colWidths[4], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
+      cell(formatMinutesDuration(getMinutesProcessed(row, historyByRequestId)), { width: colWidths[5], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
+      cell(formatDateLong(getClaimedAt(row, historyByRequestId)) || 'Pending', { width: colWidths[6], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
+    ],
+  }));
+
+  };
+
+  const contentChildren = [];
+
+  sections.forEach((section, index) => {
+    if (index > 0) {
+      contentChildren.push(new Paragraph({ pageBreakBefore: true, spacing: { after: 0 } }));
+    }
+
+    // ensure title is always a visible string
+    const safeTitle = String(section.title || 'Unspecified').trim() || 'Unspecified';
+
+    // decide whether to show a title for this section; skip umbrella titles
+    const lower = safeTitle.toLowerCase();
+    const isUmbrella = lower === 'all document' || lower === 'all certification' || lower === 'certification';
+
+    if (isUmbrella) {
+      // push table without the section title
+      contentChildren.push(
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...buildRows(section.rows)] })
+      );
+    } else {
+      // create a title row that spans all columns to ensure visibility and prevent overlap with headers
+      const titleRow = new TableRow({
+        children: [
+          new TableCell({
+            columnSpan: colWidths.length,
+            borders: noBorder,
+            margins: { top: 120, bottom: 120, left: 120, right: 120 },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 80, before: 0 },
+                children: [new TextRun({ text: `Processing of Application for ${safeTitle}`, ...makeFont(24, { bold: true, font: 'Lucida Fax' }) })],
+              }),
+            ],
+          }),
+        ],
+      });
+
+      contentChildren.push(
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [titleRow, headerRow, ...buildRows(section.rows)] })
+      );
+    }
+  });
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            size: { orientation: PageOrientation.LANDSCAPE },
+            margin: { top: 1080, bottom: 1080, left: 480, right: 480, header: 480, footer: 480 },
+          },
+        },
+        headers: { default: header },
+        footers: { default: footer },
+        children: contentChildren,
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const year = new Date().getFullYear();
+  const fileName = `Logbook_Records_${year}`;
+  saveAs(blob, `${fileName}.docx`);
+};
+
+export default logbookDocx;
