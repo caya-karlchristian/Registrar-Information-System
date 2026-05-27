@@ -7,17 +7,20 @@ import {
   ChevronRightIcon,
 } from '@heroicons/react/24/solid';
 import risImage from "../assets/RIS1.png";
-import logoImage from "../assets/puplogoimage.png";
+import CAYA_img from "../assets/members/CAYA.jpg";
+import CONDINO_img from "../assets/members/CONDINO.jpg";
+import CORDOVA_img from "../assets/members/CORDOVA.jpg";
+import TOLENTINO_img from "../assets/members/TOLENTINO.jpg";
 import { getAnnouncements } from "../services/api";
 import { useNotificationsContext } from '../context/NotificationsContext';
 
 const ICON_CYCLE = [MegaphoneIcon, QuestionMarkCircleIcon, ClipboardDocumentListIcon];
 
 const TEAM_MEMBERS = [
-  { lastName: "CAYA",      firstName: "Karl Christian", role: "PROJECT LEAD, UI/UX, AND DATABASE", image: logoImage },
-  { lastName: "CONDINO",   firstName: "Ciara Marie",    role: "FRONTEND DEVELOPER",                image: logoImage },
-  { lastName: "CORDOVA",   firstName: "Aron Stephen",   role: "BACKEND DEVELOPER",                 image: logoImage },
-  { lastName: "TOLENTINO", firstName: "Ma. Rose",       role: "DOCUMENT ANALYST AND QA",           image: logoImage },
+  { lastName: "CAYA",      firstName: "Karl Christian", role: "PROJECT LEAD, UI/UX, AND DATABASE", image: CAYA_img },
+  { lastName: "CONDINO",   firstName: "Ciara Marie",    role: "FRONTEND DEVELOPER",                image: CONDINO_img },
+  { lastName: "CORDOVA",   firstName: "Aron Stephen",   role: "BACKEND DEVELOPER",                 image: CORDOVA_img },
+  { lastName: "TOLENTINO", firstName: "Ma. Rose",       role: "DOCUMENT ANALYST AND QA",           image: TOLENTINO_img },
 ];
 
 const Tech4wardProfile = ({ bgImage }) => {
@@ -78,17 +81,17 @@ const Tech4wardProfile = ({ bgImage }) => {
           <h2 className="text-2xl md:text-4xl font-black text-[#800000] uppercase mb-4 -mt-8 text-center">
             System Announcement
           </h2>
-          <div className="flex flex-wrap md:flex-nowrap items-center gap-4">
+          <div className="flex items-center justify-between">
             <button
               onClick={handlePrevAnnouncements}
               disabled={announcementPage === 0}
-              className="order-1 bg-[#800000] text-white px-4 py-2 md:px-3 md:py-1 rounded disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              className="bg-[#800000] text-white p-3 rounded disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               aria-label="Previous announcements"
             >
               <ChevronLeftIcon className="w-5 h-5" />
             </button>
 
-            <div className="order-3 md:order-2 basis-full md:basis-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 flex-1">
+            <div className="flex-1 mx-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {visibleAnnouncements.length === 0 ? (
                 <div className="col-span-3 text-center text-white/60 py-8 italic text-sm">
                   No announcements at this time.
@@ -117,7 +120,7 @@ const Tech4wardProfile = ({ bgImage }) => {
             <button
               onClick={handleNextAnnouncements}
               disabled={announcementPage >= totalPages - 1}
-              className="order-2 md:order-3 bg-[#800000] text-white px-4 py-2 md:px-3 md:py-1 rounded disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              className="bg-[#800000] text-white p-3 rounded disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               aria-label="Next announcements"
             >
               <ChevronRightIcon className="w-5 h-5" />
