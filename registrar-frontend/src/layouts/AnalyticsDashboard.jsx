@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import DropdownGroup from '../components/DropDown';
 import AIInsightCard from '../components/AIInsightCard';
+import MonthRangeModal from '../components/MonthRangeModal';
 import {
   getDocumentTypes,
   getAnalyticsOverview,
@@ -63,6 +64,9 @@ const AnalyticsDashboard = () => {
   const [aiLoading, setAiLoading]       = useState(false);
   const [aiError, setAiError]           = useState(null);
   const [aiGeneratedAt, setAiGeneratedAt] = useState(null);
+  // Export modal state
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
 
   // ── Build params object from current filters ──────────────────────────
 
@@ -77,7 +81,31 @@ const AnalyticsDashboard = () => {
 
   useEffect(() => {
     getDocumentTypes()
-      .then(res => setDocumentTypes(['All Documents', ...res.data.map(d => d.document_name)]))
+      .then((res) => {
+        const seen = new Set(['All Documents']);
+        const options = ['All Documents'];
+
+        (res.data ?? []).forEach((docType) => {
+          const rawName = String(docType.document_name ?? '').trim();
+          if (!rawName) return;
+
+          const normalizedName = rawName.toLowerCase() === 'certification'
+            ? 'CERTIFICATION'
+            : rawName;
+
+          const dedupeKey = normalizedName.toLowerCase();
+          if (seen.has(dedupeKey)) return;
+          seen.add(dedupeKey);
+          options.push(normalizedName);
+        });
+
+        // If CERTIFICATION exists, add an "All Certification" option after 'All Documents'
+        if (options.find((o) => String(o).toUpperCase() === 'CERTIFICATION')) {
+          // insert at index 1
+          options.splice(1, 0, 'All Certification');
+        }
+        setDocumentTypes(options);
+      })
       .catch(() => setDocumentTypes(['All Documents']));
   }, []);
 
@@ -134,6 +162,22 @@ const AnalyticsDashboard = () => {
     }
   };
 
+  // ── Monthly export handler ─────────────────────────────────────────────
+  const handleExportConfirm = async (startYM, endYM, selectedDocType = 'ALL', certType = null) => {
+    setExportLoading(true);
+    try {
+      const { exportMonthlyDocx } = await import('../utils/analyticsMonthlyExport');
+      const docTypeToSend = selectedDocType === 'All Documents' ? 'ALL' : selectedDocType;
+      await exportMonthlyDocx(startYM, endYM, docTypeToSend, certType);
+    } catch (err) {
+      console.error('Export failed', err);
+      alert(err?.message || 'Failed to generate export.');
+    } finally {
+      setExportLoading(false);
+      setExportModalOpen(false);
+    }
+  };
+
   // ── Derived pie stats ─────────────────────────────────────────────────
 
   const pieTotal     = statusData.reduce((s, r) => s + r.total, 0);
@@ -159,20 +203,10 @@ const AnalyticsDashboard = () => {
   // ─────────────────────────────────────────────────────────────────────
 
   return (
-    <div className={`space-y-6 px-4 py-2 min-h-screen font-sans ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'text-gray-900'}`}>
+    <div className={`space-y-6 py-10 md:py-5 lg:py-5 min-h-screen font-sans ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'text-gray-900'}`}>
 
       {/* ── 1. FILTER BAR ── */}
       <div className="flex flex-col lg:flex-row items-start lg:items-end gap-3 w-full -mt-5">
-
-        {/* Document Type */}
-        <div className="w-full lg:w-72">
-          <DropdownGroup
-            name="docType"
-            value={docType}
-            onChange={e => setDocType(e.target.value)}
-            options={documentTypes}
-          />
-        </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 w-full lg:w-auto lg:ml-auto">
 
@@ -205,8 +239,28 @@ const AnalyticsDashboard = () => {
               />
             </div>
           )}
+
+          {/* Export monthly report */}
+          <div className="w-full sm:w-65 ml-2">
+            <button
+              onClick={() => setExportModalOpen(true)}
+              className={`w-full flex items-center justify-center px-3 py-3 rounded-lg text-sm font-black uppercase tracking-wide shadow transition-colors ${isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] hover:bg-[#4e4f50]' : 'bg-[#800000] text-white hover:bg-[#6b0000]'}`}
+            >
+              Export Monthly Report
+            </button>
+          </div>
         </div>
       </div>
+
+      <MonthRangeModal
+        isOpen={exportModalOpen}
+        isDark={isDark}
+        loading={exportLoading}
+        onClose={() => setExportModalOpen(false)}
+        onConfirm={handleExportConfirm}
+        documentTypes={documentTypes}
+        maxMonths={6}
+      />
 
       {/* ── 2. KPI CARDS ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -248,16 +302,16 @@ const AnalyticsDashboard = () => {
         />
       </div>
 
-      <div className="h-1.5 w-full bg-gradient-to-r from-[#FFD700] via-[#FACC15] to-[#FFD700] rounded-full opacity-40 shadow-sm" />
+      <div className="h-1.5 w-full bg-linear-to-r from-[#FFD700] via-[#FACC15] to-[#FFD700] rounded-full opacity-40 shadow-sm" />
 
       {/* ── 3. MAIN CHARTS ROW ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         {/* Request Volume */}
-        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
           <ChartHeader title="Request Volume" sub="Monthly Growth" isDark={isDark} />
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={256}>
               <AreaChart data={volumeData}>
                 <defs>
                   <linearGradient id="colorMaroon" x1="0" y1="0" x2="0" y2="1">
@@ -276,10 +330,10 @@ const AnalyticsDashboard = () => {
         </div>
 
         {/* Top Documents */}
-        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
           <ChartHeader title="Top Documents" sub="Most Requested" isDark={isDark} />
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={256}>
               <BarChart data={docTypeData.slice(0, 6)} barSize={40}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
                 <XAxis dataKey="document_name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: isDark ? '#b0b3b8' : '#64748b' }} />
@@ -296,10 +350,10 @@ const AnalyticsDashboard = () => {
         </div>
 
         {/* Request Status Donut */}
-        <div className={`border p-6 rounded-4xl shadow-sm flex flex-col ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+        <div className={`border p-6 rounded-4xl shadow-sm flex flex-col min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
           <ChartHeader title="Request Status" sub="Distribution Breakdown" isDark={isDark} />
           <div className="h-64 relative">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={256}>
               <PieChart>
                 <Pie data={statusData} dataKey="total" nameKey="status_name"
                   innerRadius={70} outerRadius={90} paddingAngle={8} stroke="none">
@@ -330,10 +384,10 @@ const AnalyticsDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         {/* Peak Hours Heatmap */}
-        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
           <ChartHeader title="Peak Hours" sub="Requests by Hour of Day" isDark={isDark} />
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={256}>
               <BarChart data={peakHoursData} barSize={14}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
                 <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false}
@@ -350,10 +404,10 @@ const AnalyticsDashboard = () => {
         </div>
 
         {/* Requests by Purpose */}
-        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
           <ChartHeader title="By Purpose" sub="Request Reason Breakdown" isDark={isDark} />
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={256}>
               <BarChart data={purposeData} layout="vertical" barSize={18}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
                 <XAxis type="number" tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
@@ -371,10 +425,10 @@ const AnalyticsDashboard = () => {
         </div>
 
         {/* Processing Time by Doc Type */}
-        <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
           <ChartHeader title="Processing Time" sub="Avg Minutes by Document Type" isDark={isDark} />
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 min-w-0">
+            <ResponsiveContainer width="100%" height={256}>
               <BarChart data={processingData.by_document_type ?? []} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
                 <XAxis dataKey="document_name" tick={{ fontSize: 10, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }}

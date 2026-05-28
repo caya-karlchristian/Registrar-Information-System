@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
-import { getDocumentRequests, getDocumentTypes, getRequestHistory } from "../services/api"; 
+import { getDocumentRequests, getDocumentTypes, getRequestHistory, getCertifications } from "../services/api"; 
 import LoadingOverlay from "../components/LoadingOverlay"; 
 import DropDown from '../components/DropDown';
-import { logbookExcel } from '../utils/logbookExcel.js';
+import { logbookDocx } from '../utils/logbookDocx.js';
 import pupLogoSrc from '../assets/puplogoimage.png';
 import bpLogoSrc from '../assets/Bagong_Pilipinas_logo.png';
 
@@ -18,24 +18,42 @@ const LogbookRecords = () => {
   const { isDark } = useTheme();
   const [data, setData] = useState([]);
   const [dbDocTypes, setDbDocTypes] = useState([]);
+  const [availableCertifications, setAvailableCertifications] = useState([]);
   const [historyByRequestId, setHistoryByRequestId] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDocTypeId, setSelectedDocTypeId] = useState("");
+  const [selectedExportOption, setSelectedExportOption] = useState('All Document');
+  const [exporting, setExporting] = useState(false);
   const rowsPerPage = 8;
 
   useEffect(() => {
     const fetchLogbookData = async () => {
       setLoading(true);
       try {
-        const [requestsRes, typesRes, historyRes] = await Promise.all([
-          getDocumentRequests(),
+        const requests = [];
+        let page = 1;
+        let lastPage = 1;
+
+        do {
+          const response = await getDocumentRequests({ page });
+          const payload = response?.data ?? {};
+          const rows = toRows(payload);
+
+          requests.push(...rows);
+          lastPage = Number(payload?.last_page ?? 1) || 1;
+          page += 1;
+        } while (page <= lastPage);
+
+        const [typesRes, historyRes, certRes] = await Promise.all([
           getDocumentTypes(),
           getRequestHistory(),
+          getCertifications(),
         ]);
-        const requests = toRows(requestsRes.data);
+
         const types = toRows(typesRes.data);
         const historyRows = toRows(historyRes.data);
+        const certifications = toRows(certRes.data);
         const groupedHistory = historyRows.reduce((acc, item) => {
           const requestId = item?.request_id;
           if (!requestId) return acc;
@@ -54,12 +72,14 @@ const LogbookRecords = () => {
 
         setData(requests);
         setDbDocTypes(types);
+        setAvailableCertifications(certifications);
         setHistoryByRequestId(groupedHistory);
-        console.log('Logbook data loaded:', { requests: requests.length, types: types.length, history: historyRows.length });
+        setCurrentPage(1);
       } catch (error) {
         console.error('Error loading logbook records:', error);
         setData([]);
         setDbDocTypes([]);
+        setAvailableCertifications([]);
         setHistoryByRequestId({});
       } finally {
         setLoading(false);
@@ -75,12 +95,101 @@ const LogbookRecords = () => {
     return {};
   }, [dbDocTypes]);
 
-  const docOptions = useMemo(() => Object.values(activeDocMap), [activeDocMap]);
+  const docOptions = useMemo(() => {
+    const options = ['All Document'];
+    const seen = new Set(['all document']);
+
+    Object.values(activeDocMap).forEach((name) => {
+      const normalized = String(name || '').trim();
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push(normalized);
+    });
+
+    if (Object.values(activeDocMap).some((name) => String(name || '').trim().toLowerCase() === 'certification')) {
+      options.splice(1, 0, 'All Certification');
+    }
+
+    return options;
+  }, [activeDocMap]);
+
+  const certificationOptions = useMemo(() => {
+    const options = [];
+    const seen = new Set();
+
+    availableCertifications.forEach((cert) => {
+      const normalized = String(cert?.certificate_name || '').trim();
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push(normalized);
+    });
+
+    return options;
+  }, [availableCertifications]);
+
+  const getDocumentNames = (row) => {
+    const documents = Array.isArray(row?.documents) ? row.documents : [];
+    return documents
+      .map((document) => document?.documentType?.document_name ?? document?.document_type?.document_name ?? document?.document_name ?? '')
+      .filter(Boolean)
+      .map((name) => String(name).trim())
+      .filter(Boolean);
+  };
+
+  const getCertificationNames = (row) => {
+    const certificates = Array.isArray(row?.certificates) ? row.certificates : [];
+    return certificates
+      .map((certificate) => certificate?.certification_type?.certificate_name ?? certificate?.certificate_name ?? certificate?.name ?? '')
+      .filter(Boolean)
+      .map((name) => String(name).trim())
+      .filter(Boolean);
+  };
+
+  const selectedDocLabel = useMemo(() => {
+    if (selectedExportOption === 'All Certification') return 'All Certification';
+    return activeDocMap[selectedDocTypeId] || selectedExportOption || 'All Document';
+  }, [selectedDocTypeId, activeDocMap, selectedExportOption]);
+
+  const isCertificationMode = useMemo(() => {
+    const sel = String(selectedExportOption || '').trim().toLowerCase();
+    const label = String(selectedDocLabel || '').trim().toLowerCase();
+    // show certification type selector only when user explicitly selected the CERTIFICATION document type
+    return sel === 'certification' || label === 'certification' && sel !== 'all certification';
+  }, [selectedExportOption, selectedDocLabel]);
+
+  const [selectedCertificationLabel, setSelectedCertificationLabel] = useState('');
+
+  useEffect(() => {
+    if (isCertificationMode) {
+      // default to first available certification when entering certification mode
+      if (!selectedCertificationLabel) {
+        setSelectedCertificationLabel(certificationOptions[0] || '');
+      }
+    } else {
+      // when not in certification-specific mode, clear selection
+      setSelectedCertificationLabel('');
+    }
+  }, [isCertificationMode, certificationOptions]);
 
   const filteredData = useMemo(() => {
     const completedOnly = data.filter(item =>
       String(item.status?.status_name).toLowerCase() === 'completed'
     );
+
+    if (isCertificationMode) {
+      const targetCertification = String(selectedCertificationLabel || 'All Certification').trim().toLowerCase();
+      return completedOnly.filter((item) => {
+        const certNames = getCertificationNames(item).map((name) => String(name).trim().toLowerCase());
+        if (targetCertification === 'all certification') {
+          return certNames.length > 0;
+        }
+        return certNames.includes(targetCertification);
+      });
+    }
 
     if (!selectedDocTypeId) return completedOnly;
 
@@ -88,7 +197,7 @@ const LogbookRecords = () => {
     return completedOnly.filter(item =>
       item.documents?.some(d => Number(d.document_type_id) === targetId)
     );
-  }, [selectedDocTypeId, data]);
+  }, [selectedDocTypeId, data, isCertificationMode, selectedCertificationLabel]);
 
   const sortedData = useMemo(() => {
     return [...filteredData].sort((a, b) => {
@@ -106,11 +215,50 @@ const LogbookRecords = () => {
     return sortedData.slice(indexOfFirstItem, indexOfLastItem);
   }, [indexOfFirstItem, indexOfLastItem, sortedData]);
 
-  const selectedDocLabel = useMemo(() => {
-    return activeDocMap[selectedDocTypeId] || "All Document Types";
-  }, [selectedDocTypeId, activeDocMap]);
+  const getExportSections = () => {
+    if (isCertificationMode) {
+      // when exporting all certification, include all known certification types even if they have no rows
+      if (selectedCertificationLabel && selectedCertificationLabel !== 'All Certification') {
+        return [{ title: selectedCertificationLabel, rows: sortedData }];
+      }
 
-  const handleExportExcel = () => logbookExcel(sortedData, selectedDocLabel, pupLogoSrc, bpLogoSrc, historyByRequestId);
+      // build sections from available certification options (skip the 'All Certification' placeholder)
+      const certNames = certificationOptions.filter(n => String(n || '').trim().toLowerCase() !== 'all certification');
+      return certNames.map((name) => ({
+        title: name,
+        rows: sortedData.filter((row) => getCertificationNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())),
+      }));
+    }
+
+    if (selectedDocTypeId) {
+      return [{ title: selectedDocLabel, rows: sortedData }];
+    }
+
+    // exporting all documents: include all known document types even if they have no rows
+    const docNames = Object.values(activeDocMap)
+      .map(n => String(n || '').trim())
+      .filter(Boolean);
+
+    // unique preserving order
+    const uniqueDocNames = Array.from(new Set(docNames));
+
+    return uniqueDocNames.map((name) => ({
+      title: name,
+      rows: sortedData.filter((row) => getDocumentNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())),
+    }));
+  };
+
+  const handleExportDocx = async () => {
+    if (exporting) return;
+    try {
+      setExporting(true);
+      await logbookDocx(getExportSections(), pupLogoSrc, bpLogoSrc, historyByRequestId);
+    } catch (e) {
+      console.error('Export to DOCX failed', e);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const toProperCase = (value = '') => {
     return value
@@ -218,29 +366,63 @@ const LogbookRecords = () => {
       <div className={`max-w-350 mx-auto shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
         <div className="p-4 sm:p-6 md:p-8 pb-0">
-          <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end mb-6 gap-4 print:hidden">
-            <div className="flex flex-col gap-2 text-left w-full sm:w-auto">
-              <div className="px-4 w-full sm:w-80 lg:w-120">
+          <div className="mb-6 grid grid-cols-1 gap-4 print:hidden lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2">
+              <div className="w-full">
                 <DropDown
                   label="Document Type"
                   name="docType"
-                  value={activeDocMap[selectedDocTypeId] || ''}
+                  value={selectedExportOption}
                   labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
                   onChange={(e) => {
+                    if (e.target.value === 'All Document' || e.target.value === 'All Certification') {
+                      setSelectedDocTypeId('');
+                      setSelectedExportOption(e.target.value);
+                      setSelectedCertificationLabel('');
+                      setCurrentPage(1);
+                      return;
+                    }
+
                     const id = Object.keys(activeDocMap).find(key => activeDocMap[key] === e.target.value) || '';
                     setSelectedDocTypeId(id);
+                    setSelectedExportOption(e.target.value);
+                    setSelectedCertificationLabel('');
                     setCurrentPage(1);
                   }}
                   options={docOptions}
                 />
               </div>
+              {isCertificationMode && (
+              <div className="w-full">
+                <DropDown
+                  label="Certification Type"
+                  name="certificationType"
+                  value={selectedCertificationLabel}
+                  labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
+                  onChange={(e) => {
+                    setSelectedCertificationLabel(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  options={certificationOptions}
+                />
+              </div>
+            )}
             </div>
             <button
-              onClick={handleExportExcel}
-              disabled={loading || sortedData.length === 0}
-              className={`px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto ${loading || sortedData.length === 0 ? (isDark ? 'bg-[#4e4f50] cursor-not-allowed text-[#9a9a9a]' : 'bg-gray-300 cursor-not-allowed text-gray-500') : (isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-dark-maroon hover:bg-[#4a0000] text-white')}`}
+              onClick={handleExportDocx}
+              disabled={loading || exporting || sortedData.length === 0}
+              className={
+                `px-5 py-2 rounded-md font-bold text-xs uppercase tracking-widest transition-colors duration-150 shadow-sm ` +
+                (!exporting
+                  ? (isDark
+                      ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]'
+                      : 'bg-[#800000] hover:bg-[#4a0000] text-[#FFD700]')
+                  : (isDark
+                      ? 'bg-[#3a3b3c] text-[#8f949e] border border-[#4e4f50] cursor-not-allowed'
+                      : 'bg-[#800000] text-white cursor-not-allowed'))
+              }
             >
-              <span>Export to Excel</span>
+              {exporting ? 'Exporting...' : 'Export to DOCX'}
             </button>
           </div>
 
@@ -252,16 +434,16 @@ const LogbookRecords = () => {
         </div>
 
         <div className="flex-1 overflow-x-auto px-4 sm:px-6 md:px-8">
-          <table className="w-full border-collapse min-w-200">
+          <table className="w-full min-w-225 border-collapse md:min-w-full">
             <thead>
               <tr className={`border-b-2 uppercase text-center ${isDark ? 'border-[#3e4042] text-[#9a9a9a]' : 'border-gray-300 text-gray-400'}`}>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Requested</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[15%]">Client Name</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Course</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[18%]">Email</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Processed</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[10%]">No. of Minutes Processed</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[13%]">Date Claimed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Date/Time Requested</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[15%] whitespace-nowrap">Client Name</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Course</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[18%] whitespace-nowrap">Email</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Date/Time Processed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[10%] whitespace-nowrap">No. of Minutes Processed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[13%] whitespace-nowrap">Date Claimed</th>
               </tr>
             </thead>
             <tbody>
@@ -273,31 +455,31 @@ const LogbookRecords = () => {
                   return (
                 <tr key={row.request_id || row.id} className={`border-b text-[11px] sm:text-[12px] transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
 
-                  <td className="p-3 sm:p-4 text-center">
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
                     {formatDateLong(row.requested_at) || 'N/A'}
                   </td>
 
-                  <td className="p-3 sm:p-4 text-center font-bold">
+                  <td className="p-3 sm:p-4 text-center font-bold whitespace-nowrap">
                     {getFullName(row)}
                   </td>
 
-                  <td className="p-3 sm:p-4 text-center">
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
                     {getCourse(row)}
                   </td>
 
-                  <td className="p-3 sm:p-4 text-center truncate max-w-37.5">
+                  <td className="p-3 sm:p-4 text-center truncate max-w-55 whitespace-nowrap">
                     {getEmail(row)}
                   </td>
 
-                  <td className="p-3 sm:p-4 text-center">
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
                     {formatDateTimeLong(processedAt) || '---'}
                   </td>
 
-                  <td className="p-3 sm:p-4 text-center">
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
                     {formatMinutesDuration(getMinutesProcessed(row))}
                   </td>
 
-                  <td className="p-3 sm:p-4 text-center italic text-gray-400">
+                  <td className="p-3 sm:p-4 text-center italic text-gray-400 whitespace-nowrap">
                     {formatDateLong(claimedAt) || 'Pending'}
                   </td>
 
