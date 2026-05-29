@@ -68,9 +68,6 @@ const AnalyticsDashboard = () => {
   // Export modal state
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
-  // Export modal state
-  const [exportModalOpen, setExportModalOpen] = useState(false);
-  const [exportLoading, setExportLoading] = useState(false);
 
   // ── Build params object from current filters ──────────────────────────
 
@@ -85,31 +82,6 @@ const AnalyticsDashboard = () => {
 
   useEffect(() => {
     getDocumentTypes()
-      .then((res) => {
-        const seen = new Set(['All Documents']);
-        const options = ['All Documents'];
-
-        (res.data ?? []).forEach((docType) => {
-          const rawName = String(docType.document_name ?? '').trim();
-          if (!rawName) return;
-
-          const normalizedName = rawName.toLowerCase() === 'certification'
-            ? 'CERTIFICATION'
-            : rawName;
-
-          const dedupeKey = normalizedName.toLowerCase();
-          if (seen.has(dedupeKey)) return;
-          seen.add(dedupeKey);
-          options.push(normalizedName);
-        });
-
-        // If CERTIFICATION exists, add an "All Certification" option after 'All Documents'
-        if (options.find((o) => String(o).toUpperCase() === 'CERTIFICATION')) {
-          // insert at index 1
-          options.splice(1, 0, 'All Certification');
-        }
-        setDocumentTypes(options);
-      })
       .then((res) => {
         const seen = new Set(['All Documents']);
         const options = ['All Documents'];
@@ -207,22 +179,6 @@ const AnalyticsDashboard = () => {
     }
   };
 
-  // ── Monthly export handler ─────────────────────────────────────────────
-  const handleExportConfirm = async (startYM, endYM, selectedDocType = 'ALL', certType = null) => {
-    setExportLoading(true);
-    try {
-      const { exportMonthlyDocx } = await import('../utils/analyticsMonthlyExport');
-      const docTypeToSend = selectedDocType === 'All Documents' ? 'ALL' : selectedDocType;
-      await exportMonthlyDocx(startYM, endYM, docTypeToSend, certType);
-    } catch (err) {
-      console.error('Export failed', err);
-      alert(err?.message || 'Failed to generate export.');
-    } finally {
-      setExportLoading(false);
-      setExportModalOpen(false);
-    }
-  };
-
   // ── Derived pie stats ─────────────────────────────────────────────────
 
   const pieTotal     = statusData.reduce((s, r) => s + r.total, 0);
@@ -248,7 +204,6 @@ const AnalyticsDashboard = () => {
   // ─────────────────────────────────────────────────────────────────────
 
   return (
-    <div className={`space-y-6 py-10 md:py-5 lg:py-5 min-h-screen font-sans ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'text-gray-900'}`}>
     <div className={`space-y-6 py-10 md:py-5 lg:py-5 min-h-screen font-sans ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'text-gray-900'}`}>
 
       {/* ── 1. FILTER BAR ── */}
@@ -308,16 +263,6 @@ const AnalyticsDashboard = () => {
         maxMonths={6}
       />
 
-      <MonthRangeModal
-        isOpen={exportModalOpen}
-        isDark={isDark}
-        loading={exportLoading}
-        onClose={() => setExportModalOpen(false)}
-        onConfirm={handleExportConfirm}
-        documentTypes={documentTypes}
-        maxMonths={6}
-      />
-
       {/* ── 2. KPI CARDS ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {!overview
@@ -363,7 +308,6 @@ const AnalyticsDashboard = () => {
         }
       </div>
 
-      <div className="h-1.5 w-full bg-linear-to-r from-[#FFD700] via-[#FACC15] to-[#FFD700] rounded-full opacity-40 shadow-sm" />
       <div className="h-1.5 w-full bg-linear-to-r from-[#FFD700] via-[#FACC15] to-[#FFD700] rounded-full opacity-40 shadow-sm" />
 
       {/* ── 3. MAIN CHARTS ROW ── */}
