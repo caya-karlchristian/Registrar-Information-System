@@ -12,6 +12,7 @@ import {
 import DropdownGroup from '../components/DropDown';
 import AIInsightCard from '../components/AIInsightCard';
 import MonthRangeModal from '../components/MonthRangeModal';
+import { StatCardSkeleton, ChartCardSkeleton } from '../components/LoadingSkeleton';
 import {
   getDocumentTypes,
   getAnalyticsOverview,
@@ -241,7 +242,7 @@ const AnalyticsDashboard = () => {
           )}
 
           {/* Export monthly report */}
-          <div className="w-full sm:w-65 ml-2">
+          <div className="w-full sm:w-65">
             <button
               onClick={() => setExportModalOpen(true)}
               className={`w-full flex items-center justify-center px-3 py-3 rounded-lg text-sm font-black uppercase tracking-wide shadow transition-colors ${isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] hover:bg-[#4e4f50]' : 'bg-[#800000] text-white hover:bg-[#6b0000]'}`}
@@ -264,190 +265,203 @@ const AnalyticsDashboard = () => {
 
       {/* ── 2. KPI CARDS ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Requests"
-          value={overview ? overview.total.toLocaleString() : '—'}
-          trend={trend.label}
-          status={trend.status}
-          icon={<DocumentTextIcon className="w-6 h-6" />}
-          lightColor="bg-red-50" iconColor="text-[#800000]"
-          isDark={isDark}
-        />
-        <StatCard
-          title="Pending Review"
-          value={overview ? overview.pending.toLocaleString() : '—'}
-          trend="Awaiting processing"
-          status="neutral"
-          icon={<BellAlertIcon className="w-6 h-6" />}
-          lightColor="bg-amber-50" iconColor="text-amber-700"
-          isDark={isDark}
-        />
-        <StatCard
-          title="Claimed Docs"
-          value={overview ? overview.completed.toLocaleString() : '—'}
-          trend={overview?.completion_rate != null ? `${overview.completion_rate}% completion rate` : '—'}
-          status={overview?.completion_rate >= 70 ? 'up' : 'down'}
-          icon={<CheckCircleIcon className="w-6 h-6" />}
-          lightColor="bg-blue-50" iconColor="text-blue-700"
-          isDark={isDark}
-        />
-        <StatCard
-          title="Forfeited"
-          value={overview ? overview.forfeited.toLocaleString() : '—'}
-          trend={overview?.forfeit_rate != null ? `${overview.forfeit_rate}% forfeit rate` : '—'}
-          status={overview?.forfeit_rate > 10 ? 'up' : 'neutral'}
-          icon={<ClockIcon className="w-6 h-6" />}
-          lightColor="bg-emerald-50" iconColor="text-emerald-700"
-          isDark={isDark}
-        />
+        {!overview
+          ? Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} isDark={isDark} />)
+          : <>
+              <StatCard
+                title="Total Requests"
+                value={overview.total.toLocaleString()}
+                trend={trend.label}
+                status={trend.status}
+                icon={<DocumentTextIcon className="w-6 h-6" />}
+                lightColor="bg-red-50" iconColor="text-[#800000]"
+                isDark={isDark}
+              />
+              <StatCard
+                title="Pending Review"
+                value={overview.pending.toLocaleString()}
+                trend="Awaiting processing"
+                status="neutral"
+                icon={<BellAlertIcon className="w-6 h-6" />}
+                lightColor="bg-amber-50" iconColor="text-amber-700"
+                isDark={isDark}
+              />
+              <StatCard
+                title="Claimed Docs"
+                value={overview.completed.toLocaleString()}
+                trend={overview?.completion_rate != null ? `${overview.completion_rate}% completion rate` : '—'}
+                status={overview?.completion_rate >= 70 ? 'up' : 'down'}
+                icon={<CheckCircleIcon className="w-6 h-6" />}
+                lightColor="bg-blue-50" iconColor="text-blue-700"
+                isDark={isDark}
+              />
+              <StatCard
+                title="Forfeited"
+                value={overview.forfeited.toLocaleString()}
+                trend={overview?.forfeit_rate != null ? `${overview.forfeit_rate}% forfeit rate` : '—'}
+                status={overview?.forfeit_rate > 10 ? 'up' : 'neutral'}
+                icon={<ClockIcon className="w-6 h-6" />}
+                lightColor="bg-emerald-50" iconColor="text-emerald-700"
+                isDark={isDark}
+              />
+            </>
+        }
       </div>
 
       <div className="h-1.5 w-full bg-linear-to-r from-[#FFD700] via-[#FACC15] to-[#FFD700] rounded-full opacity-40 shadow-sm" />
 
       {/* ── 3. MAIN CHARTS ROW ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-        {/* Request Volume */}
-        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
-          <ChartHeader title="Request Volume" sub="Monthly Growth" isDark={isDark} />
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height={256}>
-              <AreaChart data={volumeData}>
-                <defs>
-                  <linearGradient id="colorMaroon" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#800000" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#800000" stopOpacity={0}   />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
-                <Area type="monotone" dataKey="total" stroke="#800000" strokeWidth={3} fillOpacity={1} fill="url(#colorMaroon)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Top Documents */}
-        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
-          <ChartHeader title="Top Documents" sub="Most Requested" isDark={isDark} />
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height={256}>
-              <BarChart data={docTypeData.slice(0, 6)} barSize={40}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
-                <XAxis dataKey="document_name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: isDark ? '#b0b3b8' : '#64748b' }} />
-                <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} cursor={{ fill: 'transparent' }} />
-                <Bar dataKey="total_requests" radius={[10, 10, 0, 0]}>
-                  {docTypeData.slice(0, 6).map((_, i) => (
-                    <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Request Status Donut */}
-        <div className={`border p-6 rounded-4xl shadow-sm flex flex-col min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
-          <ChartHeader title="Request Status" sub="Distribution Breakdown" isDark={isDark} />
-          <div className="h-64 relative">
-            <ResponsiveContainer width="100%" height={256}>
-              <PieChart>
-                <Pie data={statusData} dataKey="total" nameKey="status_name"
-                  innerRadius={70} outerRadius={90} paddingAngle={8} stroke="none">
-                  {statusData.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} cornerRadius={10} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className={`text-3xl font-black ${isDark ? 'text-[#e4e6eb]' : 'text-slate-800'}`}>{successPct}%</span>
-              <span className={`text-[10px] font-bold uppercase tracking-tighter ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>Success</span>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2">
-            {statusData.map((row, i) => (
-              <div key={row.status_id} className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                <span className={`text-[10px] font-black uppercase tracking-widest ${isDark ? 'text-[#9a9a9a]' : 'text-slate-500'}`}>{row.status_name}</span>
+        {volumeData.length === 0 && docTypeData.length === 0 && statusData.length === 0
+          ? Array.from({ length: 3 }).map((_, i) => <ChartCardSkeleton key={i} isDark={isDark} />)
+          : <>
+              {/* Request Volume */}
+              <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+                <ChartHeader title="Request Volume" sub="Monthly Growth" isDark={isDark} />
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height={256}>
+                    <AreaChart data={volumeData}>
+                      <defs>
+                        <linearGradient id="colorMaroon" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#800000" stopOpacity={0.1} />
+                          <stop offset="95%" stopColor="#800000" stopOpacity={0}   />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                      <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
+                      <Area type="monotone" dataKey="total" stroke="#800000" strokeWidth={3} fillOpacity={1} fill="url(#colorMaroon)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
+
+              {/* Top Documents */}
+              <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+                <ChartHeader title="Top Documents" sub="Most Requested" isDark={isDark} />
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height={256}>
+                    <BarChart data={docTypeData.slice(0, 6)} barSize={40}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                      <XAxis dataKey="document_name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: isDark ? '#b0b3b8' : '#64748b' }} />
+                      <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} cursor={{ fill: 'transparent' }} />
+                      <Bar dataKey="total_requests" radius={[10, 10, 0, 0]}>
+                        {docTypeData.slice(0, 6).map((_, i) => (
+                          <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Request Status Donut */}
+              <div className={`border p-6 rounded-4xl shadow-sm flex flex-col min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+                <ChartHeader title="Request Status" sub="Distribution Breakdown" isDark={isDark} />
+                <div className="h-64 relative">
+                  <ResponsiveContainer width="100%" height={256}>
+                    <PieChart>
+                      <Pie data={statusData} dataKey="total" nameKey="status_name"
+                        innerRadius={70} outerRadius={90} paddingAngle={8} stroke="none">
+                        {statusData.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} cornerRadius={10} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className={`text-3xl font-black ${isDark ? 'text-[#e4e6eb]' : 'text-slate-800'}`}>{successPct}%</span>
+                    <span className={`text-[10px] font-bold uppercase tracking-tighter ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>Success</span>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2">
+                  {statusData.map((row, i) => (
+                    <div key={row.status_id} className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${isDark ? 'text-[#9a9a9a]' : 'text-slate-500'}`}>{row.status_name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+        }
       </div>
 
       {/* ── 4. SECOND CHARTS ROW ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {peakHoursData.length === 0 && purposeData.length === 0 && (processingData.by_document_type ?? []).length === 0
+          ? Array.from({ length: 3 }).map((_, i) => <ChartCardSkeleton key={i} isDark={isDark} />)
+          : <>
+              {/* Peak Hours Heatmap */}
+              <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+                <ChartHeader title="Peak Hours" sub="Requests by Hour of Day" isDark={isDark} />
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height={256}>
+                    <BarChart data={peakHoursData} barSize={14}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                      <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false}
+                        interval={3} />
+                      <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        formatter={(val, name) => [val, 'Requests']}
+                        contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }}
+                      />
+                      <Bar dataKey="total" fill={HOUR_COLOR} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
-        {/* Peak Hours Heatmap */}
-        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
-          <ChartHeader title="Peak Hours" sub="Requests by Hour of Day" isDark={isDark} />
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height={256}>
-              <BarChart data={peakHoursData} barSize={14}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
-                <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false}
-                  interval={3} />
-                <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  formatter={(val, name) => [val, 'Requests']}
-                  contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }}
-                />
-                <Bar dataKey="total" fill={HOUR_COLOR} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+              {/* Requests by Purpose */}
+              <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+                <ChartHeader title="By Purpose" sub="Request Reason Breakdown" isDark={isDark} />
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height={256}>
+                    <BarChart data={purposeData} layout="vertical" barSize={18}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="purpose_name" tick={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }}
+                        axisLine={false} tickLine={false} width={110} />
+                      <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
+                      <Bar dataKey="total" radius={[0, 6, 6, 0]}>
+                        {purposeData.map((_, i) => (
+                          <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
-        {/* Requests by Purpose */}
-        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
-          <ChartHeader title="By Purpose" sub="Request Reason Breakdown" isDark={isDark} />
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height={256}>
-              <BarChart data={purposeData} layout="vertical" barSize={18}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="purpose_name" tick={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }}
-                  axisLine={false} tickLine={false} width={110} />
-                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
-                <Bar dataKey="total" radius={[0, 6, 6, 0]}>
-                  {purposeData.map((_, i) => (
-                    <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Processing Time by Doc Type */}
-        <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
-          <ChartHeader title="Processing Time" sub="Avg Minutes by Document Type" isDark={isDark} />
-          <div className="h-64 min-w-0">
-            <ResponsiveContainer width="100%" height={256}>
-              <BarChart data={processingData.by_document_type ?? []} barSize={28}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
-                <XAxis dataKey="document_name" tick={{ fontSize: 10, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }}
-                  axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false}
-                  label={{ value: 'min', angle: -90, position: 'insideLeft', fontSize: 10, fill: isDark ? '#b0b3b8' : '#64748b' }} />
-                <Tooltip
-                  formatter={(val) => [`${val} min`, 'Avg Time']}
-                  contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }}
-                />
-                <Bar dataKey="avg_minutes" radius={[8, 8, 0, 0]}>
-                  {(processingData.by_document_type ?? []).map((_, i) => (
-                    <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+              {/* Processing Time by Doc Type */}
+              <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+                <ChartHeader title="Processing Time" sub="Avg Minutes by Document Type" isDark={isDark} />
+                <div className="h-64 min-w-0">
+                  <ResponsiveContainer width="100%" height={256}>
+                    <BarChart data={processingData.by_document_type ?? []} barSize={28}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
+                      <XAxis dataKey="document_name" tick={{ fontSize: 10, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }}
+                        axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false}
+                        label={{ value: 'min', angle: -90, position: 'insideLeft', fontSize: 10, fill: isDark ? '#b0b3b8' : '#64748b' }} />
+                      <Tooltip
+                        formatter={(val) => [`${val} min`, 'Avg Time']}
+                        contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }}
+                      />
+                      <Bar dataKey="avg_minutes" radius={[8, 8, 0, 0]}>
+                        {(processingData.by_document_type ?? []).map((_, i) => (
+                          <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </>
+        }
       </div>
 
       {/* ── 5. ADMIN PROCESSING LEADERBOARD ── */}
