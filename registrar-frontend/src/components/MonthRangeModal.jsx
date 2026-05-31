@@ -2,16 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import DropdownGroup from '../components/DropDown';
 import { getCertifications } from '../services/api';
+import SuccessToast from './SuccessToast.jsx';
+import ErrorToast from './ErrorToast.jsx';
 
 const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = 6, isDark, loading = false, documentTypes = [] }) => {
   const pad2 = (value) => String(value).padStart(2, '0');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
-  const [error, setError] = useState('');
   const [selectedDocType, setSelectedDocType] = useState(documentTypes?.[0] ?? 'All Documents');
   const [certifications, setCertifications] = useState([]);
   const [selectedCertification, setSelectedCertification] = useState('');
   const [certLoading, setCertLoading] = useState(false);
+  const [toastError, setToastError] = useState('');
+  const [toastSuccess, setToastSuccess] = useState('');
 
   useEffect(() => {
     if (documentTypes && documentTypes.length) {
@@ -49,7 +52,7 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = 6, isDark, lo
     if (isOpen) {
       setStart('');
       setEnd('');
-      setError('');
+      setToastError('');
       setCertifications([]);
       setSelectedCertification('');
       if (documentTypes && documentTypes.length) setSelectedDocType(documentTypes[0]);
@@ -75,32 +78,45 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = 6, isDark, lo
     return (b.y - a.y) * 12 + (b.m - a.m) + 1;
   };
 
-  const handleConfirm = () => {
-    setError('');
-    if (!start || !end) return setError('Please select both start and end months.');
+  const handleConfirm = async () => {
+    setToastError('');
+    setToastSuccess('');
+    if (!start || !end) { setToastError('Please select both start and end months.'); return; }
     if (selectedDocType === 'CERTIFICATION' && !selectedCertification) {
-      return setError('Please select a certification type.');
+      setToastError('Please select a certification type.');
+      return;
     }
     const s = parseDate(start);
     const e = parseDate(end);
-    if (!s || !e) return setError('Please select valid start and end months.');
+    if (!s || !e) { setToastError('Please select valid start and end months.'); return; }
     const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-    if (s.raw > todayEnd || e.raw > todayEnd) return setError('Selected months cannot be in the future.');
+    if (s.raw > todayEnd || e.raw > todayEnd) { setToastError('Selected months cannot be in the future.'); return; }
     const count = monthsBetweenInclusive(s, e);
-    if (count <= 0) return setError('End month must be the same month or after start month.');
-    if (count > maxMonths) return setError(`Range exceeds ${maxMonths} months.`);
-    
+    if (count <= 0) { setToastError('End month must be the same month or after start month.'); return; }
+    if (count > maxMonths) { setToastError(`Range must not exceeds ${maxMonths} months.`); return; }
+
     // Pass the certification type only for certification exports.
-    const params = selectedDocType === 'CERTIFICATION' 
+    const params = selectedDocType === 'CERTIFICATION'
       ? [start, end, selectedDocType, selectedCertification]
       : [start, end, selectedDocType];
-    onConfirm(...params);
+
+    try {
+      // Support both sync and async onConfirm handlers
+      const result = onConfirm(...params);
+      if (result && typeof result.then === 'function') {
+        await result;
+      }
+      setToastSuccess('Exported successfully! Check your downloads.');
+    } catch (err) {
+      console.error('Export failed:', err);
+      setToastError(err?.message || 'Export failed. Try Again.');
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 z-40" onClick={onClose} />
-      <div className={`relative z-50 w-full max-w-2xl rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden border flex flex-col max-h-[85vh] ${isDark ? 'bg-[#242526] border-[#3e4042] text-[#e4e6eb]' : 'bg-white border-[#800000]/20 text-gray-900'}`}>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className={`relative z-50 w-full max-w-2xl my-4 sm:my-8 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-y-auto border flex flex-col max-h-[90vh] ${isDark ? 'bg-[#242526] border-[#3e4042] text-[#e4e6eb]' : 'bg-white border-[#800000]/20 text-gray-900'}`}>
         <div className={`px-6 py-6 border-b-4 shrink-0 ${isDark ? 'bg-[#1f1f1f] border-[#b98b00]' : 'bg-[#800000] border-[#FFD700]'}`}>
           <div className="flex items-center justify-between">
             <h3 className="text-2xl text-white font-black uppercase tracking-tighter">Export Monthly Report</h3>
@@ -150,7 +166,7 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = 6, isDark, lo
             </div>
           </div>
 
-          {error && <p className="mt-3 text-xs text-red-500">{error}</p>}
+          
         </div>
 
         <div className={`px-8 py-6 border-t-2 shrink-0 flex justify-end gap-4 ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200'}`}>
@@ -179,6 +195,9 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = 6, isDark, lo
           </button>
         </div>
       </div>
+      {/* Toasts */}
+      <SuccessToast message={toastSuccess} onClose={() => setToastSuccess('')} />
+      <ErrorToast message={toastError} onClose={() => setToastError('')} />
     </div>
   );
 };
