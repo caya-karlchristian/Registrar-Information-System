@@ -18,7 +18,8 @@ const fetchImageData = async (src) => {
   if (!src) return null;
   try {
     const res = await fetch(src);
-    return await res.arrayBuffer();
+    const buf = await res.arrayBuffer();
+    return new Uint8Array(buf);
   } catch (e) {
     console.error('Failed to fetch image', src, e);
     return null;
@@ -91,7 +92,7 @@ const buildHeader = async (pupLogoSrc, bpLogoSrc) => {
                 width: { size: 12, type: WidthType.PERCENTAGE },
                 borders: noBorder,
                 children: [
-                  new Paragraph({ alignment: AlignmentType.RIGHT, children: leftLogo ? [new ImageRun({ data: leftLogo, transformation: { width: 72, height: 72 } })] : [] }),
+                  new Paragraph({ alignment: AlignmentType.RIGHT, children: leftLogo ? [new ImageRun({ type: 'png', data: leftLogo, transformation: { width: 80, height: 80 } })] : [] }),
                 ],
               }),
               new TableCell({
@@ -99,16 +100,16 @@ const buildHeader = async (pupLogoSrc, bpLogoSrc) => {
                 borders: noBorder,
                 children: [
                   new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'REPUBLIC OF THE PHILIPPINES', size: 16, font: 'Lucida Fax' })] }),
-                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'POLYTECHNIC UNIVERSITY OF THE PHILIPPINES', size: 22, color: '000000', bold: true, font: 'Lucida Fax' })] }),
+                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'POLYTECHNIC UNIVERSITY OF THE PHILIPPINES', size: 24, color: '000000', bold: true, font: 'Lucida Fax' })] }),
                   new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'OFFICE OF THE VICE PRESIDENT FOR CAMPUSES', size: 15, font: 'Lucida Fax' })] }),
-                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'TAGUIG CAMPUS', size: 22, bold: true, color: '000000', font: 'Lucida Fax' })] }),
+                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'TAGUIG CAMPUS', size: 24, bold: true, color: '000000', font: 'Lucida Fax' })] }),
                   new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'Office of the Campus Registrar', size: 15, italics: true, color: '666666', font: 'Lucida Fax' })] }),
                 ],
               }),
               new TableCell({
                 width: { size: 20, type: WidthType.PERCENTAGE },
                 borders: noBorder,
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: rightLogo ? [new ImageRun({ data: rightLogo, transformation: { width: 72, height: 72 } })] : [] })],
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: rightLogo ? [new ImageRun({ type: 'png', data: rightLogo, transformation: { width: 80, height: 80 } })] : [] })],
               }),
             ],
           }),
@@ -150,7 +151,7 @@ const buildFooter = async () => {
               new TableCell({
                 width: { size: 30, type: WidthType.PERCENTAGE },
                 borders: noBorder,
-                children: [ new Paragraph({ alignment: AlignmentType.RIGHT, children: [ new ImageRun({ data: new Uint8Array(footerLogo || []), transformation: { width: 240, height: 80 } }) ] }) ],
+                children: [ new Paragraph({ alignment: AlignmentType.RIGHT, children: [ new ImageRun({ type: 'png', data: footerLogo || new Uint8Array(), transformation: { width: 240, height: 80 } }) ] }) ],
               }),
             ],
           }),
@@ -288,7 +289,7 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
               new Paragraph({
                 alignment: AlignmentType.CENTER,
                 spacing: { after: 80, before: 0 },
-                children: [new TextRun({ text: `Processing of Application for ${safeTitle}`, ...makeFont(24, { bold: true, font: 'Lucida Fax' }) })],
+                children: [new TextRun({ text: `Processing of Application for ${safeTitle}`, ...makeFont(26, { bold: true, font: 'Lucida Fax' }) })],
               }),
             ],
           }),
