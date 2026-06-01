@@ -267,7 +267,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             'old_status_id'     => $oldStatusId,
             'new_status_id'     => $documentRequest->status_id,
             'changed_at'        => now(),
-            'processed_by'      => Auth::id(),
+            'changed_by'        => Auth::id(),
             'minutes_processed' => $minutesProcessed,
         ]);
     }

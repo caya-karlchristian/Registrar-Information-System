@@ -60,6 +60,25 @@ class DocumentRequestController extends Controller
         return response()->json($query->orderByDesc('requested_at')->paginate(20), 200);
     }
 
+
+    // -------------------------------------------------------------------------
+    // GET /document-requests/logbook
+    // Returns completed requests with embedded history — purpose-built for the
+    // Logbook page.  Avoids the N+1 page-loop + separate history fetch the
+    // frontend previously performed.
+    // Staff/superadmin only (enforced by route middleware role:3,4).
+    // -------------------------------------------------------------------------
+    public function logbook()
+    {
+        return response()->json(
+            DocumentRequest::with(array_merge(self::RELATIONS, ['history']))
+                ->whereHas('status', fn ($q) => $q->where('status_name', 'Completed'))
+                ->orderByDesc('requested_at')
+                ->get(),
+            200
+        );
+    }
+
     // -------------------------------------------------------------------------
     // GET /document-requests/{id}
     // -------------------------------------------------------------------------
