@@ -32,6 +32,18 @@ export const formatDateLong = (value, includeTime = false) => {
   return `${datePart} ${timePart}`;
 };
 
+/** Format an ISO value as "Month DD, YYYY HH:MM" (24-hour) */
+export const formatDateTimeLong = (value) => {
+  const datePart = formatDateLong(value);
+  if (!datePart) return null;
+  const timePart = new Date(value).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  return `${datePart} ${timePart}`;
+};
+
 /** Convert a minutes value into a human-readable duration string */
 export const formatMinutesDuration = (minutesValue) => {
   if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
