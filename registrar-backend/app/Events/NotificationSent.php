@@ -82,6 +82,19 @@ class NotificationSent implements ShouldBroadcast
     // The broadcast-worker container drains 'broadcasts' with --sleep=1 and
     // --timeout=30 for low-latency delivery.
     // -------------------------------------------------------
+    // -------------------------------------------------------
+    // WHICH QUEUE CONNECTION TO USE FOR THE BROADCAST JOB
+    // -------------------------------------------------------
+    // Switching to 'redis-broadcasts' replaces the database poll
+    // loop (1–2 s pickup delay) with Redis BLPOP (sub-100 ms).
+    // The broadcast-worker container must run:
+    //   php artisan queue:work redis-broadcasts --queue=broadcasts
+    // -------------------------------------------------------
+    public function broadcastConnection(): string
+    {
+        return 'redis-broadcasts';
+    }
+
     public function broadcastQueue(): string
     {
         return 'broadcasts';
