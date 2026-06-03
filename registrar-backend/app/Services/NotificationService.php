@@ -91,7 +91,12 @@ class NotificationService implements NotificationServiceInterface
             $typeTriggerEvent = $type->trigger_event;
 
             // Step 3 + 4: Save to DB and broadcast — atomically
-            return DB::transaction(function () use (
+            $notification = null;
+            // &$notification — pass by reference so the Notification created
+            // inside the closure is visible to the outer scope after the
+            // transaction commits. Without &, PHP captures a copy and the
+            // outer variable stays null (PHP closures are pass-by-value by default).
+            DB::transaction(function () use (&$notification,
                 $recipient, $type, $typeTitle, $typeTriggerEvent, $message, $data, $requestId
             ) {
                 $notification = Notification::create([
@@ -111,6 +116,13 @@ class NotificationService implements NotificationServiceInterface
 
                 return $notification;
             });
+
+            // Return the notification created inside the transaction.
+            // The closure's own "return $notification" returns to DB::transaction(),
+            // not to this method — without this line send() fell off the end with
+            // no return value, violating the ?Notification return type declaration
+            // and throwing "Return value must be of type ?Notification, none returned".
+            return $notification;
 
         } catch (\Throwable $e) {
             Log::error('NotificationService::send failed', [
