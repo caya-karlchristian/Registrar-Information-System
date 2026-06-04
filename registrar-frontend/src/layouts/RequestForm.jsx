@@ -25,7 +25,7 @@ const parseRequirements = (value) => {
   return [];
 };
 
-const RequestForm = () => {
+const RequestForm = ({ showProfileStep = false }) => {
   const { isDark } = useTheme();
   const { docTypeName, purposeName, certName } = useReferenceData();
 
@@ -72,6 +72,12 @@ const RequestForm = () => {
 
   const [formData, setFormData] = useState({
     termsAgreed: false,
+    firstName: '',
+    middleName: '',
+    surname: '',
+    dob: '',
+    address: '',
+    contactNumber: '',
     documentsRequested: [],
     purposeOfRequest: "",
     certification: [],
@@ -149,6 +155,9 @@ const RequestForm = () => {
     setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
+  const hasProfileStep = showProfileStep;
+  const finalStep = hasProfileStep ? 4 : 3;
+
   const nextStep = (e) => {
     e.preventDefault();
 
@@ -157,22 +166,54 @@ const RequestForm = () => {
       return;
     }
 
-    if (currentStep === 2 && formData.documentsRequested.length === 0) {
+    if (hasProfileStep && currentStep === 2) {
+      if (!(formData.firstName || '').trim()) {
+        setErrorMessage("Please enter the first name.");
+        return;
+      }
+
+      if (!(formData.middleName || '').trim()) {
+        setErrorMessage("Please enter the middle name.");
+        return;
+      }
+
+      if (!(formData.surname || '').trim()) {
+        setErrorMessage("Please enter the surname.");
+        return;
+      }
+
+      if (!formData.dob) {
+        setErrorMessage("Please select the date of birth.");
+        return;
+      }
+
+      if (!(formData.address || '').trim()) {
+        setErrorMessage("Please enter the present/permanent mailing address.");
+        return;
+      }
+
+      if (!(formData.contactNumber || '').trim()) {
+        setErrorMessage("Please enter the contact number.");
+        return;
+      }
+    }
+
+    if (currentStep === (hasProfileStep ? 3 : 2) && formData.documentsRequested.length === 0) {
       setErrorMessage("Please select at least one document to proceed.");
       return;
     }
 
-    if (currentStep === 2 && formData.purposeOfRequest.length === 0) {
+    if (currentStep === (hasProfileStep ? 3 : 2) && formData.purposeOfRequest.length === 0) {
       setErrorMessage("Please select a purpose for your request.");
       return;
     }
 
-    if (showCertificationDropdown && formData.certification.length === 0) {
+    if (currentStep === (hasProfileStep ? 3 : 2) && showCertificationDropdown && formData.certification.length === 0) {
       setErrorMessage("Please specify the certification type.");
       return;
     }
 
-    if (currentStep < 3) setCurrentStep((s) => s + 1);
+    if (currentStep < finalStep) setCurrentStep((s) => s + 1);
   };
 
   const prevStep = (e) => {
@@ -236,6 +277,12 @@ const RequestForm = () => {
     setCurrentStep(1);
     setFormData({
       termsAgreed: false,
+      firstName: '',
+      middleName: '',
+      surname: '',
+      dob: '',
+      address: '',
+      contactNumber: '',
       documentsRequested: [],
       purposeOfRequest: "",
       certification: [],
@@ -253,11 +300,18 @@ const RequestForm = () => {
     return lower.includes("certif");
   });
 
-  const stepProcess = {
-    1: "Terms & Conditions",
-    2: "Document Request",
-    3: "Payment and Document Details",
-  };
+  const stepProcess = hasProfileStep
+    ? {
+        1: "Terms & Conditions",
+        2: "Student Profile",
+        3: "Document Request",
+        4: "Payment and Document Details",
+      }
+    : {
+        1: "Terms & Conditions",
+        2: "Document Request",
+        3: "Payment and Document Details",
+      };
 
   const purposeOptions = availablePurposes.length > 0
     ? availablePurposes.map(p => p.purpose_name)
@@ -314,7 +368,7 @@ const RequestForm = () => {
             {/* Step Indicators */}
             <div className="flex flex-col items-center pt-4 pb-4">
               <div className="flex space-x-3 mb-2">
-                {[1, 2, 3].map((step) => (
+                {Array.from({ length: finalStep }, (_, index) => index + 1).map((step) => (
                   <div
                     key={step}
                     className={`w-4 h-4 rounded-full border border-pup-yellow ${
@@ -324,7 +378,7 @@ const RequestForm = () => {
                 ))}
               </div>
               <p className="text-pup-yellow font-bold text-sm tracking-wider">
-                {currentStep} of 3
+                {currentStep} of {finalStep}
               </p>
               <h2 className="text-white text-xl font-semibold mt-2">
                 {stepProcess[currentStep]}
@@ -368,8 +422,66 @@ const RequestForm = () => {
                   </div>
                 )}             
           
-              {/* STEP 2: Documents Requested */}
-              {currentStep === 2 && (
+              {/* STEP 2: Student Profile */}
+              {hasProfileStep && currentStep === 2 && (
+                <div className="space-y-6 animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <InputGroup 
+                      name="firstName" 
+                      label="First Name" 
+                      value={formData.firstName} 
+                      onChange={handleInputChange} 
+                      placeholder="e.g., Juan"
+                    />
+
+                    <InputGroup 
+                      name="middleName" 
+                      label="Middle Name" 
+                      value={formData.middleName} 
+                      onChange={handleInputChange} 
+                      placeholder="e.g., Miguel"
+                    />
+
+                    <InputGroup 
+                      name="surname" 
+                      label="Surname" 
+                      value={formData.surname} 
+                      onChange={handleInputChange} 
+                      placeholder="e.g., Dela Cruz"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <InputGroup 
+                      label="Date of Birth"
+                      type="date" 
+                      name="dob"
+                      value={formData.dob}
+                      onChange={handleInputChange}
+                      className="w-full p-2 rounded text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]" 
+                    />
+
+                    <InputGroup 
+                      name="contactNumber" 
+                      label="Contact Number" 
+                      placeholder="09XXXXXXXXX" 
+                      value={formData.contactNumber}
+                      onChange={handleInputChange} 
+                    />
+                  </div>
+
+                  <InputGroup 
+                    name="address" 
+                    label="Present/Permanent Mailing Address" 
+                    value={formData.address} 
+                    onChange={handleInputChange} 
+                    placeholder="House No., Street, Barangay, City/Municipality"
+                  />
+                </div>
+              )}
+
+              {/* STEP 3: Documents Requested */}
+              {currentStep === (hasProfileStep ? 3 : 2) && (
                 <div className="space-y-6 animate-fadeIn">
                   <MultiSelectDropdown
                     name="documentsRequested"
@@ -401,8 +513,8 @@ const RequestForm = () => {
                 </div>
               )}
 
-              {/* STEP 3: Payment & Copies */}
-              {currentStep === 3 && (
+              {/* STEP 4: Payment & Copies */}
+              {currentStep === (hasProfileStep ? 4 : 3) && (
                 <div className="space-y-6 animate-fadeIn -mt-1">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <InputGroup
@@ -566,12 +678,12 @@ const RequestForm = () => {
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={currentStep < 3 ? nextStep : handlePreSubmit}
+                <button
+                  type="button"
+                  onClick={currentStep < finalStep ? nextStep : handlePreSubmit}
                 className={`font-bold py-2 px-6 rounded shadow-md w-32 ml-auto transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
               >
-                {currentStep < 3 ? "Next" : "Submit"}
+                  {currentStep < finalStep ? "Next" : "Submit"}
               </button>
 
             </div>
