@@ -117,7 +117,6 @@ export const getAnalyticsProcessingTime = (params = {}) => api.get("/analytics/p
 export const getAnalyticsPeakHours     = (params = {}) => api.get("/analytics/peak-hours",         { params });
 export const getAnalyticsByPurpose     = (params = {}) => api.get("/analytics/by-purpose",         { params });
 export const postAnalyticsAiReport     = (params = {}) => api.post("/analytics/ai-report", {},     { params });
-export const postAnalyticsAiQuery      = (body  = {}) => api.post("/analytics/ai-query",  body);
 
 // -------------------------------------------------------
 // ANNOUNCEMENTS (read: all authenticated | write: Super Admin)
