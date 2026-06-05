@@ -148,6 +148,13 @@ class AnalyticsController extends Controller
      */
     public function aiReport(Request $request)
     {
+        // phase3-audit: max_length guard (minor finding #2)
+        $request->validate([
+            'range' => ['sometimes', 'string', 'in:today,week,month,year,all,custom'],
+            'from'  => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'to'    => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+        ]);
+
         try {
             $key = $this->cacheKey($request, 'ai-report');
 
