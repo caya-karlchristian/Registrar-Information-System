@@ -33,6 +33,11 @@ return [
         'model'   => env('ANTHROPIC_MODEL', 'claude-sonnet-4-5-20250929'),
     ],
 
+    'cashier' => [
+        'api_key' => env('CASHIER_API_KEY', ''),
+        'url'     => env('CASHIER_API_URL', 'https://puptec.ojt-ims-bsit.net/api/verify-payment'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
