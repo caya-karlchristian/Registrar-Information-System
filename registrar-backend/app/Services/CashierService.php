@@ -117,12 +117,43 @@ class CashierService
         $parts = array_filter([
             trim($firstName),
             trim($middleName),
-            trim($suffix) ? strtoupper(trim($suffix)) . '.' : '',
+            trim($suffix) ? rtrim(strtoupper(trim($suffix)), '.') . '.' : '',
         ]);
 
         $givenNames = implode(' ', $parts);
 
         return strtoupper(trim($lastName)) . ', ' . strtoupper($givenNames);
+    }
+
+    // -------------------------------------------------------------------------
+    // Single-use enforcement
+    // -------------------------------------------------------------------------
+
+    /**
+     * Check if an OR number has already been used in a previous request.
+     *
+     * Controlled by CASHIER_SINGLE_USE env flag:
+     *   false (default) — always returns false (bypass for testing)
+     *   true            — queries document_requests table for existing use
+     *
+     * @param  string   $orNo          The OR number to check
+     * @param  int|null $excludeRequestId  Exclude this request ID (for updates)
+     * @return bool  true if OR is already used and single-use is enforced
+     */
+    public function isOrAlreadyUsed(string $orNo, ?int $excludeRequestId = null): bool
+    {
+        if (!config('services.cashier.single_use', false)) {
+            return false; // single-use not enforced — testing mode
+        }
+
+        $query = \App\Models\DocumentRequest::where('or_number', $orNo)
+            ->whereNotNull('or_number');
+
+        if ($excludeRequestId) {
+            $query->where('request_id', '!=', $excludeRequestId);
+        }
+
+        return $query->exists();
     }
 
     // -------------------------------------------------------------------------
