@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
 import { getDocumentRequests, getDocumentTypes, getRequestHistory, getCertifications } from "../services/api"; 
-import LoadingOverlay from "../components/LoadingOverlay"; 
 import DropDown from '../components/DropDown';
+import { LogbookSkeleton } from '../components/LoadingSkeleton';
+import SuccessToast from '../components/SuccessToast.jsx';
+import ErrorToast from '../components/ErrorToast.jsx';
 import { logbookDocx } from '../utils/logbookDocx.js';
 import pupLogoSrc from '../assets/puplogoimage.png';
 import bpLogoSrc from '../assets/Bagong_Pilipinas_logo.png';
@@ -25,8 +27,15 @@ const LogbookRecords = () => {
   const [selectedDocTypeId, setSelectedDocTypeId] = useState("");
   const [selectedExportOption, setSelectedExportOption] = useState('All Document');
   const [exporting, setExporting] = useState(false);
+  const [toastSuccess, setToastSuccess] = useState('');
+  const [toastError, setToastError] = useState('');
   const rowsPerPage = 8;
 
+  // Load logbook data on mount:
+  // - Fetch all pages of document requests
+  // - Fetch lookup data: document types, request history, certifications
+  // - Group and sort history entries per request
+  // - Populate component state with fetched results
   useEffect(() => {
     const fetchLogbookData = async () => {
       setLoading(true);
@@ -81,6 +90,7 @@ const LogbookRecords = () => {
         setDbDocTypes([]);
         setAvailableCertifications([]);
         setHistoryByRequestId({});
+        setToastError((error && (error.message || error.toString())) || 'Error loading logbook records.');
       } finally {
         setLoading(false);
       }
@@ -88,6 +98,7 @@ const LogbookRecords = () => {
     fetchLogbookData();
   }, []);
 
+  // Map of document type id -> document name for quick lookups
   const activeDocMap = useMemo(() => {
     if (dbDocTypes.length > 0) {
       return Object.fromEntries(dbDocTypes.map(t => [t.document_type_id, t.document_name]));
@@ -95,6 +106,8 @@ const LogbookRecords = () => {
     return {};
   }, [dbDocTypes]);
 
+  // Build document filter dropdown options, preserving order and uniqueness.
+  // If a "Certification" document type exists, include an "All Certification" option.
   const docOptions = useMemo(() => {
     const options = ['All Document'];
     const seen = new Set(['all document']);
@@ -115,6 +128,7 @@ const LogbookRecords = () => {
     return options;
   }, [activeDocMap]);
 
+  // List of distinct certification names for the certification selector
   const certificationOptions = useMemo(() => {
     const options = [];
     const seen = new Set();
@@ -131,6 +145,7 @@ const LogbookRecords = () => {
     return options;
   }, [availableCertifications]);
 
+  // Extract document type names from a request row, normalizing possible shapes
   const getDocumentNames = (row) => {
     const documents = Array.isArray(row?.documents) ? row.documents : [];
     return documents
@@ -140,6 +155,7 @@ const LogbookRecords = () => {
       .filter(Boolean);
   };
 
+  // Extract certification type names from a request row, normalizing possible shapes
   const getCertificationNames = (row) => {
     const certificates = Array.isArray(row?.certificates) ? row.certificates : [];
     return certificates
@@ -149,11 +165,13 @@ const LogbookRecords = () => {
       .filter(Boolean);
   };
 
+  // Label displayed for the currently selected document/export option
   const selectedDocLabel = useMemo(() => {
     if (selectedExportOption === 'All Certification') return 'All Certification';
     return activeDocMap[selectedDocTypeId] || selectedExportOption || 'All Document';
   }, [selectedDocTypeId, activeDocMap, selectedExportOption]);
 
+  // Whether the UI is currently focused on certification-specific filters/exports
   const isCertificationMode = useMemo(() => {
     const sel = String(selectedExportOption || '').trim().toLowerCase();
     const label = String(selectedDocLabel || '').trim().toLowerCase();
@@ -163,6 +181,7 @@ const LogbookRecords = () => {
 
   const [selectedCertificationLabel, setSelectedCertificationLabel] = useState('');
 
+  // Keep selected certification label in sync when entering/exiting certification mode
   useEffect(() => {
     if (isCertificationMode) {
       // default to first available certification when entering certification mode
@@ -175,6 +194,7 @@ const LogbookRecords = () => {
     }
   }, [isCertificationMode, certificationOptions]);
 
+  // Filter data to completed requests, then apply either certification or document-type filters
   const filteredData = useMemo(() => {
     const completedOnly = data.filter(item =>
       String(item.status?.status_name).toLowerCase() === 'completed'
@@ -199,6 +219,7 @@ const LogbookRecords = () => {
     );
   }, [selectedDocTypeId, data, isCertificationMode, selectedCertificationLabel]);
 
+  // Sort filtered data by request timestamp (most recent first)
   const sortedData = useMemo(() => {
     return [...filteredData].sort((a, b) => {
       const aRequestedAt = new Date(a.requested_at || 0).getTime();
@@ -215,6 +236,8 @@ const LogbookRecords = () => {
     return sortedData.slice(indexOfFirstItem, indexOfLastItem);
   }, [indexOfFirstItem, indexOfLastItem, sortedData]);
 
+  // Build sections used for DOCX export. Sections vary depending on certification mode,
+  // selected document type, or exporting all documents (grouped by type).
   const getExportSections = () => {
     if (isCertificationMode) {
       // when exporting all certification, include all known certification types even if they have no rows
@@ -248,18 +271,22 @@ const LogbookRecords = () => {
     }));
   };
 
+  // Trigger DOCX export using grouped sections and logos
   const handleExportDocx = async () => {
     if (exporting) return;
     try {
       setExporting(true);
       await logbookDocx(getExportSections(), pupLogoSrc, bpLogoSrc, historyByRequestId);
+      setToastSuccess('Exporting Report completed.');
     } catch (e) {
       console.error('Export to DOCX failed', e);
+      setToastError((e && (e.message || e.toString())) || 'Exporting Report failed.');
     } finally {
       setExporting(false);
     }
   };
 
+  // Convert text to Proper Case while preserving roman numerals and hyphenated parts
   const toProperCase = (value = '') => {
     return value
       .toString()
@@ -274,6 +301,7 @@ const LogbookRecords = () => {
       .join(' ');
   };
 
+  // Build full name from student or alumni profile; fall back to 'Walk-in Client'
   const getFullName = (row) => {
     const p = row.student_profile || row.alumni_profile;
     if (!p) return 'Walk-in Client';
@@ -283,6 +311,7 @@ const LogbookRecords = () => {
     return `${lastName}, ${firstName}${middle}`.trim();
   };
 
+  // Try multiple locations for course information and provide fallback
   const getCourse = (row) => {
     return (
       row.student_profile?.academic_records?.[0]?.course ||
@@ -293,10 +322,12 @@ const LogbookRecords = () => {
     );
   };
 
+  // Return an email from available sources or placeholder
   const getEmail = (row) => {
     return row.user?.email || row.student_profile?.email || '---';
   };
 
+  // Format an ISO date value into a long human-readable date
   const formatDateLong = (value) => {
     if (!value) return null;
     const date = new Date(value);
@@ -309,6 +340,7 @@ const LogbookRecords = () => {
     });
   };
 
+  // Format an ISO datetime value into long date + 24-hour time
   const formatDateTimeLong = (value) => {
     const datePart = formatDateLong(value);
     if (!datePart) return null;
@@ -322,18 +354,21 @@ const LogbookRecords = () => {
     return `${datePart} ${timePart}`;
   };
 
+  // Get the most recent processing timestamp from the request history
   const getProcessedAt = (row) => {
     const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
     if (history.length === 0) return null;
     return history[0]?.changed_at || null;
   };
 
+  // Get processed duration in minutes from history if available
   const getMinutesProcessed = (row) => {
     const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
     if (history.length === 0) return null;
     return history[0]?.minutes_processed ?? null;
   };
 
+  // Convert a minutes value into a compact human-readable duration
   const formatMinutesDuration = (minutesValue) => {
     if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
 
@@ -352,6 +387,7 @@ const LogbookRecords = () => {
     return `${minutes}${minuteLabel}`;
   };
 
+  // Find when the request was claimed (status id 3) within the history entries
   const getClaimedAt = (row) => {
     const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
     if (history.length === 0) return null;
@@ -359,10 +395,10 @@ const LogbookRecords = () => {
     return claimEntry?.changed_at || null;
   };
 
+  if (loading) return <LogbookSkeleton isDark={isDark} />;
+
   return (
     <div className={`relative min-h-screen font-sans text-left z-20 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>
-      <LoadingOverlay isVisible={loading} message="Fetching Registrar Records" />
-
       <div className={`max-w-350 mx-auto shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
         <div className="p-4 sm:p-6 md:p-8 pb-0">
@@ -526,6 +562,8 @@ const LogbookRecords = () => {
             </button>
           </div>
         </div>
+        <SuccessToast message={toastSuccess} onClose={() => setToastSuccess('')} />
+        <ErrorToast message={toastError} onClose={() => setToastError('')} />
       </div>
     </div>
   );
