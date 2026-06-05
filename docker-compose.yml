@@ -197,7 +197,7 @@ services:
     container_name: ris_broadcast_worker
     restart: unless-stopped
     command: >
-        php artisan queue:work redis-broadcasts
+        php artisan queue:work database
           --queue=broadcasts
           --sleep=1
           --tries=3
