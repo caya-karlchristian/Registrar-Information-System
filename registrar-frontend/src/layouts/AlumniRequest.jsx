@@ -16,7 +16,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
 const ALUMNI_ACCESS_IDS = [2, 3];
 
-const AlumniRequestForm = () => {
+const AlumniRequestForm = ({ showProfileStep = false }) => {
   const { docTypeName, certName, purposes: referencePurposes } = useReferenceData();
   const { isDark } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
@@ -62,6 +62,12 @@ const AlumniRequestForm = () => {
 
   const [formData, setFormData] = useState({
     termsAgreed: false,
+    firstName: '',
+    middleName: '',
+    surname: '',
+    dob: '',
+    address: '',
+    contactNumber: '',
     documentsRequested: [],
     purposeOfRequest: '',
     certification: [],
@@ -102,6 +108,8 @@ const AlumniRequestForm = () => {
       return { ...prev, [name]: checked };
     });
   };
+
+  const hasProfileStep = showProfileStep;
 
   const handlePreSubmit = (e) => {
     e.preventDefault();
@@ -165,29 +173,61 @@ const AlumniRequestForm = () => {
   const nextStep = (e) => {
     e.preventDefault();
 
-    const finalStep = hasTOR ? 4 : 3;
+    const finalStep = hasProfileStep ? (hasTOR ? 5 : 4) : (hasTOR ? 4 : 3);
 
     if (currentStep === 1 && !formData.termsAgreed) {
       setErrorMessage("You must read and agree to the Terms & Conditions to proceed.");
       return;
     }
 
-    if (currentStep === 2 && formData.documentsRequested.length === 0) {
+    if (hasProfileStep && currentStep === 2) {
+      if (!(formData.firstName || '').trim()) {
+        setErrorMessage("Please enter your first name.");
+        return;
+      }
+
+      if (!(formData.middleName || '').trim()) {
+        setErrorMessage("Please enter your middle name.");
+        return;
+      }
+
+      if (!(formData.surname || '').trim()) {
+        setErrorMessage("Please enter your surname.");
+        return;
+      }
+
+      if (!formData.dob) {
+        setErrorMessage("Please select the date of birth.");
+        return;
+      }
+
+      if (!(formData.address || '').trim()) {
+        setErrorMessage("Please enter your present/permanent mailing address.");
+        return;
+      }
+
+      if (!(formData.contactNumber || '').trim()) {
+        setErrorMessage("Please enter your contact number.");
+        return;
+      }
+    }
+
+    if (currentStep === (hasProfileStep ? 3 : 2) && formData.documentsRequested.length === 0) {
       setErrorMessage("Please select at least one document to proceed.");
       return;
     }
 
-    if (currentStep === 2 && formData.purposeOfRequest.length === 0) {
+    if (currentStep === (hasProfileStep ? 3 : 2) && formData.purposeOfRequest.length === 0) {
       setErrorMessage("Please select a purpose for your request.");
       return;
     }
 
-    if (currentStep === 2 && showCertificationDropdown && formData.certification.length === 0) {
+    if (currentStep === (hasProfileStep ? 3 : 2) && showCertificationDropdown && formData.certification.length === 0) {
       setErrorMessage("Please specify the certification type.");
       return;
     }
 
-    if (currentStep === 3 && hasTOR && !formData.noRequests && !formData.doneRequest) {
+    if (currentStep === (hasProfileStep ? 4 : 3) && hasTOR && !formData.noRequests && !formData.doneRequest) {
       setErrorMessage("Please select at least one TOR option to proceed.");
       return;
     }
@@ -246,6 +286,12 @@ const AlumniRequestForm = () => {
     setCurrentStep(1);
     setFormData({
       termsAgreed: false,
+      firstName: '',
+      middleName: '',
+      surname: '',
+      dob: '',
+      address: '',
+      contactNumber: '',
       documentsRequested: [],
       purposeOfRequest: "",
       certification: [],
@@ -271,6 +317,8 @@ const AlumniRequestForm = () => {
     );
   });
 
+  const finalStep = hasProfileStep ? (hasTOR ? 5 : 4) : (hasTOR ? 4 : 3);
+
   const certificationOptions = availableCertifications.length > 0
       ? availableCertifications.map((c) => c.certificate_name)
       : Object.values(CERTIFICATION_MAP);
@@ -284,18 +332,33 @@ const AlumniRequestForm = () => {
     ? availableDocs.map(d => d.document_name)
     : Object.values(DOC_TYPE_MAP);
 
-  const stepLabels = hasTOR
-    ? [
-        "Terms & Conditions",
-        "Alumni Request",
-        "TOR Requirements",
-        "Payment and Document Details",
-      ]
-    : [
-        "Terms & Conditions",
-        "Alumni Request",
-        "Payment and Document Details",
-      ];
+  const stepLabels = hasProfileStep
+    ? (hasTOR
+      ? [
+          "Terms & Conditions",
+          "Alumni Profile",
+          "Alumni Request",
+          "TOR Requirements",
+          "Payment and Document Details",
+        ]
+      : [
+          "Terms & Conditions",
+          "Alumni Profile",
+          "Alumni Request",
+          "Payment and Document Details",
+        ])
+    : hasTOR
+      ? [
+          "Terms & Conditions",
+          "Alumni Request",
+          "TOR Requirements",
+          "Payment and Document Details",
+        ]
+      : [
+          "Terms & Conditions",
+          "Alumni Request",
+          "Payment and Document Details",
+        ];
   const totalSteps = stepLabels.length;
 
   const certificationLabel = formData.certification.join(', ');
@@ -389,7 +452,64 @@ const AlumniRequestForm = () => {
                   </div>
                 )}
             
-            {currentStep === 2 && (
+            {hasProfileStep && currentStep === 2 && (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <InputGroup 
+                  name="firstName" 
+                  label="First Name" 
+                  value={formData.firstName} 
+                  onChange={handleInputChange} 
+                  placeholder='e.g., Juan'
+                  />
+
+                  <InputGroup 
+                  name="middleName" 
+                  label="Middle Name" 
+                  value={formData.middleName} 
+                  onChange={handleInputChange} 
+                  placeholder='e.g., Miguel'
+                  />
+
+                  <InputGroup 
+                  name="surname" 
+                  label="Surname" 
+                  value={formData.surname} 
+                  onChange={handleInputChange} 
+                  placeholder='e.g., Dela Cruz'
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <InputGroup 
+                     label="Date of Birth"
+                     type="date" 
+                     name="dob"
+                     value={formData.dob}
+                     onChange={handleInputChange}
+                     className="w-full p-2 rounded text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]" 
+                   />
+
+                   <InputGroup 
+                     name="contactNumber" 
+                     label="Contact Number" 
+                     placeholder="09XXXXXXXXX" 
+                     value={formData.contactNumber}
+                     onChange={handleInputChange} 
+                   />
+                </div>
+
+                <InputGroup 
+                  name="address" 
+                  label="Present/Permanent Mailing Address" 
+                  value={formData.address} 
+                  onChange={handleInputChange} 
+                  placeholder="House No., Street, Barangay, City/Municipality"
+                  />
+              </div>
+            )}
+
+            {currentStep === (hasProfileStep ? 3 : 2) && (
               <div className="space-y-6 animate-fadeIn ">
                 <div className="grid grid-cols-1 md:grid-cols-1 gap-6 w-full mt-5">
                   <MultiSelectDropdown 
@@ -423,7 +543,7 @@ const AlumniRequestForm = () => {
               </div>
             )}
 
-            {currentStep === 3 && hasTOR && (
+            {currentStep === (hasProfileStep ? 4 : 3) && hasTOR && (
               <div className="space-y-6 animate-fadeIn">
                 <div className="grid grid-cols-1 gap-6 w-full mt-10">
                   <div className={`space-y-3 p-4 rounded-lg border ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/10'}`}>
@@ -449,7 +569,7 @@ const AlumniRequestForm = () => {
             )}
     
             {/* STEP 6: SUBMIT */}
-            {currentStep === (hasTOR ? 4 : 3) && (
+            {currentStep === finalStep && (
               <div className="space-y-6 animate-fadeIn">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full -mt-6">
                   <InputGroup
@@ -481,7 +601,7 @@ const AlumniRequestForm = () => {
                       Number of copies per document
                     </h3>
                     <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
-                      {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).length > 0 ? (
+                      {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).length > 0 && (
                         formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => (
                           <div key={index} className="flex items-center justify-between gap-2">
                            <label className="text-white text-sm flex-1">
@@ -505,9 +625,7 @@ const AlumniRequestForm = () => {
                               </div>
                           </div>
                         ))
-                      ) : (
-                        <p className="text-gray-300 text-sm italic">No documents selected.</p>
-                      )}
+                      ) }
                       {showCertificationDropdown && formData.certification.length > 0 &&
                         formData.certification.map((certName, index) => (
                           <div key={index} className="flex items-center justify-between gap-2">

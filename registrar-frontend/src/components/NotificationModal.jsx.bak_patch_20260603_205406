@@ -107,42 +107,6 @@ const NotificationModal = ({ isOpen, onClose }) => {
     return notifications;
   }, [activeTab, notifications]);
 
-  // ── Infinite-scroll setup ──────────────────────────────────────────────
-  // listRef    → the scrollable notification list container
-  // sentinelRef → invisible div at the very bottom of the list
-  //
-  // IntersectionObserver fires loadMore() whenever the sentinel enters the
-  // visible area of listRef, letting users scroll through all their
-  // notifications without a separate 'View all' / page click.
-  //
-  // IMPORTANT: these hooks must be declared BEFORE any conditional return.
-  // React requires hooks to be called in the same order on every render —
-  // placing useRef/useEffect after "if (!isOpen) return null" caused a
-  // "hooks called in different order" error because those hooks were skipped
-  // on renders where isOpen was false.
-  // ──────────────────────────────────────────────────────────────────────
-  const listRef     = useRef(null);
-  const sentinelRef = useRef(null);
-
-  useEffect(() => {
-    if (!isOpen) return; // don't observe while the modal is closed
-    const sentinel = sentinelRef.current;
-    const root     = listRef.current;
-    if (!sentinel || !root) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasMore && !loadingMore) {
-          loadMore();
-        }
-      },
-      { root, threshold: 0, rootMargin: '0px 0px 80px 0px' },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [isOpen, hasMore, loadingMore, loadMore]);
-
   if (!isOpen) return null;
 
   const handleNotifClick = async (notif) => {

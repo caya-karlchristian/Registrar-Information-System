@@ -15,6 +15,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\SsoCallbackController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AiQueryController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
 use App\Http\Controllers\AlumniSystemController;
@@ -25,7 +26,7 @@ use App\Http\Controllers\AlumniSystemController;
 |--------------------------------------------------------------------------
 */
 Route::post('/login', [AuthController::class, 'login'])
-    ->middleware('throttle:10,1');
+    ->middleware('throttle:60,1');
 
 Route::post('/auth/callback', [SsoCallbackController::class, 'handle'])
     ->middleware('throttle:20,1');
@@ -142,7 +143,11 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
             Route::get('processing-time',  [AnalyticsController::class, 'processingTime']);
             Route::get('peak-hours',       [AnalyticsController::class, 'peakHours']);
             Route::get('by-purpose',       [AnalyticsController::class, 'byPurpose']);
-            Route::post('ai-report',          [AnalyticsController::class, 'aiReport']);
+            Route::post('ai-report', [AnalyticsController::class, 'aiReport'])
+                ->middleware('throttle:30,1');
+            // Phase 3 — Conversational NLQ
+            Route::post('ai-query', [AiQueryController::class, 'query'])
+                ->middleware('throttle:30,1');
         });
 
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
@@ -171,7 +176,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 use App\Http\Controllers\LocalAuthController;
 
 Route::post('/auth/local-login', [LocalAuthController::class, 'login'])
-    ->middleware('throttle:10,1');
+    ->middleware('throttle:60,1');
 
 Route::middleware(['auth:sanctum', 'role:4'])->group(function () {
     Route::post('/auth/local-password',    [LocalAuthController::class, 'setPassword']);

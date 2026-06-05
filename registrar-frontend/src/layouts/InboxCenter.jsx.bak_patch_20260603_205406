@@ -95,28 +95,6 @@ const InboxCenter = () => {
     }
   };
 
-  // ── Infinite-scroll setup ───────────────────────────────────────────────
-  const scrollRef   = useRef(null);
-  const sentinelRef = useRef(null);
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    const root     = scrollRef.current;
-    if (!sentinel || !root) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasMore && !loadingMore) {
-          loadMore();
-        }
-      },
-      { root, threshold: 0, rootMargin: '0px 0px 100px 0px' },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, loadMore]);
-
   return (
     <>
       <div className="w-full max-w-6xl mx-auto px-4">
@@ -141,13 +119,7 @@ const InboxCenter = () => {
                 />
               </div>
 
-              {/* IntersectionObserver sentinel — fires loadMore when the
-                  user scrolls to the bottom of the list. scrollRef is the
-                  container; sentinelRef is the invisible div at the bottom. */}
-              <div
-                ref={scrollRef}
-                className="max-h-[60vh] lg:max-h-[calc(72vh-130px)] overflow-y-auto"
-              >
+              <div className="max-h-[60vh] lg:max-h-[calc(72vh-130px)] overflow-y-auto">
                 {loading ? (
                   <div className={`p-8 text-center text-sm animate-pulse ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
                     Loading notifications…
@@ -185,16 +157,6 @@ const InboxCenter = () => {
                       </button>
                     );
                   })
-                )}
-
-                {/* Sentinel: observed by IntersectionObserver below.
-                    When it enters the viewport, loadMore() is called. */}
-                <div ref={sentinelRef} aria-hidden="true" />
-
-                {loadingMore && (
-                  <div className={`py-3 text-center text-xs animate-pulse ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
-                    Loading more…
-                  </div>
                 )}
               </div>
             </aside>

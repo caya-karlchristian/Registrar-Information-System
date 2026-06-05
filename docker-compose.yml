@@ -129,7 +129,7 @@ services:
         --queue=default
         --sleep=3
         --tries=3
-        --timeout=120
+        --timeout=300
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_KEY: ${APP_KEY}
@@ -197,11 +197,11 @@ services:
     container_name: ris_broadcast_worker
     restart: unless-stopped
     command: >
-      php artisan queue:work
-        --queue=broadcasts
-        --sleep=1
-        --tries=3
-        --timeout=30
+        php artisan queue:work database
+          --queue=broadcasts
+          --sleep=1
+          --tries=3
+          --timeout=30
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_KEY: ${APP_KEY}

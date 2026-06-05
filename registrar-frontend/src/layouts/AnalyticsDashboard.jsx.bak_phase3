@@ -11,7 +11,6 @@ import {
 } from '@heroicons/react/24/outline';
 import DropdownGroup from '../components/DropDown';
 import AIInsightCard from '../components/AIInsightCard';
-import AIQueryChat   from '../components/AIQueryChat';
 import MonthRangeModal from '../components/MonthRangeModal';
 import { StatCardSkeleton, ChartCardSkeleton } from '../components/LoadingSkeleton';
 import {
@@ -24,7 +23,6 @@ import {
   getAnalyticsPeakHours,
   getAnalyticsByPurpose,
   postAnalyticsAiReport,
-  postAnalyticsAiQuery,
 } from '../services/api';
 
 // ─── Constants ────────────────────────────────────────────────────────────
@@ -515,9 +513,6 @@ const AnalyticsDashboard = () => {
         onGenerate={handleGenerateReport}
         generatedAt={aiGeneratedAt}
       />
-
-      {/* ── 7. AI QUERY CHAT */}
-      <AIQueryChat buildParams={buildParams} />
 
     </div>
   );
