@@ -143,10 +143,10 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
             Route::get('peak-hours',       [AnalyticsController::class, 'peakHours']);
             Route::get('by-purpose',       [AnalyticsController::class, 'byPurpose']);
             Route::post('ai-report', [AnalyticsController::class, 'aiReport'])
-                ->middleware('throttle:10,1');
+                ->middleware('throttle:30,1');
             // Phase 3 — Conversational NLQ
             Route::post('ai-query', [AiQueryController::class, 'query'])
-                ->middleware('throttle:10,1');
+                ->middleware('throttle:30,1');
         });
 
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
