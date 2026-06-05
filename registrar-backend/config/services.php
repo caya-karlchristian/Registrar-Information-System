@@ -34,8 +34,11 @@ return [
     ],
 
     'cashier' => [
-        'api_key' => env('CASHIER_API_KEY', ''),
-        'url'     => env('CASHIER_API_URL', 'https://puptec.ojt-ims-bsit.net/api/verify-payment'),
+        'api_key'     => env('CASHIER_API_KEY', ''),
+        'url'         => env('CASHIER_API_URL', 'https://puptec.ojt-ims-bsit.net/api/verify-payment'),
+        // single_use: when true, each OR number can only be used once.
+        // Set to false during development/testing to reuse OR numbers.
+        'single_use'  => env('CASHIER_SINGLE_USE', false),
     ],
 
     'slack' => [

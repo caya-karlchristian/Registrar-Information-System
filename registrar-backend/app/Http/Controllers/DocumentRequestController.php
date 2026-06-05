@@ -99,6 +99,17 @@ class DocumentRequestController extends Controller
             ], 422);
         }
 
+        // or-validation: single-use check
+        if (!empty($validated['or_number'])) {
+            if ($this->cashierService->isOrAlreadyUsed($validated['or_number'])) {
+                $message = 'This OR number has already been used for a previous request. Each Official Receipt can only be used once.';
+                return response()->json([
+                    'message' => $message,
+                    'errors'  => ['or_number' => [$message]],
+                ], 422);
+            }
+        }
+
         // or-validation: verify OR before creating request
         if (!empty($validated['or_number'])) {
             /** @var \App\Models\SystemUser $user */
