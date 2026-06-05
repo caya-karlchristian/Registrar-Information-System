@@ -21,6 +21,9 @@ export const CATEGORY_MAP = {
   reminder_final_warning:      { category: 'Warning',     color: 'bg-rose-600' },
   request_closed:              { category: 'Closed',      color: 'bg-white/40' },
   request_auto_archived:       { category: 'Archived',    color: 'bg-white/40' },
+  // Announcements — broadcast by admins to all users
+  announcement_sent:           { category: 'Announcement', color: 'bg-purple-400' },
+
   // Admin
   admin_new_request:           { category: 'Important',   color: 'bg-rose-600' },
   admin_payment_verification:  { category: 'Payment',     color: 'bg-pup-yellow' },

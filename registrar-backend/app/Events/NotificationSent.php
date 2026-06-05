@@ -82,6 +82,7 @@ class NotificationSent implements ShouldBroadcast
     // The broadcast-worker container drains 'broadcasts' with --sleep=1 and
     // --timeout=30 for low-latency delivery.
     // -------------------------------------------------------
+
     public function broadcastQueue(): string
     {
         return 'broadcasts';
@@ -106,14 +107,6 @@ class NotificationSent implements ShouldBroadcast
             'request_id'   => $this->notification->request_id,
             'read_at'      => $this->notification->read_at,
             'created_at'   => $this->notification->created_at->toISOString(),
-            // Forward requirements checklist so the real-time toast/bell
-            // can show it immediately without a follow-up REST call.
-            'requirements' => $data['requirements'] ?? null,
-            'announcement' => isset($data['announcement_id']) ? [
-                'id'      => $data['announcement_id'],
-                'title'   => $data['announcement_title'],
-                'content' => $data['announcement_content'],
-            ] : null,
         ];
     }
 

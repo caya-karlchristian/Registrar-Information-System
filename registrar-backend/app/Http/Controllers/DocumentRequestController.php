@@ -7,6 +7,7 @@ use App\Models\SystemUser;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Services\DocumentRequestService;
 use Illuminate\Http\Request;
+use App\Services\CashierService;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -29,7 +30,11 @@ class DocumentRequestController extends Controller
         'certificates.certificationType',
     ];
 
-    public function __construct(private DocumentRequestServiceInterface $requestService) {}
+    // or-validation: CashierService injected
+    public function __construct(
+        private DocumentRequestServiceInterface $requestService,
+        private CashierService                  $cashierService,
+    ) {}
 
     // -------------------------------------------------------------------------
     // GET /document-requests
@@ -111,6 +116,58 @@ class DocumentRequestController extends Controller
             return response()->json([
                 'message' => 'At least one document or certificate must be requested.',
             ], 422);
+        }
+
+        // or-validation: single-use check
+        if (!empty($validated['or_number'])) {
+            if ($this->cashierService->isOrAlreadyUsed($validated['or_number'])) {
+                $message = 'This OR number has already been used for a previous request. Each Official Receipt can only be used once.';
+                return response()->json([
+                    'message' => $message,
+                    'errors'  => ['or_number' => [$message]],
+                ], 422);
+            }
+        }
+
+        // or-validation: verify OR before creating request
+        if (!empty($validated['or_number'])) {
+            /** @var \App\Models\SystemUser $user */
+            $user = Auth::user();
+
+            // Resolve the customer name from the user's profile.
+            // Students and alumni have separate profile tables;
+            // admins submitting on behalf of a student are not expected
+            // to hit this path (walk-in requests bypass OR validation).
+            $profile = $user->studentProfile ?? $user->alumniProfile ?? null;
+
+            if ($profile) {
+                $customerName = $this->cashierService->formatCustomerName(
+                    $profile->last_name  ?? '',
+                    $profile->first_name ?? '',
+                    $profile->middle_name ?? '',
+                    $profile->suffix ?? '',
+                );
+
+                $verification = $this->cashierService->verifyPayment(
+                    $validated['or_number'],
+                    $customerName,
+                );
+
+                if (!$verification['valid']) {
+                    $reason = $verification['reason'] ?? 'NOT_FOUND';
+
+                    $message = match ($reason) {
+                        'NOT_FOUND' => 'The OR number could not be found. Please check your Official Receipt and try again.',
+                        'API_ERROR' => 'Payment verification is temporarily unavailable. Please try again later.',
+                        default     => 'Payment verification failed. Please contact the registrar\'s office.',
+                    };
+
+                    return response()->json([
+                        'message' => $message,
+                        'errors'  => ['or_number' => [$message]],
+                    ], 422);
+                }
+            }
         }
 
         $documentRequest = $this->requestService->createRequest(Auth::user(), $validated);

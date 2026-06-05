@@ -102,10 +102,13 @@ export const useNotifications = (onNewNotification = null) => {
     }, []);
 
     const prevUserIdRef = useRef(null);
+    
+    const fetchNotificationsRef = useRef(fetchNotifications);
+    useEffect(() => { fetchNotificationsRef.current = fetchNotifications; }, [fetchNotifications]);
 
     useEffect(() => {
         if (!user) return;
-        fetchNotifications();
+        fetchNotificationsRef.current();
 
         if (prevUserIdRef.current !== user.user_id) {
             resetEcho();
@@ -145,9 +148,27 @@ export const useNotifications = (onNewNotification = null) => {
 
         const connectionState = echo.connector.pusher.connection.state;
 
-        echo.connector.pusher.connection.bind('state_change', ({ current }) => {
+        // -------------------------------------------------------
+        // RECONNECT RECOVERY
+        // -------------------------------------------------------
+        // If the WebSocket drops and reconnects (mobile sleep, network
+        // blip, server restart), any notifications pushed during the
+        // gap are silently missed. Re-fetching on reconnect fills
+        // the gap via REST; the existing deduplication prevents doubles.
+        // We bind to 'state_change' persistently so every reconnect
+        // triggers a refresh for the lifetime of this effect.
+        // -------------------------------------------------------
+        const handleStateChange = ({ current, previous }) => {
             console.info(`[Echo] connection → ${current}`);
-        });
+            // 'disconnected' → 'connected' means a real reconnect after a drop.
+            // Skip initialized → connected (first-ever connect) because
+            // fetchNotifications() already ran at effect start above.
+            if (current === 'connected' && previous === 'disconnected') {
+                console.info('[Echo] reconnected — refreshing missed notifications');
+                fetchNotifications();
+            }
+        };
+        echo.connector.pusher.connection.bind('state_change', handleStateChange);
 
         // Store the onConnected handler outside the else block so the cleanup
         // function can unbind it by reference. Previously unbind('connected')
@@ -171,15 +192,16 @@ export const useNotifications = (onNewNotification = null) => {
 
         return () => {
             unsubscribed = true;
-            // Unbind only OUR listener by reference — never the bare
-            // unbind('connected') which strips every listener on the connection.
+            // Unbind only OUR listeners by reference — never the bare
+            // unbind() which strips every listener on the connection.
+            echo.connector.pusher.connection.unbind('state_change', handleStateChange);
             if (pendingConnectedHandler) {
                 echo.connector.pusher.connection.unbind('connected', pendingConnectedHandler);
                 pendingConnectedHandler = null;
             }
             echo.leave(channelName);
         };
-    }, [user?.user_id, fetchNotifications]);
+    }, [user?.user_id]);
 
     return {
         notifications,

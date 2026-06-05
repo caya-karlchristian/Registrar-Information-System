@@ -46,6 +46,7 @@ const ROLE_CONFIG = {
     profileLabel: (user) => user?.email,
     items: [
       { name: 'Dashboard', to: 'dashboard', icon: Squares2X2Icon },
+      { name: 'Walk-In Request', to: 'request', icon: AcademicCapIcon },
       { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon },
       { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon },
       { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon },
