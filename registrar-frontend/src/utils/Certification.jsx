@@ -66,7 +66,7 @@ export const CERT_CONFIG = {
 
   3: {
     id: 3,
-    name: "Certification of Medium of Instruction",
+    name: "Certification of Medium  of Instruction",
     fields: ["fullName", "course", "dateGraduated", "officialReceiptNum", "date"],
     renderBody: (data) => (
       <>
@@ -96,7 +96,7 @@ export const CERT_CONFIG = {
 
   4: {
     id: 4,
-    name: "Certification of Medium of Instruction with Units",
+    name: "Certification of Medium of  Instruction with Units",
     fields: ["fullName", "course", "dateGraduated", "semestersNum", "units", "officialReceiptNum", "date"],
     renderBody: (data) => (
       <>
@@ -148,7 +148,7 @@ export const CERT_CONFIG = {
 
   6: {
     id: 6,
-    name: "Certificate of Graduation",
+    name: "Certificate of  Graduation",
     fields: ["fullName", "course", "latinHonors", "dateGraduated", "diplomaNum"],
     renderBody: (data) => (
       <StandardCertLayout date={data.date}>
@@ -314,7 +314,7 @@ export const CERT_CONFIG = {
     name: "CAV Request Letter",
     hideHeaderFooter: true,
     fields: ["fullName", "course", "major", "studentStatus", "date"],
-    renderBody: (data) => (
+    renderBody: (data, layout) => (
       <>
         <TextBlock className="text-right text-xs sm:text-sm text-gray-700 -mt-5 font-lucida">
           <p>{formatDateFormal(data.date)}</p>
@@ -356,7 +356,7 @@ export const CERT_CONFIG = {
         <TextBlock className="border-t-2 border-gray-800 text-center py-1 my-4 font-lucida">
           <p className="font-bold text-[12px] sm:text-[13px]">1<sup>st</sup> Endorsement</p>
         </TextBlock>
-        <PupLetterhead date={data.date} />
+        <PupLetterhead date={data.date} layout={layout}/>
         <TextBlock className="text-[12px] sm:text-[13px] leading-relaxed text-justify mb-4">
           Respectfully forwarded to the Director IV, Commission on Higher Education-National Capital
           Region, the request of
@@ -509,7 +509,7 @@ export const CERT_CONFIG = {
     name: "Endorsement Letter",
     hideHeaderFooter: true,
     fields: ["fullName", "course", "major", "date"],
-    renderBody: (data) => (
+    renderBody: (data, layout) => (
       <>
         <TextBlock className="text-right text-xs sm:text-sm text-gray-700 -mt-5">
           <p>{formatDateFormal(data.date)}</p>
@@ -556,7 +556,7 @@ export const CERT_CONFIG = {
         <div className="border-t-2 border-gray-800 text-center py-1 my-4">
           <TextBlock className="font-bold text-[12px] sm:text-[13px]">1<sup>st</sup> Endorsement</TextBlock>
         </div>
-        <PupLetterhead date={data.date} />
+        <PupLetterhead date={data.date} layout={layout} />
         <TextBlock className="indent-6 text-[12px] sm:text-[13px] leading-relaxed text-justify mb-4">
           Respectfully forwarded to the Director, Authentication Department Region, the request of{" "}
           {fillOrLine(data.fullName)} {bold("GRADUATED -")} {fillOrLine(data.course)} for the
@@ -586,12 +586,11 @@ export const CERT_CONFIG = {
     name: "Certificate of Eligibility to Transfer",
     hideHeaderFooter: true,
     fields: ["fullName", "date"],
-    renderBody: (data) => (
+    renderBody: (data,layout) => (
       <>
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center gap-3">
-            <img src={puplogoimage} alt="PUP Logo" className="w-12 h-12 object-contain" />
-            <TextBlock className="text-[8px] font-serif leading-tight text-center">
+              <img src={layout?.headerLeftUrl || puplogoimage} alt="PUP Logo" className="w-12 h-12 object-contain" />            <TextBlock className="text-[8px] font-serif leading-tight text-center">
               <p>REPUBLIC OF THE PHILIPPINES</p>
               <p className="font-bold uppercase">Polytechnic University of the Philippines</p>
               <p>OFFICE OF THE VICE PRESIDENT FOR CAMPUSES</p>
@@ -616,7 +615,7 @@ export const CERT_CONFIG = {
           </CertParagraph>
           <TextBlock className="text-[10px] italic">Note: Not valid without University's seal.</TextBlock>
         </div>
-        <div className="mt-4 flex justify-end pr-4 sm:pr-8">
+        <div className="flex justify-end pr-4 sm:pr-8">
           <div className="text-center">
             <RegistrarSignature signee={data.signee} />
           </div>
@@ -628,8 +627,8 @@ export const CERT_CONFIG = {
         <div className="text-center mb-4">
           <TextBlock className="font-bold text-[13px] sm:text-[14px] uppercase tracking-wide">Request Form</TextBlock>
         </div>
-        <div className="flex gap-4 mb-4">
-          <img src={puplogoimage} alt="PUP Logo" className="w-12 h-12 object-contain self-start" />
+        <div className="flex gap-4">
+          <img src={layout?.headerLeftUrl || puplogoimage} alt="PUP Logo" className="w-12 h-12 object-contain" />          
           <TextBlock className="flex-1 space-y-3 text-[11px] sm:text-[12px]">
             {["Name of School:", "Address:", "Date:"].map((label) => (
               <div key={label} className="flex items-end gap-2">
