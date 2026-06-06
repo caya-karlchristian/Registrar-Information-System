@@ -132,6 +132,7 @@ const DocumentManagement = () => {
         setForm(EMPTY_FORM);
       }
       setDeleteModal({ isOpen: false, docId: null });
+      setSuccessMsg("Document deleted successfully!");
     } catch (err) {
       setErrorMsg(err.response?.data?.message || "Failed to delete document:");
     } finally {
@@ -159,7 +160,7 @@ const DocumentManagement = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+    <div className={`min-h-screen font-sans mt-10 px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
 
       {/* Top bar */}
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start mb-6">
