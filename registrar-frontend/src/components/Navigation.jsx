@@ -12,6 +12,7 @@ import {
   ChartBarSquareIcon,
   BookOpenIcon,
   Cog6ToothIcon,
+  InboxIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider";
 import { useTheme } from "../context/ThemeContext";
@@ -24,6 +25,7 @@ const ROLE_CONFIG = {
     profileLabel: (user) => user?.academic_record?.student_number || 'No Student Number',
     items: [
       { name: 'Dashboard', to: 'home', icon: Squares2X2Icon },
+      { name: 'Inbox', to: 'inbox', icon: InboxIcon },
       { name: 'Document Lists', to: 'lists', icon: TableCellsIcon },
       { name: 'Student Requests', to: 'request', icon: ClipboardDocumentCheckIcon },
       { name: 'Student Profile', to: 'profile', icon: UserGroupIcon },
@@ -35,6 +37,7 @@ const ROLE_CONFIG = {
     profileLabel: (user) => user?.email,
     items: [
       { name: 'Dashboard', to: 'home', icon: Squares2X2Icon },
+      { name: 'Inbox', to: 'inbox', icon: InboxIcon },
       { name: 'Document Lists', to: 'lists', icon: TableCellsIcon },
       { name: 'Alumni Request', to: 'request', icon: AcademicCapIcon },
       { name: 'Alumni Profile', to: 'profile', icon: UserCircleIcon },
@@ -46,6 +49,7 @@ const ROLE_CONFIG = {
     profileLabel: (user) => user?.email,
     items: [
       { name: 'Dashboard', to: 'dashboard', icon: Squares2X2Icon },
+      { name: 'Inbox', to: 'inbox', icon: InboxIcon },
       { name: 'Walk-In Request', to: 'request', icon: AcademicCapIcon },
       { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon },
       { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon },
