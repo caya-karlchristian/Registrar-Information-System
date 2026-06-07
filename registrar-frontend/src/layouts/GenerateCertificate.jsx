@@ -113,24 +113,24 @@ const FIELD_CONFIG = [
 ];
 
 // ─── Memoized Certificate Preview ───
-const CertificatePreview = React.memo(({ certConfig, activeLayout, debouncedFormData, isDark }) => (
-  <div
-    id="print-area"
-    className={`mx-auto w-full max-w-full md:max-w-187.5 flex flex-col origin-top scale-100 md:scale-95 p-3 sm:p-6 md:p-8 print:scale-100 print:shadow-none print:ring-0 print:p-0 ${isDark ? 'bg-[#242526] ring-1 ring-[#3e4042] text-[#e4e6eb]' : 'bg-white shadow-2xl shadow-stone-300/70 ring-1 ring-stone-900/5 text-gray-800'}`}
-  >
-    {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
-    <div className="flex-1">{certConfig?.renderBody(debouncedFormData)}</div>
-    {!certConfig?.hideHeaderFooter && <CertFooter layout={activeLayout} />}
-  </div>
-));
+// Make sure your code looks exactly like this:
+  const CertificatePreview = React.memo(({ certConfig, activeLayout, debouncedFormData, isDark }) => (
+    <div id="print-area" className="...">
+      {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
+      
+      {/* 👇 THIS IS THE MOST IMPORTANT PART! 👇 */}
+      <div className="flex-1">{certConfig?.renderBody(debouncedFormData, activeLayout)}</div>
+      
+      {!certConfig?.hideHeaderFooter && <CertFooter layout={activeLayout} />}
+    </div>
+  ));
 
 CertificatePreview.displayName = 'CertificatePreview';
 
 // ─── Component ───────
+const normalizeCertName = (name) => (typeof name === "string" ? name.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim() : "");
 
 const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onLoadingChange }) => {
-  const normalizeCertName = (name) => (typeof name === "string" ? name.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim() : "");
-
   const resolveCertConfigId = useCallback(
     (docType) => {
       const numericDocType = Number(docType);
@@ -165,73 +165,42 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
   const [certNameById, setCertNameById] = useState(certIdToName);
   const [formData, setFormData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
   const [savedData, setSavedData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
-  const requestedCertNames = Array.from(
-    new Set(
-      [
-        ...(Array.isArray(initialData?.certificateNames) ? initialData.certificateNames : []),
-        ...(typeof initialData?.certificateNames === "string" ? [initialData.certificateNames] : []),
-        ...(typeof initialData?.docType === "string" ? [initialData.docType] : []),
-      ]
-        .map(normalizeCertName)
-        .filter((name) => name.length > 0)
-    )
-  );
-  const requestedDocTypeId = Number(initialData?.docType);
-  const lockDocTypeToRequest = Boolean(initialData?.requestId && (requestedCertNames.length > 0 || Number.isInteger(requestedDocTypeId)));
 
-  useEffect(() => {
+  const requestedDocTypeId = useMemo(() => Number(initialData?.docType), [initialData?.docType]);
+
+const requestedCertNames = useMemo(() => Array.from(
+  new Set(
+    [
+      ...(Array.isArray(initialData?.certificateNames) ? initialData.certificateNames : []),
+      ...(typeof initialData?.certificateNames === "string" ? [initialData.certificateNames] : []),
+      ...(typeof initialData?.docType === "string" ? [initialData.docType] : []),
+    ]
+      .map(normalizeCertName)
+      .filter((name) => name.length > 0)
+  )
+), [initialData?.certificateNames, initialData?.docType]);
+
+const lockDocTypeToRequest = useMemo(() => 
+  Boolean(initialData?.requestId && (requestedCertNames.length > 0 || Number.isInteger(requestedDocTypeId)))
+, [initialData?.requestId, requestedCertNames.length, requestedDocTypeId]);
+
+useEffect(() => {
     const fetchLayoutData = async () => {
-      if (lockDocTypeToRequest) {
-        const requestedIdsFromNames = requestedCertNames
-          .map((name) => {
-            return Object.entries(CERT_CONFIG).find(
-              ([_, config]) => normalizeCertName(config.name) === name
-            )?.[0];
-          })
-          .filter(Boolean)
-          .map(Number);
-
-        const requestedIds = Array.from(
-          new Set([
-            ...requestedIdsFromNames,
-            ...(Number.isInteger(requestedDocTypeId) && requestedDocTypeId in CERT_CONFIG ? [requestedDocTypeId] : []),
-          ])
-        );
-        
-        setDocTypeOptions(requestedIds);
-        setFormData((prev) => {
-          const prevDocType = Number(prev.docType);
-          const defaultId = requestedIds.includes(prevDocType) ? prevDocType : (requestedIds[0] ?? prevDocType ?? null);
-          return { ...prev, docType: defaultId };
-        });
-        setSavedData((prev) => {
-          const prevDocType = Number(prev.docType);
-          const defaultId = requestedIds.includes(prevDocType) ? prevDocType : (requestedIds[0] ?? prevDocType ?? null);
-          return { ...prev, docType: defaultId };
-        });
-        return;
-      }
-
       try {
         const [certRes, layoutRes] = await Promise.all([
           getCertifications(),
           getCertificationLayouts(),
         ]);
-        const certs = toCertificateRows(certRes?.data);
-        const layouts = layoutRes?.data ?? [];
+        
+        const certs = toCertificateRows(certRes?.data) || [];
+        const layouts = toCertificateRows(layoutRes?.data) || [];
 
-        const nextLayouts = {};
-        layouts.forEach((layoutRow) => {
-          nextLayouts[layoutRow.certificate_type_id] = normalizeCertificateLayout(layoutRow);
-        });
-
-        // Create mapping from database certificate_type_id to CERT_CONFIG ID
+        // 1. Build mapping from database certificate_type_id to CERT_CONFIG ID
         const dbCertIdToCertConfigId = {};
         const fetchedIds = [];
         
         certs.forEach((cert) => {
           const normalizedName = normalizeCertName(cert?.certificate_name);
-          // Find matching CERT_CONFIG entry by name
           const certConfigId = Object.entries(CERT_CONFIG).find(
             ([_, config]) => normalizeCertName(config.name) === normalizedName
           )?.[0];
@@ -242,31 +211,73 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
           }
         });
 
+        // 2. Map the layouts using BOTH IDs so both systems can find them
+        const nextLayouts = {};
+        layouts.forEach((layoutRow) => {
+          const dbId = layoutRow.certificate_type_id;
+          const normalizedLayout = normalizeCertificateLayout(layoutRow);
+          
+          // Save under database ID
+          nextLayouts[String(dbId)] = normalizedLayout;
+          
+          // Also save under the CERT_CONFIG ID
+          const configId = dbCertIdToCertConfigId[dbId];
+          if (configId) {
+            nextLayouts[String(configId)] = normalizedLayout;
+          }
+        });
+
+        // 3. ✨ DETERMINE DROPDOWN OPTIONS HERE ✨
+        let finalDocTypeOptions = fetchedIds; // Default: show all
+
+        // If this request came from a specific student application, lock the dropdown
+        if (lockDocTypeToRequest) {
+          const requestedIdsFromNames = requestedCertNames
+            .map((name) => {
+              return Object.entries(CERT_CONFIG).find(
+                ([_, config]) => normalizeCertName(config.name) === name
+              )?.[0];
+            })
+            .filter(Boolean)
+            .map(Number);
+
+          const requestedIds = Array.from(
+            new Set([
+              ...requestedIdsFromNames,
+              ...(Number.isInteger(requestedDocTypeId) && requestedDocTypeId in CERT_CONFIG ? [requestedDocTypeId] : []),
+            ])
+          );
+          
+          // Apply the restriction if we successfully mapped the requested IDs
+          if (requestedIds.length > 0) {
+            finalDocTypeOptions = requestedIds;
+          }
+        }
+
+        // 4. Update the States
         setCertifications(certs);
         setLayoutsByCertId(nextLayouts);
-        setDocTypeOptions(fetchedIds);
+        setDocTypeOptions(finalDocTypeOptions); // Now it uses the locked options!
 
+        // Ensure the current selection is valid for the new restricted list
         setFormData((prev) => {
-          if (fetchedIds.includes(prev.docType)) return prev;
-          return {
-            ...prev,
-            docType: fetchedIds[0] ?? prev.docType,
-          };
+          const prevDocType = Number(prev.docType);
+          const defaultId = finalDocTypeOptions.includes(prevDocType) ? prevDocType : (finalDocTypeOptions[0] ?? prevDocType ?? null);
+          return { ...prev, docType: defaultId };
         });
         setSavedData((prev) => {
-          if (fetchedIds.includes(prev.docType)) return prev;
-          return {
-            ...prev,
-            docType: fetchedIds[0] ?? prev.docType,
-          };
+          const prevDocType = Number(prev.docType);
+          const defaultId = finalDocTypeOptions.includes(prevDocType) ? prevDocType : (finalDocTypeOptions[0] ?? prevDocType ?? null);
+          return { ...prev, docType: defaultId };
         });
+
       } catch (err) {
         console.error("Error fetching certification layouts:", err);
       }
     };
 
     fetchLayoutData();
-  }, [lockDocTypeToRequest, requestedCertNames, requestedDocTypeId]);
+  }, [lockDocTypeToRequest, requestedCertNames, requestedDocTypeId]); // ensure dependencies are correct // Add your dependencies here
 
   useEffect(() => {
     const handleTemplateLayoutChanged = (event) => {
@@ -384,19 +395,15 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
   // Get the certificate name for display
   const certDisplayName = previewCertConfig?.name || certIdToName[resolvedPreviewDocTypeId] || "Certificate";
 
-  // Find active certification by matching against CERT_CONFIG name 
-  const activeCertification = useMemo(() => {
-    return certifications.find((item) => {
-      const normalizedDbName = (typeof item.certificate_name === "string"
-        ? item.certificate_name.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim()
-        : "");
-      return normalizedDbName === certDisplayName;
-    });
-  }, [certifications, certDisplayName]);
-  
-  const activeLayout = activeCertification
-    ? layoutsByCertId[activeCertification.certificate_type_id] ?? DEFAULT_CERTIFICATE_LAYOUT
-    : DEFAULT_CERTIFICATE_LAYOUT;
+  const activeLayout = useMemo(() => {
+    // Look up the layout using the exact ID selected in the dropdown
+    if (!resolvedPreviewDocTypeId) return DEFAULT_CERTIFICATE_LAYOUT;
+    
+    const id = String(resolvedPreviewDocTypeId);
+    
+    // If we have a layout in the database for this ID, use it. Otherwise, use default.
+    return layoutsByCertId[id] ?? DEFAULT_CERTIFICATE_LAYOUT;
+  }, [resolvedPreviewDocTypeId, layoutsByCertId]);
 
   const { isDark } = useTheme();
 
@@ -404,7 +411,7 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
     <div className={`mt-15 lg:mt-10 md:mt-10 flex flex-col ${isDark ? 'bg-[#18191a]' : 'bg-white'}`}>
 
       {/* Header Toolbar */}
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 pt-12 pb-3 md:px-6 md:pt-10 md:pb-4 print:hidden">
+      <div className="relative z-10 w-full max-w-313.75 mx-auto px-4 pt-12 pb-3 md:px-6 md:pt-12 md:pb-4 print:hidden">
         <div className={`flex flex-col gap-4 rounded-2xl px-4 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-white/10 md:flex-row md:items-end md:justify-between md:px-5 md:py-5 ${isDark ? 'border-[#3e4042] bg-[#0f0f0f]' : 'border-stone-200/80 bg-white/90'}`}>
           <div className="relative z-10 w-full md:max-w-xs">
             <DropDown
@@ -428,7 +435,8 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
             <button
               onClick={handlePrint}
               disabled={printLoading}
-              className={`w-full sm:w-auto flex-1 md:flex-none flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold shadow-lg transition-all md:px-8 md:py-3 md:text-base ${
+              className={`w-full sm:w-auto flex-1 md:flex-none flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold 
+                shadow-lg transition-all md:px-8 md:py-3 md:text-base ${
                 printLoading
                   ? 'bg-gray-400 cursor-not-allowed opacity-75 text-white'
                   : isDark
@@ -443,12 +451,14 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row gap-6 items-start w-full max-w-7xl mx-auto px-4 md:px-6 pb-6 overflow-visible lg:overflow-visible print:block print:max-w-none print:px-0 print:pb-0 print:overflow-visible">
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 items-start w-full max-w-7xl mx-auto px-4 md:px-6 pb-6 
+      overflow-visible lg:overflow-visible print:block print:max-w-none print:px-0 print:pb-0 print:overflow-visible">
 
         {/* Left Sidebar */}
         <div className="w-full lg:w-88 xl:w-96 shrink-0 order-1 print:hidden">
           <div className="relative p-2 md:p-3">
-            <div className={`rounded-2xl p-4 md:p-6 overflow-visible ${isDark ? 'border-[#3e4042] bg-[#242526]/95 text-[#e4e6eb]' : 'border-stone-200/80 bg-white/95 shadow-md shadow-stone-200/60'}`}>
+            <div className={`rounded-2xl p-4 md:p-6 overflow-visible ${isDark ? 'border-[#3e4042] bg-[#242526]/95 text-[#e4e6eb]' : 
+              'border-stone-200/80 bg-white/95 shadow-md shadow-stone-200/60'}`}>
               <h3 className={`mb-6 text-base font-extrabold uppercase tracking-tight md:text-lg ${isDark ? 'text-white' : 'text-[#800000]'}`}>Edit Information</h3>
               <form className={`space-y-4 md:space-y-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
                 {loading && <p className="text-xs md:text-sm text-stone-500 animate-pulse">Fetching academic records...</p>}
@@ -519,8 +529,12 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
         </div>
 
         {/* Certificate Preview */}
-        <div className={`relative order-2 flex flex-1 flex-col overflow-y-auto custom-scrollbar rounded-2xl min-h-96 sm:min-h-120 lg:min-h-150 max-h-[78vh] lg:max-h-[80vh] print:bg-white print:rounded-none print:border-0 print:min-h-0 print:max-h-none print:overflow-visible ${isDark ? 'border-[#3e4042] bg-[#242526]/90 text-[#e4e6eb]' : 'border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70'}`}>
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(90,90,90,0.07),transparent_40%),radial-gradient(circle_at_85%_10%,rgba(120,120,120,0.06),transparent_35%)] print:hidden" />
+        <div className={`relative order-2 flex flex-1 flex-col overflow-y-auto custom-scrollbar rounded-2xl min-h-96 
+          sm:min-h-120 lg:min-h-150 max-h-[78vh] lg:max-h-[80vh] print:bg-white print:text-black print:rounded-none 
+          print:border-0 print:min-h-0 print:max-h-none print:overflow-visible ${isDark ? 'border-[#3e4042] bg-[#242526]/90 text-[#e4e6eb]' : 
+          'border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70'}`}>          <div className="pointer-events-none absolute inset-0 
+          bg-[radial-gradient(circle_at_15%_20%,rgba(90,90,90,0.07),transparent_40%),radial-gradient(circle_at_85%_10%,rgba(120,120,120,0.06),transparent_35%)] 
+          print:hidden" />
           <div className={`relative p-4 border-b shrink-0 print:hidden ${isDark ? 'bg-[#242526]/95 border-[#3e4042]' : 'bg-white/95 border-stone-200'}`}>
             <div className="flex items-center justify-between max-w-187.5 mx-auto w-full">
               <h2 className={`text-lg font-extrabold uppercase tracking-tight ${isDark ? 'text-white' : 'text-stone-800'}`}>Certificate Preview</h2>

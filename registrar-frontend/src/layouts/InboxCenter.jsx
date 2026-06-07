@@ -211,7 +211,7 @@ const InboxCenter = () => {
                       {selectedMail.subject}
                     </h3>
                     <p className={`text-sm mt-1 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
-                      Date: {formatTime(selectedMail.time)}
+                      Date and Time: {formatTime(selectedMail.time)}
                     </p>
                   </header>
 
@@ -225,7 +225,7 @@ const InboxCenter = () => {
                           </p>
                           <div className="space-y-2">
                             <p className={`text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>
-                              <span className={`font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>Sender:</span>{' '}
+                              <span className={`font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>Title:</span>{' '}
                               {selectedMail.from}
                             </p>
                             <p className={`text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>

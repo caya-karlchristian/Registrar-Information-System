@@ -224,10 +224,10 @@ export const IssuedLineAforementioned = ({ date }) => (
   </CertParagraph>
 );
 
-export const PupLetterhead = ({ date }) => (
+export const PupLetterhead = ({ date, layout }) => (
   <>
     <div className="flex items-center gap-3 mb-2">
-      <img src={puplogoimage} alt="PUP Logo" className="w-10 h-10 object-contain print:w-12 print:h-12" />
+      <img src={layout?.headerLeftUrl || puplogoimage} alt="PUP Logo" className="w-10 h-10 object-contain print:w-12 print:h-12" />      
       <div className="text-[10px] leading-tight">
         <p>Republic of the Philippines</p>
         <p className="font-bold uppercase text-[11px]">Polytechnic University of the Philippines</p>
