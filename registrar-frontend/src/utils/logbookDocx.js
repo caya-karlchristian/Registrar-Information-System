@@ -2,24 +2,11 @@ import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, Width
 import { saveAs } from 'file-saver';
 import certificate_footer from '../assets/certificate_footer.png';
 
-import {
-  formatDateLong,
-  formatMinutesDuration,
-  getFullName,
-  getCourse,
-  getEmail,
-  getHistoryRows,
-  getProcessedAt,
-  getMinutesProcessed,
-  getClaimedAt,
-} from './logbookHelpers.js';
-
 const fetchImageData = async (src) => {
   if (!src) return null;
   try {
     const res = await fetch(src);
-    const buf = await res.arrayBuffer();
-    return new Uint8Array(buf);
+    return await res.arrayBuffer();
   } catch (e) {
     console.error('Failed to fetch image', src, e);
     return null;
@@ -27,6 +14,99 @@ const fetchImageData = async (src) => {
 };
 
 const makeFont = (size, extra = {}) => ({ size, font: 'Lucida Fax', ...extra });
+
+const formatDateLong = (value, includeTime = false) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const datePart = date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: '2-digit',
+    year: 'numeric',
+  });
+
+  if (!includeTime) return datePart;
+
+  const timePart = date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  return `${datePart} ${timePart}`;
+};
+
+const formatMinutesDuration = (minutesValue) => {
+  if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
+
+  const totalMinutes = Number(minutesValue);
+  if (Number.isNaN(totalMinutes) || totalMinutes < 0) return '---';
+
+  const wholeMinutes = Math.floor(totalMinutes);
+  const days = Math.floor(wholeMinutes / 1440);
+  const hours = Math.floor((wholeMinutes % 1440) / 60);
+  const minutes = wholeMinutes % 60;
+  const minuteLabel = minutes === 1 ? 'min' : 'mins';
+
+  if (days > 0) {
+    return `${days}day${days > 1 ? 's' : ''} ${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+  }
+
+  if (hours > 0) {
+    return `${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+  }
+
+  return `${minutes}${minuteLabel}`;
+};
+
+const getFullName = (row) => {
+  const p = row.student_profile || row.alumni_profile || row.user?.student_profile || row.user?.alumni_profile;
+  if (!p) return 'Walk-in Client';
+  const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
+  const last = p.last_name || p.lastname || '';
+  const first = p.first_name || p.firstname || '';
+  return `${last}, ${first}${middle}`.trim();
+};
+
+const getCourse = (row) => (
+  row.student_profile?.academic_records?.[0]?.course
+  || row.student_profile?.course
+  || row.academic_record?.course
+  || row.alumni_academic_record?.course
+  || '---'
+);
+
+const getEmail = (row) => row.user?.email || row.student_profile?.email || '---';
+
+const getHistoryRows = (row, historyByRequestId = {}) => {
+  const fromMap = historyByRequestId?.[row.request_id];
+  const base = Array.isArray(fromMap) ? fromMap : (Array.isArray(row.history) ? row.history : []);
+  return [...base].sort((a, b) => new Date(b?.changed_at || 0).getTime() - new Date(a?.changed_at || 0).getTime());
+};
+
+const getProcessedAt = (row, historyByRequestId) => {
+  const history = getHistoryRows(row, historyByRequestId);
+  if (history.length === 0) return null;
+  // Find the entry where status moved to ReadyToClaim (id=2) — that is the true "processed" timestamp
+  const readyEntry = history.find((h) => h.new_status_id === 2);
+  return readyEntry?.changed_at || null;
+};
+
+const getMinutesProcessed = (row, historyByRequestId) => {
+  const history = getHistoryRows(row, historyByRequestId);
+  if (history.length === 0) return null;
+  // Match the same ReadyToClaim entry for consistency
+  const readyEntry = history.find((h) => h.new_status_id === 2);
+  return readyEntry?.minutes_processed ?? null;
+};
+
+const getClaimedAt = (row, historyByRequestId) => {
+  const history = getHistoryRows(row, historyByRequestId);
+  if (history.length === 0) return null;
+  const claimEntry = history.find((h) => h.new_status_id === 3);
+  return claimEntry?.changed_at || null;
+};
 
 const noBorder = {
   top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
@@ -92,7 +172,7 @@ const buildHeader = async (pupLogoSrc, bpLogoSrc) => {
                 width: { size: 12, type: WidthType.PERCENTAGE },
                 borders: noBorder,
                 children: [
-                  new Paragraph({ alignment: AlignmentType.RIGHT, children: leftLogo ? [new ImageRun({ type: 'png', data: leftLogo, transformation: { width: 80, height: 80 } })] : [] }),
+                  new Paragraph({ alignment: AlignmentType.RIGHT, children: leftLogo ? [new ImageRun({ data: leftLogo, transformation: { width: 72, height: 72 } })] : [] }),
                 ],
               }),
               new TableCell({
@@ -100,16 +180,16 @@ const buildHeader = async (pupLogoSrc, bpLogoSrc) => {
                 borders: noBorder,
                 children: [
                   new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'REPUBLIC OF THE PHILIPPINES', size: 16, font: 'Lucida Fax' })] }),
-                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'POLYTECHNIC UNIVERSITY OF THE PHILIPPINES', size: 24, color: '000000', bold: true, font: 'Lucida Fax' })] }),
+                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'POLYTECHNIC UNIVERSITY OF THE PHILIPPINES', size: 22, color: '000000', bold: true, font: 'Lucida Fax' })] }),
                   new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'OFFICE OF THE VICE PRESIDENT FOR CAMPUSES', size: 15, font: 'Lucida Fax' })] }),
-                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'TAGUIG CAMPUS', size: 24, bold: true, color: '000000', font: 'Lucida Fax' })] }),
+                  new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'TAGUIG CAMPUS', size: 22, bold: true, color: '000000', font: 'Lucida Fax' })] }),
                   new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'Office of the Campus Registrar', size: 15, italics: true, color: '666666', font: 'Lucida Fax' })] }),
                 ],
               }),
               new TableCell({
                 width: { size: 20, type: WidthType.PERCENTAGE },
                 borders: noBorder,
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: rightLogo ? [new ImageRun({ type: 'png', data: rightLogo, transformation: { width: 80, height: 80 } })] : [] })],
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: rightLogo ? [new ImageRun({ data: rightLogo, transformation: { width: 72, height: 72 } })] : [] })],
               }),
             ],
           }),
@@ -151,7 +231,7 @@ const buildFooter = async () => {
               new TableCell({
                 width: { size: 30, type: WidthType.PERCENTAGE },
                 borders: noBorder,
-                children: [ new Paragraph({ alignment: AlignmentType.RIGHT, children: [ new ImageRun({ type: 'png', data: footerLogo || new Uint8Array(), transformation: { width: 240, height: 80 } }) ] }) ],
+                children: [ new Paragraph({ alignment: AlignmentType.RIGHT, children: [ new ImageRun({ data: new Uint8Array(footerLogo || []), transformation: { width: 240, height: 80 } }) ] }) ],
               }),
             ],
           }),
@@ -161,7 +241,7 @@ const buildFooter = async () => {
   });
 };
 
-export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc = null, historyByRequestId = {}) => {
+export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc = null, historyByRequestId = {}, dateRangeLabel = null) => {
   const header = await buildHeader(pupLogoSrc, bpLogoSrc);
   const footer = await buildFooter();
 
@@ -270,7 +350,12 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
 
     // decide whether to show a title for this section; skip umbrella titles
     const lower = safeTitle.toLowerCase();
-    const isUmbrella = lower === 'all document' || lower === 'all certification' || lower === 'certification';
+    // Only suppress the title for the generic "All Document" fallback (single-section flat export).
+    // Every named document type gets its own visible section title, even in multi-section exports.
+    const isUmbrella = lower === 'all document';
+
+    // Skip sections that have no rows (avoids blank pages for document types with zero activity)
+    if (section.rows.length === 0) return;
 
     if (isUmbrella) {
       // push table without the section title
@@ -289,7 +374,7 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
               new Paragraph({
                 alignment: AlignmentType.CENTER,
                 spacing: { after: 80, before: 0 },
-                children: [new TextRun({ text: `Processing of Application for ${safeTitle}`, ...makeFont(26, { bold: true, font: 'Lucida Fax' }) })],
+                children: [new TextRun({ text: `Processing of Application for ${safeTitle}`, ...makeFont(24, { bold: true, font: 'Lucida Fax' }) })],
               }),
             ],
           }),
@@ -320,7 +405,7 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
 
   const blob = await Packer.toBlob(doc);
   const year = new Date().getFullYear();
-  const fileName = `Logbook_Records_${year}`;
+  const fileName = dateRangeLabel ? `Logbook_Records_${dateRangeLabel.replace(/\s/g, '_')}` : `Logbook_Records_${year}`;
   saveAs(blob, `${fileName}.docx`);
 };
 
