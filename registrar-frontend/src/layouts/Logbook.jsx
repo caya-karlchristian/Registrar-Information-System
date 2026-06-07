@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
-import { getLogbookData, getDocumentTypes, getCertifications } from '../services/api';
+import { getDocumentRequests, getDocumentTypes, getRequestHistory, getCertifications } from "../services/api"; 
 import DropDown from '../components/DropDown';
 import { LogbookSkeleton } from '../components/LoadingSkeleton';
 import SuccessToast from '../components/SuccessToast.jsx';
@@ -9,31 +9,6 @@ import ErrorToast from '../components/ErrorToast.jsx';
 import { logbookDocx } from '../utils/logbookDocx.js';
 import pupLogoSrc from '../assets/puplogoimage.png';
 import bpLogoSrc from '../assets/Bagong_Pilipinas_logo.png';
-import {
-  formatDateLong,
-  formatDateTimeLong,
-  formatMinutesDuration,
-  getFullName,
-  getCourse,
-  getEmail,
-  getProcessedAt,
-  getMinutesProcessed,
-  getClaimedAt,
-  getDocumentNames,
-  getCertificationNames,
-} from '../utils/logbookHelpers.js';
-
-// formatDateTimeLong is not in helpers yet — thin wrapper kept local
-const _formatDateTimeLong = (value) => {
-  const datePart = formatDateLong(value);
-  if (!datePart) return null;
-  const timePart = new Date(value).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  return `${datePart} ${timePart}`;
-};
 
 const toRows = (raw) => {
   if (Array.isArray(raw)) return raw;
@@ -46,37 +21,99 @@ const LogbookRecords = () => {
   const [data, setData] = useState([]);
   const [dbDocTypes, setDbDocTypes] = useState([]);
   const [availableCertifications, setAvailableCertifications] = useState([]);
+  const [historyByRequestId, setHistoryByRequestId] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedDocTypeId, setSelectedDocTypeId] = useState('');
+  const [selectedDocTypeId, setSelectedDocTypeId] = useState("");
   const [selectedExportOption, setSelectedExportOption] = useState('All Document');
   const [exporting, setExporting] = useState(false);
   const [toastSuccess, setToastSuccess] = useState('');
   const [toastError, setToastError] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const rowsPerPage = 8;
 
-  // ── Data loading ──────────────────────────────────────────────────────────
-  // Single-trip fetch: the /logbook endpoint returns completed requests with
-  // history already embedded, so no page-loop and no separate history call.
+  // Semester quick-select helper
+  const applySemester = (preset) => {
+    const now = new Date();
+    const year = now.getFullYear();
+    if (preset === '1st') {
+      setDateFrom(`${year - 1}-08-01`);
+      setDateTo(`${year}-01-31`);
+    } else if (preset === '2nd') {
+      setDateFrom(`${year}-02-01`);
+      setDateTo(`${year}-07-31`);
+    } else if (preset === 'month') {
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      setDateFrom(`${year}-${m}-01`);
+      const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+      setDateTo(`${year}-${m}-${lastDay}`);
+    } else {
+      setDateFrom('');
+      setDateTo('');
+    }
+    setCurrentPage(1);
+  };
+
+  // Load logbook data on mount:
+  // - Fetch all pages of document requests
+  // - Fetch lookup data: document types, request history, certifications
+  // - Group and sort history entries per request
+  // - Populate component state with fetched results
   useEffect(() => {
     const fetchLogbookData = async () => {
       setLoading(true);
       try {
-        const [logbookRes, typesRes, certRes] = await Promise.all([
-          getLogbookData(),
+        const requests = [];
+        let page = 1;
+        let lastPage = 1;
+
+        do {
+          const response = await getDocumentRequests({ page });
+          const payload = response?.data ?? {};
+          const rows = toRows(payload);
+
+          requests.push(...rows);
+          lastPage = Number(payload?.last_page ?? 1) || 1;
+          page += 1;
+        } while (page <= lastPage);
+
+        const [typesRes, historyRes, certRes] = await Promise.all([
           getDocumentTypes(),
+          getRequestHistory(),
           getCertifications(),
         ]);
 
-        setData(toRows(logbookRes.data));
-        setDbDocTypes(toRows(typesRes.data));
-        setAvailableCertifications(toRows(certRes.data));
+        const types = toRows(typesRes.data);
+        const historyRows = toRows(historyRes.data);
+        const certifications = toRows(certRes.data);
+        const groupedHistory = historyRows.reduce((acc, item) => {
+          const requestId = item?.request_id;
+          if (!requestId) return acc;
+          if (!acc[requestId]) acc[requestId] = [];
+          acc[requestId].push(item);
+          return acc;
+        }, {});
+
+        Object.keys(groupedHistory).forEach((requestId) => {
+          groupedHistory[requestId].sort((a, b) => {
+            const aTime = new Date(a?.changed_at || 0).getTime();
+            const bTime = new Date(b?.changed_at || 0).getTime();
+            return bTime - aTime;
+          });
+        });
+
+        setData(requests);
+        setDbDocTypes(types);
+        setAvailableCertifications(certifications);
+        setHistoryByRequestId(groupedHistory);
         setCurrentPage(1);
       } catch (error) {
         console.error('Error loading logbook records:', error);
         setData([]);
         setDbDocTypes([]);
         setAvailableCertifications([]);
+        setHistoryByRequestId({});
         setToastError((error && (error.message || error.toString())) || 'Error loading logbook records.');
       } finally {
         setLoading(false);
@@ -85,153 +122,198 @@ const LogbookRecords = () => {
     fetchLogbookData();
   }, []);
 
-  // ── Lookup maps ───────────────────────────────────────────────────────────
+  // Map of document type id -> document name for quick lookups
+  const activeDocMap = useMemo(() => {
+    if (dbDocTypes.length > 0) {
+      return Object.fromEntries(dbDocTypes.map(t => [t.document_type_id, t.document_name]));
+    }
+    return {};
+  }, [dbDocTypes]);
 
-  const activeDocMap = useMemo(
-    () =>
-      dbDocTypes.length > 0
-        ? Object.fromEntries(dbDocTypes.map((t) => [t.document_type_id, t.document_name]))
-        : {},
-    [dbDocTypes]
-  );
-
+  // Build document filter dropdown options, preserving order and uniqueness.
+  // If a "Certification" document type exists, include an "All Certification" option.
   const docOptions = useMemo(() => {
     const options = ['All Document'];
     const seen = new Set(['all document']);
+
     Object.values(activeDocMap).forEach((name) => {
-      const n = String(name || '').trim();
-      if (!n || seen.has(n.toLowerCase())) return;
-      seen.add(n.toLowerCase());
-      options.push(n);
+      const normalized = String(name || '').trim();
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push(normalized);
     });
-    if (Object.values(activeDocMap).some((n) => String(n || '').trim().toLowerCase() === 'certification')) {
+
+    if (Object.values(activeDocMap).some((name) => String(name || '').trim().toLowerCase() === 'certification')) {
       options.splice(1, 0, 'All Certification');
     }
+
     return options;
   }, [activeDocMap]);
 
+  // List of distinct certification names for the certification selector
   const certificationOptions = useMemo(() => {
     const options = [];
     const seen = new Set();
+
     availableCertifications.forEach((cert) => {
-      const n = String(cert?.certificate_name || '').trim();
-      if (!n || seen.has(n.toLowerCase())) return;
-      seen.add(n.toLowerCase());
-      options.push(n);
+      const normalized = String(cert?.certificate_name || '').trim();
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push(normalized);
     });
+
     return options;
   }, [availableCertifications]);
 
-  const selectedDocLabel = useMemo(
-    () =>
-      selectedExportOption === 'All Certification'
-        ? 'All Certification'
-        : activeDocMap[selectedDocTypeId] || selectedExportOption || 'All Document',
-    [selectedDocTypeId, activeDocMap, selectedExportOption]
-  );
+  // Extract document type names from a request row, normalizing possible shapes
+  const getDocumentNames = (row) => {
+    const documents = Array.isArray(row?.documents) ? row.documents : [];
+    return documents
+      .map((document) => document?.documentType?.document_name ?? document?.document_type?.document_name ?? document?.document_name ?? '')
+      .filter(Boolean)
+      .map((name) => String(name).trim())
+      .filter(Boolean);
+  };
 
+  // Extract certification type names from a request row, normalizing possible shapes
+  const getCertificationNames = (row) => {
+    const certificates = Array.isArray(row?.certificates) ? row.certificates : [];
+    return certificates
+      .map((certificate) => certificate?.certification_type?.certificate_name ?? certificate?.certificate_name ?? certificate?.name ?? '')
+      .filter(Boolean)
+      .map((name) => String(name).trim())
+      .filter(Boolean);
+  };
+
+  // Label displayed for the currently selected document/export option
+  const selectedDocLabel = useMemo(() => {
+    if (selectedExportOption === 'All Certification') return 'All Certification';
+    return activeDocMap[selectedDocTypeId] || selectedExportOption || 'All Document';
+  }, [selectedDocTypeId, activeDocMap, selectedExportOption]);
+
+  // Whether the UI is currently focused on certification-specific filters/exports
   const isCertificationMode = useMemo(() => {
-    const sel   = String(selectedExportOption || '').trim().toLowerCase();
-    const label = String(selectedDocLabel     || '').trim().toLowerCase();
-    return sel === 'certification' || (label === 'certification' && sel !== 'all certification');
+    const sel = String(selectedExportOption || '').trim().toLowerCase();
+    const label = String(selectedDocLabel || '').trim().toLowerCase();
+    // show certification type selector only when user explicitly selected the CERTIFICATION document type
+    return sel === 'certification' || label === 'certification' && sel !== 'all certification';
   }, [selectedExportOption, selectedDocLabel]);
 
   const [selectedCertificationLabel, setSelectedCertificationLabel] = useState('');
 
+  // Keep selected certification label in sync when entering/exiting certification mode
   useEffect(() => {
     if (isCertificationMode) {
-      if (!selectedCertificationLabel) setSelectedCertificationLabel(certificationOptions[0] || '');
+      // default to first available certification when entering certification mode
+      if (!selectedCertificationLabel) {
+        setSelectedCertificationLabel(certificationOptions[0] || '');
+      }
     } else {
+      // when not in certification-specific mode, clear selection
       setSelectedCertificationLabel('');
     }
   }, [isCertificationMode, certificationOptions]);
 
-  // ── Filtering & sorting ───────────────────────────────────────────────────
-
+  // Filter data to completed requests, then apply either certification or document-type filters
   const filteredData = useMemo(() => {
-    // The /logbook endpoint already filters to completed requests; guard here
-    // in case any non-completed row slips through.
-    const completedOnly = data.filter(
-      (item) => String(item.status?.status_name).toLowerCase() === 'completed'
-    );
+    const from = dateFrom ? new Date(dateFrom + 'T00:00:00') : null;
+    const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
+
+    const completedOnly = data.filter(item => {
+      if (String(item.status?.status_name).toLowerCase() !== 'completed') return false;
+      if (from || to) {
+        const req = item.requested_at ? new Date(item.requested_at) : null;
+        if (!req) return false;
+        if (from && req < from) return false;
+        if (to && req > to) return false;
+      }
+      return true;
+    });
 
     if (isCertificationMode) {
-      const target = String(selectedCertificationLabel || 'All Certification').trim().toLowerCase();
+      const targetCertification = String(selectedCertificationLabel || 'All Certification').trim().toLowerCase();
       return completedOnly.filter((item) => {
-        const names = getCertificationNames(item).map((n) => n.toLowerCase());
-        return target === 'all certification' ? names.length > 0 : names.includes(target);
+        const certNames = getCertificationNames(item).map((name) => String(name).trim().toLowerCase());
+        if (targetCertification === 'all certification') {
+          return certNames.length > 0;
+        }
+        return certNames.includes(targetCertification);
       });
     }
 
     if (!selectedDocTypeId) return completedOnly;
 
     const targetId = Number(selectedDocTypeId);
-    return completedOnly.filter((item) =>
-      item.documents?.some((d) => Number(d.document_type_id) === targetId)
+    return completedOnly.filter(item =>
+      item.documents?.some(d => Number(d.document_type_id) === targetId)
     );
-  }, [selectedDocTypeId, data, isCertificationMode, selectedCertificationLabel]);
+  }, [selectedDocTypeId, data, isCertificationMode, selectedCertificationLabel, dateFrom, dateTo]);
 
-  const sortedData = useMemo(
-    () =>
-      [...filteredData].sort(
-        (a, b) =>
-          new Date(b.requested_at || 0).getTime() - new Date(a.requested_at || 0).getTime()
-      ),
-    [filteredData]
-  );
+  // Sort filtered data by request timestamp (most recent first)
+  const sortedData = useMemo(() => {
+    return [...filteredData].sort((a, b) => {
+      const aRequestedAt = new Date(a.requested_at || 0).getTime();
+      const bRequestedAt = new Date(b.requested_at || 0).getTime();
+      return bRequestedAt - aRequestedAt;
+    });
+  }, [filteredData]);
 
-  const totalPages       = Math.ceil(sortedData.length / rowsPerPage) || 1;
+  const totalPages = Math.ceil(sortedData.length / rowsPerPage) || 1;
   const indexOfFirstItem = (currentPage - 1) * rowsPerPage;
-  const indexOfLastItem  = currentPage * rowsPerPage;
-  const currentData      = useMemo(
-    () => sortedData.slice(indexOfFirstItem, indexOfLastItem),
-    [indexOfFirstItem, indexOfLastItem, sortedData]
-  );
+  const indexOfLastItem = currentPage * rowsPerPage;
 
-  // ── Export ────────────────────────────────────────────────────────────────
+  const currentData = useMemo(() => {
+    return sortedData.slice(indexOfFirstItem, indexOfLastItem);
+  }, [indexOfFirstItem, indexOfLastItem, sortedData]);
 
+  // Build sections used for DOCX export. Sections vary depending on certification mode,
+  // selected document type, or exporting all documents (grouped by type).
   const getExportSections = () => {
     if (isCertificationMode) {
+      // when exporting all certification, include all known certification types even if they have no rows
       if (selectedCertificationLabel && selectedCertificationLabel !== 'All Certification') {
         return [{ title: selectedCertificationLabel, rows: sortedData }];
       }
-      return certificationOptions
-        .filter((n) => String(n || '').trim().toLowerCase() !== 'all certification')
-        .map((name) => ({
-          title: name,
-          rows: sortedData.filter((row) =>
-            getCertificationNames(row)
-              .map((x) => x.toLowerCase())
-              .includes(String(name).trim().toLowerCase())
-          ),
-        }));
+
+      // build sections from available certification options (skip the 'All Certification' placeholder)
+      const certNames = certificationOptions.filter(n => String(n || '').trim().toLowerCase() !== 'all certification');
+      return certNames.map((name) => ({
+        title: name,
+        rows: sortedData.filter((row) => getCertificationNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())),
+      }));
     }
 
-    if (selectedDocTypeId) return [{ title: selectedDocLabel, rows: sortedData }];
+    if (selectedDocTypeId) {
+      return [{ title: selectedDocLabel, rows: sortedData }];
+    }
 
-    const uniqueNames = Array.from(
-      new Set(
-        Object.values(activeDocMap)
-          .map((n) => String(n || '').trim())
-          .filter(Boolean)
-      )
-    );
+    // exporting all documents: include all known document types even if they have no rows
+    const docNames = Object.values(activeDocMap)
+      .map(n => String(n || '').trim())
+      .filter(Boolean);
 
-    return uniqueNames.map((name) => ({
+    // unique preserving order
+    const uniqueDocNames = Array.from(new Set(docNames));
+
+    return uniqueDocNames.map((name) => ({
       title: name,
-      rows: sortedData.filter((row) =>
-        getDocumentNames(row)
-          .map((x) => x.toLowerCase())
-          .includes(String(name).trim().toLowerCase())
-      ),
+      rows: sortedData.filter((row) => getDocumentNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())),
     }));
   };
 
+  // Trigger DOCX export using grouped sections and logos
   const handleExportDocx = async () => {
     if (exporting) return;
     try {
       setExporting(true);
-      await logbookDocx(getExportSections(), pupLogoSrc, bpLogoSrc);
+      const rangeLabel = (dateFrom && dateTo)
+        ? `${dateFrom}_to_${dateTo}`
+        : (dateFrom ? `from_${dateFrom}` : (dateTo ? `to_${dateTo}` : null));
+      await logbookDocx(getExportSections(), pupLogoSrc, bpLogoSrc, historyByRequestId, rangeLabel);
       setToastSuccess('Exporting Report completed.');
     } catch (e) {
       console.error('Export to DOCX failed', e);
@@ -241,7 +323,116 @@ const LogbookRecords = () => {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // Convert text to Proper Case while preserving roman numerals and hyphenated parts
+  const toProperCase = (value = '') => {
+    return value
+      .toString()
+      .trim()
+      .split(/\s+/)
+      .map((token) => {
+        if (/^[IVXLCDM]+$/i.test(token)) return token.toUpperCase();
+        return token
+          .toLowerCase()
+          .replace(/(^|[-'])([a-z])/g, (_, separator, letter) => `${separator}${letter.toUpperCase()}`);
+      })
+      .join(' ');
+  };
+
+  // Build full name from student or alumni profile; fall back to 'Walk-in Client'
+  const getFullName = (row) => {
+    const p = row.student_profile || row.alumni_profile;
+    if (!p) return 'Walk-in Client';
+    const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
+    const lastName = toProperCase(p.last_name || '');
+    const firstName = toProperCase(p.first_name || '');
+    return `${lastName}, ${firstName}${middle}`.trim();
+  };
+
+  // Try multiple locations for course information and provide fallback
+  const getCourse = (row) => {
+    return (
+      row.student_profile?.academic_records?.[0]?.course ||
+      row.student_profile?.course ||
+      row.academic_record?.course ||
+      row.alumni_academic_record?.course ||
+      '---'
+    );
+  };
+
+  // Return an email from available sources or placeholder
+  const getEmail = (row) => {
+    return row.user?.email || row.student_profile?.email || '---';
+  };
+
+  // Format an ISO date value into a long human-readable date
+  const formatDateLong = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  // Format an ISO datetime value into long date + 24-hour time
+  const formatDateTimeLong = (value) => {
+    const datePart = formatDateLong(value);
+    if (!datePart) return null;
+
+    const timePart = new Date(value).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    return `${datePart} ${timePart}`;
+  };
+
+  // Get the processing timestamp: when the request moved to ReadyToClaim (status id 2)
+  const getProcessedAt = (row) => {
+    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
+    if (history.length === 0) return null;
+    const readyEntry = history.find((h) => h.new_status_id === 2);
+    return readyEntry?.changed_at || null;
+  };
+
+  // Get processed duration in minutes — from the same ReadyToClaim entry for consistency
+  const getMinutesProcessed = (row) => {
+    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
+    if (history.length === 0) return null;
+    const readyEntry = history.find((h) => h.new_status_id === 2);
+    return readyEntry?.minutes_processed ?? null;
+  };
+
+  // Convert a minutes value into a compact human-readable duration
+  const formatMinutesDuration = (minutesValue) => {
+    if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
+
+    const totalMinutes = Number(minutesValue);
+    if (Number.isNaN(totalMinutes) || totalMinutes < 0) return '---';
+
+    const wholeMinutes = Math.floor(totalMinutes);
+    const days = Math.floor(wholeMinutes / 1440);
+    const hours = Math.floor((wholeMinutes % 1440) / 60);
+    const minutes = wholeMinutes % 60;
+    const minuteLabel = minutes === 1 ? 'min' : 'mins';
+
+    if (days > 0) return `${days}day${days > 1 ? 's' : ''} ${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+    if (hours > 0) return `${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+
+    return `${minutes}${minuteLabel}`;
+  };
+
+  // Find when the request was claimed (status id 3) within the history entries
+  const getClaimedAt = (row) => {
+    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
+    if (history.length === 0) return null;
+    const claimEntry = history.find((h) => h.new_status_id === 3);
+    return claimEntry?.changed_at || null;
+  };
 
   if (loading) return <LogbookSkeleton isDark={isDark} />;
 
@@ -250,9 +441,11 @@ const LogbookRecords = () => {
       <div className={`max-w-350 mx-auto shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
         <div className="p-4 sm:p-6 md:p-8 pb-0">
-          <div className="mb-6 grid grid-cols-1 gap-4 print:hidden lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2">
-              <div className="w-full">
+          {/* Controls row: filters on the left, Export button top-right */}
+          <div className="mb-6 print:hidden">
+            {/* Top row: dropdowns + export button */}
+            <div className="flex flex-wrap items-end gap-3 mb-3">
+              <div className="w-48 shrink-0">
                 <DropDown
                   label="Document Type"
                   name="docType"
@@ -266,7 +459,7 @@ const LogbookRecords = () => {
                       setCurrentPage(1);
                       return;
                     }
-                    const id = Object.keys(activeDocMap).find((k) => activeDocMap[k] === e.target.value) || '';
+                    const id = Object.keys(activeDocMap).find(key => activeDocMap[key] === e.target.value) || '';
                     setSelectedDocTypeId(id);
                     setSelectedExportOption(e.target.value);
                     setSelectedCertificationLabel('');
@@ -276,7 +469,7 @@ const LogbookRecords = () => {
                 />
               </div>
               {isCertificationMode && (
-                <div className="w-full">
+                <div className="w-48 shrink-0">
                   <DropDown
                     label="Certification Type"
                     name="certificationType"
@@ -290,29 +483,74 @@ const LogbookRecords = () => {
                   />
                 </div>
               )}
+              {/* Date pickers */}
+              <div className="flex flex-col gap-1">
+                <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Date From</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                  className={`text-xs px-2 py-1.5 rounded border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50] text-[#e4e6eb]' : 'bg-white border-gray-300 text-gray-700'}`}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Date To</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}
+                  className={`text-xs px-2 py-1.5 rounded border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50] text-[#e4e6eb]' : 'bg-white border-gray-300 text-gray-700'}`}
+                />
+              </div>
+              {/* Export button pushed to the far right */}
+              <div className="ml-auto">
+                <button
+                  onClick={handleExportDocx}
+                  disabled={loading || exporting || sortedData.length === 0}
+                  className={
+                    `px-5 py-2 rounded-md font-bold text-xs uppercase tracking-widest transition-colors duration-150 shadow-sm ` +
+                    (!exporting
+                      ? (isDark
+                          ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]'
+                          : 'bg-[#800000] hover:bg-[#4a0000] text-[#FFD700]')
+                      : (isDark
+                          ? 'bg-[#3a3b3c] text-[#8f949e] border border-[#4e4f50] cursor-not-allowed'
+                          : 'bg-[#800000] text-white cursor-not-allowed'))
+                  }
+                >
+                  {exporting ? 'Exporting...' : 'Export to DOCX'}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleExportDocx}
-              disabled={loading || exporting || sortedData.length === 0}
-              className={
-                'px-5 py-2 rounded-md font-bold text-xs uppercase tracking-widest transition-colors duration-150 shadow-sm ' +
-                (!exporting
-                  ? isDark
-                    ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]'
-                    : 'bg-[#800000] hover:bg-[#4a0000] text-[#FFD700]'
-                  : isDark
-                  ? 'bg-[#3a3b3c] text-[#8f949e] border border-[#4e4f50] cursor-not-allowed'
-                  : 'bg-[#800000] text-white cursor-not-allowed')
-              }
-            >
-              {exporting ? 'Exporting...' : 'Export to DOCX'}
-            </button>
+            {/* Second row: semester quick-select */}
+            <div className="flex flex-wrap gap-1">
+              {[
+                { label: '1st Sem', preset: '1st' },
+                { label: '2nd Sem', preset: '2nd' },
+                { label: 'This Month', preset: 'month' },
+                { label: 'All Time', preset: 'all' },
+              ].map(({ label, preset }) => (
+                <button
+                  key={preset}
+                  onClick={() => applySemester(preset)}
+                  className={`text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#b0b3b8] border border-[#4e4f50]' : 'bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-300'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className={`w-full text-center border-b pb-4 mb-0 ${isDark ? 'border-[#3e4042]' : 'border-gray-300'}`}>
             <h2 className={`text-lg sm:text-xl md:text-2xl font-black uppercase tracking-widest leading-tight ${isDark ? 'text-[#f5c542]' : 'text-[#4a0000]'}`}>
               Processing of Application for <br className="sm:hidden" /> {selectedDocLabel}
             </h2>
+            <p className={`text-xs mt-1 font-medium ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
+              {sortedData.length} record{sortedData.length !== 1 ? 's' : ''}
+              {(dateFrom || dateTo) && (
+                <span> &mdash; {dateFrom && `from ${dateFrom}`}{dateFrom && dateTo && ' '}{ dateTo && `to ${dateTo}`}</span>
+              )}
+            </p>
           </div>
         </div>
 
@@ -330,45 +568,52 @@ const LogbookRecords = () => {
               </tr>
             </thead>
             <tbody>
-              {currentData.map((row) => {
-                const processedAt = getProcessedAt(row);
-                const claimedAt   = getClaimedAt(row);
-                return (
-                  <tr
-                    key={row.request_id || row.id}
-                    className={`border-b text-[11px] sm:text-[12px] transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}
-                  >
-                    <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                      {formatDateLong(row.requested_at) || 'N/A'}
-                    </td>
-                    <td className="p-3 sm:p-4 text-center font-bold whitespace-nowrap">
-                      {getFullName(row)}
-                    </td>
-                    <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                      {getCourse(row)}
-                    </td>
-                    <td className="p-3 sm:p-4 text-center truncate max-w-55 whitespace-nowrap">
-                      {getEmail(row)}
-                    </td>
-                    <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                      {_formatDateTimeLong(processedAt) || '---'}
-                    </td>
-                    <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                      {formatMinutesDuration(getMinutesProcessed(row))}
-                    </td>
-                    <td className="p-3 sm:p-4 text-center italic text-gray-400 whitespace-nowrap">
-                      {formatDateLong(claimedAt) || 'Pending'}
-                    </td>
-                  </tr>
-                );
-              })}
+              {currentData.map((row) => (
+                (() => {
+                  const processedAt = getProcessedAt(row);
+                  const claimedAt = getClaimedAt(row);
 
-              {!loading &&
-                Array.from({ length: Math.max(0, rowsPerPage - currentData.length) }).map((_, i) => (
-                  <tr key={`empty-${i}`} className="h-11.25 sm:h-13.25 border-b border-gray-100">
-                    <td colSpan="7"></td>
-                  </tr>
-                ))}
+                  return (
+                <tr key={row.request_id || row.id} className={`border-b text-[11px] sm:text-[12px] transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
+
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                    {formatDateLong(row.requested_at) || 'N/A'}
+                  </td>
+
+                  <td className="p-3 sm:p-4 text-center font-bold whitespace-nowrap">
+                    {getFullName(row)}
+                  </td>
+
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                    {getCourse(row)}
+                  </td>
+
+                  <td className="p-3 sm:p-4 text-center truncate max-w-55 whitespace-nowrap">
+                    {getEmail(row)}
+                  </td>
+
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                    {formatDateTimeLong(processedAt) || '---'}
+                  </td>
+
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                    {formatMinutesDuration(getMinutesProcessed(row))}
+                  </td>
+
+                  <td className="p-3 sm:p-4 text-center italic text-gray-400 whitespace-nowrap">
+                    {formatDateLong(claimedAt) || 'Pending'}
+                  </td>
+
+                </tr>
+                  );
+                })()
+              ))}
+
+              {!loading && Array.from({ length: Math.max(0, rowsPerPage - currentData.length) }).map((_, i) => (
+                <tr key={`empty-${i}`} className="h-11.25 sm:h-13.25 border-b border-gray-100">
+                  <td colSpan="7"></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -376,7 +621,7 @@ const LogbookRecords = () => {
         {/* Pagination Footer */}
         <div className={`px-4 sm:px-8 py-4 text-[11px] sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t ${isDark ? 'bg-[#242526] text-[#9a9a9a] border-[#3e4042]' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
           <span className="text-center sm:text-left">
-            Showing {sortedData.length > 0 ? indexOfFirstItem + 1 : 0} to{' '}
+            Showing {sortedData.length > 0 ? indexOfFirstItem + 1 : 0} to{" "}
             {Math.min(indexOfLastItem, sortedData.length)} of {sortedData.length} results
           </span>
 
@@ -402,7 +647,6 @@ const LogbookRecords = () => {
             </button>
           </div>
         </div>
-
         <SuccessToast message={toastSuccess} onClose={() => setToastSuccess('')} />
         <ErrorToast message={toastError} onClose={() => setToastError('')} />
       </div>
