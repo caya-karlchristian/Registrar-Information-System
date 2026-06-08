@@ -62,6 +62,11 @@ export const getRequestStatus   = (id) => api.get(`/request-statuses/${id}`);
 export const getRequestPurposes = () => api.get("/request-purposes");
 
 // -------------------------------------------------------
+// PROGRAMS (read-only — populated automatically on student login)
+// -------------------------------------------------------
+export const getPrograms = () => api.get("/programs");
+
+// -------------------------------------------------------
 // DOCUMENT TYPES (read: all | write: Admin+)
 // -------------------------------------------------------
 export const getDocumentTypes  = ()          => api.get("/document-types");
