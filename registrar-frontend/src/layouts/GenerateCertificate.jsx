@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import InputGroup from "../components/InputGroup.jsx";
 import { useTheme } from "../context/ThemeContext";
+import { useReferenceData } from "../context/ReferenceDataContext";
 import { PrinterIcon } from "@heroicons/react/24/solid";
 import { getAcademicRecords, getCertifications, getCertificationLayouts } from "../services/api";
 import { CertHeader, CertFooter, getTodayDate } from "../utils/helpers.jsx";
@@ -29,20 +30,6 @@ const useDebounce = (value, delay) => {
 
   return debouncedValue;
 };
-
-const courses = [
-  "BS in Electronics Engineering",
-  "BS in Information Technology",
-  "BS in Information Systems",
-  "BS in Accountancy",
-  "BS in Business Administration",
-  "BS in Applied Mathematics",
-  "BS in Entrepreneurship",
-  "BS in Office Administration",
-  "Bachelor in Secondary Education",
-  "BS in Hospitality Management",
-  "BS in Civil Engineering",
-];
 
 const semesters   = ["1st Semester", "2nd Semester", "3rd Semester", "Summer"];
 const latinHonors = ["(Cum Laude)", "(Magna Cum Laude)", "(Summa Cum Laude)"];
@@ -84,10 +71,10 @@ const DEFAULT_FORM = {
 // ─── Field Config ─────
 // ComponentType: "input" | "dropdown"
 
-const FIELD_CONFIG = [
+const buildFieldConfig = (courseOptions) => [
   ["fullName",          "input",    "Full Name",               { placeholder: "Juan Santos Dela Cruz Jr." }],
   ["studentNum",        "input",    "Student Number",          { placeholder: "e.g. 2023-00101-TG-0" }],
-  ["course",            "dropdown", "Course",                  { options: courses }],
+  ["course",            "dropdown", "Course",                  { options: courseOptions }],
   ["latinHonors",       "dropdown", "Latin Honors",            { options: latinHonors }],
   ["major",             "input",    "Major",                   { placeholder: "e.g. Human Resource Management" }],
   ["educationLevel",    "dropdown", "Education Level",         { options: eduLevels }],
@@ -104,7 +91,7 @@ const FIELD_CONFIG = [
   ["lastSy",            "input",    "Last S.Y. Admitted",      { type: "date", placeholder: "XXXX" }],
   ["units",             "input",    "Number of Units",         { placeholder: "e.g. 120" }],
   ["semestersNum",      "input",    "Number of Semesters",     { placeholder: "e.g. 8" }],
-  ["ladderizedDegree",  "dropdown", "Ladderized Degree",       { options: courses }],
+  ["ladderizedDegree",  "dropdown", "Ladderized Degree",       { options: courseOptions }],
   ["studentStatus",     "input",    "Student Status",          { placeholder: "e.g. Graduated - BSBAMM" }],
   ["cavNum",            "input",    "CAV Number",              { placeholder: "e.g. TG-008" }],
   ["cavSeries",         "input",    "Series Year",             { placeholder: "e.g. 2026" }],
@@ -406,6 +393,14 @@ useEffect(() => {
   }, [resolvedPreviewDocTypeId, layoutsByCertId]);
 
   const { isDark } = useTheme();
+  const { programs } = useReferenceData();
+
+  // Build course options from the live programs table.
+  // Falls back to an empty array while programs are loading —
+  // the DropDown will show "Please Select" with no options until ready.
+  const courseOptions = programs.map((p) => p.name);
+
+  const FIELD_CONFIG = buildFieldConfig(courseOptions);
 
   return (
     <div className={`mt-15 lg:mt-10 md:mt-10 flex flex-col ${isDark ? 'bg-[#18191a]' : 'bg-white'}`}>

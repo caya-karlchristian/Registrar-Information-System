@@ -94,7 +94,7 @@ export const ReferenceDataProvider = ({ children }) => {
       if (results[1].status === "fulfilled") setCertifications(results[1].value.data ?? []);
       if (results[2].status === "fulfilled") setStatuses(results[2].value.data ?? []);
       if (results[3].status === "fulfilled") setPurposes(results[3].value.data ?? []);
-      if (results[4].status === "fulfilled") setPrograms(results[4].value.data ?? []);
+      if (results[4].status === "fulfilled") setPrograms(results[4].value.data?.data ?? []);
       setLoading(false);
     };
 
