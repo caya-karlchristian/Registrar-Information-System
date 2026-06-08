@@ -143,7 +143,7 @@ class OgosStudentService
         // is_active is intentionally NOT touched here — staff can deactivate
         // defunct programs without them being re-activated on the next login
         // of a student who somehow still has that course_id.
-        if ($student->courseId !== null && $student->courseName !== null) {
+        if ($student->courseId !== null) {
             Program::updateOrCreate(
                 ['ogos_course_id' => $student->courseId],
                 [
