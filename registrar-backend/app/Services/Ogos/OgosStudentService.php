@@ -6,6 +6,7 @@ use App\DTOs\Ogos\OgosAddressDTO;
 use App\DTOs\Ogos\OgosPersonalInfoDTO;
 use App\DTOs\Ogos\OgosStudentDTO;
 use App\Exceptions\OgosException;
+use App\Models\Program;
 use App\Models\StudentAcademicRecord;
 use App\Models\StudentProfile;
 use App\Models\SystemUser;
@@ -17,6 +18,10 @@ use Illuminate\Support\Facades\Log;
  * provisionStudentData() is called on every SSO login — it upserts
  * student_profile and student_academic_record from OGOS.
  * All other methods are on-demand lookups for controllers.
+ *
+ * Change (2026-06-08): upsertLocalRecords() now also upserts the `programs`
+ * table from the course object on the OGOS student payload. The programs table
+ * self-populates as students log in — no OGOS endpoint needed, no manual seed.
  */
 class OgosStudentService
 {
@@ -131,5 +136,21 @@ class OgosStudentService
                 'course'         => $student->courseName,
             ]
         );
+
+        // ── Upsert the local programs mirror ──────────────────
+        // If this student's program hasn't been seen before, insert it.
+        // If it has, update the code/name in case OGOS renamed it.
+        // is_active is intentionally NOT touched here — staff can deactivate
+        // defunct programs without them being re-activated on the next login
+        // of a student who somehow still has that course_id.
+        if ($student->courseId !== null && $student->courseName !== null) {
+            Program::updateOrCreate(
+                ['ogos_course_id' => $student->courseId],
+                [
+                    'code' => $student->courseCode,
+                    'name' => $student->courseName,
+                ]
+            );
+        }
     }
 }
