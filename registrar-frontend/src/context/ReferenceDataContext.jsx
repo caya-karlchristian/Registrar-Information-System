@@ -4,6 +4,7 @@ import {
   getCertifications,
   getRequestStatuses,
   getRequestPurposes,
+  getPrograms,
 } from "../services/api";
 import { useAuth } from "./AuthProvider";
 
@@ -55,6 +56,7 @@ export const ReferenceDataProvider = ({ children }) => {
   const [certifications,  setCertifications]  = useState([]);
   const [statuses,        setStatuses]        = useState([]);
   const [purposes,        setPurposes]        = useState([]);
+  const [programs,        setPrograms]        = useState([]);
   const [loading,         setLoading]         = useState(true);
 
   useEffect(() => {
@@ -72,6 +74,7 @@ export const ReferenceDataProvider = ({ children }) => {
       setCertifications([]);
       setStatuses([]);
       setPurposes([]);
+      setPrograms([]);
       setLoading(false);
       return;
     }
@@ -85,11 +88,13 @@ export const ReferenceDataProvider = ({ children }) => {
         getCertifications(),
         getRequestStatuses(),
         getRequestPurposes(),
+        getPrograms(),
       ]);
       if (results[0].status === "fulfilled") setDocumentTypes(results[0].value.data ?? []);
       if (results[1].status === "fulfilled") setCertifications(results[1].value.data ?? []);
       if (results[2].status === "fulfilled") setStatuses(results[2].value.data ?? []);
       if (results[3].status === "fulfilled") setPurposes(results[3].value.data ?? []);
+      if (results[4].status === "fulfilled") setPrograms(results[4].value.data?.data ?? []);
       setLoading(false);
     };
 
@@ -124,6 +129,13 @@ export const ReferenceDataProvider = ({ children }) => {
   const purposeName = (id) =>
     purposes.find((p) => p.request_purpose_id === id)?.purpose_name;
 
+  /**
+   * Return the full program name for a given ogos_course_id, or undefined.
+   * Usage: programName(student.course_id) → "BS Information Technology"
+   */
+  const programName = (id) =>
+    programs.find((p) => Number(p.ogos_course_id) === Number(id))?.name;
+
   return (
     <ReferenceDataContext.Provider
       value={{
@@ -131,11 +143,13 @@ export const ReferenceDataProvider = ({ children }) => {
         certifications,
         statuses,
         purposes,
+        programs,
         loading,
         docTypeName,
         certName,
         statusConfig,
         purposeName,
+        programName,
       }}
     >
       {children}
