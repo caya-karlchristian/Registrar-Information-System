@@ -19,6 +19,7 @@ use App\Http\Controllers\AiQueryController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
 use App\Http\Controllers\AlumniSystemController;
+use App\Http\Controllers\ProgramController;
 
 /*
 |--------------------------------------------------------------------------
@@ -118,6 +119,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::get('request-statuses/{id}',      [RequestStatusController::class, 'show']);
     Route::get('request-purposes',      [RequestPurposeController::class, 'index']);
     Route::get('request-purposes/{id}', [RequestPurposeController::class, 'show']);
+    Route::get('programs', [ProgramController::class, 'index']);
 
     // Admin only (role 3 — superadmin bypasses via RoleMiddleware)
     Route::middleware('role:3')->group(function () {
