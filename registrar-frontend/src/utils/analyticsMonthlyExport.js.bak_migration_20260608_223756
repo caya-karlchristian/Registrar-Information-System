@@ -3,8 +3,7 @@ import { saveAs } from 'file-saver';
 import puplogoimage from '../assets/puplogoimage.png';
 import bagongPilipinasLogo from '../assets/Bagong_Pilipinas_logo.png';
 import certificateFooterImg from '../assets/certificate_footer.png';
-import { getDocumentTypes, getLogbookData, getCertifications } from '../services/api';
-// FE-4 migration: replaced getDocumentRequests+getRequestHistory with getLogbookData()
+import { getDocumentTypes, getDocumentRequests, getRequestHistory, getCertifications } from '../services/api';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -92,7 +91,7 @@ const getDocumentNames = (request) => {
 };
 
 const getHistoryRowsByRequestId = async () => {
-  // FE-4: history is embedded in each logbook row — no separate fetch needed.
+  const historyRes = await getRequestHistory();
   const historyRows = toRows(historyRes.data);
 
   return historyRows.reduce((acc, item) => {
@@ -160,16 +159,7 @@ const buildReportTable = (rows) => {
   const avgMinutesPerRequest = totalRequests > 0 ? (totalMinutes / totalRequests) : 0;
   const hours = Math.floor(avgMinutesPerRequest / 60);
   const minutes = Math.round(avgMinutesPerRequest - (hours * 60));
-  // FE-4 migration: computeOpcRating replaces hardcoded 5.0
-  // Rating thresholds (minutes per request) — confirm with registrar's performance standards.
-  const computeOpcRating = (avgMins) => {
-    if (avgMins <= 15)  return 5.0;
-    if (avgMins <= 30)  return 4.0;
-    if (avgMins <= 60)  return 3.0;
-    if (avgMins <= 120) return 2.0;
-    return 1.0;
-  };
-  const numericValue = computeOpcRating(avgMinutesPerRequest);
+  const numericValue = 5.0;
   let timeText;
   if (hours <= 0) {
     timeText = `${minutes} MINUTE${minutes !== 1 ? 'S' : ''}`;
@@ -432,7 +422,7 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
     throw new Error('No document types found to export for the selected options.');
   }
   let [requests, latestHistoryByRequestId, allDocumentTypesRes, allCertificationsRes] = await Promise.all([
-    getLogbookData(), // FE-4: returns completed requests with embedded history
+    fetchAllDocumentRequests(),
     getHistoryRowsByRequestId(),
     (async () => { try { return await getDocumentTypes(); } catch (_) { return { data: [] }; } })(),
     (async () => { try { return await getCertifications(); } catch (_) { return { data: [] }; } })(),
