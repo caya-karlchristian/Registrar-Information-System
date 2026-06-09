@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { MicrophoneIcon, StopIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import useVoiceRecognition from '../utils/useVoiceRecognition.js';
 import { useTheme } from '../context/ThemeContext';
 
@@ -15,7 +15,7 @@ const VoiceTextareaInput = ({
   required = false,
 }) => {
   const { isDark } = useTheme();
-  const [manualEntryLocked, setManualEntryLocked] = useState(false);
+  const lastProcessedRef = useRef('');
 
   const {
     isListening,
@@ -34,46 +34,45 @@ const VoiceTextareaInput = ({
   useEffect(() => {
     if (!transcript) return;
 
-    const normalized = transcript.trim().toLowerCase();
+    if (transcript === lastProcessedRef.current) return;
+    lastProcessedRef.current = transcript;
 
-    if (normalized === 'clear' || normalized === 'clear search') {
+    // Normalize transcript and clean punctuation
+    const normalized = transcript.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?]/g, "").trim();
+
+    if (normalized === 'clear' || normalized === 'clear search' || normalized === 'reset') {
       reset();
-      setManualEntryLocked(false);
+      lastProcessedRef.current = '';
       onChange('');
       return;
     }
 
-    setManualEntryLocked(false);
     onChange(transcript.trim());
   }, [transcript, onChange, reset]);
 
-  const displayValue = isListening && interimTranscript
-    ? `${value} ${interimTranscript}`.trim()
+  const displayValue = isListening
+    ? (transcript + (interimTranscript ? ' ' + interimTranscript : '')).trim()
     : value;
 
   const handleReset = () => {
     reset();
-    setManualEntryLocked(false);
+    lastProcessedRef.current = '';
     onChange('');
   };
 
   const handleChange = (e) => {
     const nextValue = e.target.value;
 
-    if (isListening) reset();
-
-    // Manual edits must clear the speech buffer so next dictation starts fresh.
-    if (!isListening && transcript) {
+    // If user types while voice is active, stop it immediately and reset speech buffer.
+    if (isListening) {
+      reset();
+    } else if (transcript) {
       reset();
     }
-
-    // Manual typing locks voice input until the field is cleared again.
-    setManualEntryLocked(nextValue.trim().length > 0);
+    lastProcessedRef.current = '';
 
     onChange(nextValue);
   };
-
-  const isVoiceStartBlocked = manualEntryLocked && !isListening;
 
   return (
     <div className="space-y-1.5">
@@ -83,6 +82,12 @@ const VoiceTextareaInput = ({
       </label>
 
       <div className={`relative flex items-start rounded-lg shadow-sm border transition-all duration-200 focus-within:ring-2 focus-within:ring-[#FFC72C] ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-white border-gray-200'}`}>
+        
+        {/* Screen Reader Announcements */}
+        <div className="sr-only" aria-live="polite">
+          {isListening ? 'Voice input active. Speak now.' : 'Voice input inactive.'}
+        </div>
+
         <textarea
           id={id}
           required={required}
@@ -100,32 +105,29 @@ const VoiceTextareaInput = ({
                 type="button"
                 onClick={handleReset}
                 className={`p-1.5 rounded-md transition-all ${isDark ? 'text-[#9a9a9a] hover:text-white hover:bg-[#2a2a2f]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                aria-label="Clear"
+                aria-label="Clear input"
               >
                 <XMarkIcon className="w-4 h-4" />
               </button>
             </>
           )}
 
-          {isSupported && (!isVoiceStartBlocked || isListening) && (
+          {isSupported && (
             <button
               type="button"
-              onClick={() => {
-                if (isVoiceStartBlocked) return;
-                toggle();
-              }}
+              onClick={() => toggle(value)}
               aria-label={isListening ? 'Stop listening' : 'Start voice input'}
-              className={`p-1 rounded-md transition-all duration-200 shrink-0 ${
+              className={`p-1.5 rounded-md transition-all duration-200 shrink-0 ${
                 isListening
                   ? isDark
-                    ? 'text-white animate-pulse'
-                    : 'text-[#800000] animate-pulse'
+                    ? 'text-white bg-white/10 animate-pulse'
+                    : 'text-[#800000] bg-red-50 animate-pulse'
                   : isDark
-                    ? 'text-[#9a9a9a] hover:text-white'
-                    : 'text-gray-400 hover:text-[#800000]'
+                    ? 'text-[#9a9a9a] hover:text-white hover:bg-[#2a2a2f]'
+                    : 'text-gray-400 hover:text-[#800000] hover:bg-gray-100'
               }`}
             >
-              {isListening ? <StopIcon className="w-4 h-4" /> : <MicrophoneIcon className="w-4 h-4" />}
+              <MicrophoneIcon className="w-4 h-4" />
             </button>
           )}
         </div>

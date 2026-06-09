@@ -15,6 +15,7 @@ import {
 import { CertFooter, CertHeader } from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import { useTheme } from "../context/ThemeContext";
+import SuccessToast from "../components/SuccessToast.jsx";
 
 const toCertificateRows = (raw) => {
   if (Array.isArray(raw)) return raw;
@@ -356,7 +357,6 @@ const CertificateTemplateManagement = () => {
         })
       );
 
-      // Show the "Saved!" success text for 2 seconds
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
 
@@ -371,7 +371,6 @@ const CertificateTemplateManagement = () => {
     if (!selectedCertId || !isPersistedCertification || loading || saving) return;
     if (hasPreviewDataUrl(layout)) return;
 
-    // ✅ NEW: Prevent autosaving if the layout is identical to what was loaded from the DB
     const savedLayout = layoutsByCertId[selectedCertId];
     if (savedLayout && JSON.stringify(layout) === JSON.stringify(savedLayout)) {
       return; 
@@ -529,7 +528,12 @@ const CertificateTemplateManagement = () => {
             <CertificatePreviewCanvas layout={layout} certId={Number(selectedCertId)} />
           </section>
         </div>
-
+        {saveSuccess && (
+          <SuccessToast 
+            message="Layout saved successfully!" 
+            onClose={() => setSaveSuccess(false)} 
+          />
+        )}
         <PreviewModal
           isOpen={showModal}
           onClose={() => setShowModal(false)}

@@ -110,19 +110,20 @@ const AIQueryChat = ({ buildParams }) => {
   const strong = isDark ? 'text-white'      : 'text-[#800000]';
 
   return (
-    <div className={`border rounded-4xl shadow-sm p-6 space-y-4 ${card}`}>
+    <div className={`border rounded-2xl overflow-hidden ${card}`}>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={`p-2 rounded-xl ${isDark ? 'bg-[#3a3b3c]' : 'bg-red-50'}`}>
-            <SparklesIcon className={`w-5 h-5 ${isDark ? 'text-white' : 'text-[#800000]'}`} />
-          </div>
+      <div className={`flex items-center justify-between px-5 py-4
+        ${isDark ? 'bg-[#3a3b3c]' : 'bg-[#800000]'}`}>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-white/15">
+            <SparklesIcon className={`w-7 h-7 ${isDark ? 'text-white' : 'text-slate-100'}`} />          
+            </div>
           <div>
-            <h2 className={`text-lg font-black uppercase tracking-tight ${strong}`}>
+            <h2 className="text-lg font-bold uppercase tracking-tight text-white">
               Ask the Data
             </h2>
-            <p className={`text-[10px] font-bold uppercase tracking-widest ${muted}`}>
+            <p className="text-[10px] font-medium uppercase tracking-widest text-white/60 mt-0.5">
               Conversational analytics assistant
             </p>
           </div>
@@ -132,7 +133,8 @@ const AIQueryChat = ({ buildParams }) => {
           <button
             onClick={handleClear}
             title="Clear conversation"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-white/20
+          bg-white/10 text-white/85 text-xs font-medium hover:bg-white/20 transition-colors
               ${isDark
                 ? 'border-[#4e4f50] text-[#b0b3b8] hover:bg-[#3a3b3c]'
                 : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
@@ -144,7 +146,7 @@ const AIQueryChat = ({ buildParams }) => {
       </div>
 
       {/* Message list */}
-      <div className={`rounded-2xl overflow-y-auto max-h-[420px] flex flex-col gap-3 p-4
+      <div className={`overflow-y-auto mt-2 max-h-105 flex flex-col gap-3 p-5 mx-2 rounded-2xl no-scrollbar 
         ${isDark ? 'bg-[#18191a]' : 'bg-slate-50'}`}
       >
         {isEmpty && (
@@ -175,7 +177,7 @@ const AIQueryChat = ({ buildParams }) => {
       </div>
 
       {/* Input row */}
-      <div className="flex gap-2 items-end">
+      <div className="relative flex items-center p-2.5">
         <textarea
           ref={inputRef}
           value={input}
@@ -184,20 +186,20 @@ const AIQueryChat = ({ buildParams }) => {
           rows={2}
           placeholder="Ask a question about the current analytics data…"
           disabled={loading}
-          className={`flex-1 resize-none rounded-2xl px-4 py-3 text-sm outline-none border transition-colors
-            ${isDark
-              ? 'bg-[#3a3b3c] border-[#4e4f50] text-white placeholder-[#9a9a9a] focus:border-[#6e6f70]'
-              : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-[#800000]'}
-            disabled:opacity-60`}
+          className={`w-full resize-none rounded-2xl px-4 py-3.5 pr-14 text-sm outline-none border transition-all
+          ${isDark
+            ? 'bg-[#3a3b3c] border-[#4e4f50] text-white placeholder-[#9a9a9a] focus:border-[#6e6f70]'
+            : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-[#800000]'}
+          disabled:opacity-60`}
         />
         <button
           onClick={() => handleSend()}
           disabled={!input.trim() || loading}
-          className={`p-3 rounded-2xl transition-colors shadow
-            ${isDark
-              ? 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]'
-              : 'bg-[#800000] text-white hover:bg-[#6b0000]'}
-            disabled:opacity-50 disabled:cursor-not-allowed`}
+          className={`absolute right-5 p-2 rounded-xl transition-all
+          ${isDark 
+            ? 'bg-[#4e4f50] text-white hover:bg-[#6e6f70]'
+            : 'bg-[#800000] text-white hover:bg-[#6b0000]'}
+          disabled:opacity-45 disabled:cursor-not-allowed`}
         >
           <PaperAirplaneIcon className="w-5 h-5" />
         </button>
@@ -217,16 +219,24 @@ const AIQueryChat = ({ buildParams }) => {
 
 const MessageBubble = ({ msg, isDark }) => {
   const isUser = msg.role === 'user';
-
+  const renderContent = (text) => {
+    const parts = text.split(/\*\*(.*?)\*\*/g);
+    return parts.map((part, i) =>
+      i % 2 === 1
+        ? <strong key={i} className={isDark ? 'text-white font-semibold' : 'text-[#800000] font-semibold'}>{part}</strong>
+        : part
+    );
+  };
+  
   return (
     <div className={`flex gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
-        <div className={`shrink-0 p-1.5 rounded-full self-end ${isDark ? 'bg-[#3a3b3c]' : 'bg-red-50'}`}>
+        <div className={`shrink-0 p-1.5 rounded-full self-start mt-1 ${isDark ? 'bg-[#3a3b3c]' : 'bg-red-50'}`}>
           <SparklesIcon className={`w-3.5 h-3.5 ${isDark ? 'text-white' : 'text-[#800000]'}`} />
         </div>
       )}
       <div
-        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap
+        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed
           ${isUser
             ? isDark
               ? 'bg-[#3a3b3c] text-white rounded-br-sm'
@@ -236,10 +246,10 @@ const MessageBubble = ({ msg, isDark }) => {
               : 'bg-white text-slate-700 rounded-bl-sm border border-slate-100'
           }`}
       >
-        {msg.content}
+        {isUser ? msg.content : renderContent(msg.content)}
       </div>
       {isUser && (
-        <div className={`shrink-0 self-end`}>
+        <div className="shrink-0 self-end">
           <UserCircleIcon className={`w-6 h-6 ${isDark ? 'text-[#9a9a9a]' : 'text-slate-300'}`} />
         </div>
       )}
@@ -248,7 +258,9 @@ const MessageBubble = ({ msg, isDark }) => {
 };
 
 const TypingBubble = ({ isDark }) => (
-  <div className="flex gap-2 items-end">
+  <div className={`flex gap-2 items-end px-4 py-3 border-t
+  ${isDark ? 'border-[#3e4042]' : 'border-slate-100'}`}
+  >
     <div className={`shrink-0 p-1.5 rounded-full ${isDark ? 'bg-[#3a3b3c]' : 'bg-red-50'}`}>
       <SparklesIcon className={`w-3.5 h-3.5 ${isDark ? 'text-white' : 'text-[#800000]'}`} />
     </div>
@@ -273,9 +285,9 @@ const EmptyState = ({ isDark, muted, strong, onSuggest }) => (
       <SparklesIcon className={`w-7 h-7 ${isDark ? 'text-[#4e4f50]' : 'text-slate-300'}`} />
     </div>
     <div>
-      <p className={`text-sm font-bold ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>
-        Ask anything about the current data
-      </p>
+      <p className={`text-sm font-bold flex items-center justify-center text-center ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>
+      Ask anything about the current data
+    </p>
       <p className={`text-xs mt-1 max-w-xs mx-auto ${muted}`}>
         Try one of the suggestions below, or type your own question.
       </p>
@@ -285,10 +297,10 @@ const EmptyState = ({ isDark, muted, strong, onSuggest }) => (
         <button
           key={q}
           onClick={() => onSuggest(q)}
-          className={`text-left text-xs px-4 py-2.5 rounded-xl border transition-colors
-            ${isDark
-              ? 'border-[#3e4042] text-[#b0b3b8] hover:bg-[#3a3b3c]'
-              : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          className={`text-left text-xs px-4 py-2.5 rounded-lg border transition-colors
+          ${isDark
+            ? 'border-[#3e4042] text-[#b0b3b8] hover:bg-[#3a3b3c]'
+            : 'border-slate-200 text-slate-600 hover:border-[#800000] hover:text-[#800000] hover:bg-red-50'}`}
         >
           {q}
         </button>

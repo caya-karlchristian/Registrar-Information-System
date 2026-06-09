@@ -15,6 +15,7 @@ import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
 import { useTheme } from "../context/ThemeContext";
+import { DocumentSkeleton } from '../components/LoadingSkeleton'; // Import skeleton
 
 //REMOVE THIS LATER, JUST FOR DEMO PURPOSES
 const EXCLUSIVE_FOR = ["Student", "Alumni", "All"];
@@ -207,9 +208,19 @@ const DocumentManagement = () => {
 
       
           {loading ? (
-            <p className={`text-center text-sm py-8 animate-pulse ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>Loading...</p>
+            <DocumentSkeleton isDark={isDark} count={7} />
           ) : paginated.length === 0 ? (
-            <p className={`text-center text-sm py-8 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>No documents found.</p>
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className={`w-16 h-16 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
+                <MagnifyingGlassIcon className={`w-8 h-8 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
+              </div>
+              <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                No Documents Found
+              </h3>
+              <p className={`text-xs text-center px-4 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                No documents match your search criteria.
+              </p>
+            </div>
           ) : (
             paginated.map((doc) => (
               <div
@@ -269,8 +280,7 @@ const DocumentManagement = () => {
         </div>
 
         {/* Right — Always visible form */}
-        <form onSubmit={handleSave} className={`rounded-xl p-6 sm:p-10 py-4 lg:w-200 w-full flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
-          <h2 className={`font-bold text-xl mb-2 ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>
+          <form onSubmit={handleSave} className={`rounded-xl p-6 sm:p-10 py-4 lg:w-200 w-full flex flex-col shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>          <h2 className={`font-bold text-xl mb-2 ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>
             {isAdding ? "Add Document" : "Edit Document"}
           </h2>
 
