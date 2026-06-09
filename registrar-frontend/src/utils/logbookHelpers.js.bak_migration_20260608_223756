@@ -125,22 +125,16 @@ export const getHistoryRows = (row, historyByRequestId = {}) => {
   );
 };
 
-/** changed_at from the ReadyToClaim (new_status_id=2) history entry.
- *  This is the true "processed" timestamp — not the most-recent entry,
- *  which for a completed request is the Completed transition.
- *  Fix applied by migration FE-1.
- */
+/** Most-recent changed_at timestamp for a row */
 export const getProcessedAt = (row, historyByRequestId = {}) => {
   const history = getHistoryRows(row, historyByRequestId);
-  const entry = history.find((h) => h.new_status_id === 2  /* ReadyToClaim — migration FE-1 */);
-  return entry?.changed_at || null;
+  return history[0]?.changed_at || null;
 };
 
-/** minutes_processed from the same ReadyToClaim entry for consistency. */
+/** minutes_processed from the most-recent history entry */
 export const getMinutesProcessed = (row, historyByRequestId = {}) => {
   const history = getHistoryRows(row, historyByRequestId);
-  const entry = history.find((h) => h.new_status_id === 2);
-  return entry?.minutes_processed ?? null;
+  return history[0]?.minutes_processed ?? null;
 };
 
 /** Timestamp when the request was claimed (new_status_id === 3) */
