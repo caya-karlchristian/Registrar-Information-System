@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import PropTypes from "prop-types";
-import { MicrophoneIcon, StopIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { MicrophoneIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import useVoiceRecognition from "../utils/useVoiceRecognition.js";
 import { useTheme } from "../context/ThemeContext";
 
@@ -20,8 +20,8 @@ const InputGroup = ({
   voiceEnabled = true,
   language = "en-US",
 }) => {
-  const [manualEntryLocked, setManualEntryLocked] = useState(false);
   const { isDark } = useTheme();
+  const lastProcessedRef = useRef('');
 
   const { isListening, transcript, interimTranscript, isSupported, toggle, reset } = useVoiceRecognition({
     language,
@@ -33,10 +33,14 @@ const InputGroup = ({
   useEffect(() => {
     if (!voiceEnabled || !transcript) return;
 
-    const normalized = transcript.trim().toLowerCase();
-    if (normalized === "clear" || normalized === "clear search") {
+    if (transcript === lastProcessedRef.current) return;
+    lastProcessedRef.current = transcript;
+
+    // Normalize transcript and clean punctuation
+    const normalized = transcript.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?]/g, "").trim();
+    if (normalized === "clear" || normalized === "clear search" || normalized === "reset") {
       reset();
-      setManualEntryLocked(false);
+      lastProcessedRef.current = "";
       onChange({ target: { name, value: "" } });
       return;
     }
@@ -45,32 +49,29 @@ const InputGroup = ({
       ? transcript.replace(/\s+/g, '')
       : transcript;
 
-    setManualEntryLocked(false);
     onChange({ target: { name, value: cleaned } });
   }, [voiceEnabled, transcript, type, pattern, onChange, name, reset]);
 
-  const displayValue = voiceEnabled && isListening && interimTranscript
-    ? `${value} ${interimTranscript}`.trim()
+  const displayValue = voiceEnabled && isListening
+    ? (transcript + (interimTranscript ? ' ' + interimTranscript : '')).trim()
     : value;
 
   const handleChange = (e) => {
-    if (isListening) reset();
-
-    if (!isListening && transcript) {
+    // If user types while voice is active, stop it immediately and reset speech buffer.
+    if (isListening) {
+      reset();
+    } else if (transcript) {
       reset();
     }
-
-    setManualEntryLocked(e.target.value.trim().length > 0);
+    lastProcessedRef.current = '';
     onChange(e);
   };
 
   const handleReset = () => {
     reset();
-    setManualEntryLocked(false);
+    lastProcessedRef.current = '';
     onChange({ target: { name, value: "" } });
   };
-
-  const isVoiceStartBlocked = manualEntryLocked && !isListening;
 
   return (
     <div className="w-full">
@@ -80,12 +81,19 @@ const InputGroup = ({
       </label>
 
       <div className="relative flex items-center">
+        {/* Screen Reader Announcements */}
+        {voiceEnabled && (
+          <div className="sr-only" aria-live="polite">
+            {isListening ? `${label} voice input active. Speak now.` : `${label} voice input inactive.`}
+          </div>
+        )}
+
         <input
           type={type}
           name={name}
           value={displayValue}
           onChange={handleChange}
-          placeholder={voiceEnabled && isListening ? "Listening..." : placeholder}
+          placeholder={voiceEnabled && isListening ? "Listening... Speak now" : placeholder}
           required={required}
           pattern={pattern}
           title={title}
@@ -99,31 +107,25 @@ const InputGroup = ({
             <button
               type="button"
               onClick={handleReset}
-              className={`p-1 rounded-md transition-all ${isDark ? 'text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-              aria-label="Clear"
+              className={`p-1.5 rounded-md transition-all ${isDark ? 'text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+              aria-label={`Clear ${label}`}
             >
               <XMarkIcon className="w-4 h-4" />
             </button>
           )}
 
-          {voiceEnabled && isSupported && (!isVoiceStartBlocked || isListening) && (
+          {voiceEnabled && isSupported && (
             <button
               type="button"
-              onClick={() => {
-                if (isVoiceStartBlocked) return;
-                toggle();
-              }}
-              aria-label={isListening ? "Stop listening" : "Start voice input"}
-              className={`p-1 rounded-md transition-all duration-200 ${
+              onClick={() => toggle(value)}
+              aria-label={isListening ? "Stop listening" : `Start voice input for ${label}`}
+              className={`p-1.5 rounded-md transition-all duration-200 shrink-0 ${
                 isListening
-                  ? (isDark ? "text-[#FFC72C] animate-pulse" : "text-[#800000] animate-pulse")
-                  : (isDark ? "text-[#b0b3b8] hover:text-[#e4e6eb]" : "text-gray-400 hover:text-[#800000]")
+                  ? (isDark ? "text-[#FFC72C] bg-[#FFC72C]/10 animate-pulse" : "text-[#800000] bg-red-50 animate-pulse")
+                  : (isDark ? "text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c]" : "text-gray-400 hover:text-[#800000] hover:bg-gray-100")
               }`}
             >
-              {isListening
-                ? <StopIcon className="w-4 h-4" />
-                : <MicrophoneIcon className="w-4 h-4" />
-              }
+              <MicrophoneIcon className="w-4 h-4" />
             </button>
           )}
         </div>
