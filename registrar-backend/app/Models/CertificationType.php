@@ -16,6 +16,10 @@ class CertificationType extends Model
     public $timestamps = false;
     protected $guarded = [];
 
+    protected $casts = [
+        'cashier_document_patterns' => 'array',
+    ];
+
     // layout_footer_urls is stored as a JSON array of bare paths.
     // Do NOT add it to $casts here — the accessor below handles decoding
     // and URL resolution in one step.

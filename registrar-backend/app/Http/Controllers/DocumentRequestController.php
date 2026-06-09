@@ -8,6 +8,7 @@ use App\Contracts\DocumentRequestServiceInterface;
 use App\Services\DocumentRequestService;
 use Illuminate\Http\Request;
 use App\Services\CashierService;
+use App\Services\CashierDocumentMatcher;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -30,10 +31,10 @@ class DocumentRequestController extends Controller
         'certificates.certificationType',
     ];
 
-    // or-validation: CashierService injected
     public function __construct(
         private DocumentRequestServiceInterface $requestService,
         private CashierService                  $cashierService,
+        private CashierDocumentMatcher          $documentMatcher,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -63,6 +64,44 @@ class DocumentRequestController extends Controller
 
         // Staff: potentially thousands of rows — keep pagination.
         return response()->json($query->orderByDesc('requested_at')->paginate(20), 200);
+    }
+
+
+    // -------------------------------------------------------------------------
+    // GET /document-requests/logbook
+    // Returns completed requests with embedded history — purpose-built for the
+    // Logbook page.  Avoids the N+1 page-loop + separate history fetch the
+    // frontend previously performed.
+    // Staff/superadmin only (enforced by route middleware role:3,4).
+    // -------------------------------------------------------------------------
+    // BE-1 migration: added from/to/doc_type filters
+    // Accepts optional query params:
+    //   ?from=YYYY-MM-DD   filter requests on or after this date
+    //   ?to=YYYY-MM-DD     filter requests on or before this date
+    //   ?doc_type=string   filter by document_name (partial, case-insensitive)
+    public function logbook(Request $request)
+    {
+        $query = DocumentRequest::with(array_merge(self::RELATIONS, ['history']))
+            ->whereHas('status', fn ($q) => $q->where('status_name', 'Completed'));
+
+        if ($from = $request->query('from')) {
+            $query->whereDate('requested_at', '>=', $from);
+        }
+
+        if ($to = $request->query('to')) {
+            $query->whereDate('requested_at', '<=', $to);
+        }
+
+        if ($docType = $request->query('doc_type')) {
+            $query->whereHas('documents.documentType', function ($q) use ($docType) {
+                $q->where('document_name', 'like', '%' . $docType . '%');
+            });
+        }
+
+        return response()->json(
+            $query->orderByDesc('requested_at')->get(),
+            200
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -146,6 +185,25 @@ class DocumentRequestController extends Controller
                     return response()->json([
                         'message' => $message,
                         'errors'  => ['or_number' => [$message]],
+                    ], 422);
+                }
+
+                // document-validation: cross-check paid items against requested items.
+                // Only runs when the cashier API returns items[] (live mode).
+                // Mock mode returns an empty items array, which skips all checks
+                // gracefully — every item passes when there is nothing to match against.
+                $cashierItems = $verification['data']['items'] ?? [];
+
+                $matchResult = $this->documentMatcher->match(
+                    cashierItems: $cashierItems,
+                    documents:    $validated['documents']    ?? [],
+                    certificates: $validated['certificates'] ?? [],
+                );
+
+                if (!$matchResult['valid']) {
+                    return response()->json([
+                        'message' => $matchResult['message'],
+                        'errors'  => $matchResult['errors'],
                     ], 422);
                 }
             }

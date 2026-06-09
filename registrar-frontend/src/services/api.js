@@ -95,6 +95,7 @@ export const uploadCertificationLayoutLogo = (id, formData) =>
 // Read records from response.data.data, not response.data.
 // -------------------------------------------------------
 export const getDocumentRequests  = (params = {}) => api.get("/document-requests", { params });
+export const getLogbookData       = ()          => api.get("/document-requests/logbook");
 export const getDocumentRequest   = (id)          => api.get(`/document-requests/${id}`);
 export const createDocumentRequest = (data)       => api.post("/document-requests", data);
 export const updateDocumentRequest = (id, data)   => api.put(`/document-requests/${id}`, data);
