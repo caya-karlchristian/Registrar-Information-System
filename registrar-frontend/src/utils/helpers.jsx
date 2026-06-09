@@ -260,3 +260,11 @@ export const getTodayDate = () => {
   );
   return localDate.toISOString().split("T")[0];
 };
+
+export const formatLabel = (str) => {
+  if (!str || str === "All") return str;
+  return str
+    .split("_")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};

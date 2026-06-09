@@ -21,6 +21,7 @@ import CertificateModal from '../components/CertificateModal.jsx';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
 import { useNotificationsContext } from '../context/NotificationsContext';
 import DropdownGroup from '../components/DropDown.jsx';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useTheme } from '../context/ThemeContext';
@@ -62,6 +63,7 @@ const StaffDashboard = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [certRequest, setCertRequest] = useState(null);
   const [requestStatuses, setRequestStatuses] = useState([]);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [printedCertificateIds, setPrintedCertificateIds] = useState(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -385,8 +387,16 @@ const StaffDashboard = () => {
     setPrintedCertificateIds(prev => (prev.includes(requestId) ? prev : [...prev, requestId]));
   };
 
+  const confirmClearFilters = () => {
+    setFilterStatus('All');
+    setSortOrder('Recent Requests');
+    setSearchTerm('');
+    setSelectedIds([]);
+    setShowClearConfirm(false); // Close the modal
+  };
+
   return (
-    <div className={`relative min-h-screen pb-10 z-20 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5] text-gray-900'}`}>
+    <div className={`relative min-h-screen pb-10 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5] text-gray-900'}`}>
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
         <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
         <LineLoading isVisible={actionLoading} />
@@ -421,7 +431,10 @@ const StaffDashboard = () => {
             </div>
           )} 
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto md:min-w-95">
+        <div className="flex flex-col sm:flex-row items-end gap-2 w-full md:w-auto">
+          
+          {/* 1. The Dropdown Grid (Now comes first) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:min-w-95">
             <DropdownGroup
               label="Status"
               name="filterStatus"
@@ -439,6 +452,19 @@ const StaffDashboard = () => {
               options={['Recent Requests', 'Old Requests']}
               labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
             />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowClearConfirm(true)} 
+            className={`w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-semibold transition-colors border shadow-sm h-11.5 flex items-center justify-center shrink-0
+              ${isDark 
+                ? 'bg-[#1f1f1f] text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]' 
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              Clear Request
+            </button>
           </div>
         </div>
 
@@ -478,7 +504,7 @@ const StaffDashboard = () => {
                   </td>
                   <Td center>{req.id}</Td>
                   <Td>
-                    <div className="font-bold">{req.studentName}</div>
+                    <div className="font-bold text-center">{req.studentName}</div>
                   </Td>
                   <Td center>
                     <span className="text-xs font-bold tracking-wide">
@@ -604,6 +630,16 @@ const StaffDashboard = () => {
         loading={loading}
         onCancel={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDeleteSelected}
+      />
+
+      <ConfirmationModal
+        isOpen={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        onConfirm={confirmClearFilters}
+        title="Clear All Filters?"
+        message="Are you sure you want to clear ALL document/certificate requests?"
+        type="confirm" 
+        confirmText="Clear Filters" 
       />
 
       {certRequest && (
