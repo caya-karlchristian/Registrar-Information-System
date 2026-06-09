@@ -183,10 +183,9 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
     font: 'Lucida Fax',
   });
 
-  // Use consistent column widths (equal distribution with small rounding adjustment)
-  const DEFAULT_COL_WIDTH = 14; // percent
-  const LAST_COL_WIDTH = 100 - DEFAULT_COL_WIDTH * 6; // remaining percent
-  const colWidths = [DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, LAST_COL_WIDTH];
+  // Column widths (percent, must sum to 100)
+  // Date Requested | Client Name | Course | Email | Date Processed | Minutes | Date Claimed
+  const colWidths = [13, 16, 15, 18, 13, 12, 13];
 
   const headerRow = new TableRow({
     tableHeader: true,

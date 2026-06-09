@@ -277,7 +277,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         $owner = SystemUser::find($documentRequest->user_id);
         if (!$owner) return;
 
-        $status  = RequestStatusEnum::from($documentRequest->status_id);
+        $status = RequestStatusEnum::from((int) $documentRequest->status_id);
         $trigger = $status->notificationTrigger();
 
         if ($trigger) {
