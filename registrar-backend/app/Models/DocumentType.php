@@ -11,6 +11,10 @@ class DocumentType extends Model
     public $timestamps = false;
     protected $guarded = [];
 
+    protected $casts = [
+        'cashier_document_patterns' => 'array',
+    ];
+
     public function requestDocuments()
     {
         return $this->hasMany(RequestDocument::class, 'document_type_id');
