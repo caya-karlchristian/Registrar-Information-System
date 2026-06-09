@@ -87,6 +87,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Document requests
     Route::prefix('document-requests')->group(function () {
         Route::get('/',                           [DocumentRequestController::class, 'index']);
+        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware('role:3,4');
         Route::get('{id}',                        [DocumentRequestController::class, 'show']);
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware('role:3');
@@ -103,7 +104,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.
-    Route::prefix('request-history')->group(function () {
+    Route::middleware('role:3,4')->prefix('request-history')->group(function () {
         Route::get('/',    [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
     });

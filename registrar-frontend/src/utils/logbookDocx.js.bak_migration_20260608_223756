@@ -2,18 +2,6 @@ import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, Width
 import { saveAs } from 'file-saver';
 import certificate_footer from '../assets/certificate_footer.png';
 
-import {
-  formatDateLong,
-  formatMinutesDuration,
-  getFullName,
-  getCourse,
-  getEmail,
-  getHistoryRows,
-  getProcessedAt,
-  getMinutesProcessed,
-  getClaimedAt,
-} from './logbookHelpers.js';
-// FE-2 migration: helpers imported from logbookHelpers.js
 const fetchImageData = async (src) => {
   if (!src) return null;
   try {
@@ -26,6 +14,99 @@ const fetchImageData = async (src) => {
 };
 
 const makeFont = (size, extra = {}) => ({ size, font: 'Lucida Fax', ...extra });
+
+const formatDateLong = (value, includeTime = false) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const datePart = date.toLocaleDateString('en-US', {
+    month: 'long',
+    day: '2-digit',
+    year: 'numeric',
+  });
+
+  if (!includeTime) return datePart;
+
+  const timePart = date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  return `${datePart} ${timePart}`;
+};
+
+const formatMinutesDuration = (minutesValue) => {
+  if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
+
+  const totalMinutes = Number(minutesValue);
+  if (Number.isNaN(totalMinutes) || totalMinutes < 0) return '---';
+
+  const wholeMinutes = Math.floor(totalMinutes);
+  const days = Math.floor(wholeMinutes / 1440);
+  const hours = Math.floor((wholeMinutes % 1440) / 60);
+  const minutes = wholeMinutes % 60;
+  const minuteLabel = minutes === 1 ? 'min' : 'mins';
+
+  if (days > 0) {
+    return `${days}day${days > 1 ? 's' : ''} ${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+  }
+
+  if (hours > 0) {
+    return `${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+  }
+
+  return `${minutes}${minuteLabel}`;
+};
+
+const getFullName = (row) => {
+  const p = row.student_profile || row.alumni_profile || row.user?.student_profile || row.user?.alumni_profile;
+  if (!p) return 'Walk-in Client';
+  const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
+  const last = p.last_name || p.lastname || '';
+  const first = p.first_name || p.firstname || '';
+  return `${last}, ${first}${middle}`.trim();
+};
+
+const getCourse = (row) => (
+  row.student_profile?.academic_records?.[0]?.course
+  || row.student_profile?.course
+  || row.academic_record?.course
+  || row.alumni_academic_record?.course
+  || '---'
+);
+
+const getEmail = (row) => row.user?.email || row.student_profile?.email || '---';
+
+const getHistoryRows = (row, historyByRequestId = {}) => {
+  const fromMap = historyByRequestId?.[row.request_id];
+  const base = Array.isArray(fromMap) ? fromMap : (Array.isArray(row.history) ? row.history : []);
+  return [...base].sort((a, b) => new Date(b?.changed_at || 0).getTime() - new Date(a?.changed_at || 0).getTime());
+};
+
+const getProcessedAt = (row, historyByRequestId) => {
+  const history = getHistoryRows(row, historyByRequestId);
+  if (history.length === 0) return null;
+  // Find the entry where status moved to ReadyToClaim (id=2) — that is the true "processed" timestamp
+  const readyEntry = history.find((h) => h.new_status_id === 2);
+  return readyEntry?.changed_at || null;
+};
+
+const getMinutesProcessed = (row, historyByRequestId) => {
+  const history = getHistoryRows(row, historyByRequestId);
+  if (history.length === 0) return null;
+  // Match the same ReadyToClaim entry for consistency
+  const readyEntry = history.find((h) => h.new_status_id === 2);
+  return readyEntry?.minutes_processed ?? null;
+};
+
+const getClaimedAt = (row, historyByRequestId) => {
+  const history = getHistoryRows(row, historyByRequestId);
+  if (history.length === 0) return null;
+  const claimEntry = history.find((h) => h.new_status_id === 3);
+  return claimEntry?.changed_at || null;
+};
 
 const noBorder = {
   top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
@@ -183,9 +264,10 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
     font: 'Lucida Fax',
   });
 
-  // Column widths (percent, must sum to 100)
-  // Date Requested | Client Name | Course | Email | Date Processed | Minutes | Date Claimed
-  const colWidths = [13, 16, 15, 18, 13, 12, 13];
+  // Use consistent column widths (equal distribution with small rounding adjustment)
+  const DEFAULT_COL_WIDTH = 14; // percent
+  const LAST_COL_WIDTH = 100 - DEFAULT_COL_WIDTH * 6; // remaining percent
+  const colWidths = [DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, DEFAULT_COL_WIDTH, LAST_COL_WIDTH];
 
   const headerRow = new TableRow({
     tableHeader: true,
