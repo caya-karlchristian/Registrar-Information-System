@@ -17,6 +17,7 @@ const useVoiceRecognition = ({
   const silenceTimerRef = useRef(null);
   const isListeningRef = useRef(false);
   const transcriptRef = useRef('');
+  const lastToggleTimeRef = useRef(0);
 
   const onResultRef = useRef(onResult);
   const onErrorRef = useRef(onError);
@@ -53,6 +54,8 @@ const useVoiceRecognition = ({
     recognition.interimResults = interimResults;
 
     recognition.onresult = (event) => {
+      if (!isListeningRef.current) return;
+
       let finalText = '';
       let interimText = '';
 
@@ -106,8 +109,11 @@ const useVoiceRecognition = ({
     };
   }, [language, continuous, interimResults, startSilenceTimer, clearSilenceTimer]);
 
-  const start = useCallback(() => {
+  const start = useCallback((currentVal = '') => {
     if (!recognitionRef.current || isListeningRef.current) return;
+    transcriptRef.current = currentVal;
+    setTranscript(currentVal);
+    setInterimTranscript('');
     recognitionRef.current.start();
     isListeningRef.current = true;
     setIsListening(true);
@@ -122,8 +128,12 @@ const useVoiceRecognition = ({
     setIsListening(false);
   }, [clearSilenceTimer]);
 
-  const toggle = useCallback(() => {
-    isListeningRef.current ? stop() : start();
+  const toggle = useCallback((currentVal = '') => {
+    const now = Date.now();
+    if (now - lastToggleTimeRef.current < 1000) return;
+    lastToggleTimeRef.current = now;
+
+    isListeningRef.current ? stop() : start(currentVal);
   }, [start, stop]);
 
   const reset = useCallback(() => {
