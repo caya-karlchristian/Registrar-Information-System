@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Squares2X2Icon,
@@ -81,6 +81,20 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
     type: 'default',
     onConfirm: () => {},
   });
+  const [headerHeight, setHeaderHeight] = useState(101); // Fallback default
+
+  useEffect(() => {
+    const headerElement = document.querySelector('header');
+    if (!headerElement) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setHeaderHeight(entry.target.offsetHeight);
+      }
+    });
+    resizeObserver.observe(headerElement);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   const config = ROLE_CONFIG[role] || ROLE_CONFIG.student;
   const profile = config.profileKey ? user?.[config.profileKey] : null;
@@ -128,8 +142,11 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
         />
       )}
 
-      <div className={`lg:hidden absolute inset-x-0 top-0 z-50 transition-all duration-300 ease-in-out ${isOpen ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-3'}`}>
-        <div className="w-full overflow-hidden rounded-b-lg shadow-[0_18px_42px_rgba(0,0,0,0.3)]">
+          <div 
+            className={`lg:hidden fixed inset-x-0 z-50 transition-all duration-300 ease-in-out ${isOpen ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-4'}`}
+            style={{ top: `${headerHeight}px` }} 
+          >        
+          <div className="w-full overflow-hidden rounded-b-lg shadow-[0_18px_42px_rgba(0,0,0,0.3)]">
           <div className={isDark ? 'bg-[#242526]' : 'bg-[#7a0000]'}>
             <nav className={`space-y-px ${isDark ? 'bg-[#18191a]' : 'bg-[#5c0000]'}`}>
               {config.items.map((item) => (
@@ -168,12 +185,15 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
 
       <aside
         className={`
-          hidden lg:fixed lg:left-0 lg:top-25 lg:z-40 lg:flex lg:w-72
-          lg:h-[calc(100vh-100px)]
+          hidden lg:fixed lg:left-0 lg:z-40 lg:flex lg:w-72
           ${isDark ? 'bg-[#18191a] border-[#3e4042]' : 'bg-[#E0E0E0] border-gray-300'} border-r lg:flex-col
         `}
+        style={{
+          top: `${headerHeight}px`,
+          height: `calc(100vh - ${headerHeight}px)`
+        }}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full z-9999">
           <div className="p-6 shrink-0">
             <div className="flex items-center gap-3">
               <UserCircleIcon className={`w-14 h-14 lg:w-17 lg:h-17 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`} />
