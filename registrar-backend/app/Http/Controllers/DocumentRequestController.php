@@ -8,6 +8,7 @@ use App\Contracts\DocumentRequestServiceInterface;
 use App\Services\DocumentRequestService;
 use Illuminate\Http\Request;
 use App\Services\CashierService;
+use App\Services\CashierDocumentMatcher;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -30,10 +31,10 @@ class DocumentRequestController extends Controller
         'certificates.certificationType',
     ];
 
-    // or-validation: CashierService injected
     public function __construct(
         private DocumentRequestServiceInterface $requestService,
         private CashierService                  $cashierService,
+        private CashierDocumentMatcher          $documentMatcher,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -184,6 +185,25 @@ class DocumentRequestController extends Controller
                     return response()->json([
                         'message' => $message,
                         'errors'  => ['or_number' => [$message]],
+                    ], 422);
+                }
+
+                // document-validation: cross-check paid items against requested items.
+                // Only runs when the cashier API returns items[] (live mode).
+                // Mock mode returns an empty items array, which skips all checks
+                // gracefully — every item passes when there is nothing to match against.
+                $cashierItems = $verification['data']['items'] ?? [];
+
+                $matchResult = $this->documentMatcher->match(
+                    cashierItems: $cashierItems,
+                    documents:    $validated['documents']    ?? [],
+                    certificates: $validated['certificates'] ?? [],
+                );
+
+                if (!$matchResult['valid']) {
+                    return response()->json([
+                        'message' => $matchResult['message'],
+                        'errors'  => $matchResult['errors'],
                     ], 422);
                 }
             }
