@@ -1,20 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
-import { getLogbookData, getDocumentTypes, getCertifications } from '../services/api'; // FE-3 migration: uses getLogbookData() from API
-import {
-  formatMinutesDuration,
-  getProcessedAt,
-  getMinutesProcessed,
-  getFullName,
-  getCourse,
-  getEmail,
-  getDocumentNames,
-  getCertificationNames,
-  formatDateLong,
-  getClaimedAt,
-} from '../utils/logbookHelpers.js';
-
+import { getDocumentRequests, getDocumentTypes, getRequestHistory, getCertifications } from "../services/api"; 
 import DropDown from '../components/DropDown';
 import { LogbookSkeleton } from '../components/LoadingSkeleton';
 import SuccessToast from '../components/SuccessToast.jsx';
@@ -44,58 +31,82 @@ const LogbookRecords = () => {
   const [toastError, setToastError] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [activePreset, setActivePreset] = useState('');
   const rowsPerPage = 8;
 
-  // Quick-select date range presets
-  const applyPreset = (preset) => {
+  // Semester quick-select helper
+  const applySemester = (preset) => {
     const now = new Date();
-
-    if (preset === 'annual') {
-      const from = new Date(now);
-      from.setFullYear(from.getFullYear() - 1);
-      setDateFrom(from.toISOString().slice(0, 10));
-      setDateTo(now.toISOString().slice(0, 10));
-    } else if (preset === 'semi') {
-      const from = new Date(now);
-      from.setMonth(from.getMonth() - 6);
-      setDateFrom(from.toISOString().slice(0, 10));
-      setDateTo(now.toISOString().slice(0, 10));
+    const year = now.getFullYear();
+    if (preset === '1st') {
+      setDateFrom(`${year - 1}-08-01`);
+      setDateTo(`${year}-01-31`);
+    } else if (preset === '2nd') {
+      setDateFrom(`${year}-02-01`);
+      setDateTo(`${year}-07-31`);
     } else if (preset === 'month') {
-      const year = now.getFullYear();
-      const month = now.getMonth();
-      const m = String(month + 1).padStart(2, '0');
+      const m = String(now.getMonth() + 1).padStart(2, '0');
       setDateFrom(`${year}-${m}-01`);
-      const lastDay = String(new Date(year, month + 1, 0).getDate()).padStart(2, '0');
+      const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
       setDateTo(`${year}-${m}-${lastDay}`);
     } else {
       setDateFrom('');
       setDateTo('');
     }
-
-    setActivePreset(preset);
     setCurrentPage(1);
   };
 
-  // Load logbook data on mount
+  // Load logbook data on mount:
+  // - Fetch all pages of document requests
+  // - Fetch lookup data: document types, request history, certifications
+  // - Group and sort history entries per request
+  // - Populate component state with fetched results
   useEffect(() => {
     const fetchLogbookData = async () => {
       setLoading(true);
       try {
-        const [logbookRes, typesRes, certRes] = await Promise.all([
-          getLogbookData(),
+        const requests = [];
+        let page = 1;
+        let lastPage = 1;
+
+        do {
+          const response = await getDocumentRequests({ page });
+          const payload = response?.data ?? {};
+          const rows = toRows(payload);
+
+          requests.push(...rows);
+          lastPage = Number(payload?.last_page ?? 1) || 1;
+          page += 1;
+        } while (page <= lastPage);
+
+        const [typesRes, historyRes, certRes] = await Promise.all([
           getDocumentTypes(),
+          getRequestHistory(),
           getCertifications(),
         ]);
 
-        const requests       = toRows(logbookRes.data);
-        const types          = toRows(typesRes.data);
+        const types = toRows(typesRes.data);
+        const historyRows = toRows(historyRes.data);
         const certifications = toRows(certRes.data);
+        const groupedHistory = historyRows.reduce((acc, item) => {
+          const requestId = item?.request_id;
+          if (!requestId) return acc;
+          if (!acc[requestId]) acc[requestId] = [];
+          acc[requestId].push(item);
+          return acc;
+        }, {});
+
+        Object.keys(groupedHistory).forEach((requestId) => {
+          groupedHistory[requestId].sort((a, b) => {
+            const aTime = new Date(a?.changed_at || 0).getTime();
+            const bTime = new Date(b?.changed_at || 0).getTime();
+            return bTime - aTime;
+          });
+        });
 
         setData(requests);
         setDbDocTypes(types);
         setAvailableCertifications(certifications);
-        setHistoryByRequestId({});
+        setHistoryByRequestId(groupedHistory);
         setCurrentPage(1);
       } catch (error) {
         console.error('Error loading logbook records:', error);
@@ -119,7 +130,8 @@ const LogbookRecords = () => {
     return {};
   }, [dbDocTypes]);
 
-  // Build document filter dropdown options
+  // Build document filter dropdown options, preserving order and uniqueness.
+  // If a "Certification" document type exists, include an "All Certification" option.
   const docOptions = useMemo(() => {
     const options = ['All Document'];
     const seen = new Set(['all document']);
@@ -140,7 +152,7 @@ const LogbookRecords = () => {
     return options;
   }, [activeDocMap]);
 
-  // List of distinct certification names
+  // List of distinct certification names for the certification selector
   const certificationOptions = useMemo(() => {
     const options = [];
     const seen = new Set();
@@ -157,6 +169,26 @@ const LogbookRecords = () => {
     return options;
   }, [availableCertifications]);
 
+  // Extract document type names from a request row, normalizing possible shapes
+  const getDocumentNames = (row) => {
+    const documents = Array.isArray(row?.documents) ? row.documents : [];
+    return documents
+      .map((document) => document?.documentType?.document_name ?? document?.document_type?.document_name ?? document?.document_name ?? '')
+      .filter(Boolean)
+      .map((name) => String(name).trim())
+      .filter(Boolean);
+  };
+
+  // Extract certification type names from a request row, normalizing possible shapes
+  const getCertificationNames = (row) => {
+    const certificates = Array.isArray(row?.certificates) ? row.certificates : [];
+    return certificates
+      .map((certificate) => certificate?.certification_type?.certificate_name ?? certificate?.certificate_name ?? certificate?.name ?? '')
+      .filter(Boolean)
+      .map((name) => String(name).trim())
+      .filter(Boolean);
+  };
+
   // Label displayed for the currently selected document/export option
   const selectedDocLabel = useMemo(() => {
     if (selectedExportOption === 'All Certification') return 'All Certification';
@@ -165,34 +197,39 @@ const LogbookRecords = () => {
 
   // Whether the UI is currently focused on certification-specific filters/exports
   const isCertificationMode = useMemo(() => {
-    const sel   = String(selectedExportOption || '').trim().toLowerCase();
-    const label = String(selectedDocLabel     || '').trim().toLowerCase();
-    return sel === 'certification' || (label === 'certification' && sel !== 'all certification');
+    const sel = String(selectedExportOption || '').trim().toLowerCase();
+    const label = String(selectedDocLabel || '').trim().toLowerCase();
+    // show certification type selector only when user explicitly selected the CERTIFICATION document type
+    return sel === 'certification' || label === 'certification' && sel !== 'all certification';
   }, [selectedExportOption, selectedDocLabel]);
 
   const [selectedCertificationLabel, setSelectedCertificationLabel] = useState('');
 
+  // Keep selected certification label in sync when entering/exiting certification mode
   useEffect(() => {
     if (isCertificationMode) {
+      // default to first available certification when entering certification mode
       if (!selectedCertificationLabel) {
         setSelectedCertificationLabel(certificationOptions[0] || '');
       }
     } else {
+      // when not in certification-specific mode, clear selection
       setSelectedCertificationLabel('');
     }
   }, [isCertificationMode, certificationOptions]);
 
-  // Filter data
+  // Filter data to completed requests, then apply either certification or document-type filters
   const filteredData = useMemo(() => {
     const from = dateFrom ? new Date(dateFrom + 'T00:00:00') : null;
-    const to   = dateTo   ? new Date(dateTo   + 'T23:59:59') : null;
+    const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
 
     const completedOnly = data.filter(item => {
+      if (String(item.status?.status_name).toLowerCase() !== 'completed') return false;
       if (from || to) {
         const req = item.requested_at ? new Date(item.requested_at) : null;
         if (!req) return false;
         if (from && req < from) return false;
-        if (to   && req > to  ) return false;
+        if (to && req > to) return false;
       }
       return true;
     });
@@ -201,7 +238,9 @@ const LogbookRecords = () => {
       const targetCertification = String(selectedCertificationLabel || 'All Certification').trim().toLowerCase();
       return completedOnly.filter((item) => {
         const certNames = getCertificationNames(item).map((name) => String(name).trim().toLowerCase());
-        if (targetCertification === 'all certification') return certNames.length > 0;
+        if (targetCertification === 'all certification') {
+          return certNames.length > 0;
+        }
         return certNames.includes(targetCertification);
       });
     }
@@ -223,26 +262,28 @@ const LogbookRecords = () => {
     });
   }, [filteredData]);
 
-  const totalPages       = Math.ceil(sortedData.length / rowsPerPage) || 1;
+  const totalPages = Math.ceil(sortedData.length / rowsPerPage) || 1;
   const indexOfFirstItem = (currentPage - 1) * rowsPerPage;
-  const indexOfLastItem  =  currentPage      * rowsPerPage;
+  const indexOfLastItem = currentPage * rowsPerPage;
 
   const currentData = useMemo(() => {
     return sortedData.slice(indexOfFirstItem, indexOfLastItem);
   }, [indexOfFirstItem, indexOfLastItem, sortedData]);
 
-  // Build sections for DOCX export
+  // Build sections used for DOCX export. Sections vary depending on certification mode,
+  // selected document type, or exporting all documents (grouped by type).
   const getExportSections = () => {
     if (isCertificationMode) {
+      // when exporting all certification, include all known certification types even if they have no rows
       if (selectedCertificationLabel && selectedCertificationLabel !== 'All Certification') {
         return [{ title: selectedCertificationLabel, rows: sortedData }];
       }
+
+      // build sections from available certification options (skip the 'All Certification' placeholder)
       const certNames = certificationOptions.filter(n => String(n || '').trim().toLowerCase() !== 'all certification');
       return certNames.map((name) => ({
         title: name,
-        rows: sortedData.filter((row) =>
-          getCertificationNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())
-        ),
+        rows: sortedData.filter((row) => getCertificationNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())),
       }));
     }
 
@@ -250,18 +291,21 @@ const LogbookRecords = () => {
       return [{ title: selectedDocLabel, rows: sortedData }];
     }
 
-    const docNames = Object.values(activeDocMap).map(n => String(n || '').trim()).filter(Boolean);
+    // exporting all documents: include all known document types even if they have no rows
+    const docNames = Object.values(activeDocMap)
+      .map(n => String(n || '').trim())
+      .filter(Boolean);
+
+    // unique preserving order
     const uniqueDocNames = Array.from(new Set(docNames));
 
     return uniqueDocNames.map((name) => ({
       title: name,
-      rows: sortedData.filter((row) =>
-        getDocumentNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())
-      ),
+      rows: sortedData.filter((row) => getDocumentNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())),
     }));
   };
 
-  // Trigger DOCX export
+  // Trigger DOCX export using grouped sections and logos
   const handleExportDocx = async () => {
     if (exporting) return;
     try {
@@ -294,6 +338,45 @@ const LogbookRecords = () => {
       .join(' ');
   };
 
+  // Build full name from student or alumni profile; fall back to 'Walk-in Client'
+  const getFullName = (row) => {
+    const p = row.student_profile || row.alumni_profile;
+    if (!p) return 'Walk-in Client';
+    const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
+    const lastName = toProperCase(p.last_name || '');
+    const firstName = toProperCase(p.first_name || '');
+    return `${lastName}, ${firstName}${middle}`.trim();
+  };
+
+  // Try multiple locations for course information and provide fallback
+  const getCourse = (row) => {
+    return (
+      row.student_profile?.academic_records?.[0]?.course ||
+      row.student_profile?.course ||
+      row.academic_record?.course ||
+      row.alumni_academic_record?.course ||
+      '---'
+    );
+  };
+
+  // Return an email from available sources or placeholder
+  const getEmail = (row) => {
+    return row.user?.email || row.student_profile?.email || '---';
+  };
+
+  // Format an ISO date value into a long human-readable date
+  const formatDateLong = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: '2-digit',
+      year: 'numeric',
+    });
+  };
+
   // Format an ISO datetime value into long date + 24-hour time
   const formatDateTimeLong = (value) => {
     const datePart = formatDateLong(value);
@@ -308,6 +391,49 @@ const LogbookRecords = () => {
     return `${datePart} ${timePart}`;
   };
 
+  // Get the processing timestamp: when the request moved to ReadyToClaim (status id 2)
+  const getProcessedAt = (row) => {
+    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
+    if (history.length === 0) return null;
+    const readyEntry = history.find((h) => h.new_status_id === 2);
+    return readyEntry?.changed_at || null;
+  };
+
+  // Get processed duration in minutes — from the same ReadyToClaim entry for consistency
+  const getMinutesProcessed = (row) => {
+    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
+    if (history.length === 0) return null;
+    const readyEntry = history.find((h) => h.new_status_id === 2);
+    return readyEntry?.minutes_processed ?? null;
+  };
+
+  // Convert a minutes value into a compact human-readable duration
+  const formatMinutesDuration = (minutesValue) => {
+    if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
+
+    const totalMinutes = Number(minutesValue);
+    if (Number.isNaN(totalMinutes) || totalMinutes < 0) return '---';
+
+    const wholeMinutes = Math.floor(totalMinutes);
+    const days = Math.floor(wholeMinutes / 1440);
+    const hours = Math.floor((wholeMinutes % 1440) / 60);
+    const minutes = wholeMinutes % 60;
+    const minuteLabel = minutes === 1 ? 'min' : 'mins';
+
+    if (days > 0) return `${days}day${days > 1 ? 's' : ''} ${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+    if (hours > 0) return `${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
+
+    return `${minutes}${minuteLabel}`;
+  };
+
+  // Find when the request was claimed (status id 3) within the history entries
+  const getClaimedAt = (row) => {
+    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
+    if (history.length === 0) return null;
+    const claimEntry = history.find((h) => h.new_status_id === 3);
+    return claimEntry?.changed_at || null;
+  };
+
   if (loading) return <LogbookSkeleton isDark={isDark} />;
 
   return (
@@ -315,20 +441,16 @@ const LogbookRecords = () => {
       <div className={`max-w-350 mx-auto shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
         <div className="p-4 sm:p-6 md:p-8 pb-0">
-
-          {/* ── Controls Panel ── */}
-          <div className={`mb-6 print:hidden rounded-xl border p-4 sm:p-5 ${isDark ? 'bg-[#1e1f20] border-[#3e4042]' : 'bg-gray-50 border-gray-200'}`}>
-
-            {/* Row 1 — Dropdowns · Date Range · Export */}
-            <div className="flex flex-wrap items-end gap-3 mb-4">
-
-              {/* Document Type dropdown */}
-              <div className="w-44 shrink-0">
+          {/* Controls row: filters on the left, Export button top-right */}
+          <div className="mb-6 print:hidden">
+            {/* Top row: dropdowns + export button */}
+            <div className="flex flex-wrap items-end gap-3 mb-3">
+              <div className="w-48 shrink-0">
                 <DropDown
                   label="Document Type"
                   name="docType"
                   value={selectedExportOption}
-                  labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+                  labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
                   onChange={(e) => {
                     if (e.target.value === 'All Document' || e.target.value === 'All Certification') {
                       setSelectedDocTypeId('');
@@ -346,15 +468,13 @@ const LogbookRecords = () => {
                   options={docOptions}
                 />
               </div>
-
-              {/* Certification Type dropdown (conditional) */}
               {isCertificationMode && (
-                <div className="w-44 shrink-0">
+                <div className="w-48 shrink-0">
                   <DropDown
                     label="Certification Type"
                     name="certificationType"
                     value={selectedCertificationLabel}
-                    labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+                    labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
                     onChange={(e) => {
                       setSelectedCertificationLabel(e.target.value);
                       setCurrentPage(1);
@@ -363,115 +483,64 @@ const LogbookRecords = () => {
                   />
                 </div>
               )}
-
-              {/* Vertical divider */}
-              <div className={`hidden sm:block self-stretch w-px mx-1 ${isDark ? 'bg-[#3e4042]' : 'bg-gray-200'}`} />
-
-              {/* Date range */}
-              <div className="flex items-end gap-2">
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>From</label>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => { setDateFrom(e.target.value); setActivePreset(''); setCurrentPage(1); }}
-                    className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
-                  />
-                </div>
-                <span className={`mb-2 text-xs font-medium ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>→</span>
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>To</label>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => { setDateTo(e.target.value); setActivePreset(''); setCurrentPage(1); }}
-                    className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
-                  />
-                </div>
+              {/* Date pickers */}
+              <div className="flex flex-col gap-1">
+                <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Date From</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                  className={`text-xs px-2 py-1.5 rounded border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50] text-[#e4e6eb]' : 'bg-white border-gray-300 text-gray-700'}`}
+                />
               </div>
-
-              {/* Export button */}
+              <div className="flex flex-col gap-1">
+                <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Date To</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}
+                  className={`text-xs px-2 py-1.5 rounded border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50] text-[#e4e6eb]' : 'bg-white border-gray-300 text-gray-700'}`}
+                />
+              </div>
+              {/* Export button pushed to the far right */}
               <div className="ml-auto">
                 <button
                   onClick={handleExportDocx}
                   disabled={loading || exporting || sortedData.length === 0}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all duration-150 shadow-sm
-                    ${(loading || exporting || sortedData.length === 0)
+                  className={
+                    `px-5 py-2 rounded-md font-bold text-xs uppercase tracking-widest transition-colors duration-150 shadow-sm ` +
+                    (!exporting
                       ? (isDark
-                          ? 'bg-[#2d2e30] text-[#4e4f50] border border-[#3e4042] cursor-not-allowed'
-                          : 'bg-gray-100 text-gray-300 border border-gray-200 cursor-not-allowed')
+                          ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]'
+                          : 'bg-[#800000] hover:bg-[#4a0000] text-[#FFD700]')
                       : (isDark
-                          ? 'bg-[#800000] hover:bg-[#9a0000] text-[#FFD700] border border-[#9a0000] shadow-[#800000]/20'
-                          : 'bg-[#800000] hover:bg-[#6a0000] text-[#FFD700] shadow-[#800000]/30')
-                    }`}
+                          ? 'bg-[#3a3b3c] text-[#8f949e] border border-[#4e4f50] cursor-not-allowed'
+                          : 'bg-[#800000] text-white cursor-not-allowed'))
+                  }
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round"
-                      d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                  </svg>
-                  {exporting ? 'Exporting…' : 'Export DOCX'}
+                  {exporting ? 'Exporting...' : 'Export to DOCX'}
                 </button>
               </div>
             </div>
-
-            {/* Row 2 — Quick-select presets */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`text-[10px] font-semibold uppercase tracking-widest mr-1 ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>
-                Quick Range:
-              </span>
-
+            {/* Second row: semester quick-select */}
+            <div className="flex flex-wrap gap-1">
               {[
-                { label: 'Annual',      sublabel: '1 yr', preset: 'annual' },
-                { label: 'Semi-Annual', sublabel: '6 mo', preset: 'semi'   },
-                { label: 'This Month',  sublabel: '1 mo', preset: 'month'  },
-                { label: 'All Time',    sublabel: '∞',    preset: 'all'    },
-              ].map(({ label, sublabel, preset }) => {
-                const isActive = activePreset === preset;
-                return (
-                  <button
-                    key={preset}
-                    onClick={() => applyPreset(preset)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150 border
-                      ${isActive
-                        ? (isDark
-                            ? 'bg-[#800000] border-[#9a0000] text-[#FFD700] shadow-sm'
-                            : 'bg-[#800000] border-[#800000] text-[#FFD700] shadow-sm')
-                        : (isDark
-                            ? 'bg-[#2d2e30] border-[#3e4042] text-[#b0b3b8] hover:border-[#6b6c6e] hover:text-[#e4e6eb]'
-                            : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:text-gray-800')
-                      }`}
-                  >
-                    {label}
-                    <span className={`text-[9px] font-normal px-1 py-0.5 rounded
-                      ${isActive
-                        ? 'bg-white/20 text-current'
-                        : (isDark ? 'bg-[#3e4042] text-[#6b6c6e]' : 'bg-gray-100 text-gray-400')
-                      }`}>
-                      {sublabel}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {/* Clear dates */}
-              {(dateFrom || dateTo) && (
+                { label: '1st Sem', preset: '1st' },
+                { label: '2nd Sem', preset: '2nd' },
+                { label: 'This Month', preset: 'month' },
+                { label: 'All Time', preset: 'all' },
+              ].map(({ label, preset }) => (
                 <button
-                  onClick={() => { setDateFrom(''); setDateTo(''); setActivePreset(''); setCurrentPage(1); }}
-                  className={`ml-1 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors border
-                    ${isDark
-                      ? 'border-[#3e4042] text-[#6b6c6e] hover:text-[#b0b3b8] hover:border-[#6b6c6e]'
-                      : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'}`}
+                  key={preset}
+                  onClick={() => applySemester(preset)}
+                  className={`text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#b0b3b8] border border-[#4e4f50]' : 'bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-300'}`}
                 >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Clear
+                  {label}
                 </button>
-              )}
+              ))}
             </div>
           </div>
 
-          {/* ── Original section heading ── */}
           <div className={`w-full text-center border-b pb-4 mb-0 ${isDark ? 'border-[#3e4042]' : 'border-gray-300'}`}>
             <h2 className={`text-lg sm:text-xl md:text-2xl font-black uppercase tracking-widest leading-tight ${isDark ? 'text-[#f5c542]' : 'text-[#4a0000]'}`}>
               Processing of Application for <br className="sm:hidden" /> {selectedDocLabel}
@@ -479,13 +548,12 @@ const LogbookRecords = () => {
             <p className={`text-xs mt-1 font-medium ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
               {sortedData.length} record{sortedData.length !== 1 ? 's' : ''}
               {(dateFrom || dateTo) && (
-                <span> &mdash; {dateFrom && `from ${dateFrom}`}{dateFrom && dateTo && ' '}{dateTo && `to ${dateTo}`}</span>
+                <span> &mdash; {dateFrom && `from ${dateFrom}`}{dateFrom && dateTo && ' '}{ dateTo && `to ${dateTo}`}</span>
               )}
             </p>
           </div>
         </div>
 
-        {/* ── Original Table ── */}
         <div className="flex-1 overflow-x-auto px-4 sm:px-6 md:px-8">
           <table className="w-full min-w-225 border-collapse md:min-w-full">
             <thead>
@@ -503,40 +571,40 @@ const LogbookRecords = () => {
               {currentData.map((row) => (
                 (() => {
                   const processedAt = getProcessedAt(row);
-                  const claimedAt   = getClaimedAt(row);
+                  const claimedAt = getClaimedAt(row);
 
                   return (
-                    <tr key={row.request_id || row.id} className={`border-b text-[11px] sm:text-[12px] transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
+                <tr key={row.request_id || row.id} className={`border-b text-[11px] sm:text-[12px] transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
 
-                      <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                        {formatDateLong(row.requested_at) || 'N/A'}
-                      </td>
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                    {formatDateLong(row.requested_at) || 'N/A'}
+                  </td>
 
-                      <td className="p-3 sm:p-4 text-center font-bold whitespace-nowrap">
-                        {getFullName(row)}
-                      </td>
+                  <td className="p-3 sm:p-4 text-center font-bold whitespace-nowrap">
+                    {getFullName(row)}
+                  </td>
 
-                      <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                        {getCourse(row)}
-                      </td>
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                    {getCourse(row)}
+                  </td>
 
-                      <td className="p-3 sm:p-4 text-center truncate max-w-55 whitespace-nowrap">
-                        {getEmail(row)}
-                      </td>
+                  <td className="p-3 sm:p-4 text-center truncate max-w-55 whitespace-nowrap">
+                    {getEmail(row)}
+                  </td>
 
-                      <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                        {formatDateTimeLong(processedAt) || '---'}
-                      </td>
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                    {formatDateTimeLong(processedAt) || '---'}
+                  </td>
 
-                      <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                        {formatMinutesDuration(getMinutesProcessed(row))}
-                      </td>
+                  <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                    {formatMinutesDuration(getMinutesProcessed(row))}
+                  </td>
 
-                      <td className="p-3 sm:p-4 text-center italic text-gray-400 whitespace-nowrap">
-                        {formatDateLong(claimedAt) || 'Pending'}
-                      </td>
+                  <td className="p-3 sm:p-4 text-center italic text-gray-400 whitespace-nowrap">
+                    {formatDateLong(claimedAt) || 'Pending'}
+                  </td>
 
-                    </tr>
+                </tr>
                   );
                 })()
               ))}
@@ -550,7 +618,7 @@ const LogbookRecords = () => {
           </table>
         </div>
 
-        {/* ── Original Pagination Footer ── */}
+        {/* Pagination Footer */}
         <div className={`px-4 sm:px-8 py-4 text-[11px] sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t ${isDark ? 'bg-[#242526] text-[#9a9a9a] border-[#3e4042]' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
           <span className="text-center sm:text-left">
             Showing {sortedData.length > 0 ? indexOfFirstItem + 1 : 0} to{" "}
@@ -579,9 +647,8 @@ const LogbookRecords = () => {
             </button>
           </div>
         </div>
-
         <SuccessToast message={toastSuccess} onClose={() => setToastSuccess('')} />
-        <ErrorToast   message={toastError}   onClose={() => setToastError('')}   />
+        <ErrorToast message={toastError} onClose={() => setToastError('')} />
       </div>
     </div>
   );
