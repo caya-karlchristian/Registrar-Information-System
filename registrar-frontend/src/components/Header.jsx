@@ -19,9 +19,9 @@ function Header({ onMenuClick }) {
   return (
     <header
       style={headerStyle}
-      className="dark:bg-[#242526] w-full shadow-sm dark:shadow-lg fixed top-0 left-0 right-0 z-50 border-b-[5px] border-yellow-400 transition-all duration-200"
+      className="dark:bg-[#242526] w-full shadow-sm dark:shadow-lg fixed top-0 left-0 right-0 z-9999 border-b-[5px] border-yellow-400 transition-all duration-200"
     >
-      <div className="w-full px-4 py-4 flex justify-between items-center h-full">
+      <div className="w-full px-4 py-4 z-9999 flex justify-between items-center h-full">
         <div className="flex space-x-4 items-center">
           <img
             src={LogoImage}
