@@ -41,6 +41,7 @@ import NotificationToast from './components/NotificationToast.jsx';
 import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ReferenceDataProvider } from './context/ReferenceDataContext.jsx';
 import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
+import FloatingActionMenu from './components/FloatingActionMenu.jsx';
 
 
 const App = () => {
@@ -137,6 +138,7 @@ const App = () => {
 
         {/* Global toast stack — rendered outside Routes so it persists across navigation */}
         <NotificationToast />
+        <FloatingActionMenu />
       </div>
     </NotificationsProvider>
     </ReferenceDataProvider>
