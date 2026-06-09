@@ -12,7 +12,7 @@ const WalkInRequest = () => {
     : 'border-[#d7c3c3] bg-white text-[#4a0000] hover:border-[#b97a7a] hover:bg-[#fff8f8]';
 
   return (
-    <div className={`min-h-[calc(100vh-120px)] px-4 py-8 ${isDark ? 'bg-[#18191a]' : 'bg-[#f8f2f2]'}`}>
+    <div className={`min-h-[calc(100vh-120px)] px-4 py-8 ${isDark ? 'bg-[#18191a]' : 'bg-[#F5F5F5]'}`}>
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <div className={`rounded-2xl border px-6 py-7 shadow-sm ${isDark ? 'border-[#3e4042] bg-[#18191a]' : 'border-[#eadada] bg-white'}`}>
           <p className={`text-sm font-semibold uppercase tracking-[0.24em] ${isDark ? 'text-[#b0b3b8]' : 'text-[#7a0000]'}`}>

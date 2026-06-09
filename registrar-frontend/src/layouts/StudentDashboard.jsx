@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthProvider';
 import { STATUS_CONFIG, TAB_MAP, TABS } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
 import { useNotificationsContext } from '../context/NotificationsContext';
+import { DocumentMagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 import { useReferenceData } from '../context/ReferenceDataContext';
 const StudentDashboard = () => {
@@ -159,7 +160,16 @@ useEffect(() => {
             {loading ? (
               <div className={`p-10 text-center ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>Loading...</div>
             ) : currentItems.length === 0 ? (
-              <div className={`p-10 text-center font-black uppercase tracking-widest ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>No records found.</div>
+                <div className="flex-1 flex flex-col items-center justify-center p-12 min-h-[300px]">                <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full transition-colors ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
+                  <DocumentMagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
+                </div>
+                <h3 className={`text-base font-bold mb-1 tracking-tight ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                  No Records Found
+                </h3>
+                <p className={`text-xs text-center max-w-xs leading-relaxed ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                  You don't have any document requests in this category at the moment.
+                </p>
+              </div>
             ) : (
               currentItems.map((req) => (
                 <div
