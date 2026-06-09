@@ -1,0 +1,36 @@
+{
+  "timestamp": "20260608_223756",
+  "mode": "APPLIED",
+  "steps": [
+    {
+      "step": "FE-1",
+      "file": "registrar-frontend/src/utils/logbookHelpers.js",
+      "status": "ok",
+      "detail": "replaced getProcessedAt/getMinutesProcessed (backup: logbookHelpers.js.bak_migration_20260608_223756)"
+    },
+    {
+      "step": "FE-2",
+      "file": "registrar-frontend/src/utils/logbookDocx.js",
+      "status": "ok",
+      "detail": "stripped 9 local helpers, added import (backup: logbookDocx.js.bak_migration_20260608_223756)"
+    },
+    {
+      "step": "FE-3",
+      "file": "registrar-frontend/src/layouts/Logbook.jsx",
+      "status": "ok",
+      "detail": "replaced fetch logic + imports (backup: Logbook.jsx.bak_migration_20260608_223756)"
+    },
+    {
+      "step": "FE-4",
+      "file": "registrar-frontend/src/utils/analyticsMonthlyExport.js",
+      "status": "ok",
+      "detail": "OPCR rating fixed; logbook API wired (backup: analyticsMonthlyExport.js.bak_migration_20260608_223756)"
+    },
+    {
+      "step": "BE-1",
+      "file": "registrar-backend/app/Http/Controllers/DocumentRequestController.php",
+      "status": "ok",
+      "detail": "logbook() extended with from/to/doc_type params (backup: DocumentRequestController.php.bak_migration_20260608_223756)"
+    }
+  ]
+}

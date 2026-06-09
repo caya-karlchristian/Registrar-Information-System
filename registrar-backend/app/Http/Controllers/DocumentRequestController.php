@@ -73,13 +73,32 @@ class DocumentRequestController extends Controller
     // frontend previously performed.
     // Staff/superadmin only (enforced by route middleware role:3,4).
     // -------------------------------------------------------------------------
-    public function logbook()
+    // BE-1 migration: added from/to/doc_type filters
+    // Accepts optional query params:
+    //   ?from=YYYY-MM-DD   filter requests on or after this date
+    //   ?to=YYYY-MM-DD     filter requests on or before this date
+    //   ?doc_type=string   filter by document_name (partial, case-insensitive)
+    public function logbook(Request $request)
     {
+        $query = DocumentRequest::with(array_merge(self::RELATIONS, ['history']))
+            ->whereHas('status', fn ($q) => $q->where('status_name', 'Completed'));
+
+        if ($from = $request->query('from')) {
+            $query->whereDate('requested_at', '>=', $from);
+        }
+
+        if ($to = $request->query('to')) {
+            $query->whereDate('requested_at', '<=', $to);
+        }
+
+        if ($docType = $request->query('doc_type')) {
+            $query->whereHas('documents.documentType', function ($q) use ($docType) {
+                $q->where('document_name', 'like', '%' . $docType . '%');
+            });
+        }
+
         return response()->json(
-            DocumentRequest::with(array_merge(self::RELATIONS, ['history']))
-                ->whereHas('status', fn ($q) => $q->where('status_name', 'Completed'))
-                ->orderByDesc('requested_at')
-                ->get(),
+            $query->orderByDesc('requested_at')->get(),
             200
         );
     }
