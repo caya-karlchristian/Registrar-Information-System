@@ -35,26 +35,24 @@ jobs:
 
       - name: Create .env
         run: |
-          cat > .env << 'ENVEOF'
-          APP_NAME=RIS
-          APP_ENV=testing
-          APP_KEY=base64:dGVzdGtleWZvcmNpdGVzdGluZ29ubHkxMjM0NTY3OA==
-          APP_DEBUG=false
-          DB_CONNECTION=sqlite
-          DB_DATABASE=:memory:
-          BROADCAST_CONNECTION=log
-          QUEUE_CONNECTION=sync
-          CACHE_STORE=array
-          SESSION_DRIVER=array
-          REVERB_APP_ID=123456
-          REVERB_APP_KEY=testkey
-          REVERB_APP_SECRET=testsecret
-          REVERB_HOST=localhost
-          REVERB_PORT=8080
-          REVERB_SCHEME=http
-          ALUMNI_MOCK=true
-          CASHIER_API_KEY=
-          ENVEOF
+          echo "APP_NAME=RIS" > .env
+          echo "APP_ENV=testing" >> .env
+          echo "APP_KEY=base64:dGVzdGtleWZvcmNpdGVzdGluZ29ubHkxMjM0NTY3OA==" >> .env
+          echo "APP_DEBUG=false" >> .env
+          echo "DB_CONNECTION=sqlite" >> .env
+          echo "DB_DATABASE=:memory:" >> .env
+          echo "BROADCAST_CONNECTION=log" >> .env
+          echo "QUEUE_CONNECTION=sync" >> .env
+          echo "CACHE_STORE=array" >> .env
+          echo "SESSION_DRIVER=array" >> .env
+          echo "REVERB_APP_ID=123456" >> .env
+          echo "REVERB_APP_KEY=testkey" >> .env
+          echo "REVERB_APP_SECRET=testsecret" >> .env
+          echo "REVERB_HOST=localhost" >> .env
+          echo "REVERB_PORT=8080" >> .env
+          echo "REVERB_SCHEME=http" >> .env
+          echo "ALUMNI_MOCK=true" >> .env
+          echo "CASHIER_API_KEY=" >> .env
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
