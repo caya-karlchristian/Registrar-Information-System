@@ -55,7 +55,10 @@ jobs:
           echo "CASHIER_API_KEY=" >> .env
 
       - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+      - name: Generate app key
+        run: php artisan key:generate
 
       - name: Run tests
         run: php artisan test
