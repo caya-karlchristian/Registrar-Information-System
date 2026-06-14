@@ -6,7 +6,6 @@ ris_backup.sql
 *.zip
 docker-compose.yml
 docker-compose.dev.yml
-.github/
 registrar-frontend/certs/
 /vendor/
 /node_modules/
