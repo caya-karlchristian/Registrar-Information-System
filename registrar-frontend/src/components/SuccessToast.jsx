@@ -20,7 +20,7 @@ const SuccessToast = ({ message, onClose }) => {
   if (!message) return null;
 
   return (
-    <div className="fixed top-30 right-5 z-9999 flex items-center w-auto max-w-sm px-4 py-3 text-white bg-green-600 rounded-lg shadow-xl border border-white/20 animate-slide-in-right">
+    <div className="fixed toast-container-shifted right-5 z-9999 flex items-center w-auto max-w-sm px-4 py-3 text-white bg-green-600 rounded-lg shadow-xl border border-white/20 animate-slide-in-right">
       
       {/* Icon */}
       <div className="flex items-center justify-center w-9 h-9 text-green-600 bg-white rounded-md">
