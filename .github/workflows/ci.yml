@@ -10,6 +10,9 @@ on:
     paths:
       - 'registrar-backend/**'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test:
     name: PHP Tests
@@ -21,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -30,25 +33,22 @@ jobs:
           extensions: mbstring, pdo, pdo_sqlite, sqlite3, bcmath, gd
           coverage: none
 
-      - name: Copy .env
-        run: cp .env.example .env.ci
-
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Generate app key
-        run: php artisan key:generate --env=ci
-
-      - name: Copy .env
+      - name: Create .env
         run: |
           cp .env.example .env
+          echo "APP_KEY=base64:dGVzdGtleWZvcmNpdGVzdGluZ29ubHkxMjM0NTY3OA==" >> .env
           echo "REVERB_APP_KEY=testkey" >> .env
           echo "REVERB_APP_ID=123456" >> .env
           echo "REVERB_APP_SECRET=testsecret" >> .env
           echo "BROADCAST_CONNECTION=null" >> .env
+          echo "ALUMNI_MOCK=true" >> .env
+          echo "CASHIER_API_KEY=" >> .env
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Run tests
-        run: php artisan test --env=ci
+        run: php artisan test
         env:
           APP_ENV: testing
           APP_KEY: base64:dGVzdGtleWZvcmNpdGVzdGluZ29ubHkxMjM0NTY3OA==
@@ -60,3 +60,9 @@ jobs:
           BROADCAST_CONNECTION: null
           ALUMNI_MOCK: "true"
           CASHIER_API_KEY: ""
+          REVERB_APP_KEY: testkey
+          REVERB_APP_ID: "123456"
+          REVERB_APP_SECRET: testsecret
+          REVERB_HOST: localhost
+          REVERB_PORT: "8080"
+          REVERB_SCHEME: http
