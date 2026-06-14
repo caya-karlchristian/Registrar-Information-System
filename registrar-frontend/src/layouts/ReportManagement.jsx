@@ -102,8 +102,8 @@ const ReportManagement = () => {
   };
 
   return (
-    <div className={`mt-5 min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
-
+    <div className={`font-sans px-4 sm:px-6 py-4 flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+      <div className="w-full max-w-6xl flex flex-col">
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-6">
 
         <div className="mt-6 sm:mt-12 flex-1 min-w-0 sm:min-w-45 sm:max-w-xs">
@@ -237,6 +237,7 @@ const ReportManagement = () => {
         message={errorMsg} 
         onClose={() => setErrorMsg("")} 
       />
+    </div>
     </div>
   );
 };
