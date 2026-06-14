@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class StudentProfile extends Model
 {
+    use HasFactory;
     protected $table = 'student_profile';
     protected $primaryKey = 'student_profile_id';
     public $timestamps = false;
