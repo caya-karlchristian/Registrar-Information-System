@@ -9,10 +9,11 @@ use App\Models\Alumni;
 use App\Models\AlumniProfile;
 use App\Models\AlumniType;
 use App\Models\AlumniAcademicRecord;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class SystemUser extends Authenticatable
 {
-    use HasApiTokens;
+    use HasApiTokens, HasFactory;
 
     protected $table = 'users';
     protected $primaryKey = 'user_id';
@@ -177,5 +178,10 @@ class SystemUser extends Authenticatable
     public function adminProfile()
     {
         return $this->hasOne(AdminProfile::class, 'user_id', 'user_id');
+    }
+
+    protected static function newFactory()
+    {
+        return \Database\Factories\SystemUserFactory::new();
     }
 }
