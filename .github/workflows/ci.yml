@@ -39,6 +39,14 @@ jobs:
       - name: Generate app key
         run: php artisan key:generate --env=ci
 
+      - name: Copy .env
+        run: |
+          cp .env.example .env
+          echo "REVERB_APP_KEY=testkey" >> .env
+          echo "REVERB_APP_ID=123456" >> .env
+          echo "REVERB_APP_SECRET=testsecret" >> .env
+          echo "BROADCAST_CONNECTION=null" >> .env
+
       - name: Run tests
         run: php artisan test --env=ci
         env:
