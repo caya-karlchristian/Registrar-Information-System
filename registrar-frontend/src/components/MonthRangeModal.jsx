@@ -106,7 +106,6 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = 6, isDark, lo
       if (result && typeof result.then === 'function') {
         await result;
       }
-      setToastSuccess('Exported successfully! Check your downloads.');
     } catch (err) {
       console.error('Export failed:', err);
       setToastError(err?.message || 'Export failed. Try Again.');
