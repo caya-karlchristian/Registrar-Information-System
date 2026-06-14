@@ -26,6 +26,8 @@ import {
   postAnalyticsAiReport,
   postAnalyticsAiQuery,
 } from '../services/api';
+import SuccessToast from '../components/SuccessToast.jsx';
+import ErrorToast from '../components/ErrorToast.jsx';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -70,6 +72,8 @@ const AnalyticsDashboard = () => {
   // Export modal state
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [toastSuccess, setToastSuccess] = useState('');
+  const [toastError, setToastError] = useState('');
 
   // ── Build params object from current filters ──────────────────────────
 
@@ -168,13 +172,16 @@ const AnalyticsDashboard = () => {
   // ── Monthly export handler ─────────────────────────────────────────────
   const handleExportConfirm = async (startYM, endYM, selectedDocType = 'ALL', certType = null) => {
     setExportLoading(true);
+    setToastSuccess('');
+    setToastError('');
     try {
       const { exportMonthlyDocx } = await import('../utils/analyticsMonthlyExport');
       const docTypeToSend = selectedDocType === 'All Documents' ? 'ALL' : selectedDocType;
       await exportMonthlyDocx(startYM, endYM, docTypeToSend, certType);
+      setToastSuccess('Exported successfully! Check your downloads.');
     } catch (err) {
       console.error('Export failed', err);
-      alert(err?.message || 'Failed to generate export.');
+      setToastError(err?.message || 'Failed to generate export.');
     } finally {
       setExportLoading(false);
       setExportModalOpen(false);
@@ -249,7 +256,7 @@ const AnalyticsDashboard = () => {
               onClick={() => setExportModalOpen(true)}
               className={`w-full flex items-center justify-center px-3 py-3 rounded-lg text-sm font-black uppercase tracking-wide shadow transition-colors ${isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] hover:bg-[#4e4f50]' : 'bg-[#800000] text-white hover:bg-[#6b0000]'}`}
             >
-              Export Monthly Report
+              Export Report
             </button>
           </div>
         </div>
@@ -518,6 +525,8 @@ const AnalyticsDashboard = () => {
 
       {/* ── 7. AI QUERY CHAT */}
       <AIQueryChat buildParams={buildParams} />
+      <SuccessToast message={toastSuccess} onClose={() => setToastSuccess('')} />
+      <ErrorToast message={toastError} onClose={() => setToastError('')} />
 
     </div>
   );
