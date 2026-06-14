@@ -57,7 +57,7 @@ export const LogbookSkeleton = ({ isDark }) => {
   );
 
   return (
-    <div className={`relative min-h-screen font-sans text-left z-20 animate-pulse ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>
+    <div className={`relative min-h-full font-sans text-left z-20 animate-pulse ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>
       <div className={`max-w-350 mx-auto shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
         <div className="p-3 sm:p-4 md:p-4 pb-0">

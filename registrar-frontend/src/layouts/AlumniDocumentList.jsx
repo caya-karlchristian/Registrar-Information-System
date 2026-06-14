@@ -41,9 +41,8 @@ const AlumniDocumentList = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans relative ${isDark ? 'bg-[#18191a]' : 'bg-gray-50/50'}`}>
-      <LoadingOverlay isVisible={loading} message="Loading Documents..." />
-      <div className="max-w-6xl mx-auto px-4 pt-4 pb-10">
+      <div className="w-full pb-10 relative">      
+        <LoadingOverlay isVisible={loading} message="Loading Documents..." />
         {/* --- HEADER --- */}
         <div className={`mb-8 border-b-2 pb-6 ${isDark ? 'border-yellow-600/30' : 'border-[#4a120e]/10'}`}>
           <h1 className={`text-3xl font-black uppercase tracking-tighter ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
@@ -52,7 +51,7 @@ const AlumniDocumentList = () => {
         </div>
 
         {/* --- FIXED GRID LAYOUT --- */}
-        <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {documents.length === 0 && !loading ? (
             <p className={`italic col-span-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>No documents available.</p>
           ) : (
@@ -147,9 +146,8 @@ const AlumniDocumentList = () => {
             );
           })
         )}
-        </main>
+        </div>
       </div>
-    </div>
   );
 };
 

@@ -12,7 +12,9 @@ import {
   ChartBarSquareIcon,
   BookOpenIcon,
   Cog6ToothIcon,
-  InboxIcon
+  InboxIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider";
 import { useTheme } from "../context/ThemeContext";
@@ -50,7 +52,7 @@ const ROLE_CONFIG = {
     items: [
       { name: 'Dashboard', to: 'dashboard', icon: Squares2X2Icon },
       { name: 'Inbox', to: 'inbox', icon: InboxIcon },
-      { name: 'Walk-In Request', to: 'request', icon: AcademicCapIcon },
+      // { name: 'Walk-In Request', to: 'request', icon: AcademicCapIcon },
       { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon },
       { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon },
       { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon },
@@ -79,9 +81,32 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
     title: '',
     message: '',
     type: 'default',
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
   const [headerHeight, setHeaderHeight] = useState(101); // Fallback default
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar-collapsed') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebar-collapsed', isCollapsed);
+    } catch (e) {
+      console.error('Failed to save sidebar collapsed state:', e);
+    }
+    if (isCollapsed) {
+      document.documentElement.classList.add('sidebar-collapsed');
+    } else {
+      document.documentElement.classList.remove('sidebar-collapsed');
+    }
+    return () => {
+      document.documentElement.classList.remove('sidebar-collapsed');
+    };
+  }, [isCollapsed]);
 
   useEffect(() => {
     const headerElement = document.querySelector('header');
@@ -142,11 +167,11 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
         />
       )}
 
-          <div 
-            className={`lg:hidden fixed inset-x-0 z-50 transition-all duration-300 ease-in-out ${isOpen ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-4'}`}
-            style={{ top: `${headerHeight}px` }} 
-          >        
-          <div className="w-full overflow-hidden rounded-b-lg shadow-[0_18px_42px_rgba(0,0,0,0.3)]">
+      <div
+        className={`lg:hidden fixed inset-x-0 z-50 transition-all duration-300 ease-in-out ${isOpen ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-4'}`}
+        style={{ top: `${headerHeight}px` }}
+      >
+        <div className="w-full overflow-hidden rounded-b-lg shadow-[0_18px_42px_rgba(0,0,0,0.3)]">
           <div className={isDark ? 'bg-[#242526]' : 'bg-[#7a0000]'}>
             <nav className={`space-y-px ${isDark ? 'bg-[#18191a]' : 'bg-[#5c0000]'}`}>
               {config.items.map((item) => (
@@ -166,7 +191,7 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                     ${isDark ? 'focus-visible:bg-[#3a3b3c] focus-visible:text-[#e4e6eb]' : 'focus-visible:bg-[#8a0f0f] focus-visible:text-[#fff3f3]'}
                   `}
                 >
-                    <span className="text-[16px] uppercase tracking-wider">{item.name}</span>
+                  <span className="text-[16px] uppercase tracking-wider">{item.name}</span>
                   <item.icon className={`h-5 w-5 transition-transform duration-200 group-hover:scale-110 group-active:scale-110 ${isDark ? 'text-[#b0b3b8]' : 'text-white/85'}`} />
                 </NavLink>
               ))}
@@ -185,36 +210,59 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
 
       <aside
         className={`
-          hidden lg:fixed lg:left-0 lg:z-40 lg:flex lg:w-72
-          ${isDark ? 'bg-[#18191a] border-[#3e4042]' : 'bg-[#E0E0E0] border-gray-300'} border-r lg:flex-col
+          hidden lg:fixed lg:left-0 lg:z-40 lg:flex lg:flex-col relative
+          ${isCollapsed ? 'lg:w-20' : 'lg:w-72'}
+          ${isDark ? 'bg-[#18191a] border-[#3e4042]' : 'bg-[#E0E0E0] border-gray-300'} border-r transition-all duration-300 ease-in-out
         `}
         style={{
           top: `${headerHeight}px`,
           height: `calc(100vh - ${headerHeight}px)`
         }}
       >
-        <div className="flex flex-col h-full z-9999">
-          <div className="p-6 shrink-0">
-            <div className="flex items-center gap-3">
-              <UserCircleIcon className={`w-14 h-14 lg:w-17 lg:h-17 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`} />
-              <div className="flex flex-col">
-                <h2 className={`font-black text-l leading-tight uppercase ${isDark ? 'text-[#e4e6eb]' : 'text-pup-maroon'}`}>
-                  {fullName}
-                </h2>
-                <span className={`text-xs font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{config.profileLabel(user) || 'Guest'}</span>
-              </div>
+        {/* Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className={`
+            hidden lg:flex absolute top-5 -right-3 z-50 items-center justify-center w-6 h-6 rounded-full border shadow-md transition-all duration-300 hover:scale-110
+            ${isDark
+              ? 'bg-[#18191a] border-[#3e4042] text-[#e4e6eb] hover:bg-[#3a3b3c]'
+              : 'bg-[#E0E0E0] border-gray-300 text-[#700000] hover:bg-white'}
+          `}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <ChevronRightIcon className="w-4 h-4 font-bold" />
+          ) : (
+            <ChevronLeftIcon className="w-4 h-4 font-bold" />
+          )}
+        </button>
+
+        <div className={`flex flex-col h-full z-9999 ${isCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
+          <div className={`shrink-0 transition-all duration-300 ${isCollapsed ? 'p-3' : 'p-6'}`}>
+            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+              <UserCircleIcon className={`transition-all duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-14 h-14 lg:w-17 lg:h-17'} ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`} />
+              {!isCollapsed && (
+                <div className="flex flex-col overflow-hidden transition-all duration-300">
+                  <h2 className={`font-black text-l leading-tight uppercase truncate ${isDark ? 'text-[#e4e6eb]' : 'text-pup-maroon'}`}>
+                    {fullName}
+                  </h2>
+                  <span className={`text-xs font-medium truncate ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{config.profileLabel(user) || 'Guest'}</span>
+                </div>
+              )}
             </div>
-            <hr className={`mt-6 ${isDark ? 'border-[#3e4042]' : 'border-gray-400'}`} />
+            {!isCollapsed && <hr className={`mt-6 ${isDark ? 'border-[#3e4042]' : 'border-gray-400'}`} />}
           </div>
 
-          <nav className="flex-1 px-4 py-3 space-y-3 overflow-y-auto custom-scrollbar">
+          <nav className={`flex-1 space-y-3 custom-scrollbar transition-all duration-300 ${isCollapsed ? 'px-2 py-3 overflow-visible' : 'px-4 py-3 overflow-y-auto'}`}>
             {config.items.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 onClick={onItemClick}
                 className={({ isActive }) => `
-                  group flex items-center gap-4 px-4 py-4 rounded-lg font-bold transition-all duration-200 outline-none
+                  group relative flex items-center rounded-lg font-bold transition-all duration-200 outline-none
+                  ${isCollapsed ? 'justify-center p-3' : 'gap-4 px-4 py-4'}
                   ${isActive
                     ? (isDark
                       ? 'bg-[#3a3b3c] text-[#e4e6eb] shadow-none hover:bg-[#4e4f50] active:bg-[#5a5b5c]'
@@ -225,24 +273,45 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                   ${isDark ? 'focus-visible:bg-[#3a3b3c] focus-visible:text-[#e4e6eb]' : 'focus-visible:bg-black/10 focus-visible:text-[#5c0000]'}
                 `}
               >
-                <item.icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110 group-active:scale-110" />
-                <span className="text-sm uppercase tracking-wider">{item.name}</span>
+                <item.icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110 group-active:scale-110 shrink-0" />
+                {!isCollapsed && <span className="text-sm uppercase tracking-wider truncate">{item.name}</span>}
+                {isCollapsed && (
+                  <span className={`pointer-events-none absolute left-full ml-4 z-50 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-lg border transition-all duration-200 opacity-0 translate-x-[-8px] scale-95 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 ${
+                    isDark
+                      ? 'bg-[#242526] text-[#e4e6eb] border-[#3e4042]'
+                      : 'bg-white text-[#700000] border-gray-200'
+                  }`}>
+                    {item.name}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
 
-          <div className="p-6 mt-auto shrink-0 lg:p-3 lg:px-4">
+          <div className={`mt-auto shrink-0 transition-all duration-300 ${isCollapsed ? 'p-2 overflow-visible' : 'p-6 lg:p-3 lg:px-4'}`}>
             <button
+              type="button"
               onClick={handleLogoutClick}
-              className={`flex items-center gap-2 text-white px-5 py-2 rounded transition-all mb-4 w-fit font-bold text-sm uppercase ${isDark ? 'bg-[#242526] shadow-none hover:bg-[#3a3b3c] active:bg-[#4e4f50] focus-visible:bg-[#3a3b3c]' : 'bg-pup-dark-maroon shadow-md hover:bg-[#3a0303] active:bg-[#4a0707] focus-visible:bg-[#3a0303]'}`}
+              className={`group relative flex items-center transition-all mb-4 font-bold text-sm uppercase ${isCollapsed ? 'justify-center w-full p-3 rounded-lg' : 'gap-2 px-5 py-2 rounded w-fit'} text-white ${isDark ? 'bg-[#242526] shadow-none hover:bg-[#3a3b3c] active:bg-[#4e4f50] focus-visible:bg-[#3a3b3c]' : 'bg-pup-dark-maroon shadow-md hover:bg-[#3a0303] active:bg-[#4a0707] focus-visible:bg-[#3a0303]'}`}
             >
-              <ArrowRightStartOnRectangleIcon className="w-5 h-5" />
-              Logout
+              <ArrowRightStartOnRectangleIcon className="w-5 h-5 shrink-0" />
+              {!isCollapsed && <span>Logout</span>}
+              {isCollapsed && (
+                <span className={`pointer-events-none absolute left-full ml-4 z-50 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-lg border transition-all duration-200 opacity-0 translate-x-[-8px] scale-95 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 ${
+                  isDark
+                    ? 'bg-[#242526] text-[#e4e6eb] border-[#3e4042]'
+                    : 'bg-white text-[#700000] border-gray-200'
+                }`}>
+                  Logout
+                </span>
+              )}
             </button>
-            <div className={`flex items-center justify-between text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
-              <span>RIS @ 2026</span>
-              <span>v. 1.0.1</span>
-            </div>
+            {!isCollapsed && (
+              <div className={`flex items-center justify-between text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
+                <span>RIS @ 2026</span>
+                <span>v. 1.0.1</span>
+              </div>
+            )}
           </div>
         </div>
       </aside>
