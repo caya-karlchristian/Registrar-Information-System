@@ -42,6 +42,7 @@ jobs:
           echo "DB_CONNECTION=sqlite" >> .env
           echo "DB_DATABASE=:memory:" >> .env
           echo "BROADCAST_CONNECTION=log" >> .env
+          echo "BROADCAST_DRIVER=log" >> .env
           echo "QUEUE_CONNECTION=sync" >> .env
           echo "CACHE_STORE=array" >> .env
           echo "SESSION_DRIVER=array" >> .env
