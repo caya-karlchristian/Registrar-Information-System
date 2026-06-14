@@ -91,21 +91,6 @@ const getDocumentNames = (request) => {
     .filter(Boolean);
 };
 
-const getHistoryRowsByRequestId = async () => {
-  // FE-4: history is embedded in each logbook row — no separate fetch needed.
-  const historyRows = toRows(historyRes.data);
-
-  return historyRows.reduce((acc, item) => {
-    const requestId = item?.request_id;
-    if (!requestId) return acc;
-
-    if (!acc[requestId]) acc[requestId] = [];
-    acc[requestId].push(item);
-
-    return acc;
-  }, {});
-};
-
 const fetchAllDocumentRequests = async () => {
   const allRequests = [];
   let page = 1;
@@ -431,15 +416,22 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
   if (!Array.isArray(docsToExport) || docsToExport.length === 0) {
     throw new Error('No document types found to export for the selected options.');
   }
-  let [requests, latestHistoryByRequestId, allDocumentTypesRes, allCertificationsRes] = await Promise.all([
+  const [logbookRes, allDocumentTypesRes, allCertificationsRes] = await Promise.all([
     getLogbookData(), // FE-4: returns completed requests with embedded history
-    getHistoryRowsByRequestId(),
     (async () => { try { return await getDocumentTypes(); } catch (_) { return { data: [] }; } })(),
     (async () => { try { return await getCertifications(); } catch (_) { return { data: [] }; } })(),
   ]);
 
+  const requestsRaw = toRows(logbookRes);
+  const latestHistoryByRequestId = {};
+  requestsRaw.forEach((req) => {
+    if (req?.request_id) {
+      latestHistoryByRequestId[req.request_id] = Array.isArray(req.history) ? req.history : [];
+    }
+  });
+
   const seenRequestIds = new Set();
-  requests = requests.filter((req) => {
+  let logbookRequests  = requestsRaw.filter((req) => {
     const id = req?.request_id;
     if (seenRequestIds.has(id)) return false;
     seenRequestIds.add(id);
@@ -472,7 +464,7 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
       return certs.map((c) => (c.certification_type?.certificate_name ?? c.certificate_name ?? c.name ?? '')).filter(Boolean).map(s => String(s).trim().toLowerCase());
     };
 
-    const matchingRequests = requests.filter((request) => {
+    const matchingRequests = logbookRequests.filter((request) => {
       const docNames = getDocumentNames(request).map(s => String(s).trim().toLowerCase());
       const certNames = getCertificateNames(request);
       const target = String(docName).trim().toLowerCase();

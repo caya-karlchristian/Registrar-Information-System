@@ -64,15 +64,14 @@ const FloatingActionMenu = () => {
     >
       {/* Submenu items */}
       <div
-        className={`flex flex-col gap-3 mb-1 transition-all duration-300 transform origin-bottom ${
-          isOpen
+        className={`flex flex-col gap-3 mb-1 transition-all duration-300 transform origin-bottom ${isOpen
             ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
             : "opacity-0 translate-y-4 scale-75 pointer-events-none"
-        }`}
+          }`}
       >
         {/* Accessibility Submenu Option */}
-        <div className="flex items-center gap-3 justify-end group">
-          <span className="bg-gray-900/90 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+        <div className="flex items-center justify-end relative group">
+          <span className="absolute right-16 bg-gray-900/90 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
             Accessibility Options
           </span>
           <button
@@ -103,17 +102,16 @@ const FloatingActionMenu = () => {
         </div>
 
         {/* Voice Speech Submenu Option */}
-        <div className="flex items-center gap-3 justify-end group">
-          <span className="bg-gray-900/90 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-            Voice Navigation
+        <div className="flex items-center justify-end relative group">
+          <span className="absolute right-16 bg-gray-900/90 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+            Voice Speech
           </span>
           <button
             onClick={handleVoiceSpeechClick}
-            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-yellow-400 ${
-              isVoiceAnimating
+            className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-yellow-400 ${isVoiceAnimating
                 ? "bg-pup-yellow text-[#800000] scale-110"
                 : "bg-pup-dark-maroon text-white hover:bg-[#500000]"
-            }`}
+              }`}
             aria-label="Voice Speech"
             title="Voice Speech"
             disabled={isVoiceAnimating}
@@ -148,9 +146,8 @@ const FloatingActionMenu = () => {
         className="w-14 h-14 rounded-full bg-pup-dark-maroon hover:bg-[#500000] text-white flex items-center justify-center shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-yellow-400/50"
       >
         <span
-          className={`transform transition-transform duration-300 ${
-            isOpen ? "rotate-45" : "rotate-0"
-          }`}
+          className={`transform transition-transform duration-300 ${isOpen ? "rotate-45" : "rotate-0"
+            }`}
         >
           <svg
             className="w-7 h-7"
