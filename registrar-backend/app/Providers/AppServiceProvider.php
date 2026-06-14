@@ -2,11 +2,14 @@
 
 namespace App\Providers;
 
+use App\Contracts\AlumniSystemClientInterface;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Contracts\NotificationServiceInterface;
 use App\Models\NotificationType;
 use App\Observers\NotificationTypeObserver;
 use App\Services\AuditLogger;
+use App\Services\Alumni\AlumniSystemClient;
+use App\Services\Alumni\FakeAlumniSystemClient;
 use App\Services\DocumentRequestService;
 use App\Services\NotificationService;
 use Illuminate\Support\ServiceProvider;
@@ -31,6 +34,17 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             NotificationServiceInterface::class,
             NotificationService::class,
+        );
+
+        // Alumni System client — swap between real HTTP and fake based on env.
+        // Set ALUMNI_MOCK=true in .env (or docker-compose environment) to use
+        // hardcoded dummy data instead of calling PUPTAPS.
+        // Production: ALUMNI_MOCK=false (or omit entirely — defaults to false).
+        $this->app->bind(
+            AlumniSystemClientInterface::class,
+            env('ALUMNI_MOCK', false)
+                ? FakeAlumniSystemClient::class
+                : AlumniSystemClient::class,
         );
 
         // AuditLogger is a concrete class — no interface needed.
