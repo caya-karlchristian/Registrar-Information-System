@@ -272,3 +272,22 @@
   font-weight: bold;
   font-style: italic;
 }
+
+@media (min-width: 1024px) {
+  html.sidebar-collapsed main {
+    margin-left: 5rem !important;
+  }
+}
+
+.modal-overlay-container {
+  transition: padding-left 300ms ease-in-out;
+}
+
+@media (min-width: 1024px) {
+  .modal-overlay-container {
+    padding-left: 18rem; /* lg:pl-72 equivalent */
+  }
+  html.sidebar-collapsed .modal-overlay-container {
+    padding-left: 5rem; /* lg:pl-20 equivalent */
+  }
+}
