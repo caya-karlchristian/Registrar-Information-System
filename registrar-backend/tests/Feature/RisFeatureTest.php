@@ -32,6 +32,10 @@ function makeUser(int $roleId): SystemUser
 function seedReferenceData(): array
 {
     $status  = RequestStatus::firstOrCreate(['status_id' => 1], ['status_name' => 'Processing']);
+    RequestStatus::firstOrCreate(['status_id' => 2], ['status_name' => 'Ready to Claim']);
+    RequestStatus::firstOrCreate(['status_id' => 3], ['status_name' => 'Completed']);
+    RequestStatus::firstOrCreate(['status_id' => 4], ['status_name' => 'Forfeited']);
+    RequestStatus::firstOrCreate(['status_id' => 5], ['status_name' => 'Cancelled']);
     $purpose = RequestPurpose::firstOrCreate(['request_purpose_id' => 1], ['purpose_name' => 'DFA']);
     $docType = DocumentType::firstOrCreate(
         ['document_type_id' => 1],
