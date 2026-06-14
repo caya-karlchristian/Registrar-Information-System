@@ -9,4 +9,5 @@ docker-compose.dev.yml
 registrar-frontend/certs/
 /vendor/
 /node_modules/
-/storage/logs/
+/storage/logs/*.bak
+*.bak_*
