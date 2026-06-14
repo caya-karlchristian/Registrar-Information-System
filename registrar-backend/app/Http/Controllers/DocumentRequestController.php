@@ -193,18 +193,21 @@ class DocumentRequestController extends Controller
                 // Mock mode returns an empty items array, which skips all checks
                 // gracefully — every item passes when there is nothing to match against.
                 $cashierItems = $verification['data']['items'] ?? [];
+                $isMock       = $verification['data']['_mock'] ?? false;
 
-                $matchResult = $this->documentMatcher->match(
-                    cashierItems: $cashierItems,
-                    documents:    $validated['documents']    ?? [],
-                    certificates: $validated['certificates'] ?? [],
-                );
+                if (!$isMock) {
+                    $matchResult = $this->documentMatcher->match(
+                        cashierItems: $cashierItems,
+                        documents:    $validated['documents']    ?? [],
+                        certificates: $validated['certificates'] ?? [],
+                    );
 
-                if (!$matchResult['valid']) {
-                    return response()->json([
-                        'message' => $matchResult['message'],
-                        'errors'  => $matchResult['errors'],
-                    ], 422);
+                    if (!$matchResult['valid']) {
+                        return response()->json([
+                            'message' => $matchResult['message'],
+                            'errors'  => $matchResult['errors'],
+                        ], 422);
+                    }
                 }
             }
         }
