@@ -11,7 +11,6 @@ import ErrorToast from "../components/ErrorToast";
 import { useTheme } from "../context/ThemeContext";
 import { ReportTableSkeleton } from '../components/LoadingSkeleton';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { formatLabel } from '../utils/helpers.jsx';
 
 const PER_PAGE = 10;
 
@@ -122,7 +121,7 @@ const ReportManagement = () => {
           <DropDown label="Role" name="roleFilter"
             value={roleFilter === "All" ? "" : roleFilter}
             onChange={(e) => { setRoleFilter(e.target.value || "All"); handleFilterChange(); }}
-            options={roleOptions.map(r => formatLabel(r))} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
+            options={roleOptions} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
           />
         </div>
 
@@ -130,7 +129,7 @@ const ReportManagement = () => {
           <DropDown label="Action" name="actionFilter"
             value={actionFilter === "All" ? "" : actionFilter}
             onChange={(e) => { setActionFilter(e.target.value || "All"); handleFilterChange(); }}
-            options={actionOptions.map(a => formatLabel(a))} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
+            options={actionOptions} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
           />
         </div>
 
@@ -186,13 +185,13 @@ const ReportManagement = () => {
 
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${isDark ? 'bg-[#3a2b2b]/20 text-[#ffb3b3] border-[#7a4b4b]' : 'bg-red-50 text-red-400/60 border-red-200'}`}>
-                      {formatLabel(log.role)}
+                      {log.role}
                     </span>
                   </td>
 
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] border-[#3e4042]' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                      {formatLabel(log.action)}
+                      {log.action}
                     </span>
                   </td>
 
