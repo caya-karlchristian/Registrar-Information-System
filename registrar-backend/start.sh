@@ -13,7 +13,7 @@ if [ ! -L public/storage ] && [ ! -e public/storage ]; then
 fi
 
 # Run migrations
-php artisan migrate --force
+php artisan migrate --force || true
 
 # Clear and cache config
 php artisan optimize
