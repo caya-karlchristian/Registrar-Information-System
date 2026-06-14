@@ -18,7 +18,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, type = 
   const btnLabel  = isDanger ? 'Delete' : isConfirm ? 'Confirm' : 'Logout';
 
   return (
-    <div className="fixed inset-0 z-10000 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-20 flex modal-overlay-container items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className={`w-100 h-80 rounded-2xl shadow-2xl flex flex-col items-center justify-between p-7 animate-in fade-in zoom-in duration-200 ${isDark ? 'bg-[#242526] border border-[#3e4042] text-[#e4e6eb]' : 'bg-white'}`}>
 
         <div className={`p-4 rounded-full ${iconClass}`}>

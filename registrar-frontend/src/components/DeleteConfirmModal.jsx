@@ -12,7 +12,7 @@ const DeleteConfirmModal = ({
   if (!open) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center ${isDark ? 'bg-black/70' : 'bg-black/40'}`}>
+    <div className={`fixed inset-0 z-20 modal-overlay-container flex items-center justify-center ${isDark ? 'bg-black/70' : 'bg-black/40'}`}>
       <div className={`rounded-xl shadow-xl w-full max-w-md p-6 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
 
         <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>
