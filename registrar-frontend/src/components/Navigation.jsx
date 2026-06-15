@@ -62,7 +62,7 @@ const ROLE_CONFIG = {
     profileKey: null,
     profileLabel: (user) => user?.email,
     items: [
-      { name: 'User Management', to: 'user', icon: Squares2X2Icon },
+      { name: 'User Directory', to: 'user', icon: Squares2X2Icon },
       { name: 'Document Management', to: 'documents', icon: TableCellsIcon },
       { name: 'Certificate Management', to: 'certificates', icon: AcademicCapIcon },
       { name: 'Report Management', to: 'report', icon: UserCircleIcon },
