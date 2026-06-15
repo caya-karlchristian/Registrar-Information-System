@@ -63,7 +63,9 @@ class DocumentRequestController extends Controller
         }
 
         // Staff: potentially thousands of rows — keep pagination.
-        return response()->json($query->orderByDesc('requested_at')->paginate(20), 200);
+        $perPage = min((int) request()->query('per_page', 20), 200); // cap at 200
+        
+        return response()->json($query->orderByDesc('requested_at')->paginate($perPage), 200);
     }
 
 
@@ -105,7 +107,7 @@ class DocumentRequestController extends Controller
     }
 
     // -------------------------------------------------------------------------
-    // GET /document-requests/{id}
+    // GET /document-requests/{documentRequest}
     // -------------------------------------------------------------------------
     public function show(DocumentRequest $documentRequest)
     {

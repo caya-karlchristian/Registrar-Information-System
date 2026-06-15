@@ -99,7 +99,7 @@ const StaffDashboard = () => {
     try {
       if (showOverlay) setLoading(true);
       const [requestsRes, statusesRes] = await Promise.all([
-        getDocumentRequests(),
+        getDocumentRequests({ per_page: 200 }),
         getRequestStatuses(),
       ]);
 

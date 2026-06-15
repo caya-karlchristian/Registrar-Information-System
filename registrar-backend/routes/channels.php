@@ -3,6 +3,10 @@
 use Illuminate\Support\Facades\Broadcast;
 use App\Models\SystemUser;
 
+if (app()->environment('testing')) {
+    return;
+}
+
 /*
 |--------------------------------------------------------------------------
 | PRIVATE CHANNEL: notifications.{userId}
