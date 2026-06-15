@@ -105,7 +105,7 @@ class DocumentRequestController extends Controller
     }
 
     // -------------------------------------------------------------------------
-    // GET /document-requests/{id}
+    // GET /document-requests/{documentRequest}
     // -------------------------------------------------------------------------
     public function show(DocumentRequest $documentRequest)
     {
