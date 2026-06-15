@@ -62,6 +62,7 @@ services:
       CASHIER_API_URL: ${CASHIER_API_URL}
       CASHIER_SINGLE_USE: ${CASHIER_SINGLE_USE}
       ALUMNI_MOCK: ${ALUMNI_MOCK}
+      TELESCOPE_ENABLED: ${TELESCOPE_ENABLED:-false}
     ports:
       - "8000:8000"
     networks:
