@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, ClockIcon  } from '@heroicons/react/24/outline';
 import { getDocumentTypes } from '../services/api';
-import LoadingOverlay from '../components/LoadingOverlay.jsx';
+import { DocumentListSkeleton } from '../components/LoadingSkeleton';
 import { useTheme } from '../context/ThemeContext';
 
 const ensureArray = (data) => {
@@ -41,8 +41,7 @@ const AlumniDocumentList = () => {
   };
 
   return (
-      <div className="w-full pb-10 relative">      
-        <LoadingOverlay isVisible={loading} message="Loading Documents..." />
+      <div className="w-full pb-10">    
         {/* --- HEADER --- */}
         <div className={`mb-8 border-b-2 pb-6 ${isDark ? 'border-yellow-600/30' : 'border-[#4a120e]/10'}`}>
           <h1 className={`text-3xl font-black uppercase tracking-tighter ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
@@ -52,7 +51,9 @@ const AlumniDocumentList = () => {
 
         {/* --- FIXED GRID LAYOUT --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {documents.length === 0 && !loading ? (
+          {loading ? (
+            <DocumentListSkeleton isDark={isDark} />
+          ) : documents.length === 0 ? (
             <p className={`italic col-span-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>No documents available.</p>
           ) : (
           documents.map((doc) => {
