@@ -54,6 +54,10 @@ jobs:
           echo "REVERB_SCHEME=http" >> .env
           echo "ALUMNI_MOCK=true" >> .env
           echo "CASHIER_API_KEY=" >> .env
+          echo "SSO_BASE_URL=http://localhost" >> .env
+          echo "SSO_CLIENT_ID=test-client" >> .env
+          echo "SSO_CLIENT_SECRET=test-secret" >> .env
+          echo "ANTHROPIC_API_KEY=" >> .env
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts
