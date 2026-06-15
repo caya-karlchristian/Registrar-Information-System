@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Services\Alumni\AlumniSystemClient;
 use Illuminate\Http\Request;
+use App\Contracts\AlumniSystemClientInterface;
 
 class AlumniSystemController extends Controller
 {
-    public function __construct(private AlumniSystemClient $client) {}
+    public function __construct(private AlumniSystemClientInterface $client) {}
 
     public function index(Request $request)
     {

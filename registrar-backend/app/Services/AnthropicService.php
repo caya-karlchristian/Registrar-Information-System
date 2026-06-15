@@ -25,13 +25,13 @@ class AnthropicService
     private const API_URL     = 'https://api.anthropic.com/v1/messages';
     private const API_VERSION = '2023-06-01';
 
-    private string $apiKey;
+    private string $apiKey = '';
     private string $model;
 
     public function __construct()
     {
         $this->apiKey = config('services.anthropic.api_key', '');
-        $this->model  = config('services.anthropic.model', 'claude-sonnet-4-20250514');
+        $this->model  = config('services.anthropic.model', 'claude-haiku-4-5-20251001');
     }
 
     /**
@@ -49,6 +49,64 @@ class AnthropicService
         }
 
         return $this->callClaudeApi($stats);
+    }
+
+    // -------------------------------------------------------------------------
+    // Multi-turn chat (Phase 3)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Send a multi-turn conversation to Claude and return the assistant reply.
+     *
+     * @param  string $systemPrompt  Pre-built system prompt with analytics context
+     * @param  array  $messages      Full conversation: [['role'=>…,'content'=>…], …]
+     * @return string                Assistant reply text
+     */
+    public function chat(string $systemPrompt, array $messages): string
+    {
+        if (empty($this->apiKey)) {
+            return $this->mockChatReply($messages);
+        }
+
+        $response = Http::withHeaders([
+            'x-api-key'         => $this->apiKey,
+            'anthropic-version' => self::API_VERSION,
+            'Content-Type'      => 'application/json',
+        ])->timeout(60)->post(self::API_URL, [
+            'model'      => $this->model,
+            'max_tokens' => 1024,
+            'system'     => $systemPrompt,
+            'messages'   => $messages,
+        ]);
+
+        if ($response->failed()) {
+            Log::error('Anthropic chat API error', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+            throw new \RuntimeException(
+                'AI service returned an error. Please try again later.'
+            );
+        }
+
+        return $response->json('content.0.text', 'No response generated.');
+    }
+
+    private function mockChatReply(array $messages): string
+    {
+        $last = end($messages);
+        $q    = strtolower($last['content'] ?? '');
+
+        if (str_contains($q, 'processing time') || str_contains($q, 'turnaround')) {
+            return '[Preview] Average processing time data is available in the analytics context. '
+                . 'Set ANTHROPIC_API_KEY in registrar-backend/.env for a real AI answer.';
+        }
+        if (str_contains($q, 'forfeit')) {
+            return '[Preview] Forfeit rate statistics are shown in the overview section. '
+                . 'Add ANTHROPIC_API_KEY to enable live AI responses.';
+        }
+        return '[Preview Mode] This response is a mock. '
+            . 'Add ANTHROPIC_API_KEY to registrar-backend/.env to enable live AI answers.';
     }
 
     // -------------------------------------------------------------------------

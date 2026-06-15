@@ -29,8 +29,16 @@ return [
     ],
 
     'anthropic' => [
-        'api_key' => env('ANTHROPIC_API_KEY'),
-        'model'   => env('ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'),
+        'api_key' => env('ANTHROPIC_API_KEY', ''),
+        'model'   => env('ANTHROPIC_MODEL', 'claude-sonnet-4-5-20250929'),
+    ],
+
+    'cashier' => [
+        'api_key'     => env('CASHIER_API_KEY', ''),
+        'url'         => env('CASHIER_API_URL', 'https://puptec.ojt-ims-bsit.net/api/verify-payment'),
+        // single_use: when true, each OR number can only be used once.
+        // Set to false during development/testing to reuse OR numbers.
+        'single_use'  => env('CASHIER_SINGLE_USE', false),
     ],
 
     'slack' => [

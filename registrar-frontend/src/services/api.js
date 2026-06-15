@@ -62,6 +62,11 @@ export const getRequestStatus   = (id) => api.get(`/request-statuses/${id}`);
 export const getRequestPurposes = () => api.get("/request-purposes");
 
 // -------------------------------------------------------
+// PROGRAMS (read-only — populated automatically on student login)
+// -------------------------------------------------------
+export const getPrograms = () => api.get("/programs");
+
+// -------------------------------------------------------
 // DOCUMENT TYPES (read: all | write: Admin+)
 // -------------------------------------------------------
 export const getDocumentTypes  = ()          => api.get("/document-types");
@@ -90,6 +95,7 @@ export const uploadCertificationLayoutLogo = (id, formData) =>
 // Read records from response.data.data, not response.data.
 // -------------------------------------------------------
 export const getDocumentRequests  = (params = {}) => api.get("/document-requests", { params });
+export const getLogbookData       = ()          => api.get("/document-requests/logbook");
 export const getDocumentRequest   = (id)          => api.get(`/document-requests/${id}`);
 export const createDocumentRequest = (data)       => api.post("/document-requests", data);
 export const updateDocumentRequest = (id, data)   => api.put(`/document-requests/${id}`, data);
@@ -117,6 +123,7 @@ export const getAnalyticsProcessingTime = (params = {}) => api.get("/analytics/p
 export const getAnalyticsPeakHours     = (params = {}) => api.get("/analytics/peak-hours",         { params });
 export const getAnalyticsByPurpose     = (params = {}) => api.get("/analytics/by-purpose",         { params });
 export const postAnalyticsAiReport     = (params = {}) => api.post("/analytics/ai-report", {},     { params });
+export const postAnalyticsAiQuery      = (body  = {}) => api.post("/analytics/ai-query",  body);
 
 // -------------------------------------------------------
 // ANNOUNCEMENTS (read: all authenticated | write: Super Admin)

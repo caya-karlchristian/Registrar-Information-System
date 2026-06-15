@@ -9,10 +9,11 @@ use App\Models\Alumni;
 use App\Models\AlumniProfile;
 use App\Models\AlumniType;
 use App\Models\AlumniAcademicRecord;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class SystemUser extends Authenticatable
 {
-    use HasApiTokens;
+    use HasApiTokens, HasFactory;
 
     protected $table = 'users';
     protected $primaryKey = 'user_id';
@@ -43,9 +44,10 @@ class SystemUser extends Authenticatable
         'email',
         'password',
         'role_id',   // needed when creating users programmatically
-        'status', 
-        'idp_user_id',  
+        'status',
+        'idp_user_id',
         'idp_access_token',
+        'local_auth_enabled', // 1 = local bcrypt password is active and usable as IDP fallback
     ];
 
     protected $hidden = [
@@ -176,5 +178,10 @@ class SystemUser extends Authenticatable
     public function adminProfile()
     {
         return $this->hasOne(AdminProfile::class, 'user_id', 'user_id');
+    }
+
+    protected static function newFactory()
+    {
+        return \Database\Factories\SystemUserFactory::new();
     }
 }

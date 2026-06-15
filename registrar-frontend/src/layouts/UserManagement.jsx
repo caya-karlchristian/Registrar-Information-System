@@ -5,6 +5,7 @@ import {
   PlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
 import DropDown from '../components/DropDown';
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
@@ -14,6 +15,7 @@ import { getSystemUsers, createSystemUser, updateSystemUser, deleteSystemUser } 
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import { useTheme } from "../context/ThemeContext";
+import { UserTableSkeleton } from '../components/LoadingSkeleton';
 
 const ROLE_MAP     = { 3: "Admin", 4: "Super Admin" };
 const ROLE_FILTERS = ["All", "Admin", "Super Admin"];
@@ -32,8 +34,7 @@ const getRoleBadgeClasses = (roleName, isDark) => {
   if (isDark) {
     return 'bg-[#3a2b2b]/20 text-[#ffb3b3] border-[#7a4b4b]';
   }
-
-  return 'bg-red-50 text-pup-dark-maroon border-red-200';
+    return 'bg-red-50 text-red-400/60 border-red-200';
 };
 
 const getStatusBadgeClasses = (status, isDark) => {
@@ -178,8 +179,8 @@ const UserManagement = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
-
+    <div className={`font-sans items-center flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+      <div className="w-full max-w-6xl flex flex-col">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-6">
 
@@ -243,10 +244,24 @@ const UserManagement = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className={`text-center py-16 text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>Loading...</td></tr>
+              <UserTableSkeleton isDark={isDark} count={10} />            
             ) : paginated.length === 0 ? (
-              <tr><td colSpan={7} className={`text-center py-16 text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>No users found.</td></tr>
-            ) : (
+            <tr>
+                <td colSpan={7} className="py-24">
+                  <div className="flex flex-col items-center justify-center">
+                    <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
+                      <MagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
+                    </div>
+                    <h3 className={`text-base font-bold mb-1 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                      No Records Found
+                    </h3>
+                    <p className={`text-xs text-center max-w-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                      No data matches your current search or filter criteria.
+                    </p>
+                  </div>
+                </td>
+              </tr>            
+              ) : (
               paginated.map((user) => {
                 const profile = user.admin_profile;
                 const fullName = profile
@@ -345,6 +360,7 @@ const UserManagement = () => {
         message={errorMsg} 
         onClose={() => setErrorMsg("")} 
       />
+    </div>
     </div>
   );
 };

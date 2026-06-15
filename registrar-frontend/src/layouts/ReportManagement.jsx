@@ -9,6 +9,8 @@ import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import { getAuditLogs, getAuditLogFilters } from "../services/api";
 import ErrorToast from "../components/ErrorToast";
 import { useTheme } from "../context/ThemeContext";
+import { ReportTableSkeleton } from '../components/LoadingSkeleton';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 const PER_PAGE = 10;
 
@@ -88,7 +90,7 @@ const ReportManagement = () => {
     setCurrentPage(1);
     setShowConfirm(false);
     await fetchLogs();  // ← force a fresh fetch
-};
+  };
 
   const pageNumbers = () => {
     if (totalPages <= 6) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -100,8 +102,8 @@ const ReportManagement = () => {
   };
 
   return (
-    <div className={`mt-5 min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
-
+    <div className={`font-sans px-4 sm:px-6 py-4 flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+      <div className="w-full max-w-6xl flex flex-col">
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-6">
 
         <div className="mt-6 sm:mt-12 flex-1 min-w-0 sm:min-w-45 sm:max-w-xs">
@@ -152,15 +154,23 @@ const ReportManagement = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={5} className={`text-center py-16 text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
-                  Loading...
-                </td>
-              </tr>
+              <ReportTableSkeleton isDark={isDark} count={10} />
             ) : logs.length === 0 ? (
               <tr>
-                <td colSpan={5} className={`text-center py-16 text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
-                  No logs found.
+                <td colSpan={5} className="py-20">
+                  <div className="flex flex-col items-center justify-center">
+                    {/* Icon container */}
+                    <div className={`w-16 h-16 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/50' : 'bg-gray-100'}`}>
+                      <MagnifyingGlassIcon className={`w-8 h-8 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
+                    </div>
+                    {/* Text */}
+                    <h3 className={`text-sm font-bold mb-1 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                      No Logs Found
+                    </h3>
+                    <p className={`text-xs ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>
+                      No audit entries match your current search or filters.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -174,13 +184,13 @@ const ReportManagement = () => {
                   <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>{log.user}</td>
 
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${isDark ? 'bg-[#3a2b2b]/20 text-[#ffb3b3] border-[#7a4b4b]' : 'bg-red-50 text-pup-dark-maroon border-red-200'}`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${isDark ? 'bg-[#3a2b2b]/20 text-[#ffb3b3] border-[#7a4b4b]' : 'bg-red-50 text-red-400/60 border-red-200'}`}>
                       {log.role}
                     </span>
                   </td>
 
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] border-[#3e4042]' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] border-[#3e4042]' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                       {log.action}
                     </span>
                   </td>
@@ -227,6 +237,7 @@ const ReportManagement = () => {
         message={errorMsg} 
         onClose={() => setErrorMsg("")} 
       />
+    </div>
     </div>
   );
 };

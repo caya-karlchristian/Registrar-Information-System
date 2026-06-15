@@ -50,7 +50,7 @@ class OcmsClient
             return null;
         }
 
-        [$body, $status, $error] = $this->get("/api/external/admin-profiles/{$adminId}");
+        [$body, $status, $error] = $this->get("/api/external/admins/{$adminId}");
 
         if ($error) {
             Log::warning('OcmsClient: connection error fetching admin profile', [
@@ -75,6 +75,13 @@ class OcmsClient
                 "OCMS returned {$status} for admin-profiles/{$adminId}",
                 $status
             );
+        }
+
+        if ($status === 429) {
+            Log::warning('OcmsClient: rate limited by OCMS — skipping profile fetch', [
+                'admin_id' => $adminId,
+            ]);
+            return null;
         }
 
         $decoded = json_decode($body, true);
@@ -156,8 +163,8 @@ class OcmsClient
     {
         return [
             'Accept: application/json',
-            'X-Client-ID: '     . $this->clientId,
-            'X-Client-Secret: ' . $this->clientSecret,
+            'Authorization: Bearer ' . $this->clientSecret,
+            'X-External-System: '    . $this->clientId,
         ];
     }
 

@@ -16,6 +16,7 @@ import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
 import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx';
 import StaffDashboard from './layouts/StaffDashboard.jsx';
 import Logbook from './layouts/Logbook.jsx';
+import WalkInRequest from './layouts/WalkInRequest.jsx';
 import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx'; 
 import MainPage from './layouts/MainPage.jsx';
@@ -40,6 +41,7 @@ import NotificationToast from './components/NotificationToast.jsx';
 import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ReferenceDataProvider } from './context/ReferenceDataContext.jsx';
 import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
+import FloatingActionMenu from './components/FloatingActionMenu.jsx';
 
 
 const App = () => {
@@ -102,6 +104,9 @@ const App = () => {
           >
             <Route index element={<StaffDashboard />} />
             <Route path="dashboard" element={<StaffDashboard />} />
+            <Route path="request" element={<WalkInRequest />} />
+            <Route path="request/student" element={<RequestForm showProfileStep />} />
+            <Route path="request/alumni" element={<AlumniRequest showProfileStep />} />
             <Route path="analytics" element={<AnalyticsDashboard />} />
             <Route path="logbook" element={<Logbook />} />
             <Route path="profile" element={<ProfilePage userType="admin" />} />
@@ -133,6 +138,7 @@ const App = () => {
 
         {/* Global toast stack — rendered outside Routes so it persists across navigation */}
         <NotificationToast />
+        <FloatingActionMenu />
       </div>
     </NotificationsProvider>
     </ReferenceDataProvider>

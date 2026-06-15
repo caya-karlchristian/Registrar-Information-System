@@ -5,12 +5,13 @@ namespace App\Services\Alumni;
 use App\DTOs\Alumni\AlumniDTO;
 use App\Exceptions\AlumniSystemException;
 use Illuminate\Support\Facades\Log;
+use App\Contracts\AlumniSystemClientInterface;
 
 /**
  * HTTP client for the PUP Alumni System (PUPTAPS) API.
  * Uses a static Bearer token — no OAuth flow needed.
  */
-class AlumniSystemClient
+class AlumniSystemClient implements AlumniSystemClientInterface
 {
     private string $baseUrl;
     private string $token;
