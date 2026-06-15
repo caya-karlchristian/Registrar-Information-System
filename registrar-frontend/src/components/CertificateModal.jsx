@@ -30,6 +30,20 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   const [visible, setVisible] = useState(false);
   const [opening, setOpening] = useState(true);
   const [editLoading, setEditLoading] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(101);
+
+  useEffect(() => {
+    const headerElement = document.querySelector('header');
+    if (!headerElement) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setHeaderHeight(entry.target.offsetHeight);
+      }
+    });
+    resizeObserver.observe(headerElement);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 10);
@@ -72,7 +86,7 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   };
 
   return (
-    <div id="cert-modal-root" role="dialog" aria-modal="true" className="fixed inset-0 z-9998 mb-2">
+    <div id="cert-modal-root" role="dialog" aria-modal="true" className="fixed inset-0 z-20 mb-2">
       {/* Dim Overlay - Native div with keyboard support */}
       <div
         id="cert-modal-overlay"
@@ -86,12 +100,12 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
       {/* Slide-in Panel */}
       <div
         id="cert-modal-panel"
-        className={`fixed top-0 bottom-0 left-0 right-0 md:top-15 lg:left-72 bg-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed bottom-0 left-0 right-0 lg:left-72 bg-white dark:bg-[#18191a] flex flex-col shadow-2xl transition-all duration-300 ease-in-out ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
-        style={{ zIndex: 9999 }}
+        style={{ zIndex: 9999, top: `${headerHeight}px` }}
       >
-        <div id="cert-modal-content" className="flex-1 overflow-auto h-full bg-white">
+        <div id="cert-modal-content" className="flex-1 overflow-auto h-full bg-white dark:bg-[#18191a]">
           <GenerateCertification
             key={selectedCert}
             initialData={initialData}

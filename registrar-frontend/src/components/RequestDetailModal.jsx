@@ -51,7 +51,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
   const displayStatus = request.status?.status_name || request.status || 'N/A';
 
   return (
-    <div className="fixed inset-x-0 top-25 pt-10 md:pt-10 bottom-0 pb-5 z-50 flex items-start justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm overflow-hidden lg:top-24 lg:left-72 lg:w-[calc(100vw-18rem)] lg:bottom-0 lg:items-start lg:justify-center">
+    <div className="fixed inset-0 pt-30 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 modal-overlay-container">
       <div className={`rounded-xl sm:rounded-2xl shadow-2xl w-[95vw] sm:w-full sm:max-w-2xl lg:max-w-4xl md:max-h-[calc(100vh-180px)] flex flex-col h-full sm:h-auto max-h-full sm:max-h-[calc(100vh-110px)] lg:max-h-[calc(100vh-180px)] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none mx-auto my-0 sm:my-4 lg:my-4 ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
         {/* Header */}
