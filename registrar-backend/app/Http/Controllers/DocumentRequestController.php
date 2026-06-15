@@ -64,7 +64,27 @@ class DocumentRequestController extends Controller
 
         // Staff: potentially thousands of rows — keep pagination.
         $perPage = min((int) request()->query('per_page', 20), 200); // cap at 200
-        
+
+        // By default the dashboard only shows actionable work: Processing, ReadyToClaim,
+        // and Completed requests that are less than 1 day old.  Forfeited, Cancelled, and
+        // older Completed records are omitted unless the caller passes ?all_statuses=1
+        // (used when the frontend has an explicit status filter or search active).
+        $allStatuses = filter_var(request()->query('all_statuses', false), FILTER_VALIDATE_BOOLEAN);
+
+        if (!$allStatuses) {
+            $cutoff = now()->subDay();
+
+            $query->where(function ($q) use ($cutoff) {
+                // Processing (1) and ReadyToClaim (2) — always visible
+                $q->whereHas('status', fn ($s) => $s->whereIn('status_name', ['Processing', 'Ready to Claim']))
+                  // Completed (3) within the last 24 hours
+                  ->orWhere(function ($q2) use ($cutoff) {
+                      $q2->whereHas('status', fn ($s) => $s->where('status_name', 'Completed'))
+                         ->where('requested_at', '>=', $cutoff);
+                  });
+            });
+        }
+
         return response()->json($query->orderByDesc('requested_at')->paginate($perPage), 200);
     }
 
