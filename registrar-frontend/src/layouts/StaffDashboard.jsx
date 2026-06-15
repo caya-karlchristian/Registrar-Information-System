@@ -396,7 +396,7 @@ const StaffDashboard = () => {
   };
 
   return (
-    <div className={`relative min-h-screen pb-10 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5] text-gray-900'}`}>
+    <div className={`relative ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5] text-gray-900'}`}>
       <main className={`max-w-7xl mx-auto px-4 sm:px-6 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
         <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
         <LineLoading isVisible={actionLoading} />

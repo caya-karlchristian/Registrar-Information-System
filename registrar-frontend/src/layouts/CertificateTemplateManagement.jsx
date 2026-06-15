@@ -143,37 +143,12 @@ const CertificatePreviewCanvas = ({ layout, certId }) => {
   );
 };
 
-const PreviewModal = ({ isOpen, onClose, layout, certId }) => {
-  const { isDark } = useTheme();
-  if (!isOpen) return null;
-
-  return (
-    <div className={`fixed inset-0 z-9999 p-4 sm:p-8 ${isDark ? 'bg-black/75' : 'bg-black/55'}`}>
-      <div className={`mx-auto flex h-full max-w-6xl flex-col rounded-2xl shadow-2xl ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
-        <div className={`flex items-center justify-between border-b p-4 ${isDark ? 'border-[#3e4042]' : 'border-gray-200'}`}>
-          <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-[#4b1f16]'}`}>Certificate Modal Preview</h3>
-          <button
-            onClick={onClose}
-            className={`rounded-md px-3 py-1.5 text-sm font-semibold ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-          >
-            Close
-          </button>
-        </div>
-        <div className={`flex-1 overflow-auto p-4 sm:p-8 ${isDark ? 'bg-[#18191a]' : 'bg-gray-100'}`}>
-          <CertificatePreviewCanvas layout={layout} certId={certId} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const CertificateTemplateManagement = () => {
   const { isDark } = useTheme();
   const [certifications, setCertifications] = useState([]);
   const [layoutsByCertId, setLayoutsByCertId] = useState({});
   const [selectedCertId, setSelectedCertId] = useState("");
   const [layout, setLayout] = useState({ ...DEFAULT_CERTIFICATE_LAYOUT });
-  const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const autoSaveTimerRef = useRef(null);
@@ -441,12 +416,6 @@ const CertificateTemplateManagement = () => {
               >
                 {saving ? "Saving..." : saveSuccess ? "Saved!" : hasPreviewDataUrl(layout) ? "Waiting for upload..." : "Save Layout"}
               </button>
-              <button
-                onClick={() => setShowModal(true)}
-                className={`rounded-md px-3 py-2 text-sm font-semibold text-white ${isDark ? 'bg-[#2a2a2f] hover:bg-[#353539] border border-[#3e4042]' : 'bg-[#5c2a21] hover:bg-[#4b2119]'}`}
-              >
-                Open Certificate Modal
-              </button>
             </div>
           </div>
         </header>
@@ -521,7 +490,7 @@ const CertificateTemplateManagement = () => {
             </div>
           </aside>
 
-          <section className={`rounded-2xl border p-4 sm:p-8 ${isDark ? 'border-[#3e4042] bg-[#18191a]' : 'border-gray-200 bg-gray-100'}`}>
+          <section className={`rounded-2xl border p-4 sm:p-8 ${isDark ? 'border-[#3e4042] bg-[#353638]' : 'border-gray-200 bg-gray-100'}`}>
             <div className={`mb-3 flex items-center justify-between rounded-lg px-4 py-3 ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
               <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>Certificate Preview</h2>
             </div>
@@ -534,12 +503,6 @@ const CertificateTemplateManagement = () => {
             onClose={() => setSaveSuccess(false)} 
           />
         )}
-        <PreviewModal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          layout={layout}
-          certId={Number(selectedCertId)}
-        />
       </div>
     </div>
   );
