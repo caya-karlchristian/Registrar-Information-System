@@ -96,6 +96,9 @@ jobs:
             echo "── Rebuilding containers ────────────────────────"
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
+            echo "── Publishing Telescope assets ──────────────────"
+            docker exec ris_backend php artisan vendor:publish --tag=telescope-assets --force
+
             echo "── Caching config and routes ────────────────────"
             docker exec ris_backend php artisan config:cache
             docker exec ris_backend php artisan route:cache
