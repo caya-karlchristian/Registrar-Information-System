@@ -1,10 +1,17 @@
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, AlignmentType, BorderStyle, ImageRun, Header, Footer, PageOrientation } from 'docx';
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, VerticalAlign, TextRun, WidthType, AlignmentType, BorderStyle, ImageRun, Header, Footer, PageOrientation } from 'docx';
 import { saveAs } from 'file-saver';
 import puplogoimage from '../assets/puplogoimage.png';
 import bagongPilipinasLogo from '../assets/Bagong_Pilipinas_logo.png';
 import certificateFooterImg from '../assets/certificate_footer.png';
 import { getDocumentTypes, getLogbookData, getCertifications } from '../services/api';
 // FE-4 migration: replaced getDocumentRequests+getRequestHistory with getLogbookData()
+
+const noBorder = {
+  top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+};
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -372,6 +379,58 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
                 borders: { top: { style: BorderStyle.NONE, size: 0 }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } },
                 children: [
                   new Paragraph({ alignment: AlignmentType.RIGHT, children: [ new ImageRun({ data: new Uint8Array(footerLogo), transformation: { width: 240, height: 80 } }) ] }),
+                ],
+              }),
+            ],
+          }),
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 60, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [
+                  new Paragraph({
+                    spacing: { before: 50 },
+                    children: [
+                      new TextRun({
+                        text: 'This document contains personal-identifiable information that is subject to Data Privacy.',
+                        size: 13,
+                        color: 'FF0000',
+                        bold: true,
+                        font: 'Lucida Fax',
+                      }),
+                    ],
+                  }),
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: 'Please keep this document protected and in a safe place.',
+                        size: 13,
+                        color: 'FF0000',
+                        bold: true,
+                        font: 'Lucida Fax',
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 20, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                verticalAlign: VerticalAlign.BOTTOM,
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    spacing: { before: 50 },
+                    children: [
+                      new TextRun({
+                        text: 'This is system-generated, signature is not required.',
+                        size: 13,
+                        color: '555555',
+                        font: 'Lucida Fax',
+                      }),
+                    ],
+                  }),
                 ],
               }),
             ],
