@@ -91,7 +91,10 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="flex h-screen w-full font-sans bg-gray-50 overflow-hidden">
+    <div 
+      className="flex h-screen w-full font-sans bg-gray-50 overflow-hidden" 
+      style={{ colorScheme: "light" }}
+    >
       <LineLoading isVisible={loading} />
 
       {/* Left panel */}
