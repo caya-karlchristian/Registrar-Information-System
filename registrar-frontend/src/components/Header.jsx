@@ -13,7 +13,7 @@ function Header({ onMenuClick }) {
   const { isDark } = useTheme();
 
   const headerStyle = {
-    backgroundColor: isDark ? undefined : '#660000',
+    backgroundColor: isDark ? '#242526' : '#660000',
   };
 
   return (
