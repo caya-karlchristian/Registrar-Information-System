@@ -15,6 +15,7 @@ import {
 import { CertFooter, CertHeader } from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import { useTheme } from "../context/ThemeContext";
+import SuccessToast from "../components/SuccessToast.jsx";
 
 const toCertificateRows = (raw) => {
   if (Array.isArray(raw)) return raw;
@@ -127,39 +128,16 @@ const CertificatePreviewCanvas = ({ layout, certId }) => {
   const certConfig = CERT_CONFIG[certId] || CERT_CONFIG[1];
 
   return (
-    <div className={`mx-auto w-full max-w-187.5 p-8 shadow-2xl ring-1 ${isDark ? 'bg-[#242526] ring-[#3e4042]' : 'bg-white ring-black/5'}`}>
+    <div className="...">
       <div className="flex min-h-180 flex-col">
         {!certConfig?.hideHeaderFooter && <CertHeader layout={layout} />}
-        <div className="flex-1">{certConfig?.renderBody(SAMPLE_FORM_DATA)}</div>
+        <div className="flex-1">{certConfig?.renderBody(SAMPLE_FORM_DATA, layout)}</div>
+        
         {!certConfig?.hideHeaderFooter && (
           <div className="mt-4">
             <CertFooter layout={layout} />
           </div>
         )}
-      </div>
-    </div>
-  );
-};
-
-const PreviewModal = ({ isOpen, onClose, layout, certId }) => {
-  const { isDark } = useTheme();
-  if (!isOpen) return null;
-
-  return (
-    <div className={`fixed inset-0 z-9999 p-4 sm:p-8 ${isDark ? 'bg-black/75' : 'bg-black/55'}`}>
-      <div className={`mx-auto flex h-full max-w-6xl flex-col rounded-2xl shadow-2xl ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
-        <div className={`flex items-center justify-between border-b p-4 ${isDark ? 'border-[#3e4042]' : 'border-gray-200'}`}>
-          <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-[#4b1f16]'}`}>Certificate Modal Preview</h3>
-          <button
-            onClick={onClose}
-            className={`rounded-md px-3 py-1.5 text-sm font-semibold ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-          >
-            Close
-          </button>
-        </div>
-        <div className={`flex-1 overflow-auto p-4 sm:p-8 ${isDark ? 'bg-[#18191a]' : 'bg-gray-100'}`}>
-          <CertificatePreviewCanvas layout={layout} certId={certId} />
-        </div>
       </div>
     </div>
   );
@@ -171,10 +149,10 @@ const CertificateTemplateManagement = () => {
   const [layoutsByCertId, setLayoutsByCertId] = useState({});
   const [selectedCertId, setSelectedCertId] = useState("");
   const [layout, setLayout] = useState({ ...DEFAULT_CERTIFICATE_LAYOUT });
-  const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const autoSaveTimerRef = useRef(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const dropdownCertifications = useMemo(() => {
     const byName = new Map();
@@ -193,7 +171,7 @@ const CertificateTemplateManagement = () => {
         setLoading(true);
         const [certResult, layoutResult] = await Promise.allSettled([getCertifications(), getCertificationLayouts()]);
         const certRows = certResult.status === "fulfilled" ? toCertificateRows(certResult.value?.data) : [];
-        const layoutRows = layoutResult.status === "fulfilled" ? layoutResult.value?.data ?? [] : [];
+        const layoutRows = layoutResult.status === "fulfilled" ? toCertificateRows(layoutResult.value?.data) : [];
 
         const layoutMap = {};
         layoutRows.forEach((row) => {
@@ -312,7 +290,7 @@ const CertificateTemplateManagement = () => {
     }
   };
 
-  const saveLayout = async () => {
+ const saveLayout = async () => {
     if (!selectedCertId) return;
     if (hasPreviewDataUrl(layout)) {
       console.warn("Skipping layout save until image uploads finish.");
@@ -321,24 +299,42 @@ const CertificateTemplateManagement = () => {
 
     try {
       setSaving(true);
+      setSaveSuccess(false);
       const certTypeId = selectedCertId;
 
       const payload = toLayoutPayload(layout);
-      await updateCertificationLayout(certTypeId, payload);
+      const response = await updateCertificationLayout(certTypeId, payload);
 
+      // 1. Grab the fresh data straight from Laravel's response
+      const freshDbData = response?.data?.data; 
+      
+      // 2. Normalize it so it has the perfect absolute URLs
+      const freshLayout = freshDbData 
+        ? normalizeCertificateLayout(freshDbData) 
+        : normalizeCertificateLayout(layout);
+
+      // 3. Update the global dictionary
       setLayoutsByCertId((prev) => ({
         ...prev,
-        [certTypeId]: normalizeCertificateLayout(layout),
+        [certTypeId]: freshLayout,
       }));
 
+      // 4. Instantly update the screen with the final database URLs
+      setLayout(freshLayout);
+
+      // Broadcast to the rest of the app
       window.dispatchEvent(
         new CustomEvent(CERT_TEMPLATE_LAYOUT_CHANGED, {
           detail: {
             certTypeId: Number(certTypeId),
-            layout: normalizeCertificateLayout(layout),
+            layout: freshLayout,
           },
         })
       );
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+
     } catch (error) {
       console.error("Failed to save certification layout:", error);
     } finally {
@@ -349,6 +345,11 @@ const CertificateTemplateManagement = () => {
   useEffect(() => {
     if (!selectedCertId || !isPersistedCertification || loading || saving) return;
     if (hasPreviewDataUrl(layout)) return;
+
+    const savedLayout = layoutsByCertId[selectedCertId];
+    if (savedLayout && JSON.stringify(layout) === JSON.stringify(savedLayout)) {
+      return; 
+    }
 
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
@@ -372,7 +373,7 @@ const CertificateTemplateManagement = () => {
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [layout, selectedCertId, isPersistedCertification, loading, saving]);
+  }, [layout, selectedCertId, isPersistedCertification, loading, saving, layoutsByCertId]);
 
   const resetLayout = () => {
     setLayout({ ...DEFAULT_CERTIFICATE_LAYOUT });
@@ -397,22 +398,23 @@ const CertificateTemplateManagement = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={resetLayout}
-                className={`rounded-md border px-3 py-2 text-sm font-semibold ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' : 'border-gray-300 bg-gray-100 hover:bg-gray-200'}`}
+                className={`rounded-md border px-3 py-2 text-sm font-semibold ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' : 
+                'border-gray-300 bg-gray-100 hover:bg-gray-200'}`}
               >
                 Reset Logos
               </button>
               <button
                 onClick={saveLayout}
-                disabled={!selectedCertId || saving || hasPreviewDataUrl(layout)}
-                className={`rounded-md px-3 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] focus:ring-[#4e4f50] disabled:bg-[#2a2a2f]/50 border border-[#3e4042]' : 'bg-yellow-400 text-slate-900 hover:bg-yellow-500 focus:ring-yellow-200 disabled:bg-yellow-200'}`}
+                disabled={!selectedCertId || saving || saveSuccess || hasPreviewDataUrl(layout)}
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed ${
+                  saveSuccess 
+                    ? 'bg-green-500 text-white border-green-600' // Turns green when successful!
+                    : isDark 
+                      ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] focus:ring-[#4e4f50] disabled:bg-[#2a2a2f]/50 border border-[#3e4042]' 
+                      : 'bg-yellow-400 text-slate-900 hover:bg-yellow-500 focus:ring-yellow-200 disabled:bg-yellow-200'
+                }`}
               >
-                {saving ? "Saving..." : hasPreviewDataUrl(layout) ? "Waiting for upload..." : "Save Layout"}
-              </button>
-              <button
-                onClick={() => setShowModal(true)}
-                className={`rounded-md px-3 py-2 text-sm font-semibold text-white ${isDark ? 'bg-[#2a2a2f] hover:bg-[#353539] border border-[#3e4042]' : 'bg-[#5c2a21] hover:bg-[#4b2119]'}`}
-              >
-                Open Certificate Modal
+                {saving ? "Saving..." : saveSuccess ? "Saved!" : hasPreviewDataUrl(layout) ? "Waiting for upload..." : "Save Layout"}
               </button>
             </div>
           </div>
@@ -488,20 +490,19 @@ const CertificateTemplateManagement = () => {
             </div>
           </aside>
 
-          <section className={`rounded-2xl border p-4 sm:p-8 ${isDark ? 'border-[#3e4042] bg-[#18191a]' : 'border-gray-200 bg-gray-100'}`}>
+          <section className={`rounded-2xl border p-4 sm:p-8 ${isDark ? 'border-[#3e4042] bg-[#353638]' : 'border-gray-200 bg-gray-100'}`}>
             <div className={`mb-3 flex items-center justify-between rounded-lg px-4 py-3 ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
               <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>Certificate Preview</h2>
             </div>
             <CertificatePreviewCanvas layout={layout} certId={Number(selectedCertId)} />
           </section>
         </div>
-
-        <PreviewModal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          layout={layout}
-          certId={Number(selectedCertId)}
-        />
+        {saveSuccess && (
+          <SuccessToast 
+            message="Layout saved successfully!" 
+            onClose={() => setSaveSuccess(false)} 
+          />
+        )}
       </div>
     </div>
   );

@@ -1,10 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
-import { getDocumentRequests, getDocumentTypes, getRequestHistory } from "../services/api"; 
-import LoadingOverlay from "../components/LoadingOverlay"; 
+import { getLogbookData, getDocumentTypes, getCertifications } from '../services/api'; // FE-3 migration: uses getLogbookData() from API
+import {
+  formatMinutesDuration,
+  getProcessedAt,
+  getMinutesProcessed,
+  getFullName,
+  getCourse,
+  getEmail,
+  getDocumentNames,
+  getCertificationNames,
+  formatDateLong,
+  getClaimedAt,
+} from '../utils/logbookHelpers.js';
+
 import DropDown from '../components/DropDown';
-import { logbookExcel } from '../utils/logbookExcel.js';
+import { LogbookSkeleton } from '../components/LoadingSkeleton';
+import SuccessToast from '../components/SuccessToast.jsx';
+import ErrorToast from '../components/ErrorToast.jsx';
+import { logbookDocx } from '../utils/logbookDocx.js';
 import pupLogoSrc from '../assets/puplogoimage.png';
 import bpLogoSrc from '../assets/Bagong_Pilipinas_logo.png';
 
@@ -18,49 +33,77 @@ const LogbookRecords = () => {
   const { isDark } = useTheme();
   const [data, setData] = useState([]);
   const [dbDocTypes, setDbDocTypes] = useState([]);
+  const [availableCertifications, setAvailableCertifications] = useState([]);
   const [historyByRequestId, setHistoryByRequestId] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDocTypeId, setSelectedDocTypeId] = useState("");
+  const [selectedExportOption, setSelectedExportOption] = useState('All Document');
+  const [exporting, setExporting] = useState(false);
+  const [toastSuccess, setToastSuccess] = useState('');
+  const [toastError, setToastError] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [activePreset, setActivePreset] = useState('');
   const rowsPerPage = 8;
 
+  // Quick-select date range presets
+  const applyPreset = (preset) => {
+    const now = new Date();
+
+    if (preset === 'annual') {
+      const from = new Date(now);
+      from.setFullYear(from.getFullYear() - 1);
+      setDateFrom(from.toISOString().slice(0, 10));
+      setDateTo(now.toISOString().slice(0, 10));
+    } else if (preset === 'semi') {
+      const from = new Date(now);
+      from.setMonth(from.getMonth() - 6);
+      setDateFrom(from.toISOString().slice(0, 10));
+      setDateTo(now.toISOString().slice(0, 10));
+    } else if (preset === 'month') {
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const m = String(month + 1).padStart(2, '0');
+      setDateFrom(`${year}-${m}-01`);
+      const lastDay = String(new Date(year, month + 1, 0).getDate()).padStart(2, '0');
+      setDateTo(`${year}-${m}-${lastDay}`);
+    } else {
+      setDateFrom('');
+      setDateTo('');
+    }
+
+    setActivePreset(preset);
+    setCurrentPage(1);
+  };
+
+  // Load logbook data on mount
   useEffect(() => {
     const fetchLogbookData = async () => {
       setLoading(true);
       try {
-        const [requestsRes, typesRes, historyRes] = await Promise.all([
-          getDocumentRequests(),
+        const [logbookRes, typesRes, certRes] = await Promise.all([
+          getLogbookData(),
           getDocumentTypes(),
-          getRequestHistory(),
+          getCertifications(),
         ]);
-        const requests = toRows(requestsRes.data);
-        const types = toRows(typesRes.data);
-        const historyRows = toRows(historyRes.data);
-        const groupedHistory = historyRows.reduce((acc, item) => {
-          const requestId = item?.request_id;
-          if (!requestId) return acc;
-          if (!acc[requestId]) acc[requestId] = [];
-          acc[requestId].push(item);
-          return acc;
-        }, {});
 
-        Object.keys(groupedHistory).forEach((requestId) => {
-          groupedHistory[requestId].sort((a, b) => {
-            const aTime = new Date(a?.changed_at || 0).getTime();
-            const bTime = new Date(b?.changed_at || 0).getTime();
-            return bTime - aTime;
-          });
-        });
+        const requests       = toRows(logbookRes.data);
+        const types          = toRows(typesRes.data);
+        const certifications = toRows(certRes.data);
 
         setData(requests);
         setDbDocTypes(types);
-        setHistoryByRequestId(groupedHistory);
-        console.log('Logbook data loaded:', { requests: requests.length, types: types.length, history: historyRows.length });
+        setAvailableCertifications(certifications);
+        setHistoryByRequestId({});
+        setCurrentPage(1);
       } catch (error) {
         console.error('Error loading logbook records:', error);
         setData([]);
         setDbDocTypes([]);
+        setAvailableCertifications([]);
         setHistoryByRequestId({});
+        setToastError((error && (error.message || error.toString())) || 'Error loading logbook records.');
       } finally {
         setLoading(false);
       }
@@ -68,6 +111,7 @@ const LogbookRecords = () => {
     fetchLogbookData();
   }, []);
 
+  // Map of document type id -> document name for quick lookups
   const activeDocMap = useMemo(() => {
     if (dbDocTypes.length > 0) {
       return Object.fromEntries(dbDocTypes.map(t => [t.document_type_id, t.document_name]));
@@ -75,12 +119,92 @@ const LogbookRecords = () => {
     return {};
   }, [dbDocTypes]);
 
-  const docOptions = useMemo(() => Object.values(activeDocMap), [activeDocMap]);
+  // Build document filter dropdown options
+  const docOptions = useMemo(() => {
+    const options = ['All Document'];
+    const seen = new Set(['all document']);
 
+    Object.values(activeDocMap).forEach((name) => {
+      const normalized = String(name || '').trim();
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push(normalized);
+    });
+
+    if (Object.values(activeDocMap).some((name) => String(name || '').trim().toLowerCase() === 'certification')) {
+      options.splice(1, 0, 'All Certification');
+    }
+
+    return options;
+  }, [activeDocMap]);
+
+  // List of distinct certification names
+  const certificationOptions = useMemo(() => {
+    const options = [];
+    const seen = new Set();
+
+    availableCertifications.forEach((cert) => {
+      const normalized = String(cert?.certificate_name || '').trim();
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push(normalized);
+    });
+
+    return options;
+  }, [availableCertifications]);
+
+  // Label displayed for the currently selected document/export option
+  const selectedDocLabel = useMemo(() => {
+    if (selectedExportOption === 'All Certification') return 'All Certification';
+    return activeDocMap[selectedDocTypeId] || selectedExportOption || 'All Document';
+  }, [selectedDocTypeId, activeDocMap, selectedExportOption]);
+
+  // Whether the UI is currently focused on certification-specific filters/exports
+  const isCertificationMode = useMemo(() => {
+    const sel   = String(selectedExportOption || '').trim().toLowerCase();
+    const label = String(selectedDocLabel     || '').trim().toLowerCase();
+    return sel === 'certification' || (label === 'certification' && sel !== 'all certification');
+  }, [selectedExportOption, selectedDocLabel]);
+
+  const [selectedCertificationLabel, setSelectedCertificationLabel] = useState('');
+
+  useEffect(() => {
+    if (isCertificationMode) {
+      if (!selectedCertificationLabel) {
+        setSelectedCertificationLabel(certificationOptions[0] || '');
+      }
+    } else {
+      setSelectedCertificationLabel('');
+    }
+  }, [isCertificationMode, certificationOptions]);
+
+  // Filter data
   const filteredData = useMemo(() => {
-    const completedOnly = data.filter(item =>
-      String(item.status?.status_name).toLowerCase() === 'completed'
-    );
+    const from = dateFrom ? new Date(dateFrom + 'T00:00:00') : null;
+    const to   = dateTo   ? new Date(dateTo   + 'T23:59:59') : null;
+
+    const completedOnly = data.filter(item => {
+      if (from || to) {
+        const req = item.requested_at ? new Date(item.requested_at) : null;
+        if (!req) return false;
+        if (from && req < from) return false;
+        if (to   && req > to  ) return false;
+      }
+      return true;
+    });
+
+    if (isCertificationMode) {
+      const targetCertification = String(selectedCertificationLabel || 'All Certification').trim().toLowerCase();
+      return completedOnly.filter((item) => {
+        const certNames = getCertificationNames(item).map((name) => String(name).trim().toLowerCase());
+        if (targetCertification === 'all certification') return certNames.length > 0;
+        return certNames.includes(targetCertification);
+      });
+    }
 
     if (!selectedDocTypeId) return completedOnly;
 
@@ -88,8 +212,9 @@ const LogbookRecords = () => {
     return completedOnly.filter(item =>
       item.documents?.some(d => Number(d.document_type_id) === targetId)
     );
-  }, [selectedDocTypeId, data]);
+  }, [selectedDocTypeId, data, isCertificationMode, selectedCertificationLabel, dateFrom, dateTo]);
 
+  // Sort filtered data by request timestamp (most recent first)
   const sortedData = useMemo(() => {
     return [...filteredData].sort((a, b) => {
       const aRequestedAt = new Date(a.requested_at || 0).getTime();
@@ -98,20 +223,63 @@ const LogbookRecords = () => {
     });
   }, [filteredData]);
 
-  const totalPages = Math.ceil(sortedData.length / rowsPerPage) || 1;
+  const totalPages       = Math.ceil(sortedData.length / rowsPerPage) || 1;
   const indexOfFirstItem = (currentPage - 1) * rowsPerPage;
-  const indexOfLastItem = currentPage * rowsPerPage;
+  const indexOfLastItem  =  currentPage      * rowsPerPage;
 
   const currentData = useMemo(() => {
     return sortedData.slice(indexOfFirstItem, indexOfLastItem);
   }, [indexOfFirstItem, indexOfLastItem, sortedData]);
 
-  const selectedDocLabel = useMemo(() => {
-    return activeDocMap[selectedDocTypeId] || "All Document Types";
-  }, [selectedDocTypeId, activeDocMap]);
+  // Build sections for DOCX export
+  const getExportSections = () => {
+    if (isCertificationMode) {
+      if (selectedCertificationLabel && selectedCertificationLabel !== 'All Certification') {
+        return [{ title: selectedCertificationLabel, rows: sortedData }];
+      }
+      const certNames = certificationOptions.filter(n => String(n || '').trim().toLowerCase() !== 'all certification');
+      return certNames.map((name) => ({
+        title: name,
+        rows: sortedData.filter((row) =>
+          getCertificationNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())
+        ),
+      }));
+    }
 
-  const handleExportExcel = () => logbookExcel(sortedData, selectedDocLabel, pupLogoSrc, bpLogoSrc, historyByRequestId);
+    if (selectedDocTypeId) {
+      return [{ title: selectedDocLabel, rows: sortedData }];
+    }
 
+    const docNames = Object.values(activeDocMap).map(n => String(n || '').trim()).filter(Boolean);
+    const uniqueDocNames = Array.from(new Set(docNames));
+
+    return uniqueDocNames.map((name) => ({
+      title: name,
+      rows: sortedData.filter((row) =>
+        getDocumentNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())
+      ),
+    }));
+  };
+
+  // Trigger DOCX export
+  const handleExportDocx = async () => {
+    if (exporting) return;
+    try {
+      setExporting(true);
+      const rangeLabel = (dateFrom && dateTo)
+        ? `${dateFrom}_to_${dateTo}`
+        : (dateFrom ? `from_${dateFrom}` : (dateTo ? `to_${dateTo}` : null));
+      await logbookDocx(getExportSections(), pupLogoSrc, bpLogoSrc, historyByRequestId, rangeLabel);
+      setToastSuccess('Exporting Report completed.');
+    } catch (e) {
+      console.error('Export to DOCX failed', e);
+      setToastError((e && (e.message || e.toString())) || 'Exporting Report failed.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Convert text to Proper Case while preserving roman numerals and hyphenated parts
   const toProperCase = (value = '') => {
     return value
       .toString()
@@ -126,41 +294,7 @@ const LogbookRecords = () => {
       .join(' ');
   };
 
-  const getFullName = (row) => {
-    const p = row.student_profile || row.alumni_profile;
-    if (!p) return 'Walk-in Client';
-    const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
-    const lastName = toProperCase(p.last_name || '');
-    const firstName = toProperCase(p.first_name || '');
-    return `${lastName}, ${firstName}${middle}`.trim();
-  };
-
-  const getCourse = (row) => {
-    return (
-      row.student_profile?.academic_records?.[0]?.course ||
-      row.student_profile?.course ||
-      row.academic_record?.course ||
-      row.alumni_academic_record?.course ||
-      '---'
-    );
-  };
-
-  const getEmail = (row) => {
-    return row.user?.email || row.student_profile?.email || '---';
-  };
-
-  const formatDateLong = (value) => {
-    if (!value) return null;
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
-
-    return date.toLocaleDateString('en-US', {
-      month: 'long',
-      day: '2-digit',
-      year: 'numeric',
-    });
-  };
-
+  // Format an ISO datetime value into long date + 24-hour time
   const formatDateTimeLong = (value) => {
     const datePart = formatDateLong(value);
     if (!datePart) return null;
@@ -174,134 +308,235 @@ const LogbookRecords = () => {
     return `${datePart} ${timePart}`;
   };
 
-  const getProcessedAt = (row) => {
-    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
-    if (history.length === 0) return null;
-    return history[0]?.changed_at || null;
-  };
-
-  const getMinutesProcessed = (row) => {
-    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
-    if (history.length === 0) return null;
-    return history[0]?.minutes_processed ?? null;
-  };
-
-  const formatMinutesDuration = (minutesValue) => {
-    if (minutesValue === null || minutesValue === undefined || minutesValue === '') return '---';
-
-    const totalMinutes = Number(minutesValue);
-    if (Number.isNaN(totalMinutes) || totalMinutes < 0) return '---';
-
-    const wholeMinutes = Math.floor(totalMinutes);
-    const days = Math.floor(wholeMinutes / 1440);
-    const hours = Math.floor((wholeMinutes % 1440) / 60);
-    const minutes = wholeMinutes % 60;
-    const minuteLabel = minutes === 1 ? 'min' : 'mins';
-
-    if (days > 0) return `${days}day${days > 1 ? 's' : ''} ${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
-    if (hours > 0) return `${hours}hr${hours !== 1 ? 's' : ''} ${minutes}${minuteLabel}`;
-
-    return `${minutes}${minuteLabel}`;
-  };
-
-  const getClaimedAt = (row) => {
-    const history = historyByRequestId[row.request_id] || (Array.isArray(row.history) ? row.history : []);
-    if (history.length === 0) return null;
-    const claimEntry = history.find((h) => h.new_status_id === 3);
-    return claimEntry?.changed_at || null;
-  };
+  if (loading) return <LogbookSkeleton isDark={isDark} />;
 
   return (
-    <div className={`relative min-h-screen font-sans text-left z-20 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>
-      <LoadingOverlay isVisible={loading} message="Fetching Registrar Records" />
-
+    <div className={`relative min-h-full font-sans text-left z-20 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>
       <div className={`max-w-350 mx-auto shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
         <div className="p-4 sm:p-6 md:p-8 pb-0">
-          <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end mb-6 gap-4 print:hidden">
-            <div className="flex flex-col gap-2 text-left w-full sm:w-auto">
-              <div className="px-4 w-full sm:w-80 lg:w-120">
+
+          {/* ── Controls Panel ── */}
+          <div className={`mb-6 print:hidden rounded-xl border p-4 sm:p-5 ${isDark ? 'bg-[#1e1f20] border-[#3e4042]' : 'bg-gray-50 border-gray-200'}`}>
+
+            {/* Row 1 — Dropdowns · Date Range · Export */}
+            <div className="flex flex-wrap items-end gap-3 mb-4">
+
+              {/* Document Type dropdown */}
+              <div className="w-44 shrink-0">
                 <DropDown
                   label="Document Type"
                   name="docType"
-                  value={activeDocMap[selectedDocTypeId] || ''}
-                  labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
+                  value={selectedExportOption}
+                  labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
                   onChange={(e) => {
+                    if (e.target.value === 'All Document' || e.target.value === 'All Certification') {
+                      setSelectedDocTypeId('');
+                      setSelectedExportOption(e.target.value);
+                      setSelectedCertificationLabel('');
+                      setCurrentPage(1);
+                      return;
+                    }
                     const id = Object.keys(activeDocMap).find(key => activeDocMap[key] === e.target.value) || '';
                     setSelectedDocTypeId(id);
+                    setSelectedExportOption(e.target.value);
+                    setSelectedCertificationLabel('');
                     setCurrentPage(1);
                   }}
                   options={docOptions}
                 />
               </div>
+
+              {/* Certification Type dropdown (conditional) */}
+              {isCertificationMode && (
+                <div className="w-44 shrink-0">
+                  <DropDown
+                    label="Certification Type"
+                    name="certificationType"
+                    value={selectedCertificationLabel}
+                    labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+                    onChange={(e) => {
+                      setSelectedCertificationLabel(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    options={certificationOptions}
+                  />
+                </div>
+              )}
+
+              {/* Vertical divider */}
+              <div className={`hidden sm:block self-stretch w-px mx-1 ${isDark ? 'bg-[#3e4042]' : 'bg-gray-200'}`} />
+
+              {/* Date range */}
+              <div className="flex items-end gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>From</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => { setDateFrom(e.target.value); setActivePreset(''); setCurrentPage(1); }}
+                    className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
+                  />
+                </div>
+                <span className={`mb-2 text-xs font-medium ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>→</span>
+                <div className="flex flex-col gap-1">
+                  <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>To</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => { setDateTo(e.target.value); setActivePreset(''); setCurrentPage(1); }}
+                    className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
+                  />
+                </div>
+              </div>
+
+              {/* Export button */}
+              <div className="ml-auto">
+                <button
+                  onClick={handleExportDocx}
+                  disabled={loading || exporting || sortedData.length === 0}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all duration-150 shadow-sm
+                    ${(loading || exporting || sortedData.length === 0)
+                      ? (isDark
+                          ? 'bg-[#2d2e30] text-[#4e4f50] border border-[#3e4042] cursor-not-allowed'
+                          : 'bg-gray-100 text-gray-300 border border-gray-200 cursor-not-allowed')
+                      : (isDark
+                          ? 'bg-[#800000] hover:bg-[#9a0000] text-[#FFD700] border border-[#9a0000] shadow-[#800000]/20'
+                          : 'bg-[#800000] hover:bg-[#6a0000] text-[#FFD700] shadow-[#800000]/30')
+                    }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round"
+                      d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                  </svg>
+                  {exporting ? 'Exporting…' : 'Export DOCX'}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleExportExcel}
-              disabled={loading || sortedData.length === 0}
-              className={`px-6 sm:px-8 py-2.5 rounded flex items-center justify-center gap-2 transition-all shadow-md font-bold uppercase text-xs w-full sm:w-auto ${loading || sortedData.length === 0 ? (isDark ? 'bg-[#4e4f50] cursor-not-allowed text-[#9a9a9a]' : 'bg-gray-300 cursor-not-allowed text-gray-500') : (isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-dark-maroon hover:bg-[#4a0000] text-white')}`}
-            >
-              <span>Export to Excel</span>
-            </button>
+
+            {/* Row 2 — Quick-select presets */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`text-[10px] font-semibold uppercase tracking-widest mr-1 ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>
+                Quick Range:
+              </span>
+
+              {[
+                { label: 'Annual',      sublabel: '1 yr', preset: 'annual' },
+                { label: 'Semi-Annual', sublabel: '6 mo', preset: 'semi'   },
+                { label: 'This Month',  sublabel: '1 mo', preset: 'month'  },
+                { label: 'All Time',    sublabel: '∞',    preset: 'all'    },
+              ].map(({ label, sublabel, preset }) => {
+                const isActive = activePreset === preset;
+                return (
+                  <button
+                    key={preset}
+                    onClick={() => applyPreset(preset)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150 border
+                      ${isActive
+                        ? (isDark
+                            ? 'bg-[#800000] border-[#9a0000] text-[#FFD700] shadow-sm'
+                            : 'bg-[#800000] border-[#800000] text-[#FFD700] shadow-sm')
+                        : (isDark
+                            ? 'bg-[#2d2e30] border-[#3e4042] text-[#b0b3b8] hover:border-[#6b6c6e] hover:text-[#e4e6eb]'
+                            : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:text-gray-800')
+                      }`}
+                  >
+                    {label}
+                    <span className={`text-[9px] font-normal px-1 py-0.5 rounded
+                      ${isActive
+                        ? 'bg-white/20 text-current'
+                        : (isDark ? 'bg-[#3e4042] text-[#6b6c6e]' : 'bg-gray-100 text-gray-400')
+                      }`}>
+                      {sublabel}
+                    </span>
+                  </button>
+                );
+              })}
+
+              {/* Clear dates */}
+              {(dateFrom || dateTo) && (
+                <button
+                  onClick={() => { setDateFrom(''); setDateTo(''); setActivePreset(''); setCurrentPage(1); }}
+                  className={`ml-1 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors border
+                    ${isDark
+                      ? 'border-[#3e4042] text-[#6b6c6e] hover:text-[#b0b3b8] hover:border-[#6b6c6e]'
+                      : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'}`}
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
 
+          {/* ── Original section heading ── */}
           <div className={`w-full text-center border-b pb-4 mb-0 ${isDark ? 'border-[#3e4042]' : 'border-gray-300'}`}>
             <h2 className={`text-lg sm:text-xl md:text-2xl font-black uppercase tracking-widest leading-tight ${isDark ? 'text-[#f5c542]' : 'text-[#4a0000]'}`}>
               Processing of Application for <br className="sm:hidden" /> {selectedDocLabel}
             </h2>
+            <p className={`text-xs mt-1 font-medium ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
+              {sortedData.length} record{sortedData.length !== 1 ? 's' : ''}
+              {(dateFrom || dateTo) && (
+                <span> &mdash; {dateFrom && `from ${dateFrom}`}{dateFrom && dateTo && ' '}{dateTo && `to ${dateTo}`}</span>
+              )}
+            </p>
           </div>
         </div>
 
+        {/* ── Original Table ── */}
         <div className="flex-1 overflow-x-auto px-4 sm:px-6 md:px-8">
-          <table className="w-full border-collapse min-w-200">
+          <table className="w-full min-w-225 border-collapse md:min-w-full">
             <thead>
               <tr className={`border-b-2 uppercase text-center ${isDark ? 'border-[#3e4042] text-[#9a9a9a]' : 'border-gray-300 text-gray-400'}`}>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Requested</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[15%]">Client Name</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Course</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[18%]">Email</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%]">Date/Time Processed</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[10%]">No. of Minutes Processed</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[13%]">Date Claimed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Date/Time Requested</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[15%] whitespace-nowrap">Client Name</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Course</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[18%] whitespace-nowrap">Email</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Date/Time Processed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[10%] whitespace-nowrap">No. of Minutes Processed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[13%] whitespace-nowrap">Date Claimed</th>
               </tr>
             </thead>
             <tbody>
               {currentData.map((row) => (
                 (() => {
                   const processedAt = getProcessedAt(row);
-                  const claimedAt = getClaimedAt(row);
+                  const claimedAt   = getClaimedAt(row);
 
                   return (
-                <tr key={row.request_id || row.id} className={`border-b text-[11px] sm:text-[12px] transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
+                    <tr key={row.request_id || row.id} className={`border-b text-[11px] sm:text-[12px] transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
 
-                  <td className="p-3 sm:p-4 text-center">
-                    {formatDateLong(row.requested_at) || 'N/A'}
-                  </td>
+                      <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                        {formatDateLong(row.requested_at) || 'N/A'}
+                      </td>
 
-                  <td className="p-3 sm:p-4 text-center font-bold">
-                    {getFullName(row)}
-                  </td>
+                      <td className="p-3 sm:p-4 text-center font-bold whitespace-nowrap">
+                        {getFullName(row)}
+                      </td>
 
-                  <td className="p-3 sm:p-4 text-center">
-                    {getCourse(row)}
-                  </td>
+                      <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                        {getCourse(row)}
+                      </td>
 
-                  <td className="p-3 sm:p-4 text-center truncate max-w-37.5">
-                    {getEmail(row)}
-                  </td>
+                      <td className="p-3 sm:p-4 text-center truncate max-w-55 whitespace-nowrap">
+                        {getEmail(row)}
+                      </td>
 
-                  <td className="p-3 sm:p-4 text-center">
-                    {formatDateTimeLong(processedAt) || '---'}
-                  </td>
+                      <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                        {formatDateTimeLong(processedAt) || '---'}
+                      </td>
 
-                  <td className="p-3 sm:p-4 text-center">
-                    {formatMinutesDuration(getMinutesProcessed(row))}
-                  </td>
+                      <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                        {formatMinutesDuration(getMinutesProcessed(row))}
+                      </td>
 
-                  <td className="p-3 sm:p-4 text-center italic text-gray-400">
-                    {formatDateLong(claimedAt) || 'Pending'}
-                  </td>
+                      <td className="p-3 sm:p-4 text-center italic text-gray-400 whitespace-nowrap">
+                        {formatDateLong(claimedAt) || 'Pending'}
+                      </td>
 
-                </tr>
+                    </tr>
                   );
                 })()
               ))}
@@ -315,7 +550,7 @@ const LogbookRecords = () => {
           </table>
         </div>
 
-        {/* Pagination Footer */}
+        {/* ── Original Pagination Footer ── */}
         <div className={`px-4 sm:px-8 py-4 text-[11px] sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t ${isDark ? 'bg-[#242526] text-[#9a9a9a] border-[#3e4042]' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
           <span className="text-center sm:text-left">
             Showing {sortedData.length > 0 ? indexOfFirstItem + 1 : 0} to{" "}
@@ -344,6 +579,9 @@ const LogbookRecords = () => {
             </button>
           </div>
         </div>
+
+        <SuccessToast message={toastSuccess} onClose={() => setToastSuccess('')} />
+        <ErrorToast   message={toastError}   onClose={() => setToastError('')}   />
       </div>
     </div>
   );

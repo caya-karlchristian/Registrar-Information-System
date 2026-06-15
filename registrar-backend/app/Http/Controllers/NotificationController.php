@@ -74,7 +74,12 @@ class NotificationController extends Controller
 
         $notification->markAsRead();
 
-        return response()->json(['message' => 'Notification marked as read.']);
+        return response()->json([
+            'message'      => 'Notification marked as read.',
+            // Return the updated count so the frontend doesn't need a second
+            // GET /notifications/unread-count request after this mutation.
+            'unread_count' => $this->notificationService->unreadCount($user),
+        ]);
     }
 
     // -------------------------------------------------------
@@ -105,6 +110,11 @@ class NotificationController extends Controller
 
         $notification->delete();
 
-        return response()->json(['message' => 'Notification dismissed.']);
+        return response()->json([
+            'message'      => 'Notification dismissed.',
+            // Return the updated count so the frontend doesn't need a second
+            // GET /notifications/unread-count request after this mutation.
+            'unread_count' => $this->notificationService->unreadCount($user),
+        ]);
     }
 }

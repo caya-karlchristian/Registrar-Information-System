@@ -3,28 +3,9 @@ import { XMarkIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/NotificationToastContext';
 
-// -------------------------------------------------------
-// CATEGORY_MAP — mirrors NotificationModal.jsx exactly
-// -------------------------------------------------------
-const CATEGORY_MAP = {
-    request_submitted:          { category: 'Submitted',   color: 'bg-blue-400' },
-    payment_verified:           { category: 'Payment',     color: 'bg-green-400' },
-    payment_invalid:            { category: 'Payment',     color: 'bg-rose-600' },
-    status_updated:             { category: 'Update',      color: 'bg-blue-400' },
-    request_processing:         { category: 'Processing',  color: 'bg-blue-400' },
-    action_needed:              { category: 'Action',      color: 'bg-rose-600' },
-    ready_to_claim:             { category: 'Ready',       color: 'bg-green-400' },
-    request_completed:          { category: 'Completed',   color: 'bg-green-400' },
-    request_forfeited:          { category: 'Forfeited',   color: 'bg-rose-600' },
-    reminder_claim:             { category: 'Reminder',    color: 'bg-pup-yellow' },
-    reminder_final_warning:     { category: 'Warning',     color: 'bg-rose-600' },
-    request_closed:             { category: 'Closed',      color: 'bg-white/40' },
-    request_auto_archived:      { category: 'Archived',    color: 'bg-white/40' },
-    admin_new_request:          { category: 'Important',   color: 'bg-rose-600' },
-    admin_payment_verification: { category: 'Payment',     color: 'bg-pup-yellow' },
-    admin_incomplete_request:   { category: 'Incomplete',  color: 'bg-rose-600' },
-    admin_deadline_warning:     { category: 'Deadline',    color: 'bg-pup-yellow' },
-};
+// CATEGORY_MAP lives in src/constants/notificationCategories.js
+// — edit it there; changes apply to both NotificationModal and NotificationToast.
+import { CATEGORY_MAP } from '../constants/notificationCategories';
 
 // -------------------------------------------------------
 // SingleToast
@@ -98,7 +79,7 @@ const NotificationToast = () => {
     if (toasts.length === 0) return null;
 
     return (
-        <div className="fixed top-26 lg:top-30 md:top-30 right-3 lg:right-5 md:right-5 z-9999 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] pointer-events-none">
+        <div className="fixed toast-container-shifted right-3 lg:right-5 md:right-5 z-9999 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] pointer-events-none">
             {toasts.map(toast => (
                 <div key={toast.id} className="pointer-events-auto">
                     <SingleToast toast={toast} onDismiss={dismissToast} />

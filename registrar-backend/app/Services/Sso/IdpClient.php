@@ -20,15 +20,15 @@ use Illuminate\Support\Facades\Log;
  */
 class IdpClient
 {
-    private string $baseUrl;
-    private string $clientId;
-    private string $clientSecret;
+    private string $baseUrl = '';
+    private string $clientId = '';
+    private string $clientSecret = '';
 
     public function __construct()
     {
-        $this->baseUrl      = config('sso.base_url');
-        $this->clientId     = config('sso.client_id');
-        $this->clientSecret = config('sso.client_secret');
+        $this->baseUrl = config('sso.base_url', '');
+        $this->clientId     = config('sso.client_id', '');
+        $this->clientSecret = config('sso.client_secret', '');
     }
 
     // -------------------------------------------------------------------------
@@ -398,12 +398,38 @@ class IdpClient
         return $ch;
     }
 
+    /** @var bool  True when the last cURL call failed with a connectivity error. */
+    private bool $lastConnectivityError = false;
+
+    /**
+     * Returns true if the most recent HTTP call failed because the IDP
+     * was unreachable (DNS, connection refused, timeout), not because of
+     * a 4xx/5xx response.  SsoAuthService uses this to decide whether
+     * to fall back to local auth.
+     */
+    public function lastErrorWasConnectivity(): bool
+    {
+        return $this->lastConnectivityError;
+    }
+
     private function execRaw($ch): array
     {
         $body   = curl_exec($ch);
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error  = curl_error($ch);
+        $errno  = curl_errno($ch);
         curl_close($ch);
+
+        // Mark connectivity errors: cURL error codes that indicate the host
+        // was unreachable (not an application-level HTTP error).
+        $connectivityErrors = [
+            CURLE_COULDNT_RESOLVE_HOST,  // DNS failure
+            CURLE_COULDNT_CONNECT,       // connection refused / port closed
+            CURLE_OPERATION_TIMEDOUT,    // connect or read timeout
+            CURLE_SSL_CONNECT_ERROR,     // TLS handshake failed
+        ];
+        $this->lastConnectivityError = in_array($errno, $connectivityErrors, true);
+
         return [$body, $status, $error];
     }
 }

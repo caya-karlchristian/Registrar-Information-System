@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
+import { ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import InputGroup from "../components/InputGroup";
 import VoiceTextareaInput from "../components/VoiceTextareaInput.jsx";
 import {
@@ -9,6 +9,10 @@ import {
   deleteAnnouncement,
 } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
+import { AnnouncementSkeleton } from '../components/LoadingSkeleton';
+import SuccessToast from "../components/SuccessToast.jsx";
+import ErrorToast from "../components/ErrorToast.jsx";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 const PER_PAGE = 4;
 const EMPTY_FORM = { title: "", content: "" };
@@ -24,6 +28,9 @@ const SystemSettings = () => {
   const [isAdding, setIsAdding]           = useState(true);
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState(null);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false });
 
   const fetchAnnouncements = useCallback(async (page = 1) => {
     setLoading(true);
@@ -61,7 +68,7 @@ const SystemSettings = () => {
         prev.map((a) => (a.id === ann.id ? res.data : a))
       );
     } catch {
-      setError("Failed to update announcement.");
+      setErrorMsg("Failed to update announcement.");
     }
   };
 
@@ -71,15 +78,17 @@ const SystemSettings = () => {
     try {
       if (isAdding) {
         await createAnnouncement(form);
+        setSuccessMsg("Announcement posted successfully!");
       } else {
         await updateAnnouncement(selected.id, form);
+        setSuccessMsg("Changes saved successfully!");
       }
       setForm(EMPTY_FORM);
       setSelected(null);
       setIsAdding(true);
       fetchAnnouncements(currentPage);
     } catch {
-      setError("Failed to save announcement.");
+      setErrorMsg("Failed to save announcement.");
     }
   };
 
@@ -92,7 +101,7 @@ const SystemSettings = () => {
       setIsAdding(true);
       fetchAnnouncements(currentPage);
     } catch {
-      setError("Failed to delete announcement.");
+      setErrorMsg("Failed to delete announcement.");
     }
   };
 
@@ -113,8 +122,8 @@ const SystemSettings = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
-      <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 items-start">
+    <div className={`font-sans px-4 sm:px-6 py-8 flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+      <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-6 sm:gap-8 items-start justify-center">
         {/* Left Panel */}
         <div className="w-full lg:w-105 shrink-0">
           <div className="mb-4">
@@ -133,16 +142,28 @@ const SystemSettings = () => {
               <hr className={`mt-3 ${isDark ? 'border-[#3e4042]' : 'border-gray-300'}`} />
             </div>
             <div className="px-4 pb-4 space-y-3 flex-1 overflow-y-auto">
-              {loading && <p className={`text-center text-sm py-8 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>Loading...</p>}
               {error && <p className="text-center text-red-400 text-sm py-8">{error}</p>}
-              {!loading && announcements.length === 0 && (
-                <p className={`text-center text-sm py-8 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>No announcements found.</p>
-              )}
-              {!loading && announcements.map((ann) => (
+              
+              {loading ? (
+                <AnnouncementSkeleton isDark={isDark} count={4} />
+              ) : announcements.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className={`w-16 h-16 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
+                    <MagnifyingGlassIcon className={`w-8 h-8 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
+                  </div>
+                  <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                    No Announcements
+                  </h3>
+                  <p className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                    Create your first announcement now.
+                  </p>
+                </div>
+              ) : (
+                announcements.map((ann) => (
                 <div
                   key={ann.id}
                   onClick={() => handleCardClick(ann)}
-                  className={`rounded-xl px-4 py-4 shadow-sm cursor-pointer transition-all ${selected?.id === ann.id ? 'ring-2 ring-yellow-400' : 'hover:shadow-md'} ${isDark ? 'bg-[#1f1f1f] border border-[#3e4042]' : 'bg-white'}`}
+                  className={`rounded-xl outline-offset-2 p-2 mt-3 px-4 py-4 shadow-sm cursor-pointer transition-all ${selected?.id === ann.id ? 'ring-2 ring-yellow-400' : 'hover:shadow-md'} ${isDark ? 'bg-[#1f1f1f] border border-[#3e4042]' : 'bg-white'}`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className={`text-sm font-bold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>{ann.title}</span>
@@ -162,7 +183,7 @@ const SystemSettings = () => {
                   </div>
                   <p className={`text-xs leading-relaxed line-clamp-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{ann.content}</p>
                 </div>
-              ))}
+              )))}
             </div>
             <div className={`flex items-center justify-center gap-1 px-4 py-3 border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-300'}`}>
               <button
@@ -236,8 +257,9 @@ const SystemSettings = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={handleDelete}
-                    className={`px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-colors ${isDark ? 'bg-red-900/40 hover:bg-red-900/60' : 'bg-red-500 hover:bg-red-600'}`}
+                    onClick={() => setDeleteModal({ isOpen: true })}
+                    className={`px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-colors 
+                      ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon hover:bg-red-800'} border border-transparent`}
                   >
                     Delete
                   </button>
@@ -245,12 +267,33 @@ const SystemSettings = () => {
               )}
               <button
                 type="submit"
-                className={`px-8 py-2.5 rounded-full text-sm font-bold transition-all shadow ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
-              >
+                className={`px-8 py-2.5 rounded-full text-sm font-bold transition-all shadow ${
+                  isDark
+                    ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}              >
                 {isAdding ? "Add Announcement" : "Save Changes"}
               </button>
             </div>
           </form>
+          <ConfirmationModal
+            isOpen={deleteModal.isOpen}
+            onClose={() => setDeleteModal({ isOpen: false })}
+            onConfirm={handleDelete}
+            title="Delete Announcement"
+            message="This will permanently remove this announcement. This action cannot be undone."
+            type="danger"
+          />
+          
+          <SuccessToast 
+            message={successMsg} 
+            onClose={() => setSuccessMsg("")} 
+          />
+          
+          <ErrorToast 
+            message={errorMsg} 
+            onClose={() => setErrorMsg("")} 
+          />
         </div>
       </div>
     </div>

@@ -79,6 +79,29 @@ return [
             'after_commit' => true,
         ],
 
+        // -------------------------------------------------------
+        // redis-broadcasts — dedicated Redis connection for the
+        // broadcasts queue. Redis replaces the DB poll loop with
+        // a BLPOP blocking pop, giving sub-100 ms pickup vs the
+        // 1–2 s poll delay of the database driver.
+        // The broadcast-worker container must use this connection:
+        //   php artisan queue:work redis-broadcasts --queue=broadcasts
+        // -------------------------------------------------------
+        'redis-broadcasts' => [
+            'driver'       => 'redis',
+            'connection'   => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue'        => 'broadcasts',
+            'retry_after'  => 30,   // tight — broadcast jobs are fast
+            'block_for'    => 5,    // BLPOP wait: no CPU spin, instant pickup
+            // true = Laravel holds the BroadcastEvent job in memory until
+            // the surrounding DB::transaction commits before pushing it onto
+            // the Redis queue. This closes the race condition where the
+            // WebSocket push arrived at the browser before the notifications
+            // row was visible to other DB connections, causing REST follow-up
+            // calls to 404 or return stale data and toasts to flash then vanish.
+            'after_commit' => true,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],

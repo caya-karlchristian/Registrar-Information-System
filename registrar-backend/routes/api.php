@@ -15,9 +15,11 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\SsoCallbackController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AiQueryController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
 use App\Http\Controllers\AlumniSystemController;
+use App\Http\Controllers\ProgramController;
 
 /*
 |--------------------------------------------------------------------------
@@ -25,7 +27,7 @@ use App\Http\Controllers\AlumniSystemController;
 |--------------------------------------------------------------------------
 */
 Route::post('/login', [AuthController::class, 'login'])
-    ->middleware('throttle:10,1');
+    ->middleware('throttle:60,1');
 
 Route::post('/auth/callback', [SsoCallbackController::class, 'handle'])
     ->middleware('throttle:20,1');
@@ -85,6 +87,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Document requests
     Route::prefix('document-requests')->group(function () {
         Route::get('/',                           [DocumentRequestController::class, 'index']);
+        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware('role:3,4');
         Route::get('{id}',                        [DocumentRequestController::class, 'show']);
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware('role:3');
@@ -101,7 +104,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.
-    Route::prefix('request-history')->group(function () {
+    Route::middleware('role:3,4')->prefix('request-history')->group(function () {
         Route::get('/',    [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
     });
@@ -116,6 +119,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::get('request-statuses/{id}',      [RequestStatusController::class, 'show']);
     Route::get('request-purposes',      [RequestPurposeController::class, 'index']);
     Route::get('request-purposes/{id}', [RequestPurposeController::class, 'show']);
+    Route::get('programs', [ProgramController::class, 'index']);
 
     // Admin only (role 3 — superadmin bypasses via RoleMiddleware)
     Route::middleware('role:3')->group(function () {
@@ -141,7 +145,11 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
             Route::get('processing-time',  [AnalyticsController::class, 'processingTime']);
             Route::get('peak-hours',       [AnalyticsController::class, 'peakHours']);
             Route::get('by-purpose',       [AnalyticsController::class, 'byPurpose']);
-            Route::post('ai-report',          [AnalyticsController::class, 'aiReport']);
+            Route::post('ai-report', [AnalyticsController::class, 'aiReport'])
+                ->middleware('throttle:30,1');
+            // Phase 3 — Conversational NLQ
+            Route::post('ai-query', [AiQueryController::class, 'query'])
+                ->middleware('throttle:30,1');
         });
 
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
@@ -158,4 +166,21 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::put('announcements/{announcement}',        [AnnouncementController::class, 'update']);
         Route::delete('announcements/{announcement}',     [AnnouncementController::class, 'destroy']);
     });
+});
+/*
+|--------------------------------------------------------------------------
+| LOCAL AUTH ROUTES  (added by apply_local_auth.py)
+|--------------------------------------------------------------------------
+| POST /api/auth/local-login         — always local, bypasses IDP
+| POST /api/auth/local-password      — superadmin: set a user's local pwd
+| GET  /api/auth/local-auth-status   — superadmin: list local-auth coverage
+*/
+use App\Http\Controllers\LocalAuthController;
+
+Route::post('/auth/local-login', [LocalAuthController::class, 'login'])
+    ->middleware('throttle:60,1');
+
+Route::middleware(['auth:sanctum', 'role:4'])->group(function () {
+    Route::post('/auth/local-password',    [LocalAuthController::class, 'setPassword']);
+    Route::get('/auth/local-auth-status',  [LocalAuthController::class, 'status']);
 });

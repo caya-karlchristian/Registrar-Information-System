@@ -109,7 +109,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-20 modal-overlay-container flex items-center justify-center">
       <div className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} onClick={() => setConfirmClose(true)} />
 
       <div className={`relative rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>

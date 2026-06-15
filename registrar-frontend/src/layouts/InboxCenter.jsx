@@ -1,32 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useLocation } from 'react-router-dom';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
 import { useNotificationsContext as useNotifications } from '../context/NotificationsContext';
 import { useTheme } from '../context/ThemeContext';
-
-// -------------------------------------------------------
-// Maps backend trigger_event → human-readable category
-// -------------------------------------------------------
-const CATEGORY_MAP = {
-  request_submitted:          'Submitted',
-  payment_verified:           'Payment',
-  payment_invalid:            'Payment',
-  status_updated:             'Update',
-  request_processing:         'Processing',
-  action_needed:              'Action',
-  ready_to_claim:             'Ready',
-  request_completed:          'Completed',
-  request_forfeited:          'Forfeited',
-  reminder_claim:             'Reminder',
-  reminder_final_warning:     'Warning',
-  request_closed:             'Closed',
-  request_auto_archived:      'Archived',
-  admin_new_request:          'Important',
-  admin_payment_verification: 'Payment',
-  admin_incomplete_request:   'Incomplete',
-  admin_deadline_warning:     'Deadline',
-};
+import { InboxListSkeleton, InboxPreviewSkeleton } from '../components/LoadingSkeleton'; 
+import { EnvelopeOpenIcon } from '@heroicons/react/24/outline';
+// CATEGORY_MAP lives in src/constants/notificationCategories.js
+// InboxCenter only uses the .category label from each entry.
+import { CATEGORY_MAP } from '../constants/notificationCategories';
 
 const formatTime = (isoString) => {
   if (!isoString) return '';
@@ -46,7 +28,7 @@ const toMailItem = (n) => ({
   email:   'no-reply@ris.local',
   subject: n.title,
   preview: n.message,
-  category: CATEGORY_MAP[n.type] ?? 'Notification',
+  category: CATEGORY_MAP[n.type]?.category ?? 'Notification',
   time:    n.created_at,
   unread:  n.is_unread ?? !n.read_at,
   // Keep original for markAsRead and requirements checklist
@@ -61,6 +43,9 @@ const InboxCenter = () => {
   const {
     notifications,
     loading,
+    loadingMore,
+    hasMore,
+    loadMore,
     markAsRead,
     dismiss,
   } = useNotifications();
@@ -111,6 +96,28 @@ const InboxCenter = () => {
     }
   };
 
+  // ── Infinite-scroll setup ───────────────────────────────────────────────
+  const scrollRef   = useRef(null);
+  const sentinelRef = useRef(null);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root     = scrollRef.current;
+    if (!sentinel || !root) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !loadingMore) {
+          loadMore();
+        }
+      },
+      { root, threshold: 0, rootMargin: '0px 0px 100px 0px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loadMore]);
+
   return (
     <>
       <div className="w-full max-w-6xl mx-auto px-4">
@@ -135,17 +142,21 @@ const InboxCenter = () => {
                 />
               </div>
 
-              <div className="max-h-[60vh] lg:max-h-[calc(72vh-130px)] overflow-y-auto">
+              {/* IntersectionObserver sentinel — fires loadMore when the
+                  user scrolls to the bottom of the list. scrollRef is the
+                  container; sentinelRef is the invisible div at the bottom. */}
+              <div
+                ref={scrollRef}
+                className="max-h-[60vh] lg:max-h-[calc(72vh-130px)] overflow-y-auto"
+              >
                 {loading ? (
-                  <div className={`p-8 text-center text-sm animate-pulse ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
-                    Loading notifications…
-                  </div>
-                ) : filteredEmails.length === 0 ? (
-                  <div className={`p-8 text-center text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                    No messages found.
-                  </div>
-                ) : (
-                  filteredEmails.map((mail) => {
+                    <InboxListSkeleton isDark={isDark} count={6} />
+                  ) : filteredEmails.length === 0 ? (
+                    <div className={`p-8 text-center text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                      No messages found.
+                    </div>
+                  ) : (
+                    filteredEmails.map((mail) => {
                     const isActive = selectedMail?.id === mail.id;
                     return (
                       <button
@@ -174,13 +185,25 @@ const InboxCenter = () => {
                     );
                   })
                 )}
+
+                {/* Sentinel: observed by IntersectionObserver below.
+                    When it enters the viewport, loadMore() is called. */}
+                <div ref={sentinelRef} aria-hidden="true" />
+
+                {loadingMore && (
+                  <div className="opacity-50">
+                    <InboxListSkeleton isDark={isDark} count={2} />
+                </div>
+                )}
               </div>
             </aside>
 
             {/* ── RIGHT PANEL: preview / compose ── */}
             <section className={`flex flex-col ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
-              {selectedMail ? (
-                <>
+                {loading ? (
+                  <InboxPreviewSkeleton isDark={isDark} />
+                ) : selectedMail ? (
+                  <>
                   <header className={`px-4 md:px-6 py-4 border-b ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
                     <p className={`text-[11px] uppercase tracking-[0.2em] font-black ${isDark ? 'text-pup-yellow/70' : 'text-[#6D0000]/55'}`}>
                       Selected Inbox Message
@@ -189,7 +212,7 @@ const InboxCenter = () => {
                       {selectedMail.subject}
                     </h3>
                     <p className={`text-sm mt-1 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
-                      Date: {formatTime(selectedMail.time)}
+                      Date and Time: {formatTime(selectedMail.time)}
                     </p>
                   </header>
 
@@ -203,7 +226,7 @@ const InboxCenter = () => {
                           </p>
                           <div className="space-y-2">
                             <p className={`text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>
-                              <span className={`font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>Sender:</span>{' '}
+                              <span className={`font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>Title:</span>{' '}
                               {selectedMail.from}
                             </p>
                             <p className={`text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>
@@ -257,16 +280,19 @@ const InboxCenter = () => {
                   </div>
                 </>
               ) : (
-                <div className={`h-full flex items-center justify-center ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                  <div className="text-center px-4">
-                    <ArrowLeftIcon className={`w-10 h-10 mx-auto mb-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
-                    <p className="font-medium">
-                      {loading
-                        ? 'Loading your notifications…'
-                        : 'Select a message from the inbox to view details.'}
-                    </p>
-                  </div>
+                <div className="h-full flex flex-col items-center justify-center p-8">
+                <div className={`w-24 h-24 mb-6 flex items-center justify-center rounded-full transition-colors ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
+                  <EnvelopeOpenIcon className={`w-12 h-12 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
                 </div>
+                
+                <h3 className={`text-lg font-bold mb-2 tracking-tight ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                  No Message Selected
+                </h3>
+                
+                <p className={`text-sm text-center max-w-xs leading-relaxed ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                  Select a conversation from the sidebar to read its contents and view your requirements checklist.
+                </p>
+              </div>
               )}
             </section>
 

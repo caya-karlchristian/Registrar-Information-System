@@ -40,7 +40,7 @@ const ErrorToast = ({ message, onClose }) => {
   return (
     <div
       ref={toastRef}
-      className={`fixed top-26 lg:top-30 right-3 lg:right-5 md:right-5 z-9999 flex items-center w-auto max-w-sm px-4 py-3 rounded-lg shadow-xl animate-slide-in-right ${isDark ? 'text-[#e4e6eb] bg-[#242526] border border-[#3e4042]' : 'text-white bg-pup-maroon border border-white/20'}`}
+      className={`fixed toast-container-shifted right-3 lg:right-5 md:right-5 z-9999 flex items-center w-auto max-w-sm px-4 py-3 rounded-lg shadow-xl animate-slide-in-right ${isDark ? 'text-[#e4e6eb] bg-[#242526] border border-[#3e4042]' : 'text-white bg-pup-maroon border border-white/20'}`}
     >
       <div className={`flex items-center justify-center w-9 h-9 rounded-md ${isDark ? 'text-[#FFC72C] bg-[#1a1b1e]' : 'text-pup-maroon bg-white'}`}>
         <ExclamationCircleIcon className="w-9 h-7" strokeWidth={2.5} />

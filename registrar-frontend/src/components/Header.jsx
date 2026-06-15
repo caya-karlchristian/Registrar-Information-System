@@ -19,9 +19,9 @@ function Header({ onMenuClick }) {
   return (
     <header
       style={headerStyle}
-      className="dark:bg-[#242526] w-full shadow-sm dark:shadow-lg fixed top-0 left-0 right-0 z-50 border-b-[5px] border-yellow-400 transition-all duration-200"
+      className="dark:bg-[#242526] w-full shadow-sm dark:shadow-lg fixed top-0 left-0 right-0 z-9999 border-b-[5px] border-yellow-400 transition-all duration-200"
     >
-      <div className="w-full px-4 py-4 flex justify-between items-center h-full">
+      <div className="w-full px-4 py-4 z-9999 flex justify-between items-center h-full">
         <div className="flex space-x-4 items-center">
           <img
             src={LogoImage}
@@ -46,9 +46,10 @@ function Header({ onMenuClick }) {
             title="Notifications"
           >
             <BellIcon className="w-8 h-8 text-white group-hover:scale-110 transition-transform duration-200" />
+
             {unreadCount > 0 && (
-              <span className="absolute top-2 right-2 flex h-3 w-3">
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600 dark:bg-red-500 border-2 border-white shadow-lg dark:shadow-red-500/50 animate-pulse"></span>
+              <span className="absolute top-0 right-0 flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-red-600 dark:bg-red-500 border-2 border-white text-[10px] font-bold text-white shadow-lg dark:shadow-red-500/50">
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>

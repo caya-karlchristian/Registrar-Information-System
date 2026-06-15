@@ -1,33 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { useNotificationsContext as useNotifications } from '../context/NotificationsContext';
 import { useTheme } from '../context/ThemeContext';
 
-// -------------------------------------------------------
-// Maps backend trigger_event → display category + color
-// -------------------------------------------------------
-const CATEGORY_MAP = {
-  // Student/Alumni
-  request_submitted:       { category: 'Submitted',   color: 'bg-blue-400' },
-  payment_verified:        { category: 'Payment',     color: 'bg-green-400' },
-  payment_invalid:         { category: 'Payment',     color: 'bg-rose-600' },
-  status_updated:          { category: 'Update',      color: 'bg-blue-400' },
-  request_processing:      { category: 'Processing',  color: 'bg-blue-400' },
-  action_needed:           { category: 'Action',      color: 'bg-rose-600' },
-  ready_to_claim:          { category: 'Ready',       color: 'bg-green-400' },
-  request_completed:       { category: 'Completed',   color: 'bg-green-400' },
-  request_forfeited:       { category: 'Forfeited',   color: 'bg-rose-600' },
-  reminder_claim:          { category: 'Reminder',    color: 'bg-pup-yellow' },
-  reminder_final_warning:  { category: 'Warning',     color: 'bg-rose-600' },
-  request_closed:          { category: 'Closed',      color: 'bg-white/40' },
-  request_auto_archived:   { category: 'Archived',    color: 'bg-white/40' },
-  // Admin
-  admin_new_request:          { category: 'Important', color: 'bg-rose-600' },
-  admin_payment_verification: { category: 'Payment',   color: 'bg-pup-yellow' },
-  admin_incomplete_request:   { category: 'Incomplete',color: 'bg-rose-600' },
-  admin_deadline_warning:     { category: 'Deadline',  color: 'bg-pup-yellow' },
-};
+// CATEGORY_MAP lives in src/constants/notificationCategories.js
+// — edit it there; changes apply to both NotificationModal and NotificationToast.
+import { CATEGORY_MAP } from '../constants/notificationCategories';
 
 const formatTime = (isoString) => {
   if (!isoString) return '';
@@ -116,6 +95,9 @@ const NotificationModal = ({ isOpen, onClose }) => {
     notifications,
     unreadCount,
     loading,
+    loadMore,
+    loadingMore,
+    hasMore,
     markAsRead,
     markAllAsRead,
   } = useNotifications();
@@ -124,6 +106,42 @@ const NotificationModal = ({ isOpen, onClose }) => {
     if (activeTab === 'unread') return notifications.filter(n => !n.read_at);
     return notifications;
   }, [activeTab, notifications]);
+
+  // ── Infinite-scroll setup ──────────────────────────────────────────────
+  // listRef    → the scrollable notification list container
+  // sentinelRef → invisible div at the very bottom of the list
+  //
+  // IntersectionObserver fires loadMore() whenever the sentinel enters the
+  // visible area of listRef, letting users scroll through all their
+  // notifications without a separate 'View all' / page click.
+  //
+  // IMPORTANT: these hooks must be declared BEFORE any conditional return.
+  // React requires hooks to be called in the same order on every render —
+  // placing useRef/useEffect after "if (!isOpen) return null" caused a
+  // "hooks called in different order" error because those hooks were skipped
+  // on renders where isOpen was false.
+  // ──────────────────────────────────────────────────────────────────────
+  const listRef     = useRef(null);
+  const sentinelRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return; // don't observe while the modal is closed
+    const sentinel = sentinelRef.current;
+    const root     = listRef.current;
+    if (!sentinel || !root) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !loadingMore) {
+          loadMore();
+        }
+      },
+      { root, threshold: 0, rootMargin: '0px 0px 80px 0px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [isOpen, hasMore, loadingMore, loadMore]);
 
   if (!isOpen) return null;
 
@@ -180,8 +198,12 @@ const NotificationModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* List */}
-        <div className={`max-h-70 overflow-y-auto custom-scrollbar sm:max-h-105 ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}>
+        {/* List — scrollRef/sentinelRef power the IntersectionObserver
+             that triggers loadMore() as the user reaches the bottom. */}
+        <div
+          ref={listRef}
+          className={`max-h-70 overflow-y-auto custom-scrollbar sm:max-h-105 ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}
+        >
           {loading ? (
             <LoadingState />
           ) : filteredNotifs.length > 0 ? (
@@ -194,6 +216,16 @@ const NotificationModal = ({ isOpen, onClose }) => {
             ))
           ) : (
             <EmptyState />
+          )}
+
+          {/* Sentinel observed by the IntersectionObserver below */}
+          <div ref={sentinelRef} aria-hidden="true" />
+
+          {loadingMore && (
+            <div className={`py-3 text-center text-[10px] font-bold uppercase tracking-widest animate-pulse
+              ${isDark ? 'text-[#b0b3b8]' : 'text-white/40'}`}>
+              Loading more…
+            </div>
           )}
         </div>
 
