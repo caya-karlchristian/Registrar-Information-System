@@ -31,16 +31,21 @@ class AnalyticsService
                 SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as pending,
                 SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as ready_to_claim,
                 SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as completed,
-                SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as forfeited
+                SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as forfeited,
+                SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as cancelled
             ', [
                 RequestStatusEnum::Processing->value,
                 RequestStatusEnum::ReadyToClaim->value,
                 RequestStatusEnum::Completed->value,
                 RequestStatusEnum::Forfeited->value,
+                RequestStatusEnum::Cancelled->value, 
             ])
             ->first();
 
-        $total     = (int) $counts->total;
+        $total = (int) $counts->pending
+                    + (int) $counts->ready_to_claim
+                    + (int) $counts->completed
+                    + (int) $counts->forfeited;
         $completed = (int) $counts->completed;
         $forfeited = (int) $counts->forfeited;
 
@@ -64,6 +69,7 @@ class AnalyticsService
 
         return [
             'total'                  => $total,
+            'cancelled'      => (int) $counts->cancelled,
             'pending'                => (int) $counts->pending,
             'ready_to_claim'         => (int) $counts->ready_to_claim,
             'completed'              => $completed,
