@@ -124,7 +124,7 @@ const ProfilePage = ({ userType = "student" }) => {
 
 
   return (
-    <div className="min-h-screen flex items-start justify-center font-sans py-2 lg:-mt-5">
+    <div className="min-h-[calc(100vh-12rem)] flex items-start justify-center font-sans py-2 px-4 sm:px-6 lg:px-8 pt-10">
       <div className={`w-full max-w-7xl shadow-2xl overflow-hidden flex flex-col relative rounded-sm min-h-157.5 ${isDark ? 'bg-[#18191a] border border-[#3e4042]' : 'bg-pup-dark-maroon'}`}>
         
         <div className="h-3 w-full bg-[#eebc48]"></div>

@@ -8,7 +8,8 @@ const SubmitConfirmationModal = ({ isOpen, onClose, onConfirm, title, message })
   const { isDark } = useTheme();
 
   return (
-    <div className="fixed inset-x-0 top-24 bottom-0 z-30 bg-black/50 backdrop-blur-sm p-4 sm:p-6 flex items-center justify-center lg:left-72 lg:w-[calc(100vw-18rem)]">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 modal-overlay-container">
+
       <div className={`w-full max-w-sm sm:max-w-md ${isDark ? 'bg-[#242526] border border-[#3e4042] text-[#e4e6eb]' : 'bg-white'} rounded-xl sm:rounded-2xl shadow-2xl flex flex-col items-center justify-between p-5 sm:p-7 gap-5 sm:gap-6 animate-in fade-in zoom-in duration-200`}>
         
         {/* ICON */}

@@ -122,8 +122,8 @@ const SystemSettings = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
-      <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 items-start">
+    <div className={`font-sans px-4 sm:px-6 py-8 flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+      <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-6 sm:gap-8 items-start justify-center">
         {/* Left Panel */}
         <div className="w-full lg:w-105 shrink-0">
           <div className="mb-4">
