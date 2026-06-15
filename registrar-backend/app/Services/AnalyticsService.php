@@ -40,7 +40,10 @@ class AnalyticsService
             ])
             ->first();
 
-        $total     = (int) $counts->total;
+        $total = (int) $counts->pending
+                    + (int) $counts->ready_to_claim
+                    + (int) $counts->completed
+                    + (int) $counts->forfeited;
         $completed = (int) $counts->completed;
         $forfeited = (int) $counts->forfeited;
 
@@ -64,6 +67,7 @@ class AnalyticsService
 
         return [
             'total'                  => $total,
+            'cancelled'      => (int) $counts->cancelled,
             'pending'                => (int) $counts->pending,
             'ready_to_claim'         => (int) $counts->ready_to_claim,
             'completed'              => $completed,

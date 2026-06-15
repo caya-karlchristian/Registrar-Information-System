@@ -20,15 +20,15 @@ use Illuminate\Support\Facades\Log;
  */
 class IdpClient
 {
-    private string $baseUrl;
-    private string $clientId;
-    private string $clientSecret;
+    private string $baseUrl = '';
+    private string $clientId = '';
+    private string $clientSecret = '';
 
     public function __construct()
     {
-        $this->baseUrl      = config('sso.base_url');
-        $this->clientId     = config('sso.client_id');
-        $this->clientSecret = config('sso.client_secret');
+        $this->baseUrl = config('sso.base_url', '');
+        $this->clientId     = config('sso.client_id', '');
+        $this->clientSecret = config('sso.client_secret', '');
     }
 
     // -------------------------------------------------------------------------

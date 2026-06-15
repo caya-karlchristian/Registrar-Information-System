@@ -25,7 +25,7 @@ class AnthropicService
     private const API_URL     = 'https://api.anthropic.com/v1/messages';
     private const API_VERSION = '2023-06-01';
 
-    private string $apiKey;
+    private string $apiKey = '';
     private string $model;
 
     public function __construct()
