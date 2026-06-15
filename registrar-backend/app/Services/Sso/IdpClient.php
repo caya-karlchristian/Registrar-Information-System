@@ -21,8 +21,8 @@ use Illuminate\Support\Facades\Log;
 class IdpClient
 {
     private string $baseUrl = '';
-    private string $clientId;
-    private string $clientSecret;
+    private string $clientId = '';
+    private string $clientSecret = '';
 
     public function __construct()
     {
