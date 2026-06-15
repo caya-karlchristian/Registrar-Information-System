@@ -87,8 +87,8 @@ const LoadingOverlay = ({ isVisible = false, message = "Loading..." }) => {
   if (!isVisible) return null;
 
   return (
-    <div className={`fixed inset-x-0 top-24 bottom-0 z-30 flex flex-col items-center justify-center px-4 backdrop-blur-sm lg:left-72 lg:w-[calc(100vw-18rem)] ${isDark ? 'bg-[#18191a]/85' : 'bg-white/80'}`}>
-      <div className="flex flex-col items-center gap-3 sm:gap-4 text-center max-w-[90vw] lg:translate-x-15">
+    <div className={`fixed inset-0 z-20 flex flex-col modal-overlay-container  items-center justify-center px-4 backdrop-blur-sm ${isDark ? 'bg-[#18191a]/85' : 'bg-white/80'}`}>
+      <div className="flex flex-col items-center gap-3 sm:gap-4 text-center max-w-[90vw]">
 
         <div className="relative h-44 w-44 sm:h-52 sm:w-52">
           {IMGS.map((src, i) => (

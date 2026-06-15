@@ -116,8 +116,7 @@ const DocumentLists = () => {
   }, [documents]);
 
   return (
-    <div className={`min-h-screen font-sans ${isDark ? 'bg-[#18191a]' : 'bg-gray-50/50'}`}>
-      <div className="max-w-6xl mx-auto px-4 pt-4 pb-10">
+      <div className="w-full pb-10">
         {/* --- HEADER --- */}
         <div className={`mb-8 border-b-2 pb-6 ${isDark ? 'border-yellow-600/30' : 'border-[#4a120e]/10'}`}>
           <h1 className={`text-3xl font-black uppercase tracking-tighter ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
@@ -126,7 +125,7 @@ const DocumentLists = () => {
         </div>
 
         {/* --- FIXED GRID LAYOUT --- */}
-        <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {loading ? (
             <DocumentListSkeleton isDark={isDark} />
           ) : documents.length === 0 ? (
@@ -250,9 +249,8 @@ const DocumentLists = () => {
             );
           })
           )}
-        </main>
+        </div>
       </div>
-    </div>
   );
 };
 

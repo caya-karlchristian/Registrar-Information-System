@@ -179,8 +179,8 @@ const UserManagement = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
-
+    <div className={`font-sans items-center flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+      <div className="w-full max-w-6xl flex flex-col">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-6">
 
@@ -360,6 +360,7 @@ const UserManagement = () => {
         message={errorMsg} 
         onClose={() => setErrorMsg("")} 
       />
+    </div>
     </div>
   );
 };

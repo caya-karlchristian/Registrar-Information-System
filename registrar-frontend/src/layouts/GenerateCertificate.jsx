@@ -403,10 +403,10 @@ useEffect(() => {
   const FIELD_CONFIG = buildFieldConfig(courseOptions);
 
   return (
-    <div className={`mt-15 lg:mt-10 md:mt-10 flex flex-col ${isDark ? 'bg-[#18191a]' : 'bg-white'}`}>
+    <div className={`flex flex-col p-5 bg-transparent ${isDark ? 'bg-[#18191a]' : 'bg-white'}`}>
 
       {/* Header Toolbar */}
-      <div className="relative z-10 w-full max-w-313.75 mx-auto px-4 pt-12 pb-3 md:px-6 md:pt-12 md:pb-4 print:hidden">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 pt-4 pb-3 md:px-6 md:pt-6 md:pb-4 print:hidden">
         <div className={`flex flex-col gap-4 rounded-2xl px-4 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-white/10 md:flex-row md:items-end md:justify-between md:px-5 md:py-5 ${isDark ? 'border-[#3e4042] bg-[#0f0f0f]' : 'border-stone-200/80 bg-white/90'}`}>
           <div className="relative z-10 w-full md:max-w-xs">
             <DropDown
