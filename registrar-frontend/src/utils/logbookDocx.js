@@ -154,6 +154,58 @@ const buildFooter = async () => {
               }),
             ],
           }),
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 60, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                children: [
+                  new Paragraph({
+                    spacing: { before: 50 },
+                    children: [
+                      new TextRun({
+                        text: 'This document contains personal-identifiable information that is subject to Data Privacy.',
+                        size: 13,
+                        color: 'FF0000',
+                        bold: true,
+                        font: 'Lucida Fax',
+                      }),
+                    ],
+                  }),
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: 'Please keep this document protected and in a safe place.',
+                        size: 13,
+                        color: 'FF0000',
+                        bold: true,
+                        font: 'Lucida Fax',
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new TableCell({
+                width: { size: 20, type: WidthType.PERCENTAGE },
+                borders: noBorder,
+                verticalAlign: VerticalAlign.BOTTOM,
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    spacing: { before: 50 },
+                    children: [
+                      new TextRun({
+                        text: 'This is system-generated, signature is not required.',
+                        size: 13,
+                        color: '555555',
+                        font: 'Lucida Fax',
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
         ],
       }),
     ],

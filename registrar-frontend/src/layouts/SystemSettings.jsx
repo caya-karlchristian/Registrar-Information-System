@@ -127,14 +127,7 @@ const SystemSettings = () => {
         {/* Left Panel */}
         <div className="w-full lg:w-105 shrink-0">
           <div className="mb-4">
-            <InputGroup
-              label="Set Academic Year"
-              name="academicYear"
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              placeholder="e.g. 2025-2026"
-              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
-            />
+            
           </div>
           <div className={`rounded-xl w-full lg:max-w-lg flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
             <div className="px-6 pt-5 pb-3 text-center">

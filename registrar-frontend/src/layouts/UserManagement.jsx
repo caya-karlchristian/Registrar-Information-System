@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  PencilSquareIcon,
-  TrashIcon,
-  PlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   MagnifyingGlassIcon,
@@ -11,7 +8,7 @@ import DropDown from '../components/DropDown';
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import UserModal from "../components/UserModal";
 import ConfirmationModal from "../components/ConfirmationModal";
-import { getSystemUsers, createSystemUser, updateSystemUser, deleteSystemUser } from "../services/api";
+import { getSystemUsers } from "../services/api";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import { useTheme } from "../context/ThemeContext";
@@ -58,17 +55,11 @@ const UserManagement = () => {
   const [dateOrder, setDateOrder]     = useState("Newest");
   const [statusFilter, setStatusFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
-  const [selected, setSelected]       = useState([]);
 
   const [users, setUsers]             = useState([]);
   const [loading, setLoading]         = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-
-  const [editUser, setEditUser]       = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [submitting, setSubmitting]   = useState(false);
 
   // -------------------------------------------------------
   // Fetch users
@@ -115,59 +106,7 @@ const UserManagement = () => {
   const safePage   = Math.min(currentPage, totalPages);
   const paginated  = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
-  const allSelected =
-    paginated.length > 0 &&
-    paginated.every((u) => selected.includes(u.user_id));
-
-  const toggleAll = () =>
-    allSelected
-      ? setSelected((s) => s.filter((id) => !paginated.map((u) => u.user_id).includes(id)))
-      : setSelected((s) => [...new Set([...s, ...paginated.map((u) => u.user_id)])]);
-
-  const toggleOne = (id) =>
-    setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
-
   const handleFilterChange = () => setCurrentPage(1);
-
-  // -------------------------------------------------------
-  // Create / Update
-  // -------------------------------------------------------
-  const handleSubmit = async (formData, userId) => {
-    setSubmitting(true);
-    try {
-      if (userId) {
-        await updateSystemUser(userId, formData);
-        setSuccessMsg("User details updated successfully!");
-      } else {
-        await createSystemUser(formData);
-        setSuccessMsg("New user has been created!");
-      }
-      await fetchUsers();
-      setIsModalOpen(false);
-      setEditUser(null);
-    } catch (err) {
-      setErrorMsg(err.response?.data?.message || "An unexpected error occurred.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // -------------------------------------------------------
-  // Delete
-  // -------------------------------------------------------
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await deleteSystemUser(deleteTarget.user_id);
-      await fetchUsers();
-      setSelected((s) => s.filter((id) => id !== deleteTarget.user_id));
-      setSuccessMsg(`User ${deleteTarget.email} has been deleted.`);
-    } catch (err) {
-      setErrorMsg(err.response?.data?.message ||"Failed to delete user.");
-    } finally {
-      setDeleteTarget(null);
-    }
-  };
 
   const pageNumbers = () => {
     if (totalPages <= 6) return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -218,13 +157,6 @@ const UserManagement = () => {
             options={DATE_OPTIONS} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
           />
         </div>
-
-        <button
-          onClick={() => { setEditUser(null); setIsModalOpen(true); }}
-          className={`sm:ml-auto mt-4 sm:mt-6 w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-full text-sm font-semibold shadow transition-all ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
-        >
-          Add User <PlusIcon className="w-4 h-4" />
-        </button>
       </div>
 
       {/* Table */}
@@ -233,11 +165,7 @@ const UserManagement = () => {
           <table className="w-full min-w-190 text-sm">
           <thead>
             <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
-              <th className="px-4 py-3 text-left w-10">
-                <input type="checkbox" checked={allSelected} onChange={toggleAll}
-                  className={`rounded accent-pup-dark-maroon ${isDark ? 'border-[#4e4f50] bg-[#1f1f1f]' : 'border-gray-300'}`} />
-              </th>
-              {["Name", "Email", "Role", "Joined Date", "Status", "Actions"].map((h) => (
+                {["Name", "Email", "Role", "Joined Date", "Status"].map((h) => (
                 <th key={h} className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{h}</th>
               ))}
             </tr>
@@ -247,7 +175,7 @@ const UserManagement = () => {
               <UserTableSkeleton isDark={isDark} count={10} />            
             ) : paginated.length === 0 ? (
             <tr>
-                <td colSpan={7} className="py-24">
+                <td colSpan={5} className="py-24">
                   <div className="flex flex-col items-center justify-center">
                     <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
                       <MagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
@@ -269,11 +197,6 @@ const UserManagement = () => {
                   : "—";
                 return (
                   <tr key={user.user_id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
-                    <td className="px-4 py-3">
-                      <input type="checkbox" checked={selected.includes(user.user_id)}
-                        onChange={() => toggleOne(user.user_id)}
-                        className={`rounded accent-pup-dark-maroon ${isDark ? 'border-[#4e4f50] bg-[#1f1f1f]' : 'border-gray-300'}`} />
-                    </td>
                     <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>{fullName}</td>
                     <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>{user.email}</td>
                     <td className="px-4 py-3">
@@ -286,18 +209,6 @@ const UserManagement = () => {
                       <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(user.status, isDark)}`}>
                         {user.status}
                       </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 justify-center">
-                        <button onClick={() => { setEditUser(user); setIsModalOpen(true); }}
-                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
-                          <PencilSquareIcon className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setDeleteTarget(user)}
-                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-red-300' : 'text-gray-400 hover:text-red-600'}`}>
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 );
@@ -327,29 +238,6 @@ const UserManagement = () => {
           </button>
         </div>
       </div>
-
-      {selected.length > 0 && (
-        <div className={`mt-3 text-xs ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>
-          {selected.length} user{selected.length > 1 ? "s" : ""} selected
-        </div>
-      )}
-
-      <UserModal
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditUser(null); }}
-        onSubmit={handleSubmit}
-        editData={editUser}
-        submitting={submitting}
-      />
-
-      <ConfirmationModal
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        title="Delete User?"
-        message={`This will permanently delete ${deleteTarget?.email}. This action cannot be undone.`}
-        type="danger"
-      />
 
       <SuccessToast 
         message={successMsg} 
