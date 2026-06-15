@@ -32,13 +32,11 @@ class AnalyticsService
                 SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as ready_to_claim,
                 SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as completed,
                 SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as forfeited,
-                SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as cancelled
             ', [
                 RequestStatusEnum::Processing->value,
                 RequestStatusEnum::ReadyToClaim->value,
                 RequestStatusEnum::Completed->value,
                 RequestStatusEnum::Forfeited->value,
-                RequestStatusEnum::Cancelled->value, 
             ])
             ->first();
 
