@@ -3,28 +3,51 @@ import risImage from "../assets/RIS1.png";
 import risLogo from "../assets/ris_logo.png";
 import Tech4wardProfile from "../components/Tech4wardProfile.jsx";
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthProvider';
 import { useState } from 'react';
 import LineLoading from "../components/LineLoading.jsx";
 import tech4ward from "../assets/Tech4ward_Logo.png";
 import LandingPage from "../layouts/LandingPage.jsx";
 
+const ROLE_HOME = {
+  student:     "/student",
+  alumni:      "/alumni",
+  admin:       "/staff",
+  super_admin: "/super-admin",
+};
+
 const MainPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
 
+  // If the user already has a valid session, send them straight to their dashboard.
   useEffect(() => {
     if (!user) return;
-    const destination = {
-      student:     "/student",
-      alumni:      "/alumni",
-      admin:       "/staff",
-      super_admin: "/super-admin",
-    }[user.role_name];
+    const destination = ROLE_HOME[user.role_name];
     if (destination) navigate(destination, { replace: true });
   }, [user, navigate]);
+
+  // Auto-SSO: when the portal links to us with ?sso=1 (or ?auto_login=1),
+  // skip showing the login page entirely and bounce straight to the IDP.
+  // The IDP already has the user's session from the portal, so it will
+  // immediately redirect back to /auth/callback?code=... with no interaction.
+  // We wait until AuthProvider has finished its /me check first — if the user
+  // already has a cookie session, the effect above will redirect them before
+  // this one fires.
+  useEffect(() => {
+    if (authLoading) return;         // wait for session check to complete
+    if (user) return;                // already handled above
+    const autoLogin = searchParams.get('sso') === '1' || searchParams.get('auto_login') === '1';
+    if (!autoLogin) return;
+
+    setLoading(true);
+    setTimeout(() => {
+      window.location.href = import.meta.env.VITE_SSO_LOGIN_URL;
+    }, 0);
+  }, [authLoading, user, searchParams]);
 
   const handleSsoLogin = () => {
     setLoading(true);
