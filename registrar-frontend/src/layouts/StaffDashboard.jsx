@@ -35,6 +35,28 @@ const STATUS_FALLBACK = {
 const ITEMS_PER_PAGE = 5;
 const PRINTED_CERTIFICATE_STORAGE_KEY = 'printed-certificate-request-ids';
 
+// How long (in ms) a Completed request stays visible on the default dashboard view.
+// After this window it is only surfaced when the user explicitly filters/searches for it.
+const COMPLETED_VISIBILITY_MS = 24 * 60 * 60 * 1000; // 1 day
+
+/**
+ * Returns true when a request should appear in the *default* (unfiltered) dashboard view.
+ * Rules:
+ *  - Processing   → always visible
+ *  - ReadyToClaim → always visible
+ *  - Completed    → visible only within COMPLETED_VISIBILITY_MS of requested_at
+ *  - Everything else (Forfeited, Cancelled, …) → hidden unless explicitly filtered/searched
+ */
+const isDefaultVisible = (req, resolvedIds) => {
+  const { statusId, timestamp } = req;
+  if (statusId === resolvedIds.PENDING) return true;
+  if (statusId === resolvedIds.READY)   return true;
+  if (statusId === resolvedIds.COMPLETED) {
+    return timestamp > 0 && (Date.now() - timestamp) <= COMPLETED_VISIBILITY_MS;
+  }
+  return false;
+};
+
 // Module-level constant — stable across renders, safe in useEffect deps.
 const DASHBOARD_REFETCH_TRIGGERS = new Set([
   'admin_new_request',
@@ -95,11 +117,11 @@ const StaffDashboard = () => {
   const resolvedStatusIds = statusIds();
 
   /* ---------------- FETCH DATA ---------------- */
-  const fetchData = useCallback(async (showOverlay = true) => {
+  const fetchData = useCallback(async (showOverlay = true, allStatuses = false) => {
     try {
       if (showOverlay) setLoading(true);
       const [requestsRes, statusesRes] = await Promise.all([
-        getDocumentRequests({ per_page: 200 }),
+        getDocumentRequests({ per_page: 200, ...(allStatuses ? { all_statuses: 1 } : {}) }),
         getRequestStatuses(),
       ]);
 
@@ -267,6 +289,13 @@ const StaffDashboard = () => {
 
   useEffect(() => {
     setCurrentPage(1);
+    // When the user activates an explicit filter or search, re-fetch the full
+    // dataset (including Forfeited / Cancelled / old Completed) so those records
+    // are available to display.  When they clear filters, drop back to the
+    // default active-only view.
+    const filtering = filterStatus !== 'All' || searchTerm.trim() !== '';
+    fetchData(false, filtering);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterStatus, searchTerm, sortOrder]);
 
   /* ---------------- STATUS UPDATE ---------------- */
@@ -294,16 +323,32 @@ const StaffDashboard = () => {
       .filter((name, index, self) => self.indexOf(name) === index),
   ];
 
+  // A "passive" state is one the user hasn't explicitly opted into seeing —
+  // Forfeited, Cancelled, and Completed requests older than 1 day.
+  // We only surface these when the user has set a non-default filter OR typed
+  // something in the search box.  That way the dashboard stays focused on
+  // actionable work without permanently discarding old records.
+  const isFiltering = filterStatus !== 'All' || searchTerm.trim() !== '';
+
   const filteredData = requests
     .filter(r => {
+      // --- visibility gate ---
+      // When in default (no filter/search) mode, only show active statuses.
+      if (!isFiltering && !isDefaultVisible(r, resolvedStatusIds)) return false;
+
+      // --- status filter (explicit) ---
       const matchesStatus =
         filterStatus === 'All' ||
         (filterStatus === 'Completed' && r.statusId === resolvedStatusIds.COMPLETED) ||
         r.statusName === filterStatus;
+
+      // --- search filter ---
       const matchesSearch =
+        searchTerm.trim() === '' ||
         r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.id.toString().includes(searchTerm);
+
       return matchesStatus && matchesSearch;
     })
     .sort((a, b) => (sortOrder === 'Old Requests' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp));
@@ -436,7 +481,7 @@ const StaffDashboard = () => {
           {/* 1. The Dropdown Grid (Now comes first) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:min-w-95">
             <DropdownGroup
-              label="Status"
+              label={`Status${!isFiltering ? ' (active only)' : ''}`}
               name="filterStatus"
               value={filterStatus}
               onChange={handleToolbarDropdownChange}
