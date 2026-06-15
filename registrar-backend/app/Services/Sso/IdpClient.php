@@ -27,8 +27,8 @@ class IdpClient
     public function __construct()
     {
         $this->baseUrl = config('sso.base_url', '');
-        $this->clientId     = config('sso.client_id');
-        $this->clientSecret = config('sso.client_secret');
+        $this->clientId     = config('sso.client_id', '');
+        $this->clientSecret = config('sso.client_secret', '');
     }
 
     // -------------------------------------------------------------------------
