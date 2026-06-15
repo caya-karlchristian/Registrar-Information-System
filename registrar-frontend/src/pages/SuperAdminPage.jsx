@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from '../components/Header.jsx';                        
 import Navigation from '../components/Navigation.jsx';
 import { useTheme } from '../context/ThemeContext';
@@ -7,9 +7,26 @@ import { useTheme } from '../context/ThemeContext';
 const SuperAdminPage = () => {
   const { isDark } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(101);
+
+  useEffect(() => {
+    const headerElement = document.querySelector('header');
+    if (!headerElement) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setHeaderHeight(entry.target.offsetHeight);
+      }
+    });
+    resizeObserver.observe(headerElement);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   return (
-    <div className={`flex flex-col h-screen overflow-hidden pt-25 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+    <div 
+      style={{ paddingTop: `${headerHeight}px` }}
+      className={`flex flex-col h-screen overflow-hidden ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}
+    >
       <Header onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
 
       <div className="flex flex-1 overflow-hidden relative">
