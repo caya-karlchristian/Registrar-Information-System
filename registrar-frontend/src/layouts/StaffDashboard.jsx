@@ -203,7 +203,7 @@ const StaffDashboard = () => {
           documentDetailsArray,
 
           // Metadata for Certificate Modal
-          course: r.student_profile?.course ?? '',
+          course: r.academic_record?.course ?? r.alumni_academic_record?.course ?? '',
           major: r.student_profile?.major ?? '',
           educationLevel: r.student_profile?.education_level ?? '',
           syAdmitted: r.academic_record?.sy_admitted ?? '',
