@@ -44,8 +44,13 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 
     protected function gate(): void
     {
-        Gate::define('viewTelescope', function (SystemUser $user) {
-            return $user->role_id === SystemUser::ROLE_SUPER_ADMIN;
+        Gate::define('viewTelescope', function ($user = null) {
+            if (!$user) {
+                $user = auth('sanctum')->user();
+            }
+            
+            return $user instanceof \App\Models\SystemUser 
+                && $user->role_id === \App\Models\SystemUser::ROLE_SUPER_ADMIN;
         });
     }
 }
