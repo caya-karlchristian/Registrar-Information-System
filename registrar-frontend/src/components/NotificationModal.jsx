@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { useNotificationsContext as useNotifications } from '../context/NotificationsContext';
 import { useTheme } from '../context/ThemeContext';
+import { useHeaderResponsiveState } from '../utils/helpers';
 
 // CATEGORY_MAP lives in src/constants/notificationCategories.js
 // — edit it there; changes apply to both NotificationModal and NotificationToast.
@@ -90,6 +91,7 @@ const NotificationModal = ({ isOpen, onClose }) => {
   const location  = useLocation();
   const [activeTab, setActiveTab] = useState('all');
   const { isDark } = useTheme();
+  const { headerHeight, isMobile } = useHeaderResponsiveState(isOpen);
 
   const {
     notifications,
@@ -202,6 +204,9 @@ const NotificationModal = ({ isOpen, onClose }) => {
              that triggers loadMore() as the user reaches the bottom. */}
         <div
           ref={listRef}
+          style={{
+            maxHeight: isMobile ? `calc(100vh - ${headerHeight}px - 140px)` : undefined
+          }}
           className={`max-h-70 overflow-y-auto custom-scrollbar sm:max-h-105 ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}
         >
           {loading ? (
