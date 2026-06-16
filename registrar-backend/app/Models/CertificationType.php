@@ -25,42 +25,66 @@ class CertificationType extends Model
     // and URL resolution in one step.
 
     // -----------------------------------------------------------------------
-    // Accessors — resolve bare storage paths → full URLs at read-time.
-    // Storing only the path (not an absolute URL) means the same DB row
-    // works correctly in every environment: local, staging, production, S3.
-    // Storage::url() reads APP_URL at runtime, so the host is always right.
+    // Accessors — resolve storage paths → full URLs at read-time.
+    //
+    // Values in the DB can be either:
+    //   (a) A full URL already (https://...) — stored by uploadLayoutLogo
+    //       after the S3 migration; returned as-is.
+    //   (b) A bare storage path (certification-layouts/1/header_left/file.png)
+    //       — stored by older code or local-disk uploads; resolved via
+    //       Storage::disk()->url() using the currently configured disk.
+    //
+    // This dual-mode handling ensures existing rows keep working after the
+    // migration from local 'public' disk to S3.
     // -----------------------------------------------------------------------
+
+    /**
+     * Resolve a single stored value to a public URL.
+     * Already-absolute URLs are passed through unchanged.
+     */
+    private function resolveStorageUrl(?string $value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+        // Already a full URL (S3, CDN, or previous APP_URL-prefixed value).
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            return $value;
+        }
+        // Bare path — resolve through the currently configured disk.
+        return Storage::disk(config('filesystems.default', 'public'))->url($value);
+    }
 
     protected function layoutHeaderLeftUrl(): Attribute
     {
         return Attribute::make(
-            get: fn ($value) => $value ? Storage::url($value) : null,
+            get: fn ($value) => $this->resolveStorageUrl($value),
         );
     }
 
     protected function layoutHeaderRightUrl(): Attribute
     {
         return Attribute::make(
-            get: fn ($value) => $value ? Storage::url($value) : null,
+            get: fn ($value) => $this->resolveStorageUrl($value),
         );
     }
 
     /**
-     * layout_footer_urls is a JSON array of bare paths in the DB.
-     * On get:  decode JSON, map each path through Storage::url().
-     * On set:  accept an array of paths and JSON-encode it for storage.
-     *          The setter is here so ->update(['layout_footer_urls' => [...]])
-     *          works transparently without callers needing to json_encode.
+     * layout_footer_urls is a JSON array in the DB.
+     * Each element can be a full URL or a bare path (see resolveStorageUrl).
+     * On set: accept an array and JSON-encode it.
      */
     protected function layoutFooterUrls(): Attribute
     {
         return Attribute::make(
             get: function ($value) {
-                $paths = json_decode($value ?? '[]', true) ?? [];
-                return array_values(array_map(
-                    fn ($path) => Storage::url($path),
-                    array_filter($paths, fn ($p) => is_string($p) && trim($p) !== '')
-                ));
+                $items = json_decode($value ?? '[]', true) ?? [];
+                return array_values(array_filter(array_map(
+                    fn ($item) => is_string($item) && trim($item) !== ''
+                        ? $this->resolveStorageUrl($item)
+                        : null,
+                    $items
+                )));
             },
             set: fn ($value) => json_encode(array_values($value ?? [])),
         );
