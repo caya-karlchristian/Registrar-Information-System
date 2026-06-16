@@ -43,16 +43,11 @@ const SsoCallbackPage = () => {
     // without exposing the full token in the console.
     console.log(
       '[SSO] callback code:',
-      code ? `${code.slice(0, 8)}\u2026` : 'EMPTY \u2014 initiating OAuth flow',
+      code ? `${code.slice(0, 8)}\u2026` : 'EMPTY \u2014 check IdP redirect URL',
     );
 
     if (!code) {
-      // No code means the One Portal linked directly to /auth/callback without
-      // going through an OAuth flow first (it uses this URL as a plain href).
-      // Fix: kick off the OAuth authorize redirect ourselves. The IDP already
-      // has the user's active portal session, so it will skip its own login
-      // prompt and immediately redirect back here with ?code=... attached.
-      window.location.replace(import.meta.env.VITE_SSO_LOGIN_URL);
+      navigate('/', { replace: true });
       return;
     }
 
