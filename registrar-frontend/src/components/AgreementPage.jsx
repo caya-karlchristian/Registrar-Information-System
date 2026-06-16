@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthProvider";
+import { useHeaderResponsiveState } from "../utils/helpers";
 
 const AgreementPage = () => {
   const { isDark } = useTheme();
   const { logout, agreeToTerms, user } = useAuth(); 
   const [agreed, setAgreed] = useState(false);
   const [neverShow, setNeverShow] = useState(false);
+  const { headerHeight, isMobile } = useHeaderResponsiveState();
 
   const handleCancel = () => logout();
 
@@ -19,7 +21,11 @@ const AgreementPage = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 backdrop-blur-[2px]">
+    <div 
+      style={{
+          top: isMobile ? `${headerHeight}px` : "0px",
+        }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 backdrop-blur-[2px]">
       <div className={`w-full max-w-180 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-[#800000]/20'}`}>
 
         <div className={`px-6 py-6 border-b-4 ${isDark ? 'bg-[#1f1f1f] border-[#b98b00]' : 'bg-[#800000] border-[#FFD700]'}`}>
