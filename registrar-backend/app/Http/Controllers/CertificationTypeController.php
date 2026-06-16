@@ -153,18 +153,39 @@ class CertificationTypeController extends Controller
         ]);
 
         $slot = $validated['slot'] ?? 'footer';
-        $path = $request->file('logo')->store("certification-layouts/{$id}/{$slot}", 'public');
+
+        // Use the default disk from FILESYSTEM_DISK env var (e.g. 's3' in production).
+        // Storing on 'public' (local) while Storage::url() resolves via S3 caused
+        // images to be unreadable — the file existed on local disk but the URL
+        // pointed at S3 where nothing was uploaded.
+        $disk = config('filesystems.default', 'public');
+        $path = $request->file('logo')->store("certification-layouts/{$id}/{$slot}", $disk);
+
+        // Persist the resolved public URL into the correct layout column so the
+        // model accessors don't need to re-resolve it later (S3 pre-signed URLs
+        // differ from local Storage::url() paths).
+        $url = Storage::disk($disk)->url($path);
+
+        $column = match ($slot) {
+            'header_left'  => 'layout_header_left_url',
+            'header_right' => 'layout_header_right_url',
+            default        => null, // footer: caller appends via updateLayout
+        };
+
+        if ($column) {
+            // Store the full public URL for header slots so the accessor returns
+            // the correct S3 URL without double-prefixing.
+            $cert->update([$column => $url]);
+        }
 
         return response()->json([
             'message' => 'Logo uploaded successfully',
             'data'    => [
                 'slot' => $slot,
                 'path' => $path,
-                // Return the bare storage path, not an absolute URL.
-                // The CertificationType model accessor resolves it to a full
-                // URL at read-time using the current environment's APP_URL,
-                // so the same value works in local, staging, and production.
-                'url'  => $path,
+                // Full public URL — S3 object URL in production, /storage/... locally.
+                // The frontend should use this directly as the new layout URL value.
+                'url'  => $url,
             ],
         ], 201);
     }
