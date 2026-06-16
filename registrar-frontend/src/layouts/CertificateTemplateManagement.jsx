@@ -16,6 +16,7 @@ import { CertFooter, CertHeader } from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import { useTheme } from "../context/ThemeContext";
 import SuccessToast from "../components/SuccessToast.jsx";
+import ErrorToast from "../components/ErrorToast.jsx";
 
 const toCertificateRows = (raw) => {
   if (Array.isArray(raw)) return raw;
@@ -94,7 +95,8 @@ const UploadDropZone = ({ label, multiple = false, onFiles, disabled = false }) 
       }}
     >
       <p className={`text-xs font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>{label}</p>
-      <p className={`mt-1 text-xs ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>Drag and drop image file{multiple ? "s" : ""} here</p>
+      <p className={`mt-0.5 text-xs ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>Drag and drop image file{multiple ? "s" : ""} here</p>
+      <p className={`text-[10px] ${isDark ? 'text-[#808080]' : 'text-gray-400'}`}>PNG, JPG, JPEG, SVG (MAX. 2MB)</p>
       <label
         className={`mt-2 inline-block rounded-md px-3 py-1.5 text-xs font-semibold text-white ${
           disabled
@@ -107,7 +109,7 @@ const UploadDropZone = ({ label, multiple = false, onFiles, disabled = false }) 
         Upload
         <input
           type="file"
-          accept="image/*"
+          accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
           multiple={multiple}
           className="hidden"
           disabled={disabled}
@@ -153,6 +155,24 @@ const CertificateTemplateManagement = () => {
   const [saving, setSaving] = useState(false);
   const autoSaveTimerRef = useRef(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const validateFile = (file) => {
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+    const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml"];
+    const fileExtension = file.name ? file.name.split('.').pop().toLowerCase() : '';
+    const ALLOWED_EXTENSIONS = ["png", "jpg", "jpeg", "svg"];
+    
+    const isValidType = ALLOWED_TYPES.includes(file.type) || ALLOWED_EXTENSIONS.includes(fileExtension);
+    
+    if (!isValidType) {
+      return "Invalid file type. Only PNG, JPG, JPEG, and SVG files are allowed.";
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      return "File is too large. Maximum allowed size is 2MB.";
+    }
+    return null;
+  };
 
   const dropdownCertifications = useMemo(() => {
     const byName = new Map();
@@ -237,6 +257,12 @@ const CertificateTemplateManagement = () => {
   const updateMainLogo = async (files) => {
     const [file] = files;
     if (!file) return;
+    const error = validateFile(file);
+    if (error) {
+      setErrorMessage(error);
+      return;
+    }
+    const previousUrl = layout.headerLeftUrl;
     try {
       const previewUrl = await toDataUrl(file);
       setLayout((prev) => ({ ...prev, headerLeftUrl: previewUrl }));
@@ -244,15 +270,26 @@ const CertificateTemplateManagement = () => {
       const logoUrl = await uploadSingleLogo("header_left", file);
       if (logoUrl) {
         setLayout((prev) => ({ ...prev, headerLeftUrl: logoUrl }));
+      } else {
+        setLayout((prev) => ({ ...prev, headerLeftUrl: previousUrl }));
+        setErrorMessage("Failed to upload main logo. Please try again.");
       }
     } catch (error) {
       console.error("Failed to upload main logo:", error);
+      setLayout((prev) => ({ ...prev, headerLeftUrl: previousUrl }));
+      setErrorMessage("Failed to upload main logo. Please try again.");
     }
   };
 
   const updateRightLogo = async (files) => {
     const [file] = files;
     if (!file) return;
+    const error = validateFile(file);
+    if (error) {
+      setErrorMessage(error);
+      return;
+    }
+    const previousUrl = layout.headerRightUrl;
     try {
       const previewUrl = await toDataUrl(file);
       setLayout((prev) => ({ ...prev, headerRightUrl: previewUrl }));
@@ -260,14 +297,26 @@ const CertificateTemplateManagement = () => {
       const logoUrl = await uploadSingleLogo("header_right", file);
       if (logoUrl) {
         setLayout((prev) => ({ ...prev, headerRightUrl: logoUrl }));
+      } else {
+        setLayout((prev) => ({ ...prev, headerRightUrl: previousUrl }));
+        setErrorMessage("Failed to upload right logo. Please try again.");
       }
     } catch (error) {
       console.error("Failed to upload right logo:", error);
+      setLayout((prev) => ({ ...prev, headerRightUrl: previousUrl }));
+      setErrorMessage("Failed to upload right logo. Please try again.");
     }
   };
 
   const addFooterLogos = async (files) => {
     if (!selectedCertId || !files.length) return;
+    const invalidFile = files.find(file => validateFile(file));
+    if (invalidFile) {
+      const error = validateFile(invalidFile);
+      setErrorMessage(error);
+      return;
+    }
+    const previousFooterUrls = [...layout.footerUrls];
     try {
       const previewUrls = await Promise.all(files.map((file) => toDataUrl(file)));
       setLayout((prev) => ({
@@ -275,18 +324,37 @@ const CertificateTemplateManagement = () => {
         footerUrls: [...prev.footerUrls, ...previewUrls],
       }));
 
-      const uploadedUrls = await Promise.all(files.map(async (file) => uploadSingleLogo("footer", file)));
+      const uploadedUrls = await Promise.all(files.map(async (file) => {
+        try {
+          return await uploadSingleLogo("footer", file);
+        } catch {
+          return null;
+        }
+      }));
 
-      previewUrls.forEach((previewUrl, index) => {
-        const uploadedUrl = uploadedUrls[index];
-        if (!uploadedUrl) return;
+      const allSuccess = uploadedUrls.every(url => !!url);
+      if (allSuccess) {
+        previewUrls.forEach((previewUrl, index) => {
+          const uploadedUrl = uploadedUrls[index];
+          setLayout((prev) => ({
+            ...prev,
+            footerUrls: prev.footerUrls.map((url) => (url === previewUrl ? uploadedUrl : url)),
+          }));
+        });
+      } else {
         setLayout((prev) => ({
           ...prev,
-          footerUrls: prev.footerUrls.map((url) => (url === previewUrl ? uploadedUrl : url)),
+          footerUrls: previousFooterUrls,
         }));
-      });
+        setErrorMessage("Failed to upload one or more footer logos. Please try again.");
+      }
     } catch (error) {
       console.error("Failed to upload footer logos:", error);
+      setLayout((prev) => ({
+        ...prev,
+        footerUrls: previousFooterUrls,
+      }));
+      setErrorMessage("Failed to upload footer logos. Please try again.");
     }
   };
 
@@ -445,7 +513,7 @@ const CertificateTemplateManagement = () => {
                   <input
                     type="range"
                     min="40"
-                    max="220"
+                    max="100"
                     value={layout.headerLogoSize}
                     onChange={(event) => setLayout((prev) => ({ ...prev, headerLogoSize: Number(event.target.value) }))}
                     className="w-full"
@@ -462,7 +530,7 @@ const CertificateTemplateManagement = () => {
                   <input
                     type="range"
                     min="24"
-                    max="160"
+                    max="100"
                     value={layout.footerLogoSize}
                     onChange={(event) => setLayout((prev) => ({ ...prev, footerLogoSize: Number(event.target.value) }))}
                     className="w-full"
@@ -501,6 +569,12 @@ const CertificateTemplateManagement = () => {
           <SuccessToast 
             message="Layout saved successfully!" 
             onClose={() => setSaveSuccess(false)} 
+          />
+        )}
+        {errorMessage && (
+          <ErrorToast 
+            message={errorMessage} 
+            onClose={() => setErrorMessage("")} 
           />
         )}
       </div>
