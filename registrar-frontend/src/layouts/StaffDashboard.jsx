@@ -21,7 +21,6 @@ import CertificateModal from '../components/CertificateModal.jsx';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
 import { useNotificationsContext } from '../context/NotificationsContext';
 import DropdownGroup from '../components/DropDown.jsx';
-import ConfirmationModal from '../components/ConfirmationModal';
 
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useTheme } from '../context/ThemeContext';
@@ -35,23 +34,23 @@ const STATUS_FALLBACK = {
 const ITEMS_PER_PAGE = 5;
 const PRINTED_CERTIFICATE_STORAGE_KEY = 'printed-certificate-request-ids';
 
-// How long (in ms) a Completed request stays visible on the default dashboard view.
-// After this window it is only surfaced when the user explicitly filters/searches for it.
-const COMPLETED_VISIBILITY_MS = 24 * 60 * 60 * 1000; // 1 day
+// Completed requests stay visible on the default dashboard for 1 day.
+// After that they only appear when the user explicitly filters/searches.
+const COMPLETED_VISIBILITY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Returns true when a request should appear in the *default* (unfiltered) dashboard view.
- * Rules:
- *  - Processing   → always visible
- *  - ReadyToClaim → always visible
- *  - Completed    → visible only within COMPLETED_VISIBILITY_MS of requested_at
- *  - Everything else (Forfeited, Cancelled, …) → hidden unless explicitly filtered/searched
+ * Default dashboard visibility rules:
+ *  - Pending / Processing / Ready to Claim → always shown
+ *  - Completed → shown only within 1 day of the request date
+ *  - Everything else (Forfeited, Cancelled, ...) → hidden unless filtered/searched
  */
 const isDefaultVisible = (req, resolvedIds) => {
-  const { statusId, timestamp } = req;
-  if (statusId === resolvedIds.PENDING) return true;
-  if (statusId === resolvedIds.READY)   return true;
-  if (statusId === resolvedIds.COMPLETED) {
+  const { statusId, statusName, timestamp } = req;
+  const name = String(statusName ?? '').trim().toLowerCase();
+  if (statusId === resolvedIds.PENDING || name === 'pending')         return true;
+  if (name === 'processing')                                           return true;
+  if (statusId === resolvedIds.READY || name === 'ready to claim')    return true;
+  if (statusId === resolvedIds.COMPLETED || name === 'completed') {
     return timestamp > 0 && (Date.now() - timestamp) <= COMPLETED_VISIBILITY_MS;
   }
   return false;
@@ -85,7 +84,7 @@ const StaffDashboard = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [certRequest, setCertRequest] = useState(null);
   const [requestStatuses, setRequestStatuses] = useState([]);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
   const [printedCertificateIds, setPrintedCertificateIds] = useState(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -117,11 +116,11 @@ const StaffDashboard = () => {
   const resolvedStatusIds = statusIds();
 
   /* ---------------- FETCH DATA ---------------- */
-  const fetchData = useCallback(async (showOverlay = true, allStatuses = false) => {
+  const fetchData = useCallback(async (showOverlay = true) => {
     try {
       if (showOverlay) setLoading(true);
       const [requestsRes, statusesRes] = await Promise.all([
-        getDocumentRequests({ per_page: 200, ...(allStatuses ? { all_statuses: 1 } : {}) }),
+        getDocumentRequests({ per_page: 200 }),
         getRequestStatuses(),
       ]);
 
@@ -225,7 +224,7 @@ const StaffDashboard = () => {
           documentDetailsArray,
 
           // Metadata for Certificate Modal
-          course: r.academic_record?.course ?? r.alumni_academic_record?.course ?? '',
+          course: r.student_profile?.course ?? '',
           major: r.student_profile?.major ?? '',
           educationLevel: r.student_profile?.education_level ?? '',
           syAdmitted: r.academic_record?.sy_admitted ?? '',
@@ -289,13 +288,6 @@ const StaffDashboard = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-    // When the user activates an explicit filter or search, re-fetch the full
-    // dataset (including Forfeited / Cancelled / old Completed) so those records
-    // are available to display.  When they clear filters, drop back to the
-    // default active-only view.
-    const filtering = filterStatus !== 'All' || searchTerm.trim() !== '';
-    fetchData(false, filtering);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterStatus, searchTerm, sortOrder]);
 
   /* ---------------- STATUS UPDATE ---------------- */
@@ -323,32 +315,24 @@ const StaffDashboard = () => {
       .filter((name, index, self) => self.indexOf(name) === index),
   ];
 
-  // A "passive" state is one the user hasn't explicitly opted into seeing —
-  // Forfeited, Cancelled, and Completed requests older than 1 day.
-  // We only surface these when the user has set a non-default filter OR typed
-  // something in the search box.  That way the dashboard stays focused on
-  // actionable work without permanently discarding old records.
+  // True when the user has explicitly chosen a status filter or typed a search term.
+  // In default mode the dashboard only shows actionable/recent work.
   const isFiltering = filterStatus !== 'All' || searchTerm.trim() !== '';
 
   const filteredData = requests
     .filter(r => {
-      // --- visibility gate ---
-      // When in default (no filter/search) mode, only show active statuses.
+      // Default view: hide Forfeited, Cancelled, and old Completed records.
       if (!isFiltering && !isDefaultVisible(r, resolvedStatusIds)) return false;
 
-      // --- status filter (explicit) ---
       const matchesStatus =
         filterStatus === 'All' ||
         (filterStatus === 'Completed' && r.statusId === resolvedStatusIds.COMPLETED) ||
         r.statusName === filterStatus;
-
-      // --- search filter ---
       const matchesSearch =
         searchTerm.trim() === '' ||
         r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.id.toString().includes(searchTerm);
-
       return matchesStatus && matchesSearch;
     })
     .sort((a, b) => (sortOrder === 'Old Requests' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp));
@@ -367,14 +351,16 @@ const StaffDashboard = () => {
     const normalizedStatus = String(status ?? '').trim().toLowerCase();
     const styles = isDark
       ? {
-          processing: 'bg-yellow-900/20 text-yellow-400 border-yellow-600',
+          pending: 'bg-yellow-900/20 text-yellow-400 border-yellow-600',
+          processing: 'bg-blue-900/20 text-blue-400 border-blue-600',
           'ready to claim': 'bg-green-900/20 text-green-400 border-green-600',
           completed: 'bg-gray-700/20 text-gray-300 border-gray-400',
           forfeited: 'bg-gray-700/20 text-gray-300 border-gray-400',
           cancelled: 'bg-gray-700/20 text-gray-300 border-gray-400',
         }
       : {
-          processing: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+          pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+          processing: 'bg-blue-100 text-blue-700 border-blue-200',
           'ready to claim': 'bg-green-100 text-green-700 border-green-200',
           completed: 'bg-gray-100 text-gray-700 border-gray-200',
           forfeited: 'bg-gray-100 text-gray-700 border-gray-200',
@@ -432,13 +418,6 @@ const StaffDashboard = () => {
     setPrintedCertificateIds(prev => (prev.includes(requestId) ? prev : [...prev, requestId]));
   };
 
-  const confirmClearFilters = () => {
-    setFilterStatus('All');
-    setSortOrder('Recent Requests');
-    setSearchTerm('');
-    setSelectedIds([]);
-    setShowClearConfirm(false); // Close the modal
-  };
 
   return (
     <div className={`relative ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5] text-gray-900'}`}>
@@ -447,9 +426,10 @@ const StaffDashboard = () => {
         <LineLoading isVisible={actionLoading} />
 
         {/* ---------------- CARDS ---------------- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-          <StatCard title="New Requests" count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length} color="yellow" />
-          <StatCard title="Ready for Pickup" count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length} color="green" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+          <StatCard title="New Requests"     count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length}    color="yellow" />
+          <StatCard title="Processing"       count={requests.filter(r => r.statusName?.toLowerCase() === 'processing').length} color="blue" />
+          <StatCard title="Ready for Pickup" count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length}       color="green" />
         </div>
 
         {/* ---------------- TOOLBAR ---------------- */}
@@ -501,17 +481,22 @@ const StaffDashboard = () => {
 
           <button
             type="button"
-            onClick={() => setShowClearConfirm(true)} 
+            onClick={() => {
+              setFilterStatus('All');
+              setSortOrder('Recent Requests');
+              setSearchTerm('');
+              setSelectedIds([]);
+            }}
             className={`w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-semibold transition-colors border shadow-sm h-11.5 flex items-center justify-center shrink-0
-              ${isDark 
-                ? 'bg-[#1f1f1f] text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]' 
+              ${isDark
+                ? 'bg-[#1f1f1f] text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]'
                 : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
               }`}
-            >
-              Clear Request
-            </button>
-          </div>
+          >
+            Clear Filters
+          </button>
         </div>
+      </div>
 
         {/* ---------------- TABLE ---------------- */}
         <div className={`rounded-xl shadow overflow-x-auto border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-100'}`}>
@@ -677,17 +662,7 @@ const StaffDashboard = () => {
         onConfirm={confirmDeleteSelected}
       />
 
-      <ConfirmationModal
-        isOpen={showClearConfirm}
-        onClose={() => setShowClearConfirm(false)}
-        onConfirm={confirmClearFilters}
-        title="Clear All Filters?"
-        message="Are you sure you want to clear ALL document/certificate requests?"
-        type="confirm" 
-        confirmText="Clear Filters" 
-      />
-
-      {certRequest && (
+{certRequest && (
         <CertificateModal
           request={certRequest}
           onCertificatePrinted={markCertificateAsPrinted}
