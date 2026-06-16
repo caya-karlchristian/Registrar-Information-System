@@ -2,6 +2,7 @@ import puplogoimage from "../assets/puplogoimage.png";
 import certificate_footer from "../assets/certificate_footer.png";
 import { formatDateFormal, formatDateOrdinal } from "./formatters.js";
 import { CURRENT_YEAR } from "./formatters.js";
+import { useState, useEffect } from "react";
 
 export const TextBlock = ({ children, className = "" }) => (
   <div
@@ -267,4 +268,35 @@ export const formatLabel = (str) => {
     .split("_")
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+};
+
+export const useHeaderResponsiveState = (enabled = true) => {
+  const [headerHeight, setHeaderHeight] = useState(101);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    window.addEventListener("resize", handleResize);
+
+    const headerElement = document.querySelector("header");
+    if (!headerElement) return () => window.removeEventListener("resize", handleResize);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setHeaderHeight(entry.target.offsetHeight);
+      }
+    });
+    resizeObserver.observe(headerElement);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
+    };
+  }, [enabled]);
+
+  return { headerHeight, isMobile };
 };
