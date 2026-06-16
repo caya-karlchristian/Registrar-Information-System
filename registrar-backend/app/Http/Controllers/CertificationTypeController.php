@@ -148,7 +148,7 @@ class CertificationTypeController extends Controller
         }
 
         $validated = $request->validate([
-            'logo' => 'required|image|max:4096',
+            'logo' => 'required|image|mimes:jpeg,png,jpg,svg|max:2048',
             'slot' => 'nullable|in:header_left,header_right,footer',
         ]);
 
