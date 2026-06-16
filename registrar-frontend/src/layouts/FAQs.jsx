@@ -139,7 +139,7 @@ const FAQPage = () => {
                       onClick={() => setActiveCategory(cat)}
                           className={`w-full text-left px-5 py-4 rounded-xl text-base font-bold ${
                           activeCategory === cat
-                            ? (isDark ? 'bg-[#3a3b3c] text-[#e4e6eb]' : 'bg-pup-dark-maroon text-white')
+                            ? (isDark ? 'bg-[#3a3b3c] text-[#ebe4ea]' : 'bg-pup-dark-maroon text-white')
                             : (isDark ? 'text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#242526]' : 'text-[#700000] hover:bg-black/5 hover:text-[#5c0000]')
                       }`}
                     >
@@ -221,7 +221,7 @@ const FAQPage = () => {
                       openId === id ? (isDark ? 'bg-[#3a3b3c]/60' : 'bg-red-50/50') : (isDark ? 'bg-[#242526]' : 'bg-white')
                     }`}
                   >
-                    <span className={`text-lg font-bold pr-4 ${openId === id ? 'text-[#800000]' : (isDark ? 'text-[#e4e6eb]' : 'text-gray-800')}`}>
+                    <span className={`text-lg font-bold pr-4 ${isDark ? 'text-white' : 'text-[#800000]'}`}>
                       {question}
                     </span>
                     <span className={`shrink-0 p-2 rounded-full transition-all duration-300 ${

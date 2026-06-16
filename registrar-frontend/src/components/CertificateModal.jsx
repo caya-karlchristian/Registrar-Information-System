@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import GenerateCertification from '../layouts/GenerateCertificate.jsx';
 import { CERT_CONFIG } from '../utils/Certification.jsx';
 import LoadingOverlay from './LoadingOverlay.jsx';
+import { createPortal } from 'react-dom';
 
 const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   const normalizeCertName = (value) =>
@@ -31,6 +32,19 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   const [opening, setOpening] = useState(true);
   const [editLoading, setEditLoading] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(101);
+
+  useEffect(() => {
+    const headerElement = document.querySelector('header');
+    if (!headerElement) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        setHeaderHeight(entry.target.offsetHeight);
+      }
+    });
+    resizeObserver.observe(headerElement);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useEffect(() => {
     const headerElement = document.querySelector('header');
@@ -85,7 +99,7 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
     officialReceiptNum: request.or_number ?? '',
   };
 
-  return (
+  return createPortal(
     <div id="cert-modal-root" role="dialog" aria-modal="true" className="fixed inset-0 z-20 mb-2">
       {/* Dim Overlay - Native div with keyboard support */}
       <div
@@ -120,7 +134,8 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
         isVisible={opening || editLoading}
         message= "Loading Certificate..." 
       />
-    </div>
+    </div>,
+    document.body
   );
 };
 
