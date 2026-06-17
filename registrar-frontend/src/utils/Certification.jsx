@@ -66,7 +66,7 @@ export const CERT_CONFIG = {
 
   3: {
     id: 3,
-    name: "Certification of Medium  of Instruction",
+    name: "Certification of Medium of Instruction",
     fields: ["fullName", "course", "dateGraduated", "officialReceiptNum", "date"],
     renderBody: (data) => (
       <>
@@ -96,7 +96,7 @@ export const CERT_CONFIG = {
 
   4: {
     id: 4,
-    name: "Certification of Medium of  Instruction with Units",
+    name: "Certification of Medium of Instruction with Units",
     fields: ["fullName", "course", "dateGraduated", "semestersNum", "units", "officialReceiptNum", "date"],
     renderBody: (data) => (
       <>
@@ -148,7 +148,7 @@ export const CERT_CONFIG = {
 
   6: {
     id: 6,
-    name: "Certificate of  Graduation",
+    name: "Certificate of Graduation",
     fields: ["fullName", "course", "latinHonors", "dateGraduated", "diplomaNum"],
     renderBody: (data) => (
       <StandardCertLayout date={data.date}>
