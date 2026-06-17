@@ -201,7 +201,7 @@ class IdpClient
      */
     public function createUser(array $data, string $adminToken): ?string
     {
-        [$body, $status] = $this->postWithAuth('/api/v1/users', [
+        [$body, $status] = $this->postWithAuth('/api/v1/user', [
             'email'       => $data['email'],
             'first_name'  => $data['first_name'],
             'last_name'   => $data['last_name'],
@@ -229,7 +229,7 @@ class IdpClient
         // Fallback: search by email using server-side filtering to avoid
         // scanning a fixed page and missing newly created users.
         $query = http_build_query(['email' => $data['email'], 'per_page' => 1]);
-        [$listBody, $listStatus] = $this->getWithAuth("/api/v1/users?{$query}", $adminToken);
+        [$listBody, $listStatus] = $this->getWithAuth("/api/v1/user?{$query}", $adminToken);
 
         if ($listStatus === 200) {
             $users = json_decode($listBody, true)['users'] ?? [];
@@ -255,7 +255,7 @@ class IdpClient
     public function updateUserStatus(string $idpUserId, string $status, string $adminToken): void
     {
         [$body, $code] = $this->patchWithAuth(
-            "/api/v1/users/{$idpUserId}/status",
+            "/api/v1/user/{$idpUserId}/status",
             ['new_status' => $status],
             $adminToken
         );
@@ -273,7 +273,7 @@ class IdpClient
     public function updateUserPassword(string $idpUserId, string $newPassword, string $adminToken): void
     {
         [$body, $code] = $this->patchWithAuth(
-            "/api/v1/users/{$idpUserId}/password",
+            "/api/v1/user/{$idpUserId}/password",
             ['new_password' => $newPassword],
             $adminToken
         );
@@ -288,7 +288,7 @@ class IdpClient
      */
     public function deleteUser(string $idpUserId, string $adminToken): void
     {
-        [$body, $code] = $this->deleteRequest("/api/v1/users/{$idpUserId}", $adminToken);
+        [$body, $code] = $this->deleteRequest("/api/v1/user/{$idpUserId}", $adminToken);
 
         if ($code >= 400) {
             Log::warning('SSO: IdP user delete failed', ['idp_user_id' => $idpUserId, 'body' => $body]);
