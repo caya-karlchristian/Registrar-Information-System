@@ -23,7 +23,8 @@ export const ROLES = {
   SUPER_ADMIN: "super_admin",
 };
 
-const ROLE_HOME = {
+// eslint-disable-next-line react-refresh/only-export-components
+export const ROLE_HOME = {
   [ROLES.STUDENT]:     "/student",
   [ROLES.ALUMNI]:      "/alumni",
   [ROLES.ADMIN]:       "/staff",
