@@ -1,10 +1,17 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "../context/NotificationToastContext";
+import { useAuth } from "../context/AuthProvider";
+import useVoiceRecognition from "../utils/useVoiceRecognition";
+import { matchCommand, resolveVoiceRoute } from "../utils/voiceCommands";
+import ConfirmationModal from "./ConfirmationModal";
 
 const FloatingActionMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isVoiceAnimating, setIsVoiceAnimating] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const { addToast } = useToast();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const menuRef = useRef(null);
 
   const toggleMenu = () => setIsOpen((prev) => !prev);
@@ -47,12 +54,79 @@ const FloatingActionMenu = () => {
     }
   };
 
-  const handleVoiceSpeechClick = () => {
-    setIsVoiceAnimating(true);
-    setTimeout(() => {
-      setIsVoiceAnimating(false);
+  // -------------------------------------------------------
+  // Voice navigation
+  //
+  // onResult fires once per finished utterance (continuous: false stops
+  // listening automatically after the first final transcript, so we don't
+  // need a manual timeout). We match it against the command grammar and
+  // either navigate to a role-resolved route or trigger an auth action.
+  // -------------------------------------------------------
+  const handleVoiceResult = useCallback((transcript) => {
+    const command = matchCommand(transcript);
+
+    if (!command) {
+      addToast({
+        type: "payment_invalid",
+        title: "Voice Command",
+        message: `Didn't recognize "${transcript}". Try "open dashboard" or "logout".`,
+      });
+      return;
+    }
+
+    if (command.type === "action" && command.action === "logout") {
+      // Voice recognition has a real false-positive rate, and logging out
+      // is state-changing, so we route through the same confirmation step
+      // as the manual Logout button (see Navigation.jsx) instead of acting
+      // on a single (possibly misheard) utterance.
       setIsOpen(false);
-    }, 2000);
+      setIsLogoutConfirmOpen(true);
+      return;
+    }
+
+    if (command.type === "navigate") {
+      const path = resolveVoiceRoute(command.target, user?.role_name);
+      if (!path) {
+        addToast({
+          type: "payment_invalid",
+          title: "Voice Command",
+          message: "That section isn't available for your account.",
+        });
+        return;
+      }
+      setIsOpen(false);
+      navigate(path);
+    }
+  }, [addToast, navigate, user]);
+
+  const handleVoiceError = useCallback(() => {
+    addToast({
+      type: "payment_invalid",
+      title: "Voice Speech",
+      message: "We couldn't access the microphone. Please check your browser permissions.",
+    });
+  }, [addToast]);
+
+  const {
+    isListening: isVoiceAnimating,
+    isSupported: isVoiceSupported,
+    toggle: toggleVoiceRecognition,
+  } = useVoiceRecognition({
+    onResult: handleVoiceResult,
+    onError: handleVoiceError,
+    continuous: false,
+  });
+
+  const handleVoiceSpeechClick = () => {
+    if (!isVoiceSupported) {
+      addToast({
+        type: "payment_invalid",
+        title: "Voice Speech",
+        message: "Voice commands aren't supported in this browser. Try Chrome or Edge.",
+      });
+      return;
+    }
+    toggleVoiceRecognition();
   };
 
   return (
@@ -112,9 +186,8 @@ const FloatingActionMenu = () => {
                 ? "bg-pup-yellow text-[#800000] scale-110"
                 : "bg-pup-dark-maroon text-white hover:bg-[#500000]"
               }`}
-            aria-label="Voice Speech"
-            title="Voice Speech"
-            disabled={isVoiceAnimating}
+            aria-label={isVoiceAnimating ? "Stop Voice Speech" : "Start Voice Speech"}
+            title={isVoiceAnimating ? "Listening… tap to stop" : "Voice Speech"}
           >
             <svg
               className="w-7 h-7"
@@ -164,6 +237,15 @@ const FloatingActionMenu = () => {
           </svg>
         </span>
       </button>
+
+      <ConfirmationModal
+        isOpen={isLogoutConfirmOpen}
+        onClose={() => setIsLogoutConfirmOpen(false)}
+        onConfirm={logout}
+        title="Logout Session"
+        message="Are you sure you want to log out? Any unsaved changes in the registrar system may be lost."
+        type="default"
+      />
     </div>
   );
 };
