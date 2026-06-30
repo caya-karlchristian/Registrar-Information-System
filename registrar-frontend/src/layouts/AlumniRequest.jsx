@@ -364,7 +364,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
   const certificationLabel = formData.certification.join(', ');
 
   return (
-    <div className="min-h-screen pb-20 ">
+    <div className="relative min-h-screen pb-20 z-20">
         <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
     {isSubmitted ? (
       <div className="max-w-5xl mx-auto">
