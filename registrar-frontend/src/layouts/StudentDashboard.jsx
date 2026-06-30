@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { getDocumentRequests } from "../services/api"; 
-import { EyeIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import { EyeIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import LoadingOverlay from "../components/LoadingOverlay";
 import { useNavigate } from "react-router-dom";
@@ -8,9 +8,10 @@ import { useAuth } from '../context/AuthProvider';
 import { STATUS_CONFIG, TAB_MAP, TABS } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
 import { useNotificationsContext } from '../context/NotificationsContext';
-import { DocumentMagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { DocumentMagnifyingGlassIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 import { useReferenceData } from '../context/ReferenceDataContext';
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 const StudentDashboard = () => {
   const { docTypeName, purposeName, certName } = useReferenceData();
   const [activeTab, setActiveTab] = useState("pending");
@@ -18,6 +19,7 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
   const itemsPerPage = 5;
   const { user } = useAuth();
   const { isDark } = useTheme();
@@ -109,9 +111,32 @@ useEffect(() => {
 
   useEffect(() => { 
     setCurrentPage(1);
-  }, [activeTab]);
+  }, [activeTab, searchTerm]);
 
-  const filteredRequests = requests.filter((req) => req.type === activeTab);
+  const filteredRequests = requests.filter((req) => {
+    // 1. Tab filter
+    if (req.type !== activeTab) return false;
+
+    // 2. Search Term filter
+    if (searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase();
+      const matchesDocNames = req.doc_names && req.doc_names.some(name => name.toLowerCase().includes(term));
+      const matchesCertNames = req.certificates && req.certificates.some(c => {
+         const cert = c.certification_type?.certificate_name ?? certName(c.certification_type_id) ?? "";
+         return cert.toLowerCase().includes(term);
+      });
+      const matchesUuid = req.uuid && req.uuid.toLowerCase().includes(term);
+      const matchesId = req.request_id && req.request_id.toString().includes(term);
+      const matchesPurpose = req.purpose_label && req.purpose_label.toLowerCase().includes(term);
+
+      if (!matchesDocNames && !matchesCertNames && !matchesUuid && !matchesId && !matchesPurpose) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -145,17 +170,29 @@ useEffect(() => {
       </div>
       {/* Document Requests List */}
       <div className={`flex flex-col rounded-2xl shadow-sm border overflow-hidden min-h-175 ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-200'}`}>
-        <div className={`p-6 border-b flex justify-between items-center shrink-0 ${isDark ? 'border-[#3e4042] bg-[#18191a]/80' : 'border-gray-100 bg-gray-50/50'}`}>
-          <h3 className={`font-bold text-lg ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
-            {activeTab === "pending" && "Processing Requests"}
-            {activeTab === "ready" && "Documents Ready for Pickup"}
-            {activeTab === "history" && "Transaction Archive"}
-          </h3>
+        <div className={`p-6 border-b flex flex-col lg:flex-row lg:items-center justify-between gap-4 shrink-0 ${isDark ? 'border-[#3e4042] bg-[#18191a]/80' : 'border-gray-100 bg-gray-50/50'}`}>
+          <div className="flex flex-col md:flex-row md:items-center gap-4 flex-1">
+            <h3 className={`font-bold text-lg shrink-0 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+              {activeTab === "pending" && "Processing Requests"}
+              {activeTab === "ready" && "Documents Ready for Pickup"}
+              {activeTab === "history" && "Transaction Archive"}
+            </h3>
+            {/* Search Box */}
+            <div className="flex-1 max-w-md w-full text-xs">
+              <VoiceSearchInput
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Search by Name, ID, or Ref..."
+                language="en-US"
+              />
+            </div>
+          </div>
+
           <span className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
             Showing {filteredRequests.length} records
           </span>
         </div>
-        
+
         <div className={`flex-1 flex flex-col justify-start divide-y overflow-y-auto ${isDark ? 'divide-[#3e4042]' : 'divide-gray-100'}`}>
             {loading ? (
               <div className={`p-10 text-center ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>Loading...</div>

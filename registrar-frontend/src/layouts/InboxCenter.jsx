@@ -22,18 +22,52 @@ const formatTime = (isoString) => {
 // -------------------------------------------------------
 // Map a raw API notification → inbox display shape
 // -------------------------------------------------------
-const toMailItem = (n) => ({
-  id:      n.id,
-  from:    n.title,
-  email:   'no-reply@ris.local',
-  subject: n.title,
-  preview: n.message,
-  category: CATEGORY_MAP[n.type]?.category ?? 'Notification',
-  time:    n.created_at,
-  unread:  n.is_unread ?? !n.read_at,
-  // Keep original for markAsRead and requirements checklist
-  _raw: n,
-});
+const toMailItem = (n) => {
+  const type = n.type || '';
+  const title = n.title || '';
+
+  let dotColor = null;
+  if (
+    type === 'request_forfeited' ||
+    title.toLowerCase().includes('forfeited')
+  ) {
+    dotColor = 'bg-red-500';
+  } else if (
+    type.startsWith('reminder_') ||
+    title.toLowerCase().includes('reminder')
+  ) {
+    dotColor = 'bg-yellow-500';
+  } else if (
+    type === 'request_submitted' ||
+    type === 'announcement_sent' ||
+    type === 'announcement_published' ||
+    title.toLowerCase().includes('announcement') ||
+    title.toLowerCase().includes('submitted')
+  ) {
+    dotColor = 'bg-blue-500';
+  } else if (
+    type === 'ready_to_claim' ||
+    type === 'request_completed' ||
+    title.toLowerCase().includes('ready') ||
+    title.toLowerCase().includes('completed')
+  ) {
+    dotColor = 'bg-green-500';
+  }
+
+  return {
+    id:      n.id,
+    from:    n.title,
+    email:   'no-reply@ris.local',
+    subject: n.title,
+    preview: n.message,
+    category: CATEGORY_MAP[n.type]?.category ?? 'Notification',
+    time:    n.created_at,
+    unread:  n.is_unread ?? !n.read_at,
+    dotColor,
+    // Keep original for markAsRead and requirements checklist
+    _raw: n,
+  };
+};
 
 const InboxCenter = () => {
   const location = useLocation();
@@ -169,12 +203,16 @@ const InboxCenter = () => {
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <p className="font-semibold text-sm truncate">{mail.from}</p>
+                          <div className="flex items-center gap-2 min-w-0">
+                            {mail.dotColor && (
+                              <span className={`w-2 h-2 rounded-full shrink-0 shadow shadow-black/30 ${mail.dotColor}`} />
+                            )}
+                            <p className="font-semibold text-sm truncate">{mail.from}</p>
+                          </div>
                           <span className={`text-[11px] shrink-0 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                             {formatTime(mail.time)}
                           </span>
                         </div>
-                        <p className={`text-xs mt-0.5 truncate ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>{mail.subject}</p>
                         <p className={`text-xs mt-1 line-clamp-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{mail.preview}</p>
                         {mail.unread && !isActive && (
                           <span className={`inline-block mt-2 text-[10px] font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>
@@ -208,9 +246,14 @@ const InboxCenter = () => {
                     <p className={`text-[11px] uppercase tracking-[0.2em] font-black ${isDark ? 'text-pup-yellow/70' : 'text-[#6D0000]/55'}`}>
                       Selected Inbox Message
                     </p>
-                    <h3 className={`text-lg md:text-xl font-bold leading-tight mt-1 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
-                      {selectedMail.subject}
-                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      {selectedMail.dotColor && (
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow shadow-black/30 ${selectedMail.dotColor}`} />
+                      )}
+                      <h3 className={`text-lg md:text-xl font-bold leading-tight ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
+                        {selectedMail.subject}
+                      </h3>
+                    </div>
                     <p className={`text-sm mt-1 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
                       Date and Time: {formatTime(selectedMail.time)}
                     </p>
@@ -243,7 +286,7 @@ const InboxCenter = () => {
                         {/* ── Requirements checklist (request_submitted only) ── */}
                         {selectedMail._raw?.requirements?.length > 0 && (
                           <div className={`rounded-lg border px-4 py-4 ${isDark ? 'border-[#5d4c17] bg-[#1a1b1e]' : 'border-amber-200 bg-amber-50'}`}>
-                            <p className={`text-[11px] font-semibold uppercase tracking-widest mb-3 ${isDark ? 'text-pup-yellow' : 'text-amber-700'}`}>
+                            <p className={`text-[11px] font-bold uppercase tracking-widest mb-3 ${isDark ? 'text-pup-yellow' : 'text-amber-700'}`}>
                               Requirements Checklist
                             </p>
                             <p className={`text-xs mb-4 ${isDark ? 'text-[#e4e6eb]' : 'text-amber-800'}`}>
