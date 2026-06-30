@@ -686,7 +686,8 @@ const CertificateTemplateManagement = () => {
                   <li>Only logos are editable.</li>
                   <li>Check the corresponding checkbox before uploading a logo to apply it to all certificates.</li>
                 </ul>
-              </div>            </div>
+              </div>            
+            </div>
             <div className="flex flex-wrap gap-2">
               <button
                 id="btn-undo-logo"
@@ -717,6 +718,7 @@ const CertificateTemplateManagement = () => {
                 Reset Logos
               </button>
               <button
+                id="btn-reset-all-logos"
                 onClick={() => setIsResetConfirmOpen(true)}
                 disabled={saving || loading}
                 className={`rounded-md border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -724,17 +726,6 @@ const CertificateTemplateManagement = () => {
                     ? 'border-red-950 bg-red-950/20 text-red-400 hover:bg-red-950/30'
                     : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
                 }`}
-              >
-                Reset All Logos
-              </button>
-              <button
-                id="btn-reset-all-logos"
-                onClick={() => setIsResetConfirmOpen(true)}
-                disabled={saving || loading}
-                className={`rounded-md border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${isDark
-                  ? 'border-red-950 bg-red-950/20 text-red-400 hover:bg-red-950/30'
-                  : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
-                  }`}
               >
                 Reset All Logos
               </button>
@@ -773,6 +764,7 @@ const CertificateTemplateManagement = () => {
               <UploadDropZone label="Main Logo" onFiles={updateMainLogo} disabled={!selectedCertId} />
               <label className="mt-1.5 mb-3 flex items-center gap-2 cursor-pointer select-none">
                 <input
+                  id="checkbox-apply-main-logo"
                   type="checkbox"
                   checked={applyMainLogoToAll}
                   onChange={(e) => setApplyMainLogoToAll(e.target.checked)}
@@ -786,7 +778,25 @@ const CertificateTemplateManagement = () => {
                   Apply main logo to all templates
                 </span>
               </label>
+
               <UploadDropZone label="Header Right Logo" onFiles={updateRightLogo} disabled={!selectedCertId} />
+              <label className="mt-1.5 mb-3 flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  id="checkbox-apply-right-logo"
+                  type="checkbox"
+                  checked={applyRightLogoToAll}
+                  onChange={(e) => setApplyRightLogoToAll(e.target.checked)}
+                  disabled={!selectedCertId}
+                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${isDark
+                    ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
+                    : 'border-gray-300 text-yellow-500'
+                    }`}
+                />
+                <span className={`text-[11px] font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                  Apply right logo to all templates
+                </span>
+              </label>
+
               <div className={`rounded-lg border p-3 ${isDark ? 'border-[#3e4042] bg-[#1f1f1f]' : 'border-gray-200 bg-gray-50'}`}>
                 <p className={`text-xs font-semibold uppercase ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>Header Logo Size</p>
                 <label className="mt-2 block text-sm">
@@ -805,6 +815,7 @@ const CertificateTemplateManagement = () => {
               <UploadDropZone label="Footer Logos" multiple onFiles={addFooterLogos} disabled={!selectedCertId} />
               <label className="mt-1.5 mb-3 flex items-center gap-2 cursor-pointer select-none">
                 <input
+                  id="checkbox-apply-footer-logos"
                   type="checkbox"
                   checked={applyFooterLogosToAll}
                   onChange={(e) => setApplyFooterLogosToAll(e.target.checked)}
