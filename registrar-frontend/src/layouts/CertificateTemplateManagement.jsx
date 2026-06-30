@@ -73,12 +73,12 @@ const UploadDropZone = ({ label, multiple = false, onFiles, disabled = false }) 
   return (
     <div
       className={`rounded-lg border-2 border-dashed p-3 text-center transition ${dragOver
-          ? isDark
-            ? "border-[#b08a57] bg-[#2a2a2f]"
-            : "border-[#7f3f33] bg-[#fff7f4]"
-          : isDark
-            ? "border-[#3e4042] bg-[#242526]"
-            : "border-gray-300 bg-white"
+        ? isDark
+          ? "border-[#b08a57] bg-[#2a2a2f]"
+          : "border-[#7f3f33] bg-[#fff7f4]"
+        : isDark
+          ? "border-[#3e4042] bg-[#242526]"
+          : "border-gray-300 bg-white"
         }`}
       onDragOver={(event) => {
         if (disabled) return;
@@ -99,10 +99,10 @@ const UploadDropZone = ({ label, multiple = false, onFiles, disabled = false }) 
       <p className={`text-[10px] ${isDark ? 'text-[#808080]' : 'text-gray-400'}`}>PNG, JPG, JPEG, SVG (MAX. 2MB)</p>
       <label
         className={`mt-2 inline-block rounded-md px-3 py-1.5 text-xs font-semibold text-white ${disabled
-            ? "cursor-not-allowed bg-gray-400"
-            : isDark
-              ? "cursor-pointer bg-[#2a2a2f] hover:bg-[#353539] border border-[#3e4042]"
-              : "cursor-pointer bg-[#5c2a21] hover:bg-[#492119]"
+          ? "cursor-not-allowed bg-gray-400"
+          : isDark
+            ? "cursor-pointer bg-[#2a2a2f] hover:bg-[#353539] border border-[#3e4042]"
+            : "cursor-pointer bg-[#5c2a21] hover:bg-[#492119]"
           }`}
       >
         Upload
@@ -156,6 +156,26 @@ const CertificateTemplateManagement = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  const [past, setPast] = useState([]);
+  const [future, setFuture] = useState([]);
+  const isUndoRedoActionRef = useRef(false);
+
+  const pushToHistory = (currentLayout) => {
+    const imageState = {
+      headerLeftUrl: currentLayout.headerLeftUrl,
+      headerRightUrl: currentLayout.headerRightUrl,
+      footerUrls: [...currentLayout.footerUrls],
+    };
+    setPast((prev) => [...prev, imageState]);
+    setFuture([]);
+  };
+
+  useEffect(() => {
+    setPast([]);
+    setFuture([]);
+    isUndoRedoActionRef.current = false;
+  }, [selectedCertId]);
 
   // Bulk apply checkbox states
   const [applyMainLogoToAll, setApplyMainLogoToAll] = useState(false);
@@ -277,6 +297,7 @@ const CertificateTemplateManagement = () => {
 
       const logoUrl = await uploadSingleLogo("header_left", file);
       if (logoUrl) {
+        pushToHistory(layout);
         setLayout((prev) => ({ ...prev, headerLeftUrl: logoUrl }));
 
         if (applyMainLogoToAll) {
@@ -335,6 +356,7 @@ const CertificateTemplateManagement = () => {
 
       const logoUrl = await uploadSingleLogo("header_right", file);
       if (logoUrl) {
+        pushToHistory(layout);
         setLayout((prev) => ({ ...prev, headerRightUrl: logoUrl }));
 
         if (applyRightLogoToAll) {
@@ -404,6 +426,7 @@ const CertificateTemplateManagement = () => {
 
       const allSuccess = uploadedUrls.every(url => !!url);
       if (allSuccess) {
+        pushToHistory(layout);
         let finalFooterUrls = [];
         setLayout((prev) => {
           const updated = prev.footerUrls.map((url) => {
@@ -521,6 +544,11 @@ const CertificateTemplateManagement = () => {
     if (!selectedCertId || !isPersistedCertification || loading || saving) return;
     if (hasPreviewDataUrl(layout)) return;
 
+    if (isUndoRedoActionRef.current) {
+      isUndoRedoActionRef.current = false;
+      return;
+    }
+
     const savedLayout = layoutsByCertId[selectedCertId];
     if (savedLayout && JSON.stringify(layout) === JSON.stringify(savedLayout)) {
       return;
@@ -551,7 +579,58 @@ const CertificateTemplateManagement = () => {
   }, [layout, selectedCertId, isPersistedCertification, loading, saving, layoutsByCertId]);
 
   const resetLayout = () => {
+    pushToHistory(layout);
     setLayout({ ...DEFAULT_CERTIFICATE_LAYOUT });
+  };
+
+  const undo = () => {
+    if (past.length === 0) return;
+
+    const previousImageState = past[past.length - 1];
+    const newPast = past.slice(0, -1);
+
+    const currentImageState = {
+      headerLeftUrl: layout.headerLeftUrl,
+      headerRightUrl: layout.headerRightUrl,
+      footerUrls: [...layout.footerUrls],
+    };
+
+    setFuture((prevFuture) => [currentImageState, ...prevFuture]);
+    setPast(newPast);
+
+    isUndoRedoActionRef.current = true;
+    setLayout((prev) => ({
+      ...prev,
+      headerLeftUrl: previousImageState.headerLeftUrl,
+      headerRightUrl: previousImageState.headerRightUrl,
+      footerUrls: previousImageState.footerUrls,
+    }));
+    setSaveSuccess(false);
+  };
+
+  const redo = () => {
+    if (future.length === 0) return;
+
+    const nextImageState = future[0];
+    const newFuture = future.slice(1);
+
+    const currentImageState = {
+      headerLeftUrl: layout.headerLeftUrl,
+      headerRightUrl: layout.headerRightUrl,
+      footerUrls: [...layout.footerUrls],
+    };
+
+    setPast((prevPast) => [...prevPast, currentImageState]);
+    setFuture(newFuture);
+
+    isUndoRedoActionRef.current = true;
+    setLayout((prev) => ({
+      ...prev,
+      headerLeftUrl: nextImageState.headerLeftUrl,
+      headerRightUrl: nextImageState.headerRightUrl,
+      footerUrls: nextImageState.footerUrls,
+    }));
+    setSaveSuccess(false);
   };
 
   const resetAllLayouts = async () => {
@@ -587,6 +666,7 @@ const CertificateTemplateManagement = () => {
   };
 
   const removeFooterLogo = (index) => {
+    pushToHistory(layout);
     setLayout((prev) => ({
       ...prev,
       footerUrls: prev.footerUrls.filter((_, i) => i !== index),
@@ -609,6 +689,27 @@ const CertificateTemplateManagement = () => {
               </div>            </div>
             <div className="flex flex-wrap gap-2">
               <button
+                id="btn-undo-logo"
+                onClick={undo}
+                disabled={past.length === 0}
+                className={`rounded-md border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' :
+                  'border-gray-300 bg-gray-100 hover:bg-gray-200'}`}
+                title="Undo last logo change"
+              >
+                Undo
+              </button>
+              <button
+                id="btn-redo-logo"
+                onClick={redo}
+                disabled={future.length === 0}
+                className={`rounded-md border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' :
+                  'border-gray-300 bg-gray-100 hover:bg-gray-200'}`}
+                title="Redo logo change"
+              >
+                Redo
+              </button>
+              <button
+                id="btn-reset-logos"
                 onClick={resetLayout}
                 className={`rounded-md border px-3 py-2 text-sm font-semibold ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' :
                   'border-gray-300 bg-gray-100 hover:bg-gray-200'}`}
@@ -616,24 +717,25 @@ const CertificateTemplateManagement = () => {
                 Reset Logos
               </button>
               <button
+                id="btn-reset-all-logos"
                 onClick={() => setIsResetConfirmOpen(true)}
                 disabled={saving || loading}
-                className={`rounded-md border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isDark
-                    ? 'border-red-950 bg-red-950/20 text-red-400 hover:bg-red-950/30'
-                    : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
-                }`}
+                className={`rounded-md border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${isDark
+                  ? 'border-red-950 bg-red-950/20 text-red-400 hover:bg-red-950/30'
+                  : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                  }`}
               >
                 Reset All Logos
               </button>
               <button
+                id="btn-save-layout"
                 onClick={saveLayout}
                 disabled={!selectedCertId || saving || saveSuccess || hasPreviewDataUrl(layout)}
                 className={`rounded-md px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed ${saveSuccess
-                    ? 'bg-green-500 text-white border-green-600' // Turns green when successful!
-                    : isDark
-                      ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] focus:ring-[#4e4f50] disabled:bg-[#2a2a2f]/50 border border-[#3e4042]'
-                      : 'bg-yellow-400 text-slate-900 hover:bg-yellow-500 focus:ring-yellow-200 disabled:bg-yellow-200'
+                  ? 'bg-green-500 text-white border-green-600' // Turns green when successful!
+                  : isDark
+                    ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] focus:ring-[#4e4f50] disabled:bg-[#2a2a2f]/50 border border-[#3e4042]'
+                    : 'bg-yellow-400 text-slate-900 hover:bg-yellow-500 focus:ring-yellow-200 disabled:bg-yellow-200'
                   }`}
               >
                 {saving ? "Saving..." : saveSuccess ? "Saved!" : hasPreviewDataUrl(layout) ? "Waiting for upload..." : "Save Layout"}
@@ -664,11 +766,10 @@ const CertificateTemplateManagement = () => {
                   checked={applyMainLogoToAll}
                   onChange={(e) => setApplyMainLogoToAll(e.target.checked)}
                   disabled={!selectedCertId}
-                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${
-                    isDark
-                      ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
-                      : 'border-gray-300 text-yellow-500'
-                  }`}
+                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${isDark
+                    ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
+                    : 'border-gray-300 text-yellow-500'
+                    }`}
                 />
                 <span className={`text-[11px] font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
                   Apply main logo to all templates
@@ -682,11 +783,10 @@ const CertificateTemplateManagement = () => {
                   checked={applyRightLogoToAll}
                   onChange={(e) => setApplyRightLogoToAll(e.target.checked)}
                   disabled={!selectedCertId}
-                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${
-                    isDark
-                      ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
-                      : 'border-gray-300 text-yellow-500'
-                  }`}
+                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${isDark
+                    ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
+                    : 'border-gray-300 text-yellow-500'
+                    }`}
                 />
                 <span className={`text-[11px] font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
                   Apply right logo to all templates
@@ -715,11 +815,10 @@ const CertificateTemplateManagement = () => {
                   checked={applyFooterLogosToAll}
                   onChange={(e) => setApplyFooterLogosToAll(e.target.checked)}
                   disabled={!selectedCertId}
-                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${
-                    isDark
-                      ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
-                      : 'border-gray-300 text-yellow-500'
-                  }`}
+                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${isDark
+                    ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
+                    : 'border-gray-300 text-yellow-500'
+                    }`}
                 />
                 <span className={`text-[11px] font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
                   Apply footer logos to all templates
