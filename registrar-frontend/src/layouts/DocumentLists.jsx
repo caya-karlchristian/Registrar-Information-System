@@ -165,7 +165,7 @@ const DocumentLists = () => {
                     {/* Compact Processing Period Preview */}
                     {isOpen && doc.document_process_period && (
                       <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 mt-1 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
-                        <ClockIcon className="w-3 h-3" /> {doc.document_process_period} processing day/s
+                        <ClockIcon className="w-3 h-3" /> Process Period: {doc.document_process_period}
                       </span>
                     )}
                   </div>

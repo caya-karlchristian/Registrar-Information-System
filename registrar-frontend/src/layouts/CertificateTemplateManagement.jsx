@@ -17,6 +17,7 @@ import { CERT_CONFIG } from "../utils/Certification.jsx";
 import { useTheme } from "../context/ThemeContext";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import ConfirmationModal from "../components/ConfirmationModal.jsx";
 
 const toCertificateRows = (raw) => {
   if (Array.isArray(raw)) return raw;
@@ -71,15 +72,14 @@ const UploadDropZone = ({ label, multiple = false, onFiles, disabled = false }) 
 
   return (
     <div
-      className={`rounded-lg border-2 border-dashed p-3 text-center transition ${
-        dragOver
+      className={`rounded-lg border-2 border-dashed p-3 text-center transition ${dragOver
           ? isDark
             ? "border-[#b08a57] bg-[#2a2a2f]"
             : "border-[#7f3f33] bg-[#fff7f4]"
           : isDark
             ? "border-[#3e4042] bg-[#242526]"
             : "border-gray-300 bg-white"
-      }`}
+        }`}
       onDragOver={(event) => {
         if (disabled) return;
         event.preventDefault();
@@ -98,13 +98,12 @@ const UploadDropZone = ({ label, multiple = false, onFiles, disabled = false }) 
       <p className={`mt-0.5 text-xs ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>Drag and drop image file{multiple ? "s" : ""} here</p>
       <p className={`text-[10px] ${isDark ? 'text-[#808080]' : 'text-gray-400'}`}>PNG, JPG, JPEG, SVG (MAX. 2MB)</p>
       <label
-        className={`mt-2 inline-block rounded-md px-3 py-1.5 text-xs font-semibold text-white ${
-          disabled
+        className={`mt-2 inline-block rounded-md px-3 py-1.5 text-xs font-semibold text-white ${disabled
             ? "cursor-not-allowed bg-gray-400"
             : isDark
               ? "cursor-pointer bg-[#2a2a2f] hover:bg-[#353539] border border-[#3e4042]"
               : "cursor-pointer bg-[#5c2a21] hover:bg-[#492119]"
-        }`}
+          }`}
       >
         Upload
         <input
@@ -134,7 +133,7 @@ const CertificatePreviewCanvas = ({ layout, certId }) => {
       <div className="flex min-h-180 flex-col">
         {!certConfig?.hideHeaderFooter && <CertHeader layout={layout} />}
         <div className="flex-1">{certConfig?.renderBody(SAMPLE_FORM_DATA, layout)}</div>
-        
+
         {!certConfig?.hideHeaderFooter && (
           <div className="mt-4">
             <CertFooter layout={layout} />
@@ -155,16 +154,25 @@ const CertificateTemplateManagement = () => {
   const [saving, setSaving] = useState(false);
   const autoSaveTimerRef = useRef(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Bulk apply checkbox states
+  const [applyMainLogoToAll, setApplyMainLogoToAll] = useState(false);
+  const [applyRightLogoToAll, setApplyRightLogoToAll] = useState(false);
+  const [applyFooterLogosToAll, setApplyFooterLogosToAll] = useState(false);
+
+  // Modal confirm state
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   const validateFile = (file) => {
     const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
     const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml"];
     const fileExtension = file.name ? file.name.split('.').pop().toLowerCase() : '';
     const ALLOWED_EXTENSIONS = ["png", "jpg", "jpeg", "svg"];
-    
+
     const isValidType = ALLOWED_TYPES.includes(file.type) || ALLOWED_EXTENSIONS.includes(fileExtension);
-    
+
     if (!isValidType) {
       return "Invalid file type. Only PNG, JPG, JPEG, and SVG files are allowed.";
     }
@@ -270,6 +278,37 @@ const CertificateTemplateManagement = () => {
       const logoUrl = await uploadSingleLogo("header_left", file);
       if (logoUrl) {
         setLayout((prev) => ({ ...prev, headerLeftUrl: logoUrl }));
+
+        if (applyMainLogoToAll) {
+          setSaving(true);
+          try {
+            const otherCerts = dropdownCertifications.filter(c => String(c.certificate_type_id) !== selectedCertId);
+            const updatedLayouts = {};
+            for (const cert of otherCerts) {
+              const certId = cert.certificate_type_id;
+              const currentLayout = layoutsByCertId[certId] ?? { ...DEFAULT_CERTIFICATE_LAYOUT };
+              const updatedLayout = { ...currentLayout, headerLeftUrl: logoUrl };
+              const payload = toLayoutPayload(updatedLayout);
+              await updateCertificationLayout(certId, payload);
+              updatedLayouts[certId] = normalizeCertificateLayout(updatedLayout);
+            }
+            setLayoutsByCertId((prev) => ({
+              ...prev,
+              ...updatedLayouts,
+            }));
+            setSaveSuccess(true);
+            setSuccessMessage("Main logo applied to all templates successfully!");
+            setTimeout(() => {
+              setSaveSuccess(false);
+              setSuccessMessage("");
+            }, 2000);
+          } catch (err) {
+            console.error("Failed to apply main logo to all templates:", err);
+            setErrorMessage("Logo uploaded, but failed to apply to all certificate templates.");
+          } finally {
+            setSaving(false);
+          }
+        }
       } else {
         setLayout((prev) => ({ ...prev, headerLeftUrl: previousUrl }));
         setErrorMessage("Failed to upload main logo. Please try again.");
@@ -297,6 +336,37 @@ const CertificateTemplateManagement = () => {
       const logoUrl = await uploadSingleLogo("header_right", file);
       if (logoUrl) {
         setLayout((prev) => ({ ...prev, headerRightUrl: logoUrl }));
+
+        if (applyRightLogoToAll) {
+          setSaving(true);
+          try {
+            const otherCerts = dropdownCertifications.filter(c => String(c.certificate_type_id) !== selectedCertId);
+            const updatedLayouts = {};
+            for (const cert of otherCerts) {
+              const certId = cert.certificate_type_id;
+              const currentLayout = layoutsByCertId[certId] ?? { ...DEFAULT_CERTIFICATE_LAYOUT };
+              const updatedLayout = { ...currentLayout, headerRightUrl: logoUrl };
+              const payload = toLayoutPayload(updatedLayout);
+              await updateCertificationLayout(certId, payload);
+              updatedLayouts[certId] = normalizeCertificateLayout(updatedLayout);
+            }
+            setLayoutsByCertId((prev) => ({
+              ...prev,
+              ...updatedLayouts,
+            }));
+            setSaveSuccess(true);
+            setSuccessMessage("Header right logo applied to all templates successfully!");
+            setTimeout(() => {
+              setSaveSuccess(false);
+              setSuccessMessage("");
+            }, 2000);
+          } catch (err) {
+            console.error("Failed to apply right logo to all templates:", err);
+            setErrorMessage("Logo uploaded, but failed to apply to all certificate templates.");
+          } finally {
+            setSaving(false);
+          }
+        }
       } else {
         setLayout((prev) => ({ ...prev, headerRightUrl: previousUrl }));
         setErrorMessage("Failed to upload right logo. Please try again.");
@@ -334,13 +404,46 @@ const CertificateTemplateManagement = () => {
 
       const allSuccess = uploadedUrls.every(url => !!url);
       if (allSuccess) {
-        previewUrls.forEach((previewUrl, index) => {
-          const uploadedUrl = uploadedUrls[index];
-          setLayout((prev) => ({
-            ...prev,
-            footerUrls: prev.footerUrls.map((url) => (url === previewUrl ? uploadedUrl : url)),
-          }));
+        let finalFooterUrls = [];
+        setLayout((prev) => {
+          const updated = prev.footerUrls.map((url) => {
+            const index = previewUrls.indexOf(url);
+            return index !== -1 ? uploadedUrls[index] : url;
+          });
+          finalFooterUrls = updated;
+          return { ...prev, footerUrls: updated };
         });
+
+        if (applyFooterLogosToAll) {
+          setSaving(true);
+          try {
+            const otherCerts = dropdownCertifications.filter(c => String(c.certificate_type_id) !== selectedCertId);
+            const updatedLayouts = {};
+            for (const cert of otherCerts) {
+              const certId = cert.certificate_type_id;
+              const currentLayout = layoutsByCertId[certId] ?? { ...DEFAULT_CERTIFICATE_LAYOUT };
+              const updatedLayout = { ...currentLayout, footerUrls: finalFooterUrls };
+              const payload = toLayoutPayload(updatedLayout);
+              await updateCertificationLayout(certId, payload);
+              updatedLayouts[certId] = normalizeCertificateLayout(updatedLayout);
+            }
+            setLayoutsByCertId((prev) => ({
+              ...prev,
+              ...updatedLayouts,
+            }));
+            setSaveSuccess(true);
+            setSuccessMessage("Footer logos applied to all templates successfully!");
+            setTimeout(() => {
+              setSaveSuccess(false);
+              setSuccessMessage("");
+            }, 2000);
+          } catch (err) {
+            console.error("Failed to apply footer logos to all templates:", err);
+            setErrorMessage("Logos uploaded, but failed to apply to all certificate templates.");
+          } finally {
+            setSaving(false);
+          }
+        }
       } else {
         setLayout((prev) => ({
           ...prev,
@@ -358,7 +461,7 @@ const CertificateTemplateManagement = () => {
     }
   };
 
- const saveLayout = async () => {
+  const saveLayout = async () => {
     if (!selectedCertId) return;
     if (hasPreviewDataUrl(layout)) {
       console.warn("Skipping layout save until image uploads finish.");
@@ -374,11 +477,11 @@ const CertificateTemplateManagement = () => {
       const response = await updateCertificationLayout(certTypeId, payload);
 
       // 1. Grab the fresh data straight from Laravel's response
-      const freshDbData = response?.data?.data; 
-      
+      const freshDbData = response?.data?.data;
+
       // 2. Normalize it so it has the perfect absolute URLs
-      const freshLayout = freshDbData 
-        ? normalizeCertificateLayout(freshDbData) 
+      const freshLayout = freshDbData
+        ? normalizeCertificateLayout(freshDbData)
         : normalizeCertificateLayout(layout);
 
       // 3. Update the global dictionary
@@ -401,7 +504,11 @@ const CertificateTemplateManagement = () => {
       );
 
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
+      setSuccessMessage("Layout saved successfully!");
+      setTimeout(() => {
+        setSaveSuccess(false);
+        setSuccessMessage("");
+      }, 2000);
 
     } catch (error) {
       console.error("Failed to save certification layout:", error);
@@ -416,7 +523,7 @@ const CertificateTemplateManagement = () => {
 
     const savedLayout = layoutsByCertId[selectedCertId];
     if (savedLayout && JSON.stringify(layout) === JSON.stringify(savedLayout)) {
-      return; 
+      return;
     }
 
     if (autoSaveTimerRef.current) {
@@ -447,6 +554,38 @@ const CertificateTemplateManagement = () => {
     setLayout({ ...DEFAULT_CERTIFICATE_LAYOUT });
   };
 
+  const resetAllLayouts = async () => {
+    try {
+      setSaving(true);
+      setSaveSuccess(false);
+
+      const defaultLayout = { ...DEFAULT_CERTIFICATE_LAYOUT };
+      const payload = toLayoutPayload(defaultLayout);
+
+      await Promise.all(
+        dropdownCertifications.map(async (cert) => {
+          const certId = cert.certificate_type_id;
+          await updateCertificationLayout(certId, payload);
+          setLayoutsByCertId((prev) => ({
+            ...prev,
+            [certId]: normalizeCertificateLayout(defaultLayout),
+          }));
+        })
+      );
+
+      setLayout(defaultLayout);
+      setSuccessMessage("All certificate layouts reset to defaults.");
+      setTimeout(() => {
+        setSuccessMessage("");
+      }, 3000);
+    } catch (error) {
+      console.error("Failed to reset all certificate layouts:", error);
+      setErrorMessage("Failed to reset all layouts. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const removeFooterLogo = (index) => {
     setLayout((prev) => ({
       ...prev,
@@ -461,26 +600,41 @@ const CertificateTemplateManagement = () => {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className={`text-xl font-bold sm:text-2xl ${isDark ? 'text-white' : 'text-[#4f2018]'}`}>Certificate Template Editor</h1>
-              <p className={`text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>Only logos are editable.</p>
-            </div>
+              <div className={`mt-1 text-xs  ${isDark ? 'text-[#b0b3b8]' : 'text-[#4f2018]'}`}>
+                <span className="font-bold">Reminder:</span>
+                <ul className="list-disc ml-5 mt-1 space-y-0.5">
+                  <li>Only logos are editable.</li>
+                  <li>Check the corresponding checkbox before uploading a logo to apply it to all certificates.</li>
+                </ul>
+              </div>            </div>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={resetLayout}
-                className={`rounded-md border px-3 py-2 text-sm font-semibold ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' : 
-                'border-gray-300 bg-gray-100 hover:bg-gray-200'}`}
+                className={`rounded-md border px-3 py-2 text-sm font-semibold ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' :
+                  'border-gray-300 bg-gray-100 hover:bg-gray-200'}`}
               >
                 Reset Logos
               </button>
               <button
+                onClick={() => setIsResetConfirmOpen(true)}
+                disabled={saving || loading}
+                className={`rounded-md border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isDark
+                    ? 'border-red-950 bg-red-950/20 text-red-400 hover:bg-red-950/30'
+                    : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                }`}
+              >
+                Reset All Logos
+              </button>
+              <button
                 onClick={saveLayout}
                 disabled={!selectedCertId || saving || saveSuccess || hasPreviewDataUrl(layout)}
-                className={`rounded-md px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed ${
-                  saveSuccess 
+                className={`rounded-md px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed ${saveSuccess
                     ? 'bg-green-500 text-white border-green-600' // Turns green when successful!
-                    : isDark 
-                      ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] focus:ring-[#4e4f50] disabled:bg-[#2a2a2f]/50 border border-[#3e4042]' 
+                    : isDark
+                      ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] focus:ring-[#4e4f50] disabled:bg-[#2a2a2f]/50 border border-[#3e4042]'
                       : 'bg-yellow-400 text-slate-900 hover:bg-yellow-500 focus:ring-yellow-200 disabled:bg-yellow-200'
-                }`}
+                  }`}
               >
                 {saving ? "Saving..." : saveSuccess ? "Saved!" : hasPreviewDataUrl(layout) ? "Waiting for upload..." : "Save Layout"}
               </button>
@@ -504,7 +658,40 @@ const CertificateTemplateManagement = () => {
               </div>
 
               <UploadDropZone label="Main Logo" onFiles={updateMainLogo} disabled={!selectedCertId} />
+              <label className="mt-1.5 mb-3 flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={applyMainLogoToAll}
+                  onChange={(e) => setApplyMainLogoToAll(e.target.checked)}
+                  disabled={!selectedCertId}
+                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${
+                    isDark
+                      ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
+                      : 'border-gray-300 text-yellow-500'
+                  }`}
+                />
+                <span className={`text-[11px] font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                  Apply main logo to all templates
+                </span>
+              </label>
+
               <UploadDropZone label="Header Right Logo" onFiles={updateRightLogo} disabled={!selectedCertId} />
+              <label className="mt-1.5 mb-3 flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={applyRightLogoToAll}
+                  onChange={(e) => setApplyRightLogoToAll(e.target.checked)}
+                  disabled={!selectedCertId}
+                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${
+                    isDark
+                      ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
+                      : 'border-gray-300 text-yellow-500'
+                  }`}
+                />
+                <span className={`text-[11px] font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                  Apply right logo to all templates
+                </span>
+              </label>
 
               <div className={`rounded-lg border p-3 ${isDark ? 'border-[#3e4042] bg-[#1f1f1f]' : 'border-gray-200 bg-gray-50'}`}>
                 <p className={`text-xs font-semibold uppercase ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>Header Logo Size</p>
@@ -522,6 +709,22 @@ const CertificateTemplateManagement = () => {
               </div>
 
               <UploadDropZone label="Footer Logos" multiple onFiles={addFooterLogos} disabled={!selectedCertId} />
+              <label className="mt-1.5 mb-3 flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={applyFooterLogosToAll}
+                  onChange={(e) => setApplyFooterLogosToAll(e.target.checked)}
+                  disabled={!selectedCertId}
+                  className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${
+                    isDark
+                      ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
+                      : 'border-gray-300 text-yellow-500'
+                  }`}
+                />
+                <span className={`text-[11px] font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                  Apply footer logos to all templates
+                </span>
+              </label>
 
               <div className={`rounded-lg border p-3 ${isDark ? 'border-[#3e4042] bg-[#1f1f1f]' : 'border-gray-200 bg-gray-50'}`}>
                 <p className={`text-xs font-semibold uppercase ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`}>Footer Logo Size</p>
@@ -565,18 +768,26 @@ const CertificateTemplateManagement = () => {
             <CertificatePreviewCanvas layout={layout} certId={Number(selectedCertId)} />
           </section>
         </div>
-        {saveSuccess && (
-          <SuccessToast 
-            message="Layout saved successfully!" 
-            onClose={() => setSaveSuccess(false)} 
+        {successMessage && (
+          <SuccessToast
+            message={successMessage}
+            onClose={() => setSuccessMessage("")}
           />
         )}
         {errorMessage && (
-          <ErrorToast 
-            message={errorMessage} 
-            onClose={() => setErrorMessage("")} 
+          <ErrorToast
+            message={errorMessage}
+            onClose={() => setErrorMessage("")}
           />
         )}
+        <ConfirmationModal
+          isOpen={isResetConfirmOpen}
+          onClose={() => setIsResetConfirmOpen(false)}
+          onConfirm={resetAllLayouts}
+          title="Reset All Logos"
+          message="Are you sure you want to reset the logos of ALL certificate templates back to their defaults?"
+          type="confirm"
+        />
       </div>
     </div>
   );

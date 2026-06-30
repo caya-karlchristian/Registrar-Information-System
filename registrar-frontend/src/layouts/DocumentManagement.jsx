@@ -6,8 +6,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
-import DropDown from "../components/DropDown";
 import InputGroup from "../components/InputGroup";
+import ProcessPeriodInput from "../components/ProcessPeriodInput.jsx";
 import VoiceTextareaInput from "../components/VoiceTextareaInput.jsx";
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import { getDocumentTypes, createDocumentType, updateDocumentType, deleteDocumentType } from '../services/api';
@@ -24,7 +24,7 @@ const ACCESS_MAP = { Student: 1, Alumni: 2, All: 3 };
 
 const ACCESS_MAP_REVERSE = { 1: "Student", 2: "Alumni", 3: "All" };
 
-const PER_PAGE = 7;
+const PER_PAGE = 9;
 
 const EMPTY_FORM = {
   document_name:           "",
@@ -161,7 +161,7 @@ const DocumentManagement = () => {
   };
 
   return (
-    <div className={`min-h-screen font-sans mt-10 px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+    <div className={`font-sans mt-10 px-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
 
       {/* Top bar */}
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start mb-6">
@@ -178,7 +178,7 @@ const DocumentManagement = () => {
           </div>
         </div>
 
-        <div className="w-full lg:w-200 flex justify-start lg:justify-end">
+        <div className="w-full lg:flex-1 flex justify-start lg:justify-end">
           <button
             onClick={handleAdd}
             className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow transition-all ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
@@ -192,7 +192,7 @@ const DocumentManagement = () => {
       <div className="flex flex-col lg:flex-row gap-6 items-start">
 
         {/* Left — Document List */}
-        <div className={`rounded-xl w-full lg:max-w-sm flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
+        <div className={`rounded-xl w-full lg:min-h-178 lg:max-w-sm flex flex-col overflow-hidden shadow-sm h-fit ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
           <div className="px-6 pt-6 pb-3 text-center">
             <h2 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>List of Documents</h2>
             <hr className={`mt-3 ${isDark ? 'border-[#3e4042]' : 'border-gray-400'}`} />
@@ -280,7 +280,8 @@ const DocumentManagement = () => {
         </div>
 
         {/* Right — Always visible form */}
-          <form onSubmit={handleSave} className={`rounded-xl p-6 sm:p-10 py-4 lg:w-200 w-full flex flex-col shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>          <h2 className={`font-bold text-xl mb-2 ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>
+        <form onSubmit={handleSave} className={`rounded-xl p-6 sm:p-10 py-4 lg:flex-1 w-full flex flex-col gap-5 shadow-sm h-fit ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
+          <h2 className={`font-bold text-xl mb-2 ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>
             {isAdding ? "Add Document" : "Edit Document"}
           </h2>
 
@@ -294,49 +295,66 @@ const DocumentManagement = () => {
             labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
           />
 
-          <div className="mt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <VoiceTextareaInput
               id="document_description"
               label="Document Description"
               value={form.document_description}
               onChange={handleVoiceTextareaChange("document_description")}
               placeholder="Text"
-              minHeightClass="min-h-26"
+              minHeightClass="min-h-48"
+              required
+              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+            />
+
+            <VoiceTextareaInput
+              id="document_requirements"
+              label="List of Requirements"
+              value={form.document_requirements}
+              onChange={handleVoiceTextareaChange("document_requirements")}
+              placeholder="Text"
+              minHeightClass="min-h-48"
               required
               labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
             />
           </div>
 
-          <VoiceTextareaInput
-            id="document_requirements"
-            label="List of Requirements"
-            value={form.document_requirements}
-            onChange={handleVoiceTextareaChange("document_requirements")}
-            placeholder="Text"
-            minHeightClass="min-h-26"
-            required
+          <ProcessPeriodInput
+            label="Process Period"
+            name="document_process_period"
+            value={form.document_process_period}
+            onChange={handleChange}
             labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+            required
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <InputGroup
-              label="Process Period"
-              name="document_process_period"
-              value={form.document_process_period}
-              onChange={handleChange}
-              placeholder="e.g. 3 days"
-              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
-              required
-            />
-            <DropDown
-              label="Exclusive For"
-              name="access_id"
-              value={form.access_id}
-              onChange={handleChange}
-              options={EXCLUSIVE_FOR}
-              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
-              required
-            />
+          <div className="flex flex-col gap-1.5 w-full">
+            <span className={`text-sm font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+              Exclusive For <span className="text-red-400">*</span>
+            </span>
+            <div className="flex gap-3">
+              {EXCLUSIVE_FOR.map((option) => {
+                const isActive = form.access_id === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, access_id: option }))}
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all duration-200 cursor-pointer ${
+                      isActive
+                        ? isDark
+                          ? "bg-yellow-400 border-yellow-400 text-gray-900 shadow-md scale-[1.02]"
+                          : "bg-pup-dark-maroon border-pup-dark-maroon text-white shadow-md scale-[1.02]"
+                        : isDark
+                        ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f] hover:text-white"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-end gap-3 pt-2">
