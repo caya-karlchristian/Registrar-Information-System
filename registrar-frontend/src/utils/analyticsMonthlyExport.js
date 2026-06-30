@@ -497,6 +497,36 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
     return true;
   });
 
+  let activeStart = startYM;
+  let activeEnd = endYM;
+
+  if (!activeStart || !activeEnd) {
+    const dates = logbookRequests
+      .map((r) => toDate(r.requested_at ?? r.date_requested ?? r.requestedOn ?? r.processed_at ?? r.date_processed))
+      .filter(Boolean)
+      .map((d) => d.getTime());
+
+    if (dates.length > 0) {
+      const minDate = new Date(Math.min(...dates));
+      const maxDate = new Date(Math.max(...dates));
+      const pad2 = (val) => String(val).padStart(2, '0');
+      
+      if (!activeStart) {
+        activeStart = `${minDate.getFullYear()}-${pad2(minDate.getMonth() + 1)}`;
+      }
+      if (!activeEnd) {
+        activeEnd = `${maxDate.getFullYear()}-${pad2(maxDate.getMonth() + 1)}`;
+      }
+    } else {
+      const today = new Date();
+      const pad2 = (val) => String(val).padStart(2, '0');
+      const yStr = today.getFullYear();
+      const mStr = pad2(today.getMonth() + 1);
+      if (!activeStart) activeStart = `${yStr}-${mStr}`;
+      if (!activeEnd) activeEnd = `${yStr}-${mStr}`;
+    }
+  }
+
   const docTypesArray = Array.isArray(allDocumentTypesRes?.data) ? allDocumentTypesRes.data : [];
   const docProcessMapByName = {};
   const docProcessMapById = {};
@@ -517,7 +547,7 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
   });
 
   const sectionArrays = await Promise.all(docsToExport.map(async (docName) => {
-    const monthRows = monthRowsBetween(startYM, endYM);
+    const monthRows = monthRowsBetween(activeStart, activeEnd);
     const getCertificateNames = (request) => {
       const certs = Array.isArray(request?.certificates) ? request.certificates : [];
       return certs.map((c) => (c.certification_type?.certificate_name ?? c.certificate_name ?? c.name ?? '')).filter(Boolean).map(s => String(s).trim().toLowerCase());

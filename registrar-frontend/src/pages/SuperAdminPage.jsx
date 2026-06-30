@@ -37,7 +37,7 @@ const SuperAdminPage = () => {
         />
 
         <main className={`flex-1 w-full overflow-y-auto p-4 lg:p-8 lg:ml-72 transition-all duration-300 ease-in-out ${isDark ? 'bg-[#18191a]' : ''}`}>
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-400 mx-auto w-full">
             <Outlet />
           </div>
         </main>
