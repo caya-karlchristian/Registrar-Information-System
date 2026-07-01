@@ -269,7 +269,6 @@ const AnalyticsDashboard = () => {
         onClose={() => setExportModalOpen(false)}
         onConfirm={handleExportConfirm}
         documentTypes={documentTypes}
-        maxMonths={6}
       />
 
       {/* ── 2. KPI CARDS ── */}

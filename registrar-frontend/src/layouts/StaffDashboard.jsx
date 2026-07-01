@@ -511,7 +511,7 @@ const StaffDashboard = () => {
                     checked={currentItems.length > 0 && selectedIds.length === currentItems.length}
                   />
                 </th>
-                <Th center>Req ID</Th>
+                <Th center>#</Th>
                 <Th center>Name</Th>
                 <Th center>Classification</Th>
                 <Th center>Document</Th>
@@ -522,7 +522,7 @@ const StaffDashboard = () => {
               </tr>
             </thead>
             <tbody className={isDark ? 'divide-y divide-[#3e4042]' : 'divide-y divide-gray-100'}>
-              {currentItems.map(req => (
+              {currentItems.map((req, idx) => (
                 <tr key={req.id} className={`transition-colors ${isDark ? 'hover:bg-[#3a3b3c]' : 'hover:bg-gray-50'} ${selectedIds.includes(req.id) ? (isDark ? 'bg-blue-900/15' : 'bg-blue-50') : ''}`}>
                   <td className="px-6 py-4 text-center">
                     <input 
@@ -532,7 +532,11 @@ const StaffDashboard = () => {
                       onChange={() => handleSelectOne(req.id)}
                     />
                   </td>
-                  <Td center>{req.id}</Td>
+                  <Td center>
+                    <span className="font-semibold text-xs text-gray-500 dark:text-gray-400">
+                      {indexOfFirstItem + idx + 1}
+                    </span>
+                  </Td>
                   <Td>
                     <div className="font-bold text-center">{req.studentName}</div>
                   </Td>
