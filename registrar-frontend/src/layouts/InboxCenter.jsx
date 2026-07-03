@@ -48,8 +48,11 @@ const toMailItem = (n) => {
   } else if (
     type === 'ready_to_claim' ||
     type === 'request_completed' ||
+    type === 'admin_new_request' ||
     title.toLowerCase().includes('ready') ||
-    title.toLowerCase().includes('completed')
+    title.toLowerCase().includes('completed') ||
+    title.toLowerCase().includes('new request') ||
+    title.toLowerCase().includes('new document request')
   ) {
     dotColor = 'bg-green-500';
   }
