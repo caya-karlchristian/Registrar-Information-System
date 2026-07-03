@@ -565,7 +565,7 @@ const StaffDashboard = () => {
                     <Td center><span className={isDark ? 'font-semibold text-[#e4e6eb]' : 'font-semibold text-gray-700'}>{req.copies}</span></Td>
                   <Td center>{getStatusBadge(req.statusName)}</Td>
                   <Td center>
-                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-center sm:justify-end gap-1.5 sm:gap-2 min-w-0 sm:min-w-37.5">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 sm:gap-2 min-w-0">
                       {req.isCertificate && req.statusId === resolvedStatusIds.PENDING && (
                         <button
                           title="Generate Certificate"
@@ -611,7 +611,7 @@ const StaffDashboard = () => {
                       <button
                         title="View Details"
                         onClick={() => setSelectedRequest(req.rawRequest)}
-                        className={isDark ? 'p-2 text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}
+                        className={`flex items-center justify-center gap-1 px-3 py-1.5 ${isDark ? 'p-2text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}`}
                       >
                         <EyeIcon className="w-5 h-5" />
                       </button>                     
@@ -666,7 +666,7 @@ const StaffDashboard = () => {
         onConfirm={confirmDeleteSelected}
       />
 
-{certRequest && (
+      {certRequest && (
         <CertificateModal
           request={certRequest}
           onCertificatePrinted={markCertificateAsPrinted}
