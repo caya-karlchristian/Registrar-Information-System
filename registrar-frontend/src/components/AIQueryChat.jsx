@@ -48,13 +48,7 @@ const AIQueryChat = ({ buildParams }) => {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState(null);
 
-  const bottomRef  = useRef(null);
   const inputRef   = useRef(null);
-
-  // Auto-scroll to latest message
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history, loading]);
 
   const handleSend = async (question = input.trim()) => {
     if (!question || loading) return;
@@ -173,7 +167,6 @@ const AIQueryChat = ({ buildParams }) => {
           </div>
         )}
 
-        <div ref={bottomRef} />
       </div>
 
       {/* Input row */}

@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { XMarkIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/NotificationToastContext';
+import { useHeaderResponsiveState } from '../utils/helpers';
 
 // CATEGORY_MAP lives in src/constants/notificationCategories.js
 // — edit it there; changes apply to both NotificationModal and NotificationToast.
@@ -75,12 +76,17 @@ const SingleToast = ({ toast, onDismiss }) => {
 // -------------------------------------------------------
 const NotificationToast = () => {
     const { toasts, dismissToast } = useToast();
+    const { headerHeight } = useHeaderResponsiveState(toasts.length > 0);
 
     if (toasts.length === 0) return null;
 
     return (
-        <div className="fixed toast-container-shifted right-3 lg:right-5 md:right-5 z-9999 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] pointer-events-none">
-            {toasts.map(toast => (
+        <div 
+            style={{
+                top: `${headerHeight + 16}px`,
+            }}
+            className="fixed toast-container-shifted right-3 lg:right-5 md:right-5 z-9999 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] pointer-events-none"
+        >            {toasts.map(toast => (
                 <div key={toast.id} className="pointer-events-auto">
                     <SingleToast toast={toast} onDismiss={dismissToast} />
                 </div>
