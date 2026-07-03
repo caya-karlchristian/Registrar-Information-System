@@ -16,6 +16,7 @@ import {
 } from '../utils/logbookHelpers.js';
 
 import DropDown from '../components/DropDown';
+import LogbookDateRangeModal from '../components/LogbookDateRangeModal';
 import { LogbookSkeleton } from '../components/LoadingSkeleton';
 import SuccessToast from '../components/SuccessToast.jsx';
 import ErrorToast from '../components/ErrorToast.jsx';
@@ -45,36 +46,15 @@ const LogbookRecords = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [activePreset, setActivePreset] = useState('');
+  const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const rowsPerPage = 8;
 
-  // Quick-select date range presets
-  const applyPreset = (preset) => {
-    const now = new Date();
-
-    if (preset === 'annual') {
-      const from = new Date(now);
-      from.setFullYear(from.getFullYear() - 1);
-      setDateFrom(from.toISOString().slice(0, 10));
-      setDateTo(now.toISOString().slice(0, 10));
-    } else if (preset === 'semi') {
-      const from = new Date(now);
-      from.setMonth(from.getMonth() - 6);
-      setDateFrom(from.toISOString().slice(0, 10));
-      setDateTo(now.toISOString().slice(0, 10));
-    } else if (preset === 'month') {
-      const year = now.getFullYear();
-      const month = now.getMonth();
-      const m = String(month + 1).padStart(2, '0');
-      setDateFrom(`${year}-${m}-01`);
-      const lastDay = String(new Date(year, month + 1, 0).getDate()).padStart(2, '0');
-      setDateTo(`${year}-${m}-${lastDay}`);
-    } else {
-      setDateFrom('');
-      setDateTo('');
-    }
-
+  const handleApplyDateFilter = (start, end, preset) => {
+    setDateFrom(start);
+    setDateTo(end);
     setActivePreset(preset);
     setCurrentPage(1);
+    setIsDateModalOpen(false);
   };
 
   // Load logbook data on mount
@@ -88,8 +68,8 @@ const LogbookRecords = () => {
           getCertifications(),
         ]);
 
-        const requests       = toRows(logbookRes.data);
-        const types          = toRows(typesRes.data);
+        const requests = toRows(logbookRes.data);
+        const types = toRows(typesRes.data);
         const certifications = toRows(certRes.data);
 
         setData(requests);
@@ -165,8 +145,8 @@ const LogbookRecords = () => {
 
   // Whether the UI is currently focused on certification-specific filters/exports
   const isCertificationMode = useMemo(() => {
-    const sel   = String(selectedExportOption || '').trim().toLowerCase();
-    const label = String(selectedDocLabel     || '').trim().toLowerCase();
+    const sel = String(selectedExportOption || '').trim().toLowerCase();
+    const label = String(selectedDocLabel || '').trim().toLowerCase();
     return sel === 'certification' || (label === 'certification' && sel !== 'all certification');
   }, [selectedExportOption, selectedDocLabel]);
 
@@ -185,14 +165,14 @@ const LogbookRecords = () => {
   // Filter data
   const filteredData = useMemo(() => {
     const from = dateFrom ? new Date(dateFrom + 'T00:00:00') : null;
-    const to   = dateTo   ? new Date(dateTo   + 'T23:59:59') : null;
+    const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
 
     const completedOnly = data.filter(item => {
       if (from || to) {
         const req = item.requested_at ? new Date(item.requested_at) : null;
         if (!req) return false;
         if (from && req < from) return false;
-        if (to   && req > to  ) return false;
+        if (to && req > to) return false;
       }
       return true;
     });
@@ -223,9 +203,9 @@ const LogbookRecords = () => {
     });
   }, [filteredData]);
 
-  const totalPages       = Math.ceil(sortedData.length / rowsPerPage) || 1;
+  const totalPages = Math.ceil(sortedData.length / rowsPerPage) || 1;
   const indexOfFirstItem = (currentPage - 1) * rowsPerPage;
-  const indexOfLastItem  =  currentPage      * rowsPerPage;
+  const indexOfLastItem = currentPage * rowsPerPage;
 
   const currentData = useMemo(() => {
     return sortedData.slice(indexOfFirstItem, indexOfLastItem);
@@ -311,19 +291,19 @@ const LogbookRecords = () => {
   if (loading) return <LogbookSkeleton isDark={isDark} />;
 
   return (
-    <div className={`relative min-h-full font-sans text-left z-20 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>
+    <div className={`relative min-h-full font-sans text-left ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>
       <div className={`max-w-350 mx-auto shadow-md rounded-sm flex flex-col min-h-150 print:p-0 print:shadow-none ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
 
-        <div className="p-4 sm:p-6 md:p-8 pb-0">
+        <div className="px-8 lg:mt-10">
 
           {/* ── Controls Panel ── */}
           <div className={`mb-6 print:hidden rounded-xl border p-4 sm:p-5 ${isDark ? 'bg-[#1e1f20] border-[#3e4042]' : 'bg-gray-50 border-gray-200'}`}>
 
-            {/* Row 1 — Dropdowns · Date Range · Export */}
-            <div className="flex flex-wrap items-end gap-3 mb-4">
+            {/* Controls Row */}
+            <div className="flex flex-wrap items-end gap-3 w-full">
 
               {/* Document Type dropdown */}
-              <div className="w-44 shrink-0">
+              <div className="w-full md:w-75 shrink-0">
                 <DropDown
                   label="Document Type"
                   name="docType"
@@ -349,7 +329,7 @@ const LogbookRecords = () => {
 
               {/* Certification Type dropdown (conditional) */}
               {isCertificationMode && (
-                <div className="w-44 shrink-0">
+                <div className="w-full md:w-75 shrink-0">
                   <DropDown
                     label="Certification Type"
                     name="certificationType"
@@ -365,109 +345,50 @@ const LogbookRecords = () => {
               )}
 
               {/* Vertical divider */}
-              <div className={`hidden sm:block self-stretch w-px mx-1 ${isDark ? 'bg-[#3e4042]' : 'bg-gray-200'}`} />
-
-              {/* Date range */}
-              <div className="flex items-end gap-2">
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>From</label>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => { setDateFrom(e.target.value); setActivePreset(''); setCurrentPage(1); }}
-                    className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
-                  />
-                </div>
-                <span className={`mb-2 text-xs font-medium ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>→</span>
-                <div className="flex flex-col gap-1">
-                  <label className={`text-[10px] font-semibold uppercase tracking-widest ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>To</label>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => { setDateTo(e.target.value); setActivePreset(''); setCurrentPage(1); }}
-                    className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
-                  />
-                </div>
+              <div className={`hidden md:block self-stretch w-px mx-1 ${isDark ? 'bg-[#3e4042]' : 'bg-gray-200'}`} />
+              
+              {/* Date Filter Button */}
+              <div className="w-full md:w-65 shrink-0 flex flex-col">
+                <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                  Date Range
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsDateModalOpen(true)}
+                  className={`
+                    w-full flex items-center justify-between gap-2 pl-3 pr-3 py-3 rounded-lg text-sm font-medium 
+                    shadow-sm focus:outline-none border transition-colors text-left cursor-pointer
+                    ${isDark
+                      ? 'bg-[#1f1f1f] text-[#e4e6eb] border-[#3e4042] hover:border-gray-200'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-gray-200'
+                    }
+                  `}
+                >
+                  <span className="truncate">
+                    {dateFrom && dateTo
+                      ? `${dateFrom} to ${dateTo}`
+                      : (dateFrom ? `From ${dateFrom}` : (dateTo ? `To ${dateTo}` : 'All Time'))}
+                  </span>
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </button>
               </div>
 
               {/* Export button */}
-              <div className="ml-auto">
+              <div className="w-full md:w-60 md:ml-auto shrink-0">
                 <button
                   onClick={handleExportDocx}
                   disabled={loading || exporting || sortedData.length === 0}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all duration-150 shadow-sm
-                    ${(loading || exporting || sortedData.length === 0)
-                      ? (isDark
-                          ? 'bg-[#2d2e30] text-[#4e4f50] border border-[#3e4042] cursor-not-allowed'
-                          : 'bg-gray-100 text-gray-300 border border-gray-200 cursor-not-allowed')
-                      : (isDark
-                          ? 'bg-[#800000] hover:bg-[#9a0000] text-[#FFD700] border border-[#9a0000] shadow-[#800000]/20'
-                          : 'bg-[#800000] hover:bg-[#6a0000] text-[#FFD700] shadow-[#800000]/30')
-                    }`}
+                  className={`w-full flex items-center justify-center px-3 py-3 
+                    rounded-lg text-sm font-black uppercase tracking-wide shadow 
+                    transition-colors bg-[#800000] text-white hover:bg-[#6b0000]
+                    ${isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] hover:bg-[#4e4f50]' : 
+                    'bg-[#800000] text-white hover:bg-[#6b0000]'}`}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round"
-                      d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                  </svg>
-                  {exporting ? 'Exporting…' : 'Export DOCX'}
+                  <span>{exporting ? 'Exporting…' : 'Export DOCX'}</span>
                 </button>
               </div>
-            </div>
-
-            {/* Row 2 — Quick-select presets */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`text-[10px] font-semibold uppercase tracking-widest mr-1 ${isDark ? 'text-[#6b6c6e]' : 'text-gray-400'}`}>
-                Quick Range:
-              </span>
-
-              {[
-                { label: 'Annual',      sublabel: '1 yr', preset: 'annual' },
-                { label: 'Semi-Annual', sublabel: '6 mo', preset: 'semi'   },
-                { label: 'This Month',  sublabel: '1 mo', preset: 'month'  },
-                { label: 'All Time',    sublabel: '∞',    preset: 'all'    },
-              ].map(({ label, sublabel, preset }) => {
-                const isActive = activePreset === preset;
-                return (
-                  <button
-                    key={preset}
-                    onClick={() => applyPreset(preset)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150 border
-                      ${isActive
-                        ? (isDark
-                            ? 'bg-[#800000] border-[#9a0000] text-[#FFD700] shadow-sm'
-                            : 'bg-[#800000] border-[#800000] text-[#FFD700] shadow-sm')
-                        : (isDark
-                            ? 'bg-[#2d2e30] border-[#3e4042] text-[#b0b3b8] hover:border-[#6b6c6e] hover:text-[#e4e6eb]'
-                            : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:text-gray-800')
-                      }`}
-                  >
-                    {label}
-                    <span className={`text-[9px] font-normal px-1 py-0.5 rounded
-                      ${isActive
-                        ? 'bg-white/20 text-current'
-                        : (isDark ? 'bg-[#3e4042] text-[#6b6c6e]' : 'bg-gray-100 text-gray-400')
-                      }`}>
-                      {sublabel}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {/* Clear dates */}
-              {(dateFrom || dateTo) && (
-                <button
-                  onClick={() => { setDateFrom(''); setDateTo(''); setActivePreset(''); setCurrentPage(1); }}
-                  className={`ml-1 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors border
-                    ${isDark
-                      ? 'border-[#3e4042] text-[#6b6c6e] hover:text-[#b0b3b8] hover:border-[#6b6c6e]'
-                      : 'border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300'}`}
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Clear
-                </button>
-              )}
             </div>
           </div>
 
@@ -503,10 +424,12 @@ const LogbookRecords = () => {
               {currentData.map((row) => (
                 (() => {
                   const processedAt = getProcessedAt(row);
-                  const claimedAt   = getClaimedAt(row);
+                  const claimedAt = getClaimedAt(row);
 
                   return (
-                    <tr key={row.request_id || row.id} className={`border-b text-[11px] sm:text-[12px] transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
+                    <tr key={row.request_id || row.id} className={`border-b text-[11px] sm:text-[12px] transition-colors 
+                    ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c] text-[#b0b3b8]' : 
+                    'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
 
                       <td className="p-3 sm:p-4 text-center whitespace-nowrap">
                         {formatDateLong(row.requested_at) || 'N/A'}
@@ -551,7 +474,9 @@ const LogbookRecords = () => {
         </div>
 
         {/* ── Original Pagination Footer ── */}
-        <div className={`px-4 sm:px-8 py-4 text-[11px] sm:text-sm flex flex-col sm:flex-row justify-between items-center gap-4 print:hidden border-t ${isDark ? 'bg-[#242526] text-[#9a9a9a] border-[#3e4042]' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+        <div className={`px-4 sm:px-8 py-4 text-[11px] sm:text-sm flex flex-col sm:flex-row justify-between 
+          items-center gap-4 print:hidden border-t ${isDark ? 'bg-[#242526] text-[#9a9a9a] border-[#3e4042]' 
+          : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
           <span className="text-center sm:text-left">
             Showing {sortedData.length > 0 ? indexOfFirstItem + 1 : 0} to{" "}
             {Math.min(indexOfLastItem, sortedData.length)} of {sortedData.length} results
@@ -561,7 +486,9 @@ const LogbookRecords = () => {
             <button
               onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
-              className={`p-1 rounded transition-colors ${currentPage === 1 ? (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')}`}
+              className={`p-1 rounded transition-colors ${currentPage === 1 ? 
+                (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') 
+                : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')}`}
             >
               <ChevronLeftIcon className="w-5 h-5" />
             </button>
@@ -573,7 +500,9 @@ const LogbookRecords = () => {
             <button
               onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages || totalPages === 0}
-              className={`p-1 rounded transition-colors ${(currentPage === totalPages || totalPages === 0) ? (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')}`}
+              className={`p-1 rounded transition-colors ${(currentPage === totalPages || totalPages === 0) 
+                ? (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') 
+                : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')}`}
             >
               <ChevronRightIcon className="w-5 h-5" />
             </button>
@@ -581,7 +510,17 @@ const LogbookRecords = () => {
         </div>
 
         <SuccessToast message={toastSuccess} onClose={() => setToastSuccess('')} />
-        <ErrorToast   message={toastError}   onClose={() => setToastError('')}   />
+        <ErrorToast message={toastError} onClose={() => setToastError('')} />
+
+        <LogbookDateRangeModal
+          isOpen={isDateModalOpen}
+          onClose={() => setIsDateModalOpen(false)}
+          onConfirm={handleApplyDateFilter}
+          initialDateFrom={dateFrom}
+          initialDateTo={dateTo}
+          initialActivePreset={activePreset}
+          isDark={isDark}
+        />
       </div>
     </div>
   );
