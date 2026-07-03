@@ -24,9 +24,10 @@ import InboxCenter from './layouts/InboxCenter.jsx';
 
 // Super Admin layouts
 import UserManagement from './layouts/UserManagement.jsx';
-import DocumentManagement from './layouts/DocumentManagement.jsx';
+import DocumentAndCertificateManagement from './pages/DocumentAndCertificateManagement.jsx';
 import ReportManagement from './layouts/ReportManagement.jsx';
 import SystemSettings from './layouts/SystemSettings.jsx';
+import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
 
 // Auth
 import { ROLES } from './context/AuthProvider';
@@ -40,7 +41,6 @@ import NotificationToast from './components/NotificationToast.jsx';
 
 import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ReferenceDataProvider } from './context/ReferenceDataContext.jsx';
-import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
 import FloatingActionMenu from './components/FloatingActionMenu.jsx';
 
 
@@ -126,8 +126,8 @@ const App = () => {
             <Route index element={<UserManagement />} /> 
             <Route path="contact" element={<RegistrarContact />} /> 
             <Route path="user" element={<UserManagement />} />
-            <Route path="documents" element={<DocumentManagement />} />
-            <Route path="certificates" element={<CertificateTemplateManagement />} />
+            <Route path="documents" element={<DocumentAndCertificateManagement />} />
+            <Route path="certificates" element={<Navigate to="../documents" replace />} />
             <Route path="report" element={<ReportManagement/>} />
             <Route path="settings" element={<SystemSettings/>} />
             <Route path="inbox" element={<InboxCenter />} />
