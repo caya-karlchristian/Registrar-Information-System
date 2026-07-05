@@ -27,6 +27,9 @@ class DatabaseSeeder extends Seeder
             ['status_id' => 2,  'status_name' => 'Ready to Claim'],
             ['status_id' => 3,  'status_name' => 'Completed'],
             ['status_id' => 4,  'status_name' => 'Forfeited'],
+            // Cancelled is deprecated as of this change (see RequestStatusEnum::Cancelled)
+            // — kept only so existing document_request rows with status_id=5 still
+            // resolve to a valid request_status row. Do not use for new requests.
             ['status_id' => 5,  'status_name' => 'Cancelled'],
             ['status_id' => 6,  'status_name' => 'Pending'],
             ['status_id' => 7,  'status_name' => 'On Hold'],
