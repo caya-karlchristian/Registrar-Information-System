@@ -8,6 +8,17 @@ enum RequestStatusEnum: int
     case ReadyToClaim = 2;
     case Completed   = 3;
     case Forfeited   = 4;
+
+    /**
+     * @deprecated Cancelled is being retired as a status going forward.
+     * The case is kept (rather than removed) because RequestStatusEnum::from()
+     * is called on status_id values read from existing document_request rows
+     * (e.g. in notifyOwnerOfStatusChange()) — removing the case would throw a
+     * ValueError the first time the app reads a historical row that was
+     * already cancelled before this change. allowedTransitions() below no
+     * longer permits transitioning INTO Cancelled, so no new row can reach
+     * this status; it now only exists to keep old data readable.
+     */
     case Cancelled   = 5;
 
     /**
@@ -15,11 +26,12 @@ enum RequestStatusEnum: int
      * Used by DocumentRequestService::updateRequest() to reject illegal moves.
      *
      * Transition map:
-     *   Processing   → ReadyToClaim | Cancelled
+     *   Processing   → ReadyToClaim
      *   ReadyToClaim → Completed    | Forfeited
      *   Completed    → (terminal)
      *   Forfeited    → (terminal)
-     *   Cancelled    → (terminal)
+     *   Cancelled    → (terminal, and unreachable from any other status — see
+     *                   the @deprecated note on the Cancelled case above)
      *
      * Note: the automated shredder (ShredExpiredRequests) transitions
      * ReadyToClaim → Forfeited by writing directly to the DB, so it
@@ -30,7 +42,7 @@ enum RequestStatusEnum: int
     public function allowedTransitions(): array
     {
         return match ($this) {
-            self::Processing   => [self::ReadyToClaim, self::Cancelled],
+            self::Processing   => [self::ReadyToClaim],
             self::ReadyToClaim => [self::Completed, self::Forfeited],
             self::Completed    => [],
             self::Forfeited    => [],

@@ -11,7 +11,10 @@ class StudentAcademicRecord extends Model
     protected $table = 'student_academic_record';
     protected $primaryKey = 'student_academic_id';
     public $timestamps = false;
-    protected $guarded = [];
+    // course_id is set internally by OgosStudentService::upsertLocalRecords()
+    // via updateOrCreate(), not through StudentAcademicRecordController's
+    // validated input — must stay fillable or that sync silently breaks.
+    protected $fillable = ['student_profile_id', 'student_number', 'course_id', 'course', 'year_level', 'section', 'school_year_admitted', 'last_school_year_attended'];
 
     public function studentProfile()
     {

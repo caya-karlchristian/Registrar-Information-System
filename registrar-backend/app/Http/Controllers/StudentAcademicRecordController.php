@@ -34,8 +34,11 @@ class StudentAcademicRecordController extends Controller
             'year_level'               => 'nullable|string|max:50',
             'school_year_admitted'     => 'nullable|string|max:20',
             'last_school_year_attended'=> 'nullable|string|max:20',
-            'has_honorable_dismissal'  => 'nullable|boolean',
-            'graduation_date'          => 'nullable|date',
+            // has_honorable_dismissal / graduation_date removed — no such
+            // columns exist on student_academic_record (confirmed via
+            // SHOW CREATE TABLE), and nothing else in the app reads them.
+            // Submitting them previously passed validation, then failed
+            // with a fatal "Unknown column" SQL error on create().
         ]);
 
         $record = StudentAcademicRecord::create($validated);
@@ -56,8 +59,6 @@ class StudentAcademicRecordController extends Controller
             'year_level'               => 'nullable|string|max:50',
             'school_year_admitted'     => 'nullable|string|max:20',
             'last_school_year_attended'=> 'nullable|string|max:20',
-            'has_honorable_dismissal'  => 'nullable|boolean',
-            'graduation_date'          => 'nullable|date',
         ]);
 
         $record->update($validated);

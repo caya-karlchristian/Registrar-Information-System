@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class RequestHistory extends Model
 {
     protected $table = 'request_history';
-    protected $primaryKey = 'history_id';
+    protected $primaryKey = 'request_history_id';
     public $timestamps = false;
-    protected $guarded = [];
+    protected $fillable = ['request_id', 'old_status_id', 'new_status_id', 'changed_at', 'changed_by', 'processed_by', 'processed_by_email', 'minutes_processed'];
 
     public function request()
     {

@@ -19,6 +19,11 @@ class SystemUser extends Authenticatable
     protected $primaryKey = 'user_id';
     public $timestamps = false;
 
+    // Defense-in-depth: UserResource already explicitly allowlists what's
+    // returned, but nothing previously stopped a future response()->json($user)
+    // or an error-handler dump from serializing these directly.
+    protected $hidden = ['password', 'idp_access_token'];
+
     /**
      * Laravel's Authenticatable base returns 'id' by default.
      * Without this override, Auth::id() reads $this->id (null),
