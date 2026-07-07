@@ -36,7 +36,7 @@ const StudentPage = () => {
           role="student"
         />
 
-        <main className={`flex-1 w-full overflow-y-auto pt-10 p-4 lg:pt-15 lg:p-8 lg:ml-72 transition-all duration-300 ease-in-out ${isDark ? 'bg-[#18191a]' : 'bg-[#F5F5F5]'}`}>
+        <main className={`flex-1 w-full overflow-y-auto pt-10 p-4 lg:pt-10 lg:p-8 lg:ml-72 transition-all duration-300 ease-in-out ${isDark ? 'bg-[#18191a]' : 'bg-[#F5F5F5]'}`}>
           <div className="max-w-7xl mx-auto">
             <Outlet />
           </div>

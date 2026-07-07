@@ -152,9 +152,11 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = null, isDark,
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
-      <div className={`relative z-50 w-full max-w-2xl my-4 sm:my-8 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-y-auto border flex flex-col max-h-[90vh] ${isDark ? 'bg-[#242526] border-[#3e4042] text-[#e4e6eb]' : 'bg-white border-[#800000]/20 text-gray-900'}`}>
+    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
+      <div className={`relative z-50 w-full max-w-2xl my-4 sm:my-8 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] 
+        overflow-y-auto border flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200 
+        ${isDark ? 'bg-[#242526] border-[#3e4042] text-[#e4e6eb]' : 'bg-white border-[#800000]/20 text-gray-900'}`}>
         <div className={`px-6 py-6 border-b-4 shrink-0 ${isDark ? 'bg-[#1f1f1f] border-[#b98b00]' : 'bg-[#800000] border-[#FFD700]'}`}>
           <div className="flex items-center justify-between">
             <h3 className="text-2xl text-white font-black uppercase tracking-tighter">Export Report</h3>

@@ -674,7 +674,7 @@ const CertificateTemplateManagement = () => {
   };
 
   return (
-    <div className={`min-h-screen p-4 sm:p-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-transparent'}`}>
+    <div className={`min-h-screen p-4 sm:p-6 rounded-2xl ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white'}`}>
       <div className="mx-auto max-w-400 space-y-4">
         <header className={`rounded-xl border p-4 shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -865,10 +865,7 @@ const CertificateTemplateManagement = () => {
             </div>
           </aside>
 
-          <section className={`rounded-2xl border p-4 sm:p-8 ${isDark ? 'border-[#3e4042] bg-[#353638]' : 'border-gray-200 bg-gray-100'}`}>
-            <div className={`mb-3 flex items-center justify-between rounded-lg px-4 py-3 ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
-              <h2 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>Certificate Preview</h2>
-            </div>
+          <section className={`rounded-2xl border p-4 sm:p-8 ${isDark ? 'border-[#3e4042] bg-[#353638]' : 'border-gray-200 bg-white'}`}>
             <CertificatePreviewCanvas layout={layout} certId={Number(selectedCertId)} />
           </section>
         </div>
