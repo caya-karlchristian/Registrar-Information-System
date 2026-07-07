@@ -55,6 +55,25 @@
     background-color: #5a0c0e;
   }
 
+  .custom-scrollbar-x::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .custom-scrollbar-x::-webkit-scrollbar-track {
+    background: rgba(248, 191, 30, 0.05);
+    border-radius: 9999px;
+  }
+
+  .custom-scrollbar-x::-webkit-scrollbar-thumb {
+    background: #F8BF1E;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .custom-scrollbar-x::-webkit-scrollbar-thumb:hover {
+    background: #8B0000;
+  }
   .custom-scrollbar::-webkit-scrollbar {
     width: 5px;
   }

@@ -82,6 +82,7 @@ export const getCertifications         = ()          => api.get("/certifications
 export const getCertification          = (id)        => api.get(`/certifications/${id}`);
 export const createCertification       = (data)      => api.post("/certifications", data);
 export const updateCertification       = (id, data)  => api.put(`/certifications/${id}`, data);
+export const deleteCertification       = (id)        => api.delete(`/certifications/${id}`);
 export const getCertificationLayouts   = ()          => api.get("/certifications/layouts");
 export const updateCertificationLayout = (id, data)  => api.put(`/certifications/${id}/layout`, data);
 export const uploadCertificationLayoutLogo = (id, formData) =>
