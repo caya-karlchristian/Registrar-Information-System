@@ -215,7 +215,7 @@ class AnalyticsService
             ->get();
 
         $byAdmin = DB::table('request_history as rh')
-            ->join('users as u', 'rh.processed_by', '=', 'u.user_id')
+            ->join('users as u', 'rh.changed_by', '=', 'u.user_id')
             ->leftJoin('admin_profile as ap', 'u.user_id', '=', 'ap.user_id')
             ->whereBetween('rh.changed_at', [$from, $to])
             ->whereNotNull('rh.minutes_processed')

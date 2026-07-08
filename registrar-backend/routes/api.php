@@ -88,6 +88,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::prefix('document-requests')->group(function () {
         Route::get('/',                           [DocumentRequestController::class, 'index']);
         Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware('role:3,4');
+        Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware('role:3,4');
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show']);
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware('role:3');
