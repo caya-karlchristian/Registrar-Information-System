@@ -128,12 +128,16 @@ class IdpClient
             return;
         }
 
+        
+        [$body, $status, $error] = $this->postWithAuth('/api/v1/auth/logout', [
+            'client_id' => $this->clientId,
+            'user_id'   => $userId,
+        ], $accessToken);
+            
         $url = $this->baseUrl . '/logout?' . http_build_query([
             'client_id' => $this->clientId,
             'user_id'   => $userId,
         ]);
-
-        [$body, $status, $error] = $this->execRaw($this->buildGet($url, $accessToken));
 
         Log::info('SSO: IdP logout called', [
             'user_id'     => $userId,
