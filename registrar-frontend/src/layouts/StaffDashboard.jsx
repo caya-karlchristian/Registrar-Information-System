@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CheckCircleIcon,
   EyeIcon,
@@ -6,7 +6,10 @@ import {
   ChevronRightIcon,
   TrashIcon,
   ArrowDownTrayIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from '@heroicons/react/24/solid';
+import { CheckIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
 import {
   getDocumentRequests,
   getRequestStatuses,
@@ -19,8 +22,8 @@ import LoadingOverlay from '../components/LoadingOverlay.jsx';
 import LineLoading from '../components/LineLoading.jsx';
 import CertificateModal from '../components/CertificateModal.jsx';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
+import DashboardDropdown from '../components/DashboardDropdown.jsx';
 import { useNotificationsContext } from '../context/NotificationsContext';
-import DropdownGroup from '../components/DropDown.jsx';
 
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useTheme } from '../context/ThemeContext';
@@ -68,7 +71,7 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
   'request_forfeited',
 ]);
 
-const StaffDashboard = () => {
+const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
   const { docTypeName, purposeName, certName } = useReferenceData();
   const { isDark } = useTheme();
   const [requests, setRequests] = useState([]);
@@ -84,6 +87,40 @@ const StaffDashboard = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [certRequest, setCertRequest] = useState(null);
   const [requestStatuses, setRequestStatuses] = useState([]);
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [filterClassification, setFilterClassification] = useState('All');
+  const [classificationDropdownOpen, setClassificationDropdownOpen] = useState(false);
+
+  const sortDropdownRef = useRef(null);
+  const statusDropdownRef = useRef(null);
+  const classificationDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target)) {
+        setSortDropdownOpen(false);
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+        setStatusDropdownOpen(false);
+      }
+      if (classificationDropdownRef.current && !classificationDropdownRef.current.contains(event.target)) {
+        setClassificationDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSort = (field) => {
+    if (field === 'Date & Time') {
+      setSortOrder(prev => prev === 'Recent Requests' ? 'Old Requests' : 'Recent Requests');
+    } else if (field === 'Classification') {
+      setSortOrder(prev => prev === 'Classification Asc' ? 'Classification Desc' : 'Classification Asc');
+    } else if (field === 'Status') {
+      setSortOrder(prev => prev === 'Status Asc' ? 'Status Desc' : 'Status Asc');
+    }
+  };
 
   const [printedCertificateIds, setPrintedCertificateIds] = useState(() => {
     if (typeof window === 'undefined') return [];
@@ -110,6 +147,7 @@ const StaffDashboard = () => {
       READY: lowerNameToId['ready to claim'] ?? STATUS_FALLBACK.READY,
       COMPLETED: lowerNameToId.completed ?? STATUS_FALLBACK.COMPLETED,
       FORFEITED: lowerNameToId.forfeited ?? STATUS_FALLBACK.FORFEITED,
+      ARCHIVED: lowerNameToId.archived ?? 10,
     };
   }, [requestStatuses]);
 
@@ -119,6 +157,8 @@ const StaffDashboard = () => {
   const fetchData = useCallback(async (showOverlay = true) => {
     try {
       if (showOverlay) setLoading(true);
+      // BACKEND: Once the backend supports fetching archived requests, change this call to:
+      // getDocumentRequests({ per_page: 200, all_statuses: true })
       const [requestsRes, statusesRes] = await Promise.all([
         getDocumentRequests({ per_page: 200 }),
         getRequestStatuses(),
@@ -139,6 +179,7 @@ const StaffDashboard = () => {
           READY: lowerNameToId['ready to claim'] ?? STATUS_FALLBACK.READY,
           COMPLETED: lowerNameToId.completed ?? STATUS_FALLBACK.COMPLETED,
           FORFEITED: lowerNameToId.forfeited ?? STATUS_FALLBACK.FORFEITED,
+          ARCHIVED: lowerNameToId.archived ?? 10,
         };
       })();
 
@@ -152,7 +193,8 @@ const StaffDashboard = () => {
 
         const alreadyForfeited = computedStatusId === STATUS.FORFEITED || String(computedStatusName).toLowerCase() === 'forfeited';
         const alreadyCompleted = computedStatusId === STATUS.COMPLETED || String(computedStatusName).toLowerCase() === 'completed';
-        if (!alreadyForfeited && !alreadyCompleted && diffDays >= 90) {
+        const alreadyArchived = computedStatusId === STATUS.ARCHIVED || String(computedStatusName).toLowerCase() === 'archived';
+        if (!alreadyForfeited && !alreadyCompleted && !alreadyArchived && diffDays >= 90) {
           computedStatusId = STATUS.FORFEITED;
           computedStatusName = 'Forfeited';
           updateDocumentRequest(r.request_id, { status_id: STATUS.FORFEITED }).catch(err => {
@@ -249,6 +291,33 @@ const StaffDashboard = () => {
           timestamp: requestDate ? requestDate.getTime() : 0,
         };
       });
+ // UI-only demo: inject an example archived record so the Archived tab is not empty by default
+      const mockArchivedRecord = {
+        id: 'DEMO-ARCHIVE-1',
+        rawRequest: {
+          request_id: 'DEMO-ARCHIVE-1',
+          status: { status_id: 10, status_name: 'Archived' },
+          student_profile: { first_name: 'John', last_name: 'Doe' },
+          academic_record: { student_number: '2023-00001-MN-0' },
+          requested_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        studentName: 'John Doe',
+        studentNumber: '2023-00001-MN-0',
+        userType: 'Student',
+        certName: null,
+        isCertificate: false,
+        copies: 1,
+        documentDetailsArray: ['Transcript of Records (TOR)'],
+        date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', {
+          day: '2-digit', month: 'long', year: 'numeric',
+        }),
+        time: '10:00:00',
+        statusId: 10,
+        statusName: 'Archived',
+        timestamp: Date.now() - 30 * 24 * 60 * 60 * 1000,
+      };
+
+      formatted.push(mockArchivedRecord);
 
       setRequests(formatted);
     } catch (error) {
@@ -288,7 +357,7 @@ const StaffDashboard = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterStatus, searchTerm, sortOrder]);
+  }, [filterStatus, filterClassification, searchTerm, sortOrder]);
 
   /* ---------------- STATUS UPDATE ---------------- */
   const handleStatusUpdate = async (id, newStatusId) => {
@@ -317,26 +386,55 @@ const StaffDashboard = () => {
 
   // True when the user has explicitly chosen a status filter or typed a search term.
   // In default mode the dashboard only shows actionable/recent work.
-  const isFiltering = filterStatus !== 'All' || searchTerm.trim() !== '';
+  const isFiltering = filterStatus !== 'All' || filterClassification !== 'All' || searchTerm.trim() !== '';
 
   const filteredData = requests
     .filter(r => {
-      // Default view: hide Forfeited, Cancelled, and old Completed records.
-      if (!isFiltering && !isDefaultVisible(r, resolvedStatusIds)) return false;
+      const isArchivedStatus = r.statusId === resolvedStatusIds.ARCHIVED || String(r.statusName).toLowerCase() === 'archived';
+
+      if (viewMode === 'archived') {
+        if (!isArchivedStatus) return false;
+      } else {
+        if (isArchivedStatus) return false;
+        // Default view: hide Forfeited, Cancelled, and old Completed records.
+        if (!isFiltering && !isDefaultVisible(r, resolvedStatusIds)) return false;
+      }
 
       const matchesStatus =
         filterStatus === 'All' ||
         (filterStatus === 'Completed' && r.statusId === resolvedStatusIds.COMPLETED) ||
         r.statusName === filterStatus;
+      const matchesClassification =
+        filterClassification === 'All' ||
+        r.userType.toLowerCase() === filterClassification.toLowerCase();
       const matchesSearch =
         searchTerm.trim() === '' ||
         r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.id.toString().includes(searchTerm);
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesClassification && matchesSearch;
     })
-    .sort((a, b) => (sortOrder === 'Old Requests' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp));
-
+    .sort((a, b) => {
+      if (sortOrder === 'Recent Requests') {
+        return b.timestamp - a.timestamp;
+      }
+      if (sortOrder === 'Old Requests') {
+        return a.timestamp - b.timestamp;
+      }
+      if (sortOrder === 'Classification Asc') {
+        return a.userType.localeCompare(b.userType);
+      }
+      if (sortOrder === 'Classification Desc') {
+        return b.userType.localeCompare(a.userType);
+      }
+      if (sortOrder === 'Status Asc') {
+        return (a.statusName || '').localeCompare(b.statusName || '');
+      }
+      if (sortOrder === 'Status Desc') {
+        return (b.statusName || '').localeCompare(a.statusName || '');
+      }
+      return 0;
+    });
   /* ---------------- PAGINATION ---------------- */
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
@@ -408,9 +506,22 @@ const StaffDashboard = () => {
     }
   };
 
-  const handleToolbarDropdownChange = (e) => {
-    const { name, value } = e.target;
-    name === 'filterStatus' ? setFilterStatus(value) : setSortOrder(value);
+  const handleArchiveSelected = () => {
+    if (selectedIds.length === 0) return;
+    
+    // BACKEND TODO: Connect this to the API. Update the selected requests' status to Archived (status_id: 10).
+    // UI-only fallback (In-memory update):
+    setRequests(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, statusName: 'Archived', statusId: 10 } : r));
+    setSelectedIds([]);
+  };
+
+  const handleRestoreSelected = () => {
+    if (selectedIds.length === 0) return;
+
+    // BACKEND TODO: Connect this to the API. Update the selected requests' status to Pending (status_id: 6). 
+    // UI-only fallback (In-memory update):
+    setRequests(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, statusName: 'Pending', statusId: 6 } : r));
+    setSelectedIds([]);
   };
 
   const markCertificateAsPrinted = (requestId) => {
@@ -419,87 +530,164 @@ const StaffDashboard = () => {
   };
 
 
-  return (
-    <div className={`relative ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5] text-gray-900'}`}>
-      <main className={`max-w-7xl mx-auto px-4 sm:px-6 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
-        <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
-        <LineLoading isVisible={actionLoading} />
+  const dashboardContent = (
+    <>
+      <LoadingOverlay isVisible={loading} message="Fetching Request Records..." />
+      <LineLoading isVisible={actionLoading} />
 
         {/* ---------------- CARDS ---------------- */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-          <StatCard title="New Requests"     count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length}    color="yellow" />
-          <StatCard title="Processing"       count={requests.filter(r => r.statusName?.toLowerCase() === 'processing').length} color="blue" />
-          <StatCard title="Ready for Pickup" count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length}       color="green" />
-        </div>
+        {viewMode === 'archived' ? (
+          <div className="grid grid-cols-1 gap-6 mb-8">
+            <StatCard 
+              title="Archived Requests" 
+              count={requests.filter(r => r.statusId === resolvedStatusIds.ARCHIVED || String(r.statusName).toLowerCase() === 'archived').length} 
+              color="blue" 
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+            <StatCard title="New Requests"     count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length}    color="yellow" />
+            <StatCard title="Processing"       count={requests.filter(r => r.statusName?.toLowerCase() === 'processing').length} color="blue" />
+            <StatCard title="Ready for Pickup" count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length}       color="green" />
+          </div>
+        )}
 
         {/* ---------------- TOOLBAR ---------------- */}
-        <div className={`p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-end ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white border border-gray-100'}`}>
+        <div className={isEmbedded ? "mb-6 flex flex-col md:flex-row gap-4 justify-between items-center w-full" : `p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-center ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white border border-gray-100'}`}>
           
           {selectedIds.length > 0 ? (
-            <div className={`flex flex-wrap items-center gap-3 p-2 rounded-lg border w-full md:w-auto ${isDark ? 'bg-red-900/15 border-red-900/20' : 'bg-red-50 border-red-100'}`}>
-              <span className={`font-bold text-sm ml-2 ${isDark ? 'text-red-300' : 'text-red-700'}`}>{selectedIds.length} Selected</span>
+            <div className={`flex flex-wrap items-center gap-3 p-2 rounded-lg border w-full md:w-auto ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-blue-50/30 border-blue-100'}`}>
+              <span className={`font-bold text-sm ml-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{selectedIds.length} Selected</span>
               <button 
                 onClick={handleDeleteSelected}
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
               >
                 <TrashIcon className="w-4 h-4" /> Delete Selected
               </button>
+              {viewMode === 'archived' ? (
+                <button 
+                  onClick={handleRestoreSelected}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
+                >
+                  <CheckIcon className="w-4 h-4" /> Restore Selected
+                </button>
+              ) : (
+                <button 
+                  onClick={handleArchiveSelected}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
+                >
+                  <ArchiveBoxIcon className="w-4 h-4" /> Archive Selected
+                </button>
+              )}
             </div>
           ) : (
-            <div className="w-full md:max-w-md">
-              <VoiceSearchInput
-                value={searchTerm}
-                onChange={setSearchTerm}
-                placeholder="Search"
-                language="en-US"
-              />
+            <div className="flex flex-1 items-center gap-3 w-full md:max-w-xl">
+              <div className="flex-1">
+                <VoiceSearchInput
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                  placeholder="Search"
+                  language="en-US"
+                />
+              </div>
+              <div className="relative shrink-0">
+                <DashboardDropdown
+                  isOpen={sortDropdownOpen}
+                  setIsOpen={setSortDropdownOpen}
+                  dropdownRef={sortDropdownRef}
+                  align="right"
+                  isIconButton
+                  trigger={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                    </svg>
+                  }
+                  sections={[
+                    {
+                      title: 'Sort by',
+                      items: [
+                        { label: 'Date & Time', field: 'Date & Time' },
+                        { label: 'Status', field: 'Status' },
+                        { label: 'Classification', field: 'Classification' }
+                      ].map(opt => {
+                        let isSelected = false;
+                        if (opt.field === 'Date & Time') {
+                          isSelected = sortOrder === 'Recent Requests' || sortOrder === 'Old Requests';
+                        } else if (opt.field === 'Classification') {
+                          isSelected = sortOrder === 'Classification Asc' || sortOrder === 'Classification Desc';
+                        } else if (opt.field === 'Status') {
+                          isSelected = sortOrder === 'Status Asc' || sortOrder === 'Status Desc';
+                        }
+                        return {
+                          label: opt.label,
+                          isSelected,
+                          onClick: () => {
+                            if (opt.field === 'Date & Time') setSortOrder('Recent Requests');
+                            else if (opt.field === 'Classification') setSortOrder('Classification Asc');
+                            else if (opt.field === 'Status') setSortOrder('Status Asc');
+                          }
+                        };
+                      })
+                    },
+                    {
+                      title: 'Direction',
+                      items: [
+                        { label: 'Ascending', dir: 'asc', icon: ArrowUpIcon },
+                        { label: 'Descending', dir: 'desc', icon: ArrowDownIcon }
+                      ].map(opt => {
+                        const isAsc = sortOrder === 'Old Requests' || sortOrder === 'Classification Asc' || sortOrder === 'Status Asc';
+                        const isSelected = (opt.dir === 'asc' && isAsc) || (opt.dir === 'desc' && !isAsc);
+                        return {
+                          label: opt.label,
+                          isSelected,
+                          icon: opt.icon,
+                          onClick: () => {
+                            if (opt.dir === 'asc') {
+                              if (sortOrder === 'Recent Requests') setSortOrder('Old Requests');
+                              else if (sortOrder === 'Classification Desc') setSortOrder('Classification Asc');
+                              else if (sortOrder === 'Status Desc') setSortOrder('Status Asc');
+                            } else {
+                              if (sortOrder === 'Old Requests') setSortOrder('Recent Requests');
+                              else if (sortOrder === 'Classification Asc') setSortOrder('Classification Desc');
+                              else if (sortOrder === 'Status Asc') setSortOrder('Status Desc');
+                            }
+                          }
+                        };
+                      })
+                    }
+                  ]}
+                />
+              </div>
             </div>
-          )} 
-
-        <div className="flex flex-col sm:flex-row items-end gap-2 w-full md:w-auto">
-          
-          {/* 1. The Dropdown Grid (Now comes first) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:min-w-95">
-            <DropdownGroup
-              label={`Status${!isFiltering ? ' (active only)' : ''}`}
-              name="filterStatus"
-              value={filterStatus}
-              onChange={handleToolbarDropdownChange}
-              options={statusFilterOptions}
-              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
-            />
-
-            <DropdownGroup
-              label="Sort"
-              name="sortOrder"
-              value={sortOrder}
-              onChange={handleToolbarDropdownChange}
-              options={['Recent Requests', 'Old Requests']}
-              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
-            />
+          )}
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            {(filterStatus !== 'All' || filterClassification !== 'All' || sortOrder !== 'Recent Requests' || searchTerm.trim() !== '') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterStatus('All');
+                  setFilterClassification('All');
+                  setSortOrder('Recent Requests');
+                  setSearchTerm('');
+                  setSelectedIds([]);
+                  setSortDropdownOpen(false);
+                  setStatusDropdownOpen(false);
+                  setClassificationDropdownOpen(false);
+                }}
+                className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold transition-colors border shadow-sm flex items-center justify-center shrink-0
+                ${isDark
+                    ? 'bg-[#1f1f1f] text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setFilterStatus('All');
-              setSortOrder('Recent Requests');
-              setSearchTerm('');
-              setSelectedIds([]);
-            }}
-            className={`w-full sm:w-auto px-4 py-3 rounded-lg text-sm font-semibold transition-colors border shadow-sm h-11.5 flex items-center justify-center shrink-0
-              ${isDark
-                ? 'bg-[#1f1f1f] text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-          >
-            Clear Filters
-          </button>
         </div>
-      </div>
 
         {/* ---------------- TABLE ---------------- */}
-        <div className={`rounded-xl shadow overflow-x-auto border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-100'}`}>
+        <div className={isEmbedded ? "overflow-x-auto w-full" : `rounded-xl shadow overflow-x-auto border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-100'}`}>
           <table className={`min-w-full divide-y ${isDark ? 'divide-[#3e4042]' : 'divide-gray-100'}`}>
             <thead className={isDark ? 'bg-[#18191a]/80' : 'bg-gray-50'}>
               <tr>
@@ -513,112 +701,205 @@ const StaffDashboard = () => {
                 </th>
                 <Th center>#</Th>
                 <Th center>Name</Th>
-                <Th center>Classification</Th>
+                <Th center>
+                  <DashboardDropdown
+                    isOpen={classificationDropdownOpen}
+                    setIsOpen={setClassificationDropdownOpen}
+                    dropdownRef={classificationDropdownRef}
+                    align="center"
+                    trigger={<span>Classification</span>}
+                    sections={[
+                      {
+                        title: 'Filter by Classification',
+                        items: ['All', 'Student', 'Alumni'].map(option => ({
+                          label: option,
+                          isSelected: filterClassification === option,
+                          onClick: () => setFilterClassification(option)
+                        }))
+                      }
+                    ]}
+                  />
+                </Th>
                 <Th center>Document</Th>
-                <Th center>Date & Time</Th>
+                <Th center>
+                  <button
+                    type="button"
+                    onClick={() => handleSort('Date & Time')}
+                    className="flex items-center justify-center gap-1 mx-auto text-xs uppercase font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none"
+                  >
+                    <span>Date & Time</span>
+                    {sortOrder === 'Recent Requests' || sortOrder === 'Old Requests' ? (
+                      sortOrder === 'Old Requests' ? <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" /> : <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
+                    ) : (
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-gray-400 opacity-50" />
+                    )}
+                  </button>
+                </Th>
                 <Th center>No. of Copies</Th>
-                <Th center>Status</Th>
+                <Th center>
+                  <DashboardDropdown
+                    isOpen={statusDropdownOpen}
+                    setIsOpen={setStatusDropdownOpen}
+                    dropdownRef={statusDropdownRef}
+                    align="center"
+                    trigger={<span>Status</span>}
+                    sections={[
+                      {
+                        title: 'Filter by Status',
+                        items: statusFilterOptions.map(option => ({
+                          label: option,
+                          isSelected: filterStatus === option,
+                          onClick: () => setFilterStatus(option)
+                        }))
+                      }
+                    ]}
+                  />
+                </Th>
                 <Th center>Actions</Th>
               </tr>
             </thead>
             <tbody className={isDark ? 'divide-y divide-[#3e4042]' : 'divide-y divide-gray-100'}>
-              {currentItems.map((req, idx) => (
-                <tr key={req.id} className={`transition-colors ${isDark ? 'hover:bg-[#3a3b3c]' : 'hover:bg-gray-50'} ${selectedIds.includes(req.id) ? (isDark ? 'bg-blue-900/15' : 'bg-blue-50') : ''}`}>
-                  <td className="px-6 py-4 text-center">
-                    <input 
-                      type="checkbox" 
-                      className={`w-4 h-4 rounded cursor-pointer ${isDark ? 'border-[#4e4f50] bg-[#242526]' : 'border-gray-300'}`}
-                      checked={selectedIds.includes(req.id)}
-                      onChange={() => handleSelectOne(req.id)}
-                    />
-                  </td>
-                  <Td center>
-                    <span className="font-semibold text-xs text-gray-500 dark:text-gray-400">
-                      {indexOfFirstItem + idx + 1}
-                    </span>
-                  </Td>
-                  <Td>
-                    <div className="font-bold text-center">{req.studentName}</div>
-                  </Td>
-                  <Td center>
-                    <span className="text-xs font-bold tracking-wide">
-                      {req.userType.toUpperCase()}
-                    </span>
-                  </Td>
-                  <Td>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-medium">
-                        {req.documentDetailsArray[0]}
-                      </span>
-
-                      {req.documentDetailsArray.length > 1 && (
-                          <span className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>
-                          +{req.documentDetailsArray.length - 1} more
-                        </span>
-                      )}
+              {currentItems.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <svg
+                        className={`w-12 h-12 ${isDark ? 'text-gray-600' : 'text-gray-300'}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z"
+                        />
+                      </svg>
+                      <div>
+                        <div className={`text-base font-semibold ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                          No requests found
+                        </div>
+                        <div className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                          Try adjusting your search terms or active filters.
+                        </div>
+                      </div>
                     </div>
-                  </Td>
-                  <Td center>
+                  </td>
+                </tr>
+              ) : (
+                currentItems.map((req, idx) => (
+                  <tr key={req.id} className={`transition-colors ${isDark ? 'hover:bg-[#3a3b3c]' : 'hover:bg-gray-50'} ${selectedIds.includes(req.id) ? (isDark ? 'bg-blue-900/15' : 'bg-blue-50') : ''}`}>
+                    <td className="px-6 py-4 text-center">
+                      <input 
+                        type="checkbox" 
+                        className={`w-4 h-4 rounded cursor-pointer ${isDark ? 'border-[#4e4f50] bg-[#242526]' : 'border-gray-300'}`}
+                        checked={selectedIds.includes(req.id)}
+                        onChange={() => handleSelectOne(req.id)}
+                      />
+                    </td>
+                    <Td center>
+                      <span className="font-semibold text-xs text-gray-500 dark:text-gray-400">
+                        {indexOfFirstItem + idx + 1}
+                      </span>
+                    </Td>
+                    <Td>
+                      <div className="font-bold text-center">{req.studentName}</div>
+                    </Td>
+                    <Td center>
+                      <span className="text-xs font-bold tracking-wide">
+                        {req.userType.toUpperCase()}
+                      </span>
+                    </Td>
+                    <Td>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-medium">
+                          {req.documentDetailsArray[0]}
+                        </span>
+
+                        {req.documentDetailsArray.length > 1 && (
+                          <span className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>
+                            +{req.documentDetailsArray.length - 1} more
+                          </span>
+                        )}
+                      </div>
+                    </Td>
+                    <Td center>
                       <div className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>{req.date}</div>
                       <div className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>{req.time}</div>
-                  </Td>
+                    </Td>
                     <Td center><span className={isDark ? 'font-semibold text-[#e4e6eb]' : 'font-semibold text-gray-700'}>{req.copies}</span></Td>
-                  <Td center>{getStatusBadge(req.statusName)}</Td>
-                  <Td center>
-                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 sm:gap-2 min-w-0">
-                      {req.isCertificate && req.statusId === resolvedStatusIds.PENDING && (
-                        <button
-                          title="Generate Certificate"
-                          onClick={() => {
-                            setCertRequest(req);
-                          }}
-                          className={isDark ? 'p-2 text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}
-                        >
-                          <ArrowDownTrayIcon className="w-5 h-5" />
-                        </button>
-                      )}
-                      {req.statusId === resolvedStatusIds.PENDING && (
-                        <button
-                          disabled={updatingId === req.id || (req.isCertificate && !printedCertificateIds.includes(req.id))}
-                          onClick={() => {
-                            if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
-                              alert('Please generate and print the certificate first before marking this request as Ready to claim.');
-                              return;
+                    <Td center>{getStatusBadge(req.statusName)}</Td>
+                    <Td center>
+                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 sm:gap-2 min-w-0">
+                        {req.isCertificate && req.statusId === resolvedStatusIds.PENDING && (
+                          <button
+                            title="Generate Certificate"
+                            onClick={() => {
+                              setCertRequest(req);
+                            }}
+                            className={isDark ? 'p-2 text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}
+                          >
+                            <ArrowDownTrayIcon className="w-5 h-5" />
+                          </button>
+                        )}
+                        {req.statusId === resolvedStatusIds.PENDING && (
+                          <button
+                            disabled={updatingId === req.id || (req.isCertificate && !printedCertificateIds.includes(req.id))}
+                            onClick={() => {
+                              if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
+                                alert('Please generate and print the certificate first before marking this request as Ready to claim.');
+                                return;
+                              }
+                              handleStatusUpdate(req.id, resolvedStatusIds.READY);
+                            }}
+                            className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
+                            title={
+                              req.isCertificate && !printedCertificateIds.includes(req.id)
+                                ? 'Print certificate first'
+                                : 'Mark as Ready to claim'
                             }
-                            handleStatusUpdate(req.id, resolvedStatusIds.READY);
-                          }}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
-                          title={
-                            req.isCertificate && !printedCertificateIds.includes(req.id)
-                              ? 'Print certificate first'
-                              : 'Mark as Ready to claim'
-                          }
-                        >
-                          <CheckCircleIcon className="w-4 h-4" />
-                          {req.isCertificate && !printedCertificateIds.includes(req.id) ? 'Ready' : 'Ready'}
-                        </button>
-                      )}
+                          >
+                            <CheckCircleIcon className="w-4 h-4" />
+                            {req.isCertificate && !printedCertificateIds.includes(req.id) ? 'Ready' : 'Ready'}
+                          </button>
+                        )}
 
-                      {req.statusId === resolvedStatusIds.READY && (
+                        {req.statusId === resolvedStatusIds.READY && (
+                          <button
+                            disabled={updatingId === req.id}
+                            onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
+                            className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 ${isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'}`}
+                          >
+                            <CheckCircleIcon className="w-4 h-4" /> Done
+                          </button>
+                        )}              
+                        {viewMode === 'archived' && (
+                          <button
+                            disabled={updatingId === req.id}
+                            onClick={() => {
+                              // BACKEND TODO: Connect this to the API. Update the request status to Pending.                       
+                              alert('Restore feature is UI-only: restoring request in memory.');
+                              setRequests(prev => prev.map(r => r.id === req.id ? { ...r, statusName: 'Pending', statusId: 6 } : r));
+                            }}
+                            className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
+                            title="Restore request to Pending"
+                          >
+                            <CheckIcon className="w-4 h-4" /> Restore
+                          </button>
+                        )}
                         <button
-                          disabled={updatingId === req.id}
-                          onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 ${isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'}`}
+                          title="View Details"
+                          onClick={() => setSelectedRequest(req.rawRequest)}
+                          className={`flex items-center justify-center gap-1 px-3 py-1.5 ${isDark ? 'p-2text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}`}
                         >
-                          <CheckCircleIcon className="w-4 h-4" /> Done
-                        </button>
-                      )}              
-                      <button
-                        title="View Details"
-                        onClick={() => setSelectedRequest(req.rawRequest)}
-                        className={`flex items-center justify-center gap-1 px-3 py-1.5 ${isDark ? 'p-2text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}`}
-                      >
-                        <EyeIcon className="w-5 h-5" />
-                      </button>                     
-                    </div>
-                  </Td>
-                </tr>
-              ))}
+                          <EyeIcon className="w-5 h-5" />
+                        </button>                     
+                      </div>
+                    </Td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
 
@@ -633,7 +914,7 @@ const StaffDashboard = () => {
                 onClick={handlePrevPage}
                 disabled={currentPage === 1}
                 className={`p-1 rounded transition-colors ${
-                  currentPage === 1 ? (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')
+                currentPage === 1 ? (isDark ? 'text-[#4e4f50] cursor-not-allowed' : 'text-gray-300 cursor-not-allowed') : (isDark ? 'text-[#b0b3b8] hover:bg-[#3a3b3c]' : 'text-gray-600 hover:bg-gray-200')
                 }`}
               >
                 <ChevronLeftIcon className="w-4 sm:w-5 h-4 sm:h-5" />
@@ -655,8 +936,6 @@ const StaffDashboard = () => {
             </div>
           </div>
         </div>
-      </main>
-
       <RequestDetailsModal request={selectedRequest} onClose={() => setSelectedRequest(null)} />
       <DeleteConfirmModal
         open={showDeleteConfirm}
@@ -673,6 +952,18 @@ const StaffDashboard = () => {
           onClose={() => setCertRequest(null)}
         />
       )}
+    </>
+  );
+
+  if (isEmbedded) {
+    return dashboardContent;
+  }
+
+  return (
+    <div className={`relative ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5] text-gray-900'}`}>
+      <main className={`max-w-7xl mx-auto px-4 sm:px-6 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
+        {dashboardContent}
+      </main>
     </div>
   );
 };
