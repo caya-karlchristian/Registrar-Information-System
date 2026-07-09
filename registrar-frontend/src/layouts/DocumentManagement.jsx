@@ -6,6 +6,7 @@ import {
   DocumentTextIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline";
 import InputGroup from "../components/InputGroup";
 import ProcessPeriodInput from "../components/ProcessPeriodInput.jsx";
@@ -22,11 +23,11 @@ const ACCESS_MAP = { Student: 1, Alumni: 2, All: 3 };
 const ACCESS_MAP_REVERSE = { 1: "Student", 2: "Alumni", 3: "All" };
 
 const EMPTY_FORM = {
-  document_name:           "",
-  document_description:    "",
-  document_requirements:   "",
+  document_name: "",
+  document_description: "",
+  document_requirements: "",
   document_process_period: "",
-  access_id:           "",
+  access_id: "",
 };
 
 const FOLDER_COLORS = [
@@ -53,18 +54,23 @@ const FOLDER_COLORS = [
   },
 ];
 
-const DocumentManagement = () => {
+const DocumentManagement = ({
+  documents,
+  setDocuments,
+  certifications,
+  setCertifications,
+  loading,
+  onArchiveDoc,
+  onArchiveCert,
+}) => {
   const { isDark } = useTheme();
-  const [search, setSearch]           = useState("");
-  const [selected, setSelected]       = useState(null);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
   const [selectedType, setSelectedType] = useState("document"); // "document" or "certificate"
-  const [form, setForm]               = useState(EMPTY_FORM);
-  const [isAdding, setIsAdding]       = useState(true);
-  const [documents, setDocuments]     = useState([]);
-  const [certifications, setCertifications] = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [successMsg, setSuccessMsg]   = useState("");
-  const [errorMsg, setErrorMsg]       = useState("");
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [isAdding, setIsAdding] = useState(true);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, docId: null, type: "document" });
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -76,32 +82,15 @@ const DocumentManagement = () => {
   const certScrollRef = useRef(null);
   const [certActiveIndex, setCertActiveIndex] = useState(0);
 
-  // Data fetching on Mount
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const [docsRes, certsRes] = await Promise.all([
-          getDocumentTypes(),
-          getCertifications()
-        ]);
-        setDocuments(docsRes.data);
-        setCertifications(certsRes.data);
-      } catch (err) {
-        console.error("Failed to load list items:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
+  // Data fetching is handled by parent, this hook is a no-op but kept for lifecycle compatibility
+  useEffect(() => {}, []);
 
-  // Filter lists by search query
+  // Filter lists by search query and active status
   const filteredDocs = documents.filter((d) =>
-    d.document_name.toLowerCase().includes(search.toLowerCase())
+    d.document_name.toLowerCase().includes(search.toLowerCase()) && !d.is_archived
   );
   const filteredCerts = certifications.filter((c) =>
-    c.certificate_name.toLowerCase().includes(search.toLowerCase())
+    c.certificate_name.toLowerCase().includes(search.toLowerCase()) && !c.is_archived
   );
 
   const docTotalPages = Math.ceil(filteredDocs.length / 3);
@@ -136,24 +125,16 @@ const DocumentManagement = () => {
 
   const handleDocScroll = (e) => {
     const container = e.target;
-    const cards = container.children;
-    if (cards && cards.length > 0) {
-      let closestIdx = 0;
-      let minDiff = Infinity;
-      const containerLeft = container.getBoundingClientRect().left;
-      
-      for (let i = 0; i < cards.length; i++) {
-        const cardLeft = cards[i].getBoundingClientRect().left;
-        const diff = Math.abs(cardLeft - containerLeft);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestIdx = i;
-        }
-      }
-      
-      const newPage = Math.floor(closestIdx / 3);
-      setDocActiveIndex(newPage);
-    }
+    const { scrollLeft, clientWidth, scrollWidth } = container;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0 || docTotalPages <= 1) return;
+
+    const percentage = scrollLeft / maxScroll;
+    const newPage = Math.min(
+      docTotalPages - 1,
+      Math.max(0, Math.round(percentage * (docTotalPages - 1)))
+    );
+    setDocActiveIndex(newPage);
   };
 
   // Certificate Scrolling handlers
@@ -185,24 +166,16 @@ const DocumentManagement = () => {
 
   const handleCertScroll = (e) => {
     const container = e.target;
-    const cards = container.children;
-    if (cards && cards.length > 0) {
-      let closestIdx = 0;
-      let minDiff = Infinity;
-      const containerLeft = container.getBoundingClientRect().left;
-      
-      for (let i = 0; i < cards.length; i++) {
-        const cardLeft = cards[i].getBoundingClientRect().left;
-        const diff = Math.abs(cardLeft - containerLeft);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestIdx = i;
-        }
-      }
-      
-      const newPage = Math.floor(closestIdx / 3);
-      setCertActiveIndex(newPage);
-    }
+    const { scrollLeft, clientWidth, scrollWidth } = container;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0 || certTotalPages <= 1) return;
+
+    const percentage = scrollLeft / maxScroll;
+    const newPage = Math.min(
+      certTotalPages - 1,
+      Math.max(0, Math.round(percentage * (certTotalPages - 1)))
+    );
+    setCertActiveIndex(newPage);
   };
 
   // Reset scroll on search changes
@@ -273,13 +246,13 @@ const DocumentManagement = () => {
         if (isAdding) {
           const res = await createDocumentType(payload);
           setDocuments((prev) => [...prev, res.data]);
-          setSuccessMsg("Document added successfully!"); 
+          setSuccessMsg("Document added successfully!");
         } else if (selected) {
           const res = await updateDocumentType(selected.document_type_id, payload);
           setDocuments((prev) =>
             prev.map((d) => d.document_type_id === selected.document_type_id ? res.data : d)
           );
-          setSuccessMsg("Document updated successfully!"); 
+          setSuccessMsg("Document updated successfully!");
         }
       } else {
         const payload = {
@@ -345,7 +318,7 @@ const DocumentManagement = () => {
   };
 
   return (
-      <div className={`font-sans rounded-2xl p-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>      <style>{`
+    <div className={`font-sans rounded-2xl p-4 sm:px-6 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-white text-gray-900'}`}>      <style>{`
         .no-scrollbar::-webkit-scrollbar {
           display: none !important;
           width: 0 !important;
@@ -383,25 +356,23 @@ const DocumentManagement = () => {
         <div className="w-full lg:flex-1 flex justify-start lg:justify-end gap-3 flex-wrap">
           <button
             onClick={handleAddDoc}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow transition-all cursor-pointer ${
-              isAdding && selectedType === "document"
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow transition-all cursor-pointer ${isAdding && selectedType === "document"
                 ? isDark
                   ? "bg-yellow-400 text-gray-900 border-2 border-yellow-400 shadow-md scale-102"
                   : "bg-pup-dark-maroon text-white border-2 border-pup-dark-maroon shadow-md scale-102"
                 : isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
-            }`}
+              }`}
           >
             Add Document <PlusIcon className="w-4 h-4" />
           </button>
           <button
             onClick={handleAddCert}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow transition-all cursor-pointer ${
-              isAdding && selectedType === "certificate"
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow transition-all cursor-pointer ${isAdding && selectedType === "certificate"
                 ? isDark
                   ? "bg-yellow-400 text-gray-900 border-2 border-yellow-400 shadow-md scale-102"
                   : "bg-pup-dark-maroon text-white border-2 border-pup-dark-maroon shadow-md scale-102"
                 : isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
-            }`}
+              }`}
           >
             Add Certificate <PlusIcon className="w-4 h-4" />
           </button>
@@ -416,14 +387,14 @@ const DocumentManagement = () => {
 
           {/* List of Documents Container Box */}
           <div className="w-full bg-white dark:bg-[#242526] rounded-2xl p-4 border border-gray-200/80 dark:border-[#3e4042] shadow-sm flex flex-col justify-between gap-3">
-            
+
             <div className="flex flex-col gap-3">
               <h3 className={`font-bold text-center text-sm tracking-wider w-full ${isDark ? 'text-[#e4e6eb]' : 'text-[#8B0000]'}`}>
                 List of Documents
               </h3>
 
               <div className="relative w-full group/container">
-                
+
                 {/* Left Scroll Arrow */}
                 {docTotalPages > 1 && (
                   <button
@@ -458,12 +429,28 @@ const DocumentManagement = () => {
                         <div
                           key={doc.document_type_id}
                           onClick={() => handleEditDoc(doc)}
-                          className={`group relative shrink-0 w-[calc((100%-16px)/2)] h-28 md:w-[calc((100%-32px)/3)] p-2.5 rounded-xl border flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 snap-start ${
-                            isSelected
+                          className={`group relative shrink-0 w-[calc((100%-16px)/2)] h-28 md:w-[calc((100%-32px)/3)] p-2.5 rounded-xl border flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 snap-start ${isSelected
                               ? `${style.activeRing} ${style.bg} shadow-sm scale-102`
                               : "border-gray-200 dark:border-[#3e4042] bg-gray-50/40 dark:bg-[#1a1b1c] hover:border-gray-300 dark:hover:border-gray-600 hover:-translate-y-1 hover:shadow-sm"
-                          }`}
+                            }`}
                         >
+                          {/* Archive button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onArchiveDoc(doc.document_type_id);
+                              setSuccessMsg("Document archived successfully!");
+                              if (selected?.document_type_id === doc.document_type_id) {
+                                handleCancel();
+                              }
+                            }}
+                            className="absolute top-1.5 right-8 p-1 rounded-full bg-white/80 dark:bg-black/40 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 z-10"
+                            title="Archive Document"
+                          >
+                            <ArchiveBoxIcon className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* Delete button*/}
                           <button
                             type="button"
@@ -485,9 +472,8 @@ const DocumentManagement = () => {
                               </div>
                             </div>
                             <div className="h-8 w-full flex items-center justify-center">
-                              <span className={`text-[10px] font-bold tracking-tight leading-tight line-clamp-3 text-center w-full px-1 wrap-break-word ${
-                                isSelected ? style.text : (isDark ? "text-[#e4e6eb]" : "text-gray-700")
-                              }`}>
+                              <span className={`text-[10px] font-bold tracking-tight leading-tight line-clamp-3 text-center w-full px-1 wrap-break-word ${isSelected ? style.text : (isDark ? "text-[#e4e6eb]" : "text-gray-700")
+                                }`}>
                                 {doc.document_name}
                               </span>
                             </div>
@@ -522,11 +508,10 @@ const DocumentManagement = () => {
                       key={pageIdx}
                       type="button"
                       onClick={() => scrollDocToPage(pageIdx)}
-                      className={`transition-all duration-300 rounded-full cursor-pointer h-2 ${
-                        isActive
+                      className={`transition-all duration-300 rounded-full cursor-pointer h-2 ${isActive
                           ? "w-6 bg-[#8B0000] dark:bg-[#F8BF1E]"
                           : "w-2 bg-[#8B0000]/25 dark:bg-[#F8BF1E]/25 hover:bg-[#8B0000]/50 dark:hover:bg-[#F8BF1E]/50"
-                      }`}
+                        }`}
                       title={`Go to page ${pageIdx + 1}`}
                     />
                   );
@@ -538,14 +523,14 @@ const DocumentManagement = () => {
 
           {/* List of Certificates Container Box */}
           <div className="w-full bg-white dark:bg-[#242526] rounded-2xl p-4 border border-gray-200/80 dark:border-[#3e4042] shadow-sm flex flex-col justify-between gap-3">
-            
+
             <div className="flex flex-col gap-3">
               <h3 className={`font-bold text-center text-sm tracking-wider w-full ${isDark ? 'text-[#e4e6eb]' : 'text-[#8B0000]'}`}>
                 List of Certificates
               </h3>
 
               <div className="relative w-full group/container">
-                
+
                 {/* Left Scroll Arrow */}
                 {certTotalPages > 1 && (
                   <button
@@ -580,12 +565,28 @@ const DocumentManagement = () => {
                         <div
                           key={cert.certificate_type_id}
                           onClick={() => handleEditCert(cert)}
-                          className={`group relative shrink-0 w-[calc((100%-16px)/2)] h-28 md:w-[calc((100%-32px)/3)] p-2.5 rounded-xl border flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 snap-start ${
-                            isSelected
+                          className={`group relative shrink-0 w-[calc((100%-16px)/2)] h-28 md:w-[calc((100%-32px)/3)] p-2.5 rounded-xl border flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 snap-start ${isSelected
                               ? `${style.activeRing} ${style.bg} shadow-sm scale-102`
                               : "border-gray-200 dark:border-[#3e4042] bg-gray-50/40 dark:bg-[#1a1b1c] hover:border-gray-300 dark:hover:border-gray-600 hover:-translate-y-1 hover:shadow-sm"
-                          }`}
+                            }`}
                         >
+                          {/* Archive button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onArchiveCert(cert.certificate_type_id);
+                              setSuccessMsg("Certificate archived successfully!");
+                              if (selected?.certificate_type_id === cert.certificate_type_id) {
+                                handleCancel();
+                              }
+                            }}
+                            className="absolute top-1.5 right-8 p-1 rounded-full bg-white/80 dark:bg-black/40 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 z-10"
+                            title="Archive Certificate"
+                          >
+                            <ArchiveBoxIcon className="w-3.5 h-3.5" />
+                          </button>
+
                           {/* Delete button*/}
                           <button
                             type="button"
@@ -607,9 +608,8 @@ const DocumentManagement = () => {
                               </div>
                             </div>
                             <div className="h-8 w-full flex items-center justify-center">
-                              <span className={`text-[10px] font-bold tracking-tight leading-tight line-clamp-2 text-center w-full px-1 wrap-break-word ${
-                                isSelected ? style.text : (isDark ? "text-[#e4e6eb]" : "text-gray-700")
-                              }`}>
+                              <span className={`text-[10px] font-bold tracking-tight leading-tight line-clamp-2 text-center w-full px-1 wrap-break-word ${isSelected ? style.text : (isDark ? "text-[#e4e6eb]" : "text-gray-700")
+                                }`}>
                                 {cert.certificate_name}
                               </span>
                             </div>
@@ -644,11 +644,10 @@ const DocumentManagement = () => {
                       key={pageIdx}
                       type="button"
                       onClick={() => scrollCertToPage(pageIdx)}
-                      className={`transition-all duration-300 rounded-full cursor-pointer h-2 ${
-                        isActive
+                      className={`transition-all duration-300 rounded-full cursor-pointer h-2 ${isActive
                           ? "w-6 bg-[#8B0000] dark:bg-[#F8BF1E]"
                           : "w-2 bg-[#8B0000]/25 dark:bg-[#F8BF1E]/25 hover:bg-[#8B0000]/50 dark:hover:bg-[#F8BF1E]/50"
-                      }`}
+                        }`}
                       title={`Go to page ${pageIdx + 1}`}
                     />
                   );
@@ -662,8 +661,8 @@ const DocumentManagement = () => {
 
         <form onSubmit={handleSave} className={`rounded-xl p-6 sm:p-10 py-4 w-full flex flex-col gap-5 shadow h-fit ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white border border-gray-200'}`}>
           <h2 className={`font-bold text-xl mb-2 ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>
-            {isAdding 
-              ? (selectedType === "document" ? "Add Document" : "Add Certificate") 
+            {isAdding
+              ? (selectedType === "document" ? "Add Document" : "Add Certificate")
               : (selectedType === "document" ? "Edit Document" : "Edit Certificate")
             }
           </h2>
@@ -739,15 +738,14 @@ const DocumentManagement = () => {
                     key={option}
                     type="button"
                     onClick={() => setForm((prev) => ({ ...prev, access_id: option }))}
-                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all duration-200 cursor-pointer ${
-                      isActive
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold border transition-all duration-200 cursor-pointer ${isActive
                         ? isDark
                           ? "bg-yellow-400 border-yellow-400 text-gray-900 shadow-md scale-[1.02]"
                           : "bg-pup-dark-maroon border-pup-dark-maroon text-white shadow-sm scale-[1.02]"
                         : isDark
-                        ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f] hover:text-white"
-                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                    }`}
+                          ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f] hover:text-white"
+                          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                      }`}
                   >
                     {option}
                   </button>
@@ -770,18 +768,18 @@ const DocumentManagement = () => {
               type="submit"
               className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow cursor-pointer ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
             >
-              {isAdding 
-                ? (selectedType === "document" ? "Add Document" : "Add Certificate") 
+              {isAdding
+                ? (selectedType === "document" ? "Add Document" : "Add Certificate")
                 : "Save Changes"
               }
             </button>
             <SuccessToast
-                message={successMsg}
-                onClose={() => setSuccessMsg("")}
+              message={successMsg}
+              onClose={() => setSuccessMsg("")}
             />
-            <ErrorToast 
-              message={errorMsg} 
-              onClose={() => setErrorMsg("")} 
+            <ErrorToast
+              message={errorMsg}
+              onClose={() => setErrorMsg("")}
             />
           </div>
         </form>
