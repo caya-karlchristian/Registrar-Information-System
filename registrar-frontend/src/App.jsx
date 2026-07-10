@@ -23,7 +23,7 @@ import MainPage from './layouts/MainPage.jsx';
 import InboxCenter from './layouts/InboxCenter.jsx';
 
 // Super Admin layouts
-import UserManagement from './layouts/UserManagement.jsx';
+import UserManagementPage from './pages/UserManagementPage.jsx';
 import DocumentAndCertificateManagement from './pages/DocumentAndCertificateManagement.jsx';
 import ReportManagement from './layouts/ReportManagement.jsx';
 import SystemSettings from './layouts/SystemSettings.jsx';
@@ -123,9 +123,9 @@ const App = () => {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<UserManagement />} />
+                <Route index element={<UserManagementPage />} />
                 <Route path="contact" element={<RegistrarContact />} />
-                <Route path="user" element={<UserManagement />} />
+                <Route path="user" element={<UserManagementPage />} />
                 <Route path="documents" element={<DocumentAndCertificateManagement />} />
                 <Route path="certificates" element={<Navigate to="../documents" replace />} />
                 <Route path="report" element={<ReportManagement />} />
