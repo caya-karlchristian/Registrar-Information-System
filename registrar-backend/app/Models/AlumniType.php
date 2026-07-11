@@ -8,7 +8,9 @@ class AlumniType extends Model
 {
     public $timestamps = false;
     protected $primaryKey = 'alumni_type_id';
-    protected $guarded = [];
+    // Never written to anywhere in the app currently (static reference data,
+    // same pattern as AccessType) — guarded rather than open.
+    protected $guarded = ['alumni_type_id'];
     protected $table = 'alumni_type';
 
     public function alumni()

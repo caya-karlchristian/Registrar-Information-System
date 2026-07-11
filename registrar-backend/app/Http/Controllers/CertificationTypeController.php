@@ -27,6 +27,8 @@ class CertificationTypeController extends Controller
             'layout_footer_urls',
             'layout_header_logo_size',
             'layout_footer_logo_size',
+            'is_archived',
+            'archived_on',
         ];
     }
 
@@ -110,6 +112,40 @@ class CertificationTypeController extends Controller
         $cert->delete();
 
         return response()->json(['message' => 'Certification type deleted'], 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // Archive / Restore — reversible, distinct from destroy() above.
+    // -------------------------------------------------------------------------
+
+    public function archive($id)
+    {
+        $cert = CertificationType::find($id);
+        if (!$cert) {
+            return response()->json(['message' => 'Certification type not found'], 404);
+        }
+
+        $cert->update([
+            'is_archived' => true,
+            'archived_on' => now(),
+        ]);
+
+        return response()->json($this->freshRecord($id), 200);
+    }
+
+    public function restore($id)
+    {
+        $cert = CertificationType::find($id);
+        if (!$cert) {
+            return response()->json(['message' => 'Certification type not found'], 404);
+        }
+
+        $cert->update([
+            'is_archived' => false,
+            'archived_on' => null,
+        ]);
+
+        return response()->json($this->freshRecord($id), 200);
     }
 
     public function updateLayout(Request $request, $id)

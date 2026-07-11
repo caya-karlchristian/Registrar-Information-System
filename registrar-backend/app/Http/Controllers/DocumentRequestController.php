@@ -90,6 +90,28 @@ class DocumentRequestController extends Controller
 
 
     // -------------------------------------------------------------------------
+    // GET /document-requests/counts
+    // -------------------------------------------------------------------------
+    // Returns a total count per status across the WHOLE table, not just the
+    // current page. The staff dashboard stat cards (New Requests, Processing,
+    // Ready for Pickup, etc.) must call this instead of deriving counts from
+    // the paginated `index()` response — index() is capped at per_page=200
+    // and, by default, already excludes Forfeited/Cancelled/old-Completed rows,
+    // so filtering that array client-side silently under-counts once total
+    // volume passes 200 requests. This endpoint runs a single grouped COUNT
+    // query and is unaffected by pagination or the actionable-work filter.
+    // Staff/superadmin only (role:3,4) — same audience as the dashboard.
+    public function counts()
+    {
+        $counts = DocumentRequest::join('request_status', 'document_request.status_id', '=', 'request_status.status_id')
+            ->selectRaw('request_status.status_name, COUNT(*) as total')
+            ->groupBy('request_status.status_name')
+            ->pluck('total', 'status_name');
+
+        return response()->json($counts, 200);
+    }
+
+    // -------------------------------------------------------------------------
     // GET /document-requests/logbook
     // Returns completed requests with embedded history — purpose-built for the
     // Logbook page.  Avoids the N+1 page-loop + separate history fetch the

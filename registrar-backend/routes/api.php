@@ -88,6 +88,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     Route::prefix('document-requests')->group(function () {
         Route::get('/',                           [DocumentRequestController::class, 'index']);
         Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware('role:3,4');
+        Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware('role:3,4');
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show']);
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware('role:3');
@@ -123,12 +124,16 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // Admin only (role 3 — superadmin bypasses via RoleMiddleware)
     Route::middleware('role:3')->group(function () {
-        Route::post('document-types',          [DocumentTypeController::class, 'store']);
-        Route::put('document-types/{id}',      [DocumentTypeController::class, 'update']);
-        Route::delete('document-types/{id}',   [DocumentTypeController::class, 'destroy']);
-        Route::post('certifications',          [CertificationTypeController::class, 'store']);
-        Route::put('certifications/{id}',      [CertificationTypeController::class, 'update']);
-        Route::delete('certifications/{id}',   [CertificationTypeController::class, 'destroy']);
+        Route::post('document-types',              [DocumentTypeController::class, 'store']);
+        Route::put('document-types/{id}',          [DocumentTypeController::class, 'update']);
+        Route::delete('document-types/{id}',       [DocumentTypeController::class, 'destroy']);
+        Route::patch('document-types/{id}/archive', [DocumentTypeController::class, 'archive']);
+        Route::patch('document-types/{id}/restore', [DocumentTypeController::class, 'restore']);
+        Route::post('certifications',              [CertificationTypeController::class, 'store']);
+        Route::put('certifications/{id}',          [CertificationTypeController::class, 'update']);
+        Route::delete('certifications/{id}',       [CertificationTypeController::class, 'destroy']);
+        Route::patch('certifications/{id}/archive', [CertificationTypeController::class, 'archive']);
+        Route::patch('certifications/{id}/restore', [CertificationTypeController::class, 'restore']);
         Route::put('certifications/{id}/layout',          [CertificationTypeController::class, 'updateLayout']);
         Route::post('certifications/{id}/layout/logo',    [CertificationTypeController::class, 'uploadLayoutLogo']);
         Route::post('request-statuses',        [RequestStatusController::class, 'store']);
