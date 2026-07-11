@@ -18,10 +18,13 @@ class CertificationType extends Model
         'certificate_name', 'certificate_requirements', 'certificate_process_period', 'access_id',
         'layout_header_left_url', 'layout_header_right_url', 'layout_footer_urls',
         'layout_header_logo_size', 'layout_footer_logo_size',
+        'is_archived', 'archived_on',
     ];
 
     protected $casts = [
         'cashier_document_patterns' => 'array',
+        'is_archived'                => 'boolean',
+        'archived_on'                => 'datetime',
     ];
 
     // layout_footer_urls is stored as a JSON array of bare paths.

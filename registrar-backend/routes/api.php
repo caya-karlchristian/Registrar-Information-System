@@ -124,12 +124,16 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // Admin only (role 3 — superadmin bypasses via RoleMiddleware)
     Route::middleware('role:3')->group(function () {
-        Route::post('document-types',          [DocumentTypeController::class, 'store']);
-        Route::put('document-types/{id}',      [DocumentTypeController::class, 'update']);
-        Route::delete('document-types/{id}',   [DocumentTypeController::class, 'destroy']);
-        Route::post('certifications',          [CertificationTypeController::class, 'store']);
-        Route::put('certifications/{id}',      [CertificationTypeController::class, 'update']);
-        Route::delete('certifications/{id}',   [CertificationTypeController::class, 'destroy']);
+        Route::post('document-types',              [DocumentTypeController::class, 'store']);
+        Route::put('document-types/{id}',          [DocumentTypeController::class, 'update']);
+        Route::delete('document-types/{id}',       [DocumentTypeController::class, 'destroy']);
+        Route::patch('document-types/{id}/archive', [DocumentTypeController::class, 'archive']);
+        Route::patch('document-types/{id}/restore', [DocumentTypeController::class, 'restore']);
+        Route::post('certifications',              [CertificationTypeController::class, 'store']);
+        Route::put('certifications/{id}',          [CertificationTypeController::class, 'update']);
+        Route::delete('certifications/{id}',       [CertificationTypeController::class, 'destroy']);
+        Route::patch('certifications/{id}/archive', [CertificationTypeController::class, 'archive']);
+        Route::patch('certifications/{id}/restore', [CertificationTypeController::class, 'restore']);
         Route::put('certifications/{id}/layout',          [CertificationTypeController::class, 'updateLayout']);
         Route::post('certifications/{id}/layout/logo',    [CertificationTypeController::class, 'uploadLayoutLogo']);
         Route::post('request-statuses',        [RequestStatusController::class, 'store']);
