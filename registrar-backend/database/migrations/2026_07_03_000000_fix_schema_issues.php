@@ -75,7 +75,11 @@ return new class extends Migration
         }
 
         // --- document_request: DB-level student/alumni XOR check (if missing)
-        if (!$this->constraintExists('document_request', 'chk_dr_student_xor_alumni')) {
+        // MySQL-only: SQLite can't ALTER TABLE ADD CONSTRAINT on an existing
+        // table without a full rebuild. The XOR is enforced at the app/
+        // request-validation layer, so skipping the DB-level backstop under
+        // SQLite (test DB) is acceptable; production (MySQL) still gets it.
+        if (DB::getDriverName() === 'mysql' && !$this->constraintExists('document_request', 'chk_dr_student_xor_alumni')) {
             DB::statement(<<<SQL
                 ALTER TABLE document_request
                 ADD CONSTRAINT chk_dr_student_xor_alumni CHECK (
@@ -133,7 +137,11 @@ return new class extends Migration
         }
 
         // --- users: widen email (MODIFY is naturally idempotent) ------------
-        DB::statement('ALTER TABLE users MODIFY email VARCHAR(191) NOT NULL');
+        // MySQL-only syntax; SQLite is dynamically typed per-column so this
+        // is a no-op there anyway.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE users MODIFY email VARCHAR(191) NOT NULL');
+        }
 
         // --- users: unique idp_user_id (if missing) -------------------------
         if (!$this->indexExists('users', 'uq_users_idp_user_id')) {
@@ -158,7 +166,11 @@ return new class extends Migration
         // 3780). Changing this column, not users.user_id itself: user_id is
         // referenced by FKs from most of the rest of the schema, so it's the
         // wrong side to touch. MODIFY is naturally idempotent.
-        DB::statement('ALTER TABLE announcements MODIFY created_by INT NOT NULL');
+        // MySQL-only syntax; not needed under SQLite (no signed/unsigned
+        // distinction to reconcile there, and no cross-driver FK type check).
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE announcements MODIFY created_by INT NOT NULL');
+        }
 
         // --- announcements: index + FK on created_by (if missing) ----------
         if (!$this->indexExists('announcements', 'fk_announcements_created_by')) {
@@ -188,7 +200,9 @@ return new class extends Migration
         if ($this->indexExists('announcements', 'fk_announcements_created_by')) {
             Schema::table('announcements', fn (Blueprint $table) => $table->dropIndex('fk_announcements_created_by'));
         }
-        DB::statement('ALTER TABLE announcements MODIFY created_by BIGINT UNSIGNED NOT NULL');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE announcements MODIFY created_by BIGINT UNSIGNED NOT NULL');
+        }
 
         if (Schema::hasColumn('users', 'updated_at')) {
             Schema::table('users', fn (Blueprint $table) => $table->dropColumn('updated_at'));
@@ -196,7 +210,9 @@ return new class extends Migration
         if ($this->indexExists('users', 'uq_users_idp_user_id')) {
             Schema::table('users', fn (Blueprint $table) => $table->dropUnique('uq_users_idp_user_id'));
         }
-        DB::statement('ALTER TABLE users MODIFY email VARCHAR(100) NOT NULL');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE users MODIFY email VARCHAR(100) NOT NULL');
+        }
 
         if ($this->constraintExists('request_certificate', 'fk_rc_certificate_type')) {
             Schema::table('request_certificate', fn (Blueprint $table) => $table->dropForeign('fk_rc_certificate_type'));
@@ -221,7 +237,7 @@ return new class extends Migration
             Schema::table('request_document', fn (Blueprint $table) => $table->dropForeign('fk_rd_document_type'));
         }
 
-        if ($this->constraintExists('document_request', 'chk_dr_student_xor_alumni')) {
+        if (DB::getDriverName() === 'mysql' && $this->constraintExists('document_request', 'chk_dr_student_xor_alumni')) {
             DB::statement('ALTER TABLE document_request DROP CONSTRAINT chk_dr_student_xor_alumni');
         }
 
@@ -240,6 +256,14 @@ return new class extends Migration
     /** True if the named index/key exists on the given table in the current database. */
     private function indexExists(string $table, string $index): bool
     {
+        // information_schema.statistics is MySQL-specific. Non-MySQL
+        // connections (SQLite in tests) always run this migration against a
+        // freshly-created schema, so there's never pre-existing state to
+        // detect — treat as "not present" and let the caller proceed.
+        if (DB::getDriverName() !== 'mysql') {
+            return false;
+        }
+
         return DB::table('information_schema.statistics')
             ->whereRaw('table_schema = DATABASE()')
             ->where('table_name', $table)
@@ -250,6 +274,12 @@ return new class extends Migration
     /** True if the named constraint (FK, unique, or CHECK) exists on the given table. */
     private function constraintExists(string $table, string $constraint): bool
     {
+        // Same reasoning as indexExists(): information_schema.table_constraints
+        // is MySQL-specific, and irrelevant against a fresh SQLite test DB.
+        if (DB::getDriverName() !== 'mysql') {
+            return false;
+        }
+
         return DB::table('information_schema.table_constraints')
             ->whereRaw('table_schema = DATABASE()')
             ->where('table_name', $table)

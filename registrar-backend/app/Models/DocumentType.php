@@ -9,7 +9,7 @@ class DocumentType extends Model
     protected $table = 'document_type';
     protected $primaryKey = 'document_type_id';
     public $timestamps = false;
-    protected $fillable = ['document_name', 'document_description', 'document_requirements', 'document_process_period', 'access_id', 'is_archived', 'archived_on'];
+    protected $fillable = ['document_name', 'document_description', 'document_requirements', 'document_process_period', 'access_id', 'cashier_document_patterns', 'is_archived', 'archived_on'];
 
     protected $casts = [
         'cashier_document_patterns' => 'array',

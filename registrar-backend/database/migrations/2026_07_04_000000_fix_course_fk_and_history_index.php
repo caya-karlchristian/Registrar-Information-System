@@ -65,8 +65,11 @@ return new class extends Migration
 
         // Match programs.ogos_course_id's type (unsigned int). NOT NULL
         // preserved to match the live column (see CORRECTION note above).
-        // MODIFY is naturally idempotent, no existence guard needed.
-        DB::statement('ALTER TABLE student_academic_record MODIFY course_id INT UNSIGNED NOT NULL');
+        // MySQL-only syntax (MODIFY); not needed under SQLite, which is
+        // dynamically typed per-column.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE student_academic_record MODIFY course_id INT UNSIGNED NOT NULL');
+        }
 
         if (!$this->constraintExists('student_academic_record', 'fk_sar_program')) {
             Schema::table('student_academic_record', function (Blueprint $table) {
@@ -105,7 +108,9 @@ return new class extends Migration
             Schema::table('student_academic_record', fn (Blueprint $table) => $table->dropForeign('fk_sar_program'));
         }
 
-        DB::statement('ALTER TABLE student_academic_record MODIFY course_id INT NOT NULL');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE student_academic_record MODIFY course_id INT NOT NULL');
+        }
 
         if (!$this->constraintExists('student_academic_record', 'fk_sar_course')) {
             Schema::table('student_academic_record', function (Blueprint $table) {
@@ -118,6 +123,13 @@ return new class extends Migration
     /** True if the named index/key exists on the given table in the current database. */
     private function indexExists(string $table, string $index): bool
     {
+        // information_schema.statistics is MySQL-specific. SQLite (used in
+        // tests) always runs this migration against a fresh schema, so
+        // there's never pre-existing state to detect.
+        if (DB::getDriverName() !== 'mysql') {
+            return false;
+        }
+
         return DB::table('information_schema.statistics')
             ->whereRaw('table_schema = DATABASE()')
             ->where('table_name', $table)
@@ -128,6 +140,11 @@ return new class extends Migration
     /** True if the named constraint (FK, unique, or CHECK) exists on the given table. */
     private function constraintExists(string $table, string $constraint): bool
     {
+        // Same reasoning as indexExists().
+        if (DB::getDriverName() !== 'mysql') {
+            return false;
+        }
+
         return DB::table('information_schema.table_constraints')
             ->whereRaw('table_schema = DATABASE()')
             ->where('table_name', $table)

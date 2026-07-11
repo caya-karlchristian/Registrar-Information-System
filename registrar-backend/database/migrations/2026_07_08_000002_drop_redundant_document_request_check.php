@@ -30,14 +30,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if ($this->constraintExists('document_request', 'chk_dr_student_xor_alumni')) {
+        // MySQL-only: this constraint is only ever created under MySQL (see
+        // fix_schema_issues.php, which gates its creation the same way) —
+        // under SQLite there's nothing to drop.
+        if (DB::getDriverName() === 'mysql' && $this->constraintExists('document_request', 'chk_dr_student_xor_alumni')) {
             DB::statement('ALTER TABLE document_request DROP CONSTRAINT chk_dr_student_xor_alumni');
         }
     }
 
     public function down(): void
     {
-        if (!$this->constraintExists('document_request', 'chk_dr_student_xor_alumni')) {
+        // MySQL-only syntax; SQLite can't ALTER TABLE ADD CONSTRAINT on an
+        // existing table without a full rebuild, and this constraint was
+        // never created under SQLite in the first place (see up()).
+        if (DB::getDriverName() === 'mysql' && !$this->constraintExists('document_request', 'chk_dr_student_xor_alumni')) {
             DB::statement(<<<SQL
                 ALTER TABLE document_request
                 ADD CONSTRAINT chk_dr_student_xor_alumni CHECK (
@@ -52,6 +58,13 @@ return new class extends Migration
     /** True if the named constraint (FK, unique, or CHECK) exists on the given table. */
     private function constraintExists(string $table, string $constraint): bool
     {
+        // information_schema.table_constraints is MySQL-specific. Callers
+        // already gate on DB::getDriverName() === 'mysql' before reaching
+        // here, but keep this defensive in case that changes.
+        if (DB::getDriverName() !== 'mysql') {
+            return false;
+        }
+
         return DB::table('information_schema.table_constraints')
             ->whereRaw('table_schema = DATABASE()')
             ->where('table_name', $table)

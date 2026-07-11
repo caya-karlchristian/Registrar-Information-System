@@ -75,8 +75,11 @@ return new class extends Migration
         // FKs across mismatched column types). Fixing this column, not
         // users.user_id itself, for the same reason as that migration:
         // user_id is referenced by FKs from most of the rest of the schema,
-        // so it's the wrong side to touch. MODIFY is naturally idempotent.
-        DB::statement('ALTER TABLE request_history MODIFY changed_by INT NULL');
+        // so it's the wrong side to touch. MySQL-only syntax (MODIFY); not
+        // needed under SQLite, which has no signed/unsigned distinction.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE request_history MODIFY changed_by INT NULL');
+        }
 
         // --- changed_by: add the index + FK processed_by had -----------
         if (!$this->indexExists('request_history', 'fk_request_history_changed_by')) {
@@ -93,15 +96,44 @@ return new class extends Migration
         }
 
         // --- processed_by: drop its FK/index, then the column itself ----
-        if ($this->constraintExists('request_history', 'fk_request_history_processed_by')) {
+        // dropForeign/dropIndex are wrapped in try/catch rather than gated
+        // on constraintExists()/indexExists(), because those helpers only
+        // know how to check MySQL's information_schema and previously
+        // assumed (incorrectly) that non-MySQL drivers never have
+        // pre-existing state to detect. On SQLite, the FK this migration
+        // is trying to drop was created by an earlier migration in this
+        // same chain, so it does exist here too — skipping the drop left
+        // a dangling FK that then broke dropColumn(), since SQLite has to
+        // rebuild the whole table to drop a column and choked on the
+        // leftover FK definition pointing at a column that was about to
+        // disappear.
+        //
+        // SQLite specifically requires dropForeign() to be called with the
+        // *column* array (['processed_by']) rather than the constraint
+        // name — passing the name string throws "This database driver does
+        // not support dropping foreign keys by name" (SQLiteGrammar), which
+        // the try/catch below previously swallowed silently, so the FK was
+        // never actually removed. MySQL needs the opposite: it must use the
+        // explicit custom name, since 'fk_request_history_processed_by'
+        // doesn't match Laravel's default naming convention that the
+        // column-array form would derive.
+        try {
             Schema::table('request_history', function (Blueprint $table) {
-                $table->dropForeign('fk_request_history_processed_by');
+                if (DB::getDriverName() === 'sqlite') {
+                    $table->dropForeign(['processed_by']);
+                } else {
+                    $table->dropForeign('fk_request_history_processed_by');
+                }
             });
+        } catch (\Throwable $e) {
+            // Already gone (or never existed on this driver) — fine.
         }
-        if ($this->indexExists('request_history', 'fk_request_history_processed_by')) {
+        try {
             Schema::table('request_history', function (Blueprint $table) {
                 $table->dropIndex('fk_request_history_processed_by');
             });
+        } catch (\Throwable $e) {
+            // Already gone (or never existed on this driver) — fine.
         }
         if (Schema::hasColumn('request_history', 'processed_by')) {
             Schema::table('request_history', function (Blueprint $table) {
@@ -134,20 +166,41 @@ return new class extends Migration
             });
         }
 
-        if ($this->constraintExists('request_history', 'fk_request_history_changed_by')) {
-            Schema::table('request_history', fn (Blueprint $table) => $table->dropForeign('fk_request_history_changed_by'));
+        // Same SQLite column-array-vs-name requirement as in up() — see the
+        // comment there.
+        try {
+            Schema::table('request_history', function (Blueprint $table) {
+                if (DB::getDriverName() === 'sqlite') {
+                    $table->dropForeign(['changed_by']);
+                } else {
+                    $table->dropForeign('fk_request_history_changed_by');
+                }
+            });
+        } catch (\Throwable $e) {
+            // Already gone (or never existed on this driver) — fine.
         }
-        if ($this->indexExists('request_history', 'fk_request_history_changed_by')) {
+        try {
             Schema::table('request_history', fn (Blueprint $table) => $table->dropIndex('fk_request_history_changed_by'));
+        } catch (\Throwable $e) {
+            // Already gone (or never existed on this driver) — fine.
         }
 
         // Revert the type alignment from up() now that nothing constrains it.
-        DB::statement('ALTER TABLE request_history MODIFY changed_by BIGINT UNSIGNED NULL');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE request_history MODIFY changed_by BIGINT UNSIGNED NULL');
+        }
     }
 
     /** True if the named index/key exists on the given table in the current database. */
     private function indexExists(string $table, string $index): bool
     {
+        // information_schema.statistics is MySQL-specific. SQLite (used in
+        // tests) always runs this migration against a fresh schema, so
+        // there's never pre-existing state to detect.
+        if (DB::getDriverName() !== 'mysql') {
+            return false;
+        }
+
         return DB::table('information_schema.statistics')
             ->whereRaw('table_schema = DATABASE()')
             ->where('table_name', $table)
@@ -158,6 +211,11 @@ return new class extends Migration
     /** True if the named constraint (FK, unique, or CHECK) exists on the given table. */
     private function constraintExists(string $table, string $constraint): bool
     {
+        // Same reasoning as indexExists().
+        if (DB::getDriverName() !== 'mysql') {
+            return false;
+        }
+
         return DB::table('information_schema.table_constraints')
             ->whereRaw('table_schema = DATABASE()')
             ->where('table_name', $table)
