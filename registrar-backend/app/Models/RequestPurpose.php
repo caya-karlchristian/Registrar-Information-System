@@ -7,7 +7,7 @@ class RequestPurpose extends Model
 {
     public $timestamps = false;
     protected $primaryKey = 'request_purpose_id';
-    protected $guarded = [];
+    protected $fillable = ['purpose_name'];
     protected $table = 'request_purpose';
 
     public function documentRequests()

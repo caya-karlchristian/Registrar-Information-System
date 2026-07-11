@@ -68,4 +68,38 @@ class DocumentTypeController extends Controller
 
         return response()->json(['message' => 'Document type deleted'], 200);
     }
+
+    // -------------------------------------------------------------------------
+    // Archive / Restore — reversible, distinct from destroy() above.
+    // -------------------------------------------------------------------------
+
+    public function archive($id)
+    {
+        $docType = DocumentType::find($id);
+        if (!$docType) {
+            return response()->json(['message' => 'Document type not found'], 404);
+        }
+
+        $docType->update([
+            'is_archived' => true,
+            'archived_on' => now(),
+        ]);
+
+        return response()->json($docType->fresh(), 200);
+    }
+
+    public function restore($id)
+    {
+        $docType = DocumentType::find($id);
+        if (!$docType) {
+            return response()->json(['message' => 'Document type not found'], 404);
+        }
+
+        $docType->update([
+            'is_archived' => false,
+            'archived_on' => null,
+        ]);
+
+        return response()->json($docType->fresh(), 200);
+    }
 }

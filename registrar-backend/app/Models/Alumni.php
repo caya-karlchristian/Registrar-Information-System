@@ -8,7 +8,7 @@ class Alumni extends Model
 {
     public $timestamps = false;
     protected $primaryKey = 'alumni_id';
-    protected $guarded = [];
+    protected $fillable = ['user_id', 'alumni_type_id'];
     protected $table = 'alumni';
 
     const TYPE_SIS     = 1;  // fixed from 2
