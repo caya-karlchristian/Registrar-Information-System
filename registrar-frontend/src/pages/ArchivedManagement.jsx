@@ -7,7 +7,6 @@ import {
   ArrowPathIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
-import SuccessToast from "../components/SuccessToast.jsx";
 import { CertHeader, CertFooter } from "../utils/helpers.jsx";
 import { DEFAULT_CERTIFICATE_LAYOUT } from "../utils/certificateTemplateSettings.js";
 
@@ -16,7 +15,6 @@ const ArchivedManagement = ({ documents, certifications, layoutsByCertId, onRest
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all"); // "all" | "documents" | "certificates"
   const [selectedId, setSelectedId] = useState(null);
-  const [successMsg, setSuccessMsg] = useState("");
   const [checkedKeys, setCheckedKeys] = useState([]);
 
   const getItemKey = (item) => `${item.type}-${item.type === "document" ? item.document_type_id : item.certificate_type_id}`;
@@ -55,10 +53,8 @@ const ArchivedManagement = ({ documents, certifications, layoutsByCertId, onRest
 
     if (selectedItem.type === "document") {
       onRestoreDoc(selectedItem.document_type_id);
-      setSuccessMsg("Document restored successfully!");
     } else {
       onRestoreCert(selectedItem.certificate_type_id);
-      setSuccessMsg("Certificate restored successfully!");
     }
     setSelectedId(null);
     setCheckedKeys([]);
@@ -362,7 +358,6 @@ const ArchivedManagement = ({ documents, certifications, layoutsByCertId, onRest
           )}
         </div>
       </div>
-      <SuccessToast message={successMsg} onClose={() => setSuccessMsg("")} />
     </div>
   );
 };
