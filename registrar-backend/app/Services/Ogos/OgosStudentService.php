@@ -8,6 +8,8 @@ use App\DTOs\Ogos\OgosStudentDTO;
 use App\Exceptions\OgosException;
 use App\Models\Program;
 use App\Models\StudentAcademicRecord;
+use App\Models\StudentAddress;
+use App\Models\StudentContactInformation;
 use App\Models\StudentProfile;
 use App\Models\SystemUser;
 use Illuminate\Support\Facades\Log;
@@ -64,7 +66,21 @@ class OgosStudentService
             ]);
         }
 
-        $this->upsertLocalRecords($user, $student, $personal);
+        // Step 3: Get addresses (separate endpoint, may return multiple
+        // types — Residential, Provincial). Best-effort like personal-info:
+        // a login must never break because this call fails or OGOS has no
+        // address on file for this student yet.
+        $addresses = [];
+        try {
+            $addresses = $this->client->getStudentAddresses($student->studentNumber);
+        } catch (OgosException $e) {
+            Log::warning('OGOS: addresses unavailable during provisioning', [
+                'student_number' => $student->studentNumber,
+                'error'          => $e->getMessage(),
+            ]);
+        }
+
+        $this->upsertLocalRecords($user, $student, $personal, $addresses);
         return true;
     }
 
@@ -102,7 +118,8 @@ class OgosStudentService
     private function upsertLocalRecords(
         SystemUser $user,
         OgosStudentDTO $student,
-        ?OgosPersonalInfoDTO $personal
+        ?OgosPersonalInfoDTO $personal,
+        array $addresses = []
     ): void {
         // Map OGOS gender string → DB enum
         $sexAtBirth = match (strtolower($personal?->gender ?? '')) {
@@ -123,6 +140,28 @@ class OgosStudentService
             ]
         );
 
+        // ── Upsert the local programs mirror FIRST ────────────────
+        // Must happen before the student_academic_record upsert below: that
+        // table's course_id has an FK to programs.ogos_course_id, so the
+        // parent row has to exist before we write the child row that
+        // references it — otherwise the very first login for a brand-new
+        // course would fail the FK check.
+        //
+        // If this student's program hasn't been seen before, insert it.
+        // If it has, update the code/name in case OGOS renamed it.
+        // is_active is intentionally NOT touched here — staff can deactivate
+        // defunct programs without them being re-activated on the next login
+        // of a student who somehow still has that course_id.
+        if ($student->courseId !== null) {
+            Program::updateOrCreate(
+                ['ogos_course_id' => $student->courseId],
+                [
+                    'code' => $student->courseCode,
+                    'name' => $student->courseName,
+                ]
+            );
+        }
+
         StudentAcademicRecord::updateOrCreate(
             ['student_profile_id' => $profile->student_profile_id],
             [
@@ -137,18 +176,38 @@ class OgosStudentService
             ]
         );
 
-        // ── Upsert the local programs mirror ──────────────────
-        // If this student's program hasn't been seen before, insert it.
-        // If it has, update the code/name in case OGOS renamed it.
-        // is_active is intentionally NOT touched here — staff can deactivate
-        // defunct programs without them being re-activated on the next login
-        // of a student who somehow still has that course_id.
-        if ($student->courseId !== null) {
-            Program::updateOrCreate(
-                ['ogos_course_id' => $student->courseId],
+        // ── Contact info: mobile/email, straight from the already-fetched
+        // student DTO — no extra OGOS call needed for this part.
+        StudentContactInformation::updateOrCreate(
+            ['student_profile_id' => $profile->student_profile_id],
+            [
+                'mobile_number'           => $student->mobileNumber,
+                'personal_email_address'  => $student->email,
+            ]
+        );
+
+        // ── Addresses: one row per address type OGOS returns (Residential,
+        // Provincial, etc.). Best-effort — $addresses is empty if the
+        // earlier fetch failed or OGOS has nothing on file, in which case
+        // this is just a no-op rather than clearing out existing rows.
+        /** @var OgosAddressDTO $address */
+        foreach ($addresses as $address) {
+            StudentAddress::updateOrCreate(
                 [
-                    'code' => $student->courseCode,
-                    'name' => $student->courseName,
+                    'student_profile_id' => $profile->student_profile_id,
+                    'address_type'       => $address->addressType,
+                ],
+                [
+                    'street_detail'  => $address->streetDetail,
+                    'barangay_code'  => $address->barangayCode,
+                    'barangay_name'  => $address->barangayName,
+                    'city_code'      => $address->cityCode,
+                    'city_name'      => $address->cityName,
+                    'province_code'  => $address->provinceCode,
+                    'province_name'  => $address->provinceName,
+                    'region_code'    => $address->regionCode,
+                    'region_name'    => $address->regionName,
+                    'synced_at'      => now(),
                 ]
             );
         }

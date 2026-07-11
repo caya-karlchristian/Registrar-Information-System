@@ -24,7 +24,8 @@ class AnalyticsService
     {
         [$from, $to] = $range;
 
-        // Single query — conditional aggregates replace 5 separate COUNT calls
+        // Single query — conditional aggregates replace separate COUNT calls.
+        // Cancelled requests are intentionally excluded from these buckets.
         $counts = DocumentRequest::whereBetween('requested_at', [$from, $to])
             ->selectRaw('
                 COUNT(*) as total,
@@ -40,10 +41,10 @@ class AnalyticsService
             ])
             ->first();
 
-        $total = (int) $counts->pending
-                    + (int) $counts->ready_to_claim
-                    + (int) $counts->completed
-                    + (int) $counts->forfeited;
+        // Use the unconditional COUNT(*) as the total, not a hand-summed total
+        // of the buckets above — those buckets deliberately omit cancelled
+        // requests, so summing them would undercount total volume.
+        $total = (int) $counts->total;
         $completed = (int) $counts->completed;
         $forfeited = (int) $counts->forfeited;
 
@@ -67,7 +68,6 @@ class AnalyticsService
 
         return [
             'total'                  => $total,
-            'cancelled'      => (int) $counts->cancelled,
             'pending'                => (int) $counts->pending,
             'ready_to_claim'         => (int) $counts->ready_to_claim,
             'completed'              => $completed,
@@ -215,7 +215,7 @@ class AnalyticsService
             ->get();
 
         $byAdmin = DB::table('request_history as rh')
-            ->join('users as u', 'rh.processed_by', '=', 'u.user_id')
+            ->join('users as u', 'rh.changed_by', '=', 'u.user_id')
             ->leftJoin('admin_profile as ap', 'u.user_id', '=', 'ap.user_id')
             ->whereBetween('rh.changed_at', [$from, $to])
             ->whereNotNull('rh.minutes_processed')

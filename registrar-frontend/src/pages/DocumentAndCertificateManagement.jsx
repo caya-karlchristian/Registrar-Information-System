@@ -3,52 +3,21 @@ import DocumentManagement from "../layouts/DocumentManagement.jsx";
 import CertificateTemplateManagement from "../layouts/CertificateTemplateManagement.jsx";
 import ArchivedManagement from "../pages/ArchivedManagement.jsx";
 import { useTheme } from "../context/ThemeContext";
-import { getDocumentTypes, getCertifications, getCertificationLayouts } from "../services/api";
+import {
+  getDocumentTypes,
+  getCertifications,
+  getCertificationLayouts,
+  archiveDocumentType,
+  restoreDocumentType,
+  archiveCertification,
+  restoreCertification,
+} from "../services/api";
 import { normalizeCertificateLayout, DEFAULT_CERTIFICATE_LAYOUT } from "../utils/certificateTemplateSettings.js";
 
-const MOCK_ARCHIVED_DOCS = [
-  {
-    document_type_id: "mock-doc-1",
-    document_name: "Correction of Entry of Grade",
-    document_description: "Corrects an entry of grade for a student's academic record, including incomplete grade resolution and late reporting cases.",
-    document_requirements: "Grade correction form, Instructor's certification, Approved request slip.",
-    document_process_period: "2 working day/s",
-    access_id: 3,
-    is_archived: true,
-    archived_on: "Jun 14, 2026"
-  },
-  {
-    document_type_id: "mock-doc-2",
-    document_name: "Late Reporting of Grade",
-    document_description: "Allows reporting of grades that were not submitted on time.",
-    document_requirements: "Explanation letter, Grade sheet copy, Approved request form.",
-    document_process_period: "3 working day/s",
-    access_id: 3,
-    is_archived: true,
-    archived_on: "May 30, 2026"
-  }
-];
-
-const MOCK_ARCHIVED_CERTS = [
-  {
-    certificate_type_id: "mock-cert-1",
-    certificate_name: "Certificate of GWA",
-    certificate_requirements: "Transcript of Records copy, Official receipt.",
-    certificate_process_period: "1 working day/s",
-    access_id: 3,
-    is_archived: true,
-    archived_on: "Jul 1, 2026"
-  },
-  {
-    certificate_type_id: "mock-cert-2",
-    certificate_name: "Certification of Medium of Instruction",
-    certificate_requirements: "Letter of intent, Proof of payment.",
-    certificate_process_period: "1 working day/s",
-    access_id: 3,
-    is_archived: true,
-    archived_on: "Apr 2, 2026"
-  }
-];
+// NOTE: MOCK_ARCHIVED_DOCS / MOCK_ARCHIVED_CERTS have been removed.
+// Archived items now come from the real API (is_archived/archived_on are
+// real, persisted columns as of the 2026_07_11 migration) instead of being
+// hardcoded fake rows concatenated onto every load.
 
 const MOCK_ACTIVE_DOCS = [
   {
@@ -117,11 +86,14 @@ const DocumentAndCertificateManagement = () => {
           getCertifications(),
           getCertificationLayouts()
         ]);
-        const apiDocs = (docsRes.data ?? []).map(d => ({ ...d, is_archived: false }));
-        const apiCerts = (certsRes.data ?? []).map(c => ({ ...c, is_archived: false }));
-        
-        setDocuments([...apiDocs, ...MOCK_ARCHIVED_DOCS]);
-        setCertifications([...apiCerts, ...MOCK_ARCHIVED_CERTS]);
+        // Trust the real is_archived/archived_on values from the API now
+        // that they're persisted columns, instead of overwriting them with
+        // a hardcoded false and bolting on fake archived rows.
+        const apiDocs = docsRes.data ?? [];
+        const apiCerts = certsRes.data ?? [];
+
+        setDocuments(apiDocs);
+        setCertifications(apiCerts);
 
         // Process layouts
         const layoutRows = Array.isArray(layoutsRes?.data) ? layoutsRes.data : [];
@@ -130,22 +102,14 @@ const DocumentAndCertificateManagement = () => {
           layoutMap[row.certificate_type_id] = normalizeCertificateLayout(row);
         });
 
-        // Seed mock details mapping
-        layoutMap["mock-cert-1"] = { ...DEFAULT_CERTIFICATE_LAYOUT };
-        layoutMap["mock-cert-2"] = { ...DEFAULT_CERTIFICATE_LAYOUT };
-        layoutMap["active-cert-1"] = { ...DEFAULT_CERTIFICATE_LAYOUT };
-        layoutMap["active-cert-2"] = { ...DEFAULT_CERTIFICATE_LAYOUT };
-
         setLayoutsByCertId(layoutMap);
       } catch (err) {
         console.warn("Failed to load list items from API (backend offline), falling back to UI demo active lists:", err);
-        setDocuments([...MOCK_ACTIVE_DOCS, ...MOCK_ARCHIVED_DOCS]);
-        setCertifications([...MOCK_ACTIVE_CERTS, ...MOCK_ARCHIVED_CERTS]);
+        setDocuments(MOCK_ACTIVE_DOCS);
+        setCertifications(MOCK_ACTIVE_CERTS);
 
         // Fallback layout mockup mapping
         const layoutMap = {
-          "mock-cert-1": { ...DEFAULT_CERTIFICATE_LAYOUT },
-          "mock-cert-2": { ...DEFAULT_CERTIFICATE_LAYOUT },
           "active-cert-1": { ...DEFAULT_CERTIFICATE_LAYOUT },
           "active-cert-2": { ...DEFAULT_CERTIFICATE_LAYOUT }
         };
@@ -157,40 +121,52 @@ const DocumentAndCertificateManagement = () => {
     loadData();
   }, []);
 
-  const handleArchiveDoc = (docId) => {
-    setDocuments(prev => prev.map(d => 
-      d.document_type_id === docId 
-        ? { 
-            ...d, 
-            is_archived: true,
-            archived_on: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          } 
-        : d
-    ));
+  const handleArchiveDoc = async (docId) => {
+    try {
+      const res = await archiveDocumentType(docId);
+      setDocuments(prev => prev.map(d =>
+        d.document_type_id === docId ? { ...d, ...res.data } : d
+      ));
+    } catch (err) {
+      console.error("Failed to archive document type:", err);
+      alert("Couldn't archive this document. Please try again.");
+    }
   };
 
-  const handleArchiveCert = (certId) => {
-    setCertifications(prev => prev.map(c => 
-      c.certificate_type_id === certId 
-        ? { 
-            ...c, 
-            is_archived: true,
-            archived_on: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          } 
-        : c
-    ));
+  const handleArchiveCert = async (certId) => {
+    try {
+      const res = await archiveCertification(certId);
+      setCertifications(prev => prev.map(c =>
+        c.certificate_type_id === certId ? { ...c, ...res.data } : c
+      ));
+    } catch (err) {
+      console.error("Failed to archive certification type:", err);
+      alert("Couldn't archive this certification. Please try again.");
+    }
   };
 
-  const handleRestoreDoc = (docId) => {
-    setDocuments(prev => prev.map(d => 
-      d.document_type_id === docId ? { ...d, is_archived: false } : d
-    ));
+  const handleRestoreDoc = async (docId) => {
+    try {
+      const res = await restoreDocumentType(docId);
+      setDocuments(prev => prev.map(d =>
+        d.document_type_id === docId ? { ...d, ...res.data } : d
+      ));
+    } catch (err) {
+      console.error("Failed to restore document type:", err);
+      alert("Couldn't restore this document. Please try again.");
+    }
   };
 
-  const handleRestoreCert = (certId) => {
-    setCertifications(prev => prev.map(c => 
-      c.certificate_type_id === certId ? { ...c, is_archived: false } : c
-    ));
+  const handleRestoreCert = async (certId) => {
+    try {
+      const res = await restoreCertification(certId);
+      setCertifications(prev => prev.map(c =>
+        c.certificate_type_id === certId ? { ...c, ...res.data } : c
+      ));
+    } catch (err) {
+      console.error("Failed to restore certification type:", err);
+      alert("Couldn't restore this certification. Please try again.");
+    }
   };
 
   return (
