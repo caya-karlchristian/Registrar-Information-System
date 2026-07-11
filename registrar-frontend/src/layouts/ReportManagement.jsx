@@ -1,18 +1,42 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
-import DropDown from '../components/DropDown';
 import ConfirmationModal from '../components/ConfirmationModal';
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import { getAuditLogs, getAuditLogFilters } from "../services/api";
 import ErrorToast from "../components/ErrorToast";
 import { useTheme } from "../context/ThemeContext";
 import { ReportTableSkeleton } from '../components/LoadingSkeleton';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import DashboardDropdown from "../components/DashboardDropdown.jsx";
 
 const PER_PAGE = 10;
+
+const getRoleBadgeClasses = (roleName, isDark) => {
+  const role = String(roleName || "").trim().toLowerCase();
+
+  if (role.includes("super")) { // Super Admin - PUP Yellow
+    if (isDark) {
+      return 'bg-red-950/40 text-red-400 border-red-800/50';
+    }
+    return 'bg-red-50 text-[#8B0000]/70 border-red-200';
+  }
+
+  if (isDark) {
+    return 'bg-[#8B0000]/20 text-[#ffb3b3] border-[#8B0000]/30';
+  }
+  return 'bg-[#8B0000]/10 text-[#8B0000] border-[#8B0000]/20';
+};
+
+const formatLabel = (str) => {
+  if (!str) return "";
+  return str
+    .split("_")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
 
 const ReportManagement = () => {
   const { isDark } = useTheme();
@@ -30,6 +54,25 @@ const ReportManagement = () => {
   // Filter options populated from API
   const [roleOptions, setRoleOptions]     = useState(["All"]);
   const [actionOptions, setActionOptions] = useState(["All"]);
+
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
+
+  const roleDropdownRef = useRef(null);
+  const actionDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target)) {
+        setRoleDropdownOpen(false);
+      }
+      if (actionDropdownRef.current && !actionDropdownRef.current.contains(event.target)) {
+        setActionDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // -------------------------------------------------------
   // Load filter dropdown options once on mount
@@ -102,11 +145,10 @@ const ReportManagement = () => {
   };
 
   return (
-    <div className={`font-sans px-4 sm:px-6 py-4 flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
+    <div className={`font-sans sm:px-6 flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
       <div className="w-full max-w-6xl flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-6">
-
-        <div className="mt-6 sm:mt-12 flex-1 min-w-0 sm:min-w-45 sm:max-w-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <div className="flex-1 min-w-0 sm:max-w-xs">
           <VoiceSearchInput
             value={search}
             onChange={(value) => {
@@ -117,25 +159,28 @@ const ReportManagement = () => {
           />
         </div>
 
-        <div className="mt-2 sm:mt-6 flex-1 min-w-0 sm:min-w-45 sm:max-w-xs">
-          <DropDown label="Role" name="roleFilter"
-            value={roleFilter === "All" ? "" : roleFilter}
-            onChange={(e) => { setRoleFilter(e.target.value || "All"); handleFilterChange(); }}
-            options={roleOptions} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
-          />
-        </div>
-
-        <div className="mt-2 sm:mt-6 flex-1 min-w-0 sm:min-w-45 sm:max-w-xs">
-          <DropDown label="Action" name="actionFilter"
-            value={actionFilter === "All" ? "" : actionFilter}
-            onChange={(e) => { setActionFilter(e.target.value || "All"); handleFilterChange(); }}
-            options={actionOptions} labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}
-          />
-        </div>
+        {(roleFilter !== 'All' || actionFilter !== 'All' || search.trim() !== '') && (
+          <button
+            type="button"
+            onClick={() => {
+              setRoleFilter('All');
+              setActionFilter('All');
+              setSearch('');
+              setCurrentPage(1);
+            }}
+            className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold transition-colors border shadow-sm flex items-center justify-center shrink-0
+              ${isDark
+                ? 'bg-[#1f1f1f] text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]'
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+          >
+            Clear Filters
+          </button>
+        )}
 
         <button
           onClick={() => setShowConfirm(true)}
-          className={`mt-4 sm:mt-12 w-full sm:w-auto px-5 py-2 rounded-full text-sm font-semibold border shadow-sm transition-all ${isDark ? 'border-red-900/50 text-red-300 bg-[#2a2a2f] hover:bg-[#353539]' : 'border-red-200 text-red-600 bg-white hover:bg-red-50'}`}
+          className={`sm:ml-auto w-full sm:w-auto px-5 py-2 rounded-full text-sm font-semibold border shadow-sm transition-all ${isDark ? 'border-red-900/50 text-red-300 bg-[#2a2a2f] hover:bg-[#353539]' : 'border-red-200 text-red-600 bg-white hover:bg-red-50'}`}
         >
           Clear Logs
         </button>
@@ -147,9 +192,61 @@ const ReportManagement = () => {
           <table className="w-full min-w-180 text-sm">
           <thead>
             <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
-              {["Timestamp", "User", "Role", "Action", "Browser"].map((h) => (
-                <th key={h} className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{h}</th>
-              ))}
+              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Timestamp</th>
+              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>User</th>
+              <th className="px-4 py-3 text-center">
+                <DashboardDropdown
+                  isOpen={roleDropdownOpen}
+                  setIsOpen={setRoleDropdownOpen}
+                  dropdownRef={roleDropdownRef}
+                  align="center"
+                  trigger={
+                    <span className={roleFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
+                      Role
+                    </span>
+                  }
+                  sections={[
+                    {
+                      title: 'Filter by Role',
+                      items: roleOptions.map(option => ({
+                        label: formatLabel(option),
+                        isSelected: roleFilter === option,
+                        onClick: () => {
+                          setRoleFilter(option);
+                          handleFilterChange();
+                        }
+                      }))
+                    }
+                  ]}
+                />
+              </th>
+              <th className="px-4 py-3 text-center">
+                <DashboardDropdown
+                  isOpen={actionDropdownOpen}
+                  setIsOpen={setActionDropdownOpen}
+                  dropdownRef={actionDropdownRef}
+                  align="center"
+                  trigger={
+                    <span className={actionFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
+                      Action
+                    </span>
+                  }
+                  sections={[
+                    {
+                      title: 'Filter by Action',
+                      items: actionOptions.map(option => ({
+                        label: formatLabel(option),
+                        isSelected: actionFilter === option,
+                        onClick: () => {
+                          setActionFilter(option);
+                          handleFilterChange();
+                        }
+                      }))
+                    }
+                  ]}
+                />
+              </th>
+              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Browser</th>
             </tr>
           </thead>
           <tbody>
@@ -184,14 +281,14 @@ const ReportManagement = () => {
                   <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>{log.user}</td>
 
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${isDark ? 'bg-[#3a2b2b]/20 text-[#ffb3b3] border-[#7a4b4b]' : 'bg-red-50 text-red-400/60 border-red-200'}`}>
-                      {log.role}
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(log.role, isDark)}`}>
+                      {formatLabel(log.role)}
                     </span>
                   </td>
 
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] border-[#3e4042]' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                      {log.action}
+                      {formatLabel(log.action)}
                     </span>
                   </td>
 
