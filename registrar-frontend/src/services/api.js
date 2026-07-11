@@ -74,6 +74,8 @@ export const getDocumentType   = (id)        => api.get(`/document-types/${id}`)
 export const createDocumentType = (data)     => api.post("/document-types", data);
 export const updateDocumentType = (id, data) => api.put(`/document-types/${id}`, data);
 export const deleteDocumentType = (id)       => api.delete(`/document-types/${id}`);
+export const archiveDocumentType = (id)      => api.patch(`/document-types/${id}/archive`);
+export const restoreDocumentType = (id)      => api.patch(`/document-types/${id}/restore`);
 
 // -------------------------------------------------------
 // CERTIFICATIONS (read: all | write: Admin+)
@@ -83,6 +85,8 @@ export const getCertification          = (id)        => api.get(`/certifications
 export const createCertification       = (data)      => api.post("/certifications", data);
 export const updateCertification       = (id, data)  => api.put(`/certifications/${id}`, data);
 export const deleteCertification       = (id)        => api.delete(`/certifications/${id}`);
+export const archiveCertification      = (id)        => api.patch(`/certifications/${id}/archive`);
+export const restoreCertification      = (id)        => api.patch(`/certifications/${id}/restore`);
 export const getCertificationLayouts   = ()          => api.get("/certifications/layouts");
 export const updateCertificationLayout = (id, data)  => api.put(`/certifications/${id}/layout`, data);
 export const uploadCertificationLayoutLogo = (id, formData) =>

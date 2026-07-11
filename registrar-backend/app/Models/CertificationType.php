@@ -14,10 +14,17 @@ class CertificationType extends Model
     protected $keyType = 'int';
     public $incrementing = true;
     public $timestamps = false;
-    protected $guarded = [];
+    protected $fillable = [
+        'certificate_name', 'certificate_requirements', 'certificate_process_period', 'access_id',
+        'layout_header_left_url', 'layout_header_right_url', 'layout_footer_urls',
+        'layout_header_logo_size', 'layout_footer_logo_size',
+        'cashier_document_patterns', 'is_archived', 'archived_on',
+    ];
 
     protected $casts = [
         'cashier_document_patterns' => 'array',
+        'is_archived'                => 'boolean',
+        'archived_on'                => 'datetime',
     ];
 
     // layout_footer_urls is stored as a JSON array of bare paths.
@@ -90,8 +97,16 @@ class CertificationType extends Model
         );
     }
 
-    public function documentRequests()
+    // Was documentRequests() referencing document_request.cert_type_id, which
+    // doesn't exist — certificate_type_id actually lives on request_certificate.
+    // Confirmed unused anywhere in the app before renaming/fixing.
+    public function requestCertificates()
     {
-        return $this->hasMany(DocumentRequest::class, 'cert_type_id');
+        return $this->hasMany(RequestCertificate::class, 'certificate_type_id');
+    }
+
+    public function accessType()
+    {
+        return $this->belongsTo(AccessType::class, 'access_id');
     }
 }

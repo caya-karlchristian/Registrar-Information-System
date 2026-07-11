@@ -22,11 +22,11 @@ class RequestStatusController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'status_name' => 'required|string|max:50',
         ]);
 
-        $status = RequestStatus::create($request->all());
+        $status = RequestStatus::create($validated);
         return response()->json($status, 201);
     }
 
@@ -35,7 +35,11 @@ class RequestStatusController extends Controller
         $status = RequestStatus::find($id);
         if (!$status) return response()->json(['message' => 'Status not found'], 404);
 
-        $status->update($request->all());
+        $validated = $request->validate([
+            'status_name' => 'required|string|max:50',
+        ]);
+
+        $status->update($validated);
         return response()->json($status, 200);
     }
 

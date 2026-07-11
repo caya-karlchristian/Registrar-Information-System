@@ -63,25 +63,53 @@ class AdminUserService
             'roles'       => [$idpRoleMap[$validated['role_id']]],
         ], $adminToken);
 
-        $user = DB::transaction(function () use ($validated, $idpId) {
-            $user = SystemUser::create([
-                'email'       => $validated['email'],
-                'password'    => Hash::make($validated['password']),
-                'role_id'     => $validated['role_id'],
-                'status'      => 'Activated',
+        try {
+            $user = DB::transaction(function () use ($validated, $idpId) {
+                $user = SystemUser::create([
+                    'email'       => $validated['email'],
+                    'password'    => Hash::make($validated['password']),
+                    'role_id'     => $validated['role_id'],
+                    'status'      => 'Activated',
+                    'idp_user_id' => $idpId,
+                ]);
+
+                DB::table('admin_profile')->insert([
+                    'user_id'     => $user->user_id,
+                    'first_name'  => $validated['first_name'],
+                    'middle_name' => $validated['middle_name'] ?? null,
+                    'last_name'   => $validated['last_name'],
+                    'suffix'      => $validated['suffix'] ?? null,
+                ]);
+
+                return $user;
+            });
+        } catch (\Throwable $e) {
+            // The IdP user was already created above. If the local DB write
+            // fails (e.g. a race-condition unique constraint), we'd otherwise
+            // be left with an orphaned IdP account that has no local record
+            // and no way to be managed or deleted through this app. Roll it
+            // back before rethrowing so IdP and local DB stay in sync.
+            Log::error('AdminUserService: local DB insert failed after IdP user was created — rolling back orphaned IdP user', [
                 'idp_user_id' => $idpId,
+                'email'       => $validated['email'],
+                'error'       => $e->getMessage(),
             ]);
 
-            DB::table('admin_profile')->insert([
-                'user_id'     => $user->user_id,
-                'first_name'  => $validated['first_name'],
-                'middle_name' => $validated['middle_name'] ?? null,
-                'last_name'   => $validated['last_name'],
-                'suffix'      => $validated['suffix'] ?? null,
-            ]);
+            try {
+                $this->idpClient->deleteUser($idpId, $adminToken);
+            } catch (\Throwable $cleanupError) {
+                // Cleanup failed too — this now genuinely needs manual
+                // intervention in the IdP. Logged distinctly so it's easy
+                // to grep for and doesn't get silently swallowed.
+                Log::critical('AdminUserService: failed to roll back orphaned IdP user after local DB failure — manual cleanup required', [
+                    'idp_user_id' => $idpId,
+                    'email'       => $validated['email'],
+                    'error'       => $cleanupError->getMessage(),
+                ]);
+            }
 
-            return $user;
-        });
+            throw $e;
+        }
 
         $this->auditLogger->log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
 

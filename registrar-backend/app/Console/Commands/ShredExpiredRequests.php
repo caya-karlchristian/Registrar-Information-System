@@ -28,8 +28,10 @@ use Illuminate\Support\Facades\Log;
 | Audit trail
 |   A RequestHistory row is written for every automated transition so
 |   admin reports remain consistent with manual status changes.
-|   processed_by = null / processed_by_email = 'system' distinguishes
-|   automated transitions from manual admin updates.
+|   changed_by = null / processed_by_email = 'system' distinguishes
+|   automated transitions from manual admin updates (see migration
+|   2026_07_08_000001_consolidate_request_history_actor — processed_by
+|   was dropped; changed_by is now the single actor column).
 |
 | Idempotency
 |   The status is immediately updated to Forfeited inside the same DB
@@ -73,7 +75,7 @@ class ShredExpiredRequests extends Command
                     'old_status_id'      => $oldStatusId,
                     'new_status_id'      => RequestStatusEnum::Forfeited->value,
                     'changed_at'         => now(),
-                    'processed_by'       => null,
+                    'changed_by'         => null,
                     'processed_by_email' => 'system',
                     'minutes_processed'  => (int) $request->requested_at->diffInMinutes(now()),
                 ]);
