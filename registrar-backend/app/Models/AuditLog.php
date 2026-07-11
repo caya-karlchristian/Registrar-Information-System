@@ -36,6 +36,13 @@ class AuditLog extends Model
     public const ACTION_ROLE_ASSIGNED   = 'role_assigned';
     public const ACTION_REQUEST_STATUS_CHANGED = 'request_status_changed';
 
+    // User management — policy attachment (admins only)
+    public const ACTION_POLICY_CREATED  = 'policy_created';
+    public const ACTION_POLICY_UPDATED  = 'policy_updated';
+    public const ACTION_POLICY_DELETED  = 'policy_deleted';
+    public const ACTION_POLICY_ATTACHED = 'policy_attached';
+    public const ACTION_POLICY_DETACHED = 'policy_detached';
+
     // -------------------------------------------------------
     // Relationship back to user (nullable — may be deleted)
     // -------------------------------------------------------

@@ -9,6 +9,7 @@ use App\Models\Alumni;
 use App\Models\AlumniProfile;
 use App\Models\AlumniType;
 use App\Models\AlumniAcademicRecord;
+use App\Models\Policy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class SystemUser extends Authenticatable
@@ -48,6 +49,7 @@ class SystemUser extends Authenticatable
         'idp_user_id',
         'idp_access_token',
         'local_auth_enabled', // 1 = local bcrypt password is active and usable as IDP fallback
+        'policy_id', // admin-only — the module-permissions policy attached to this account
     ];
 
     protected $hidden = [
@@ -118,6 +120,16 @@ class SystemUser extends Authenticatable
         return $this->hasOne(Alumni::class, 'user_id', 'user_id');
     }
 
+    /**
+     * The module-permissions policy attached to this account.
+     * Only meaningful for admins (role_id = 3) — super admins bypass
+     * policy checks entirely (see isSuperAdmin()).
+     */
+    public function policy()
+    {
+        return $this->belongsTo(Policy::class, 'policy_id', 'policy_id');
+    }
+
     // -------------------------------------------------------
     // ROLE HELPERS
     // -------------------------------------------------------
@@ -170,7 +182,7 @@ class SystemUser extends Authenticatable
         if ($this->isAdmin() || $this->isSuperAdmin()) {
             // Admin/Super Admin don't have student profiles
             // Load admin-specific relations here when needed
-            $this->load(['adminProfile']);
+            $this->load(['adminProfile', 'policy']);
             return;
         }
     }
