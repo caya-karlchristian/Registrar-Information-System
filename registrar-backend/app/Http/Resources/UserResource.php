@@ -30,6 +30,12 @@ class UserResource extends JsonResource
             // Admin/Super Admin relation — only present if loaded
             // Will return data once admin profile module is built
             'admin_profile'   => $this->whenLoaded('adminProfile'),
+
+            // Policy attachment — admin-only. Super admins always have
+            // full access and never carry a policy_id (see RoleMiddleware).
+            'policy_id' => $this->policy_id,
+            'policy'    => $this->whenLoaded('policy', fn () => $this->policy ? new PolicyResource($this->policy) : null),
+
             'status'    => $this->status,   
             'created_at' => $this->created_at,  
         ];
