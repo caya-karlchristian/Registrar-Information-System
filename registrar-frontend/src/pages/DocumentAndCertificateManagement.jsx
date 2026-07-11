@@ -3,6 +3,8 @@ import DocumentManagement from "../layouts/DocumentManagement.jsx";
 import CertificateTemplateManagement from "../layouts/CertificateTemplateManagement.jsx";
 import ArchivedManagement from "../pages/ArchivedManagement.jsx";
 import { useTheme } from "../context/ThemeContext";
+import SuccessToast from "../components/SuccessToast.jsx";
+import ErrorToast from "../components/ErrorToast.jsx";
 import {
   getDocumentTypes,
   getCertifications,
@@ -75,6 +77,8 @@ const DocumentAndCertificateManagement = () => {
   const [certifications, setCertifications] = useState([]);
   const [layoutsByCertId, setLayoutsByCertId] = useState({});
   const [loading, setLoading] = useState(true);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   // Fetch all documents and certifications on mount
   useEffect(() => {
@@ -127,9 +131,10 @@ const DocumentAndCertificateManagement = () => {
       setDocuments(prev => prev.map(d =>
         d.document_type_id === docId ? { ...d, ...res.data } : d
       ));
+      setSuccessMsg("Document archived successfully!");
     } catch (err) {
       console.error("Failed to archive document type:", err);
-      alert("Couldn't archive this document. Please try again.");
+      setErrorMsg("Couldn't archive this document. Please try again.");
     }
   };
 
@@ -139,9 +144,10 @@ const DocumentAndCertificateManagement = () => {
       setCertifications(prev => prev.map(c =>
         c.certificate_type_id === certId ? { ...c, ...res.data } : c
       ));
+      setSuccessMsg("Certificate archived successfully!");
     } catch (err) {
       console.error("Failed to archive certification type:", err);
-      alert("Couldn't archive this certification. Please try again.");
+      setErrorMsg("Couldn't archive this certification. Please try again.");
     }
   };
 
@@ -151,9 +157,10 @@ const DocumentAndCertificateManagement = () => {
       setDocuments(prev => prev.map(d =>
         d.document_type_id === docId ? { ...d, ...res.data } : d
       ));
+      setSuccessMsg("Document restored successfully!");
     } catch (err) {
       console.error("Failed to restore document type:", err);
-      alert("Couldn't restore this document. Please try again.");
+      setErrorMsg("Couldn't restore this document. Please try again.");
     }
   };
 
@@ -163,9 +170,10 @@ const DocumentAndCertificateManagement = () => {
       setCertifications(prev => prev.map(c =>
         c.certificate_type_id === certId ? { ...c, ...res.data } : c
       ));
+      setSuccessMsg("Certificate restored successfully!");
     } catch (err) {
       console.error("Failed to restore certification type:", err);
-      alert("Couldn't restore this certification. Please try again.");
+      setErrorMsg("Couldn't restore this certification. Please try again.");
     }
   };
 
@@ -244,6 +252,8 @@ const DocumentAndCertificateManagement = () => {
           onRestoreCert={handleRestoreCert}
         />
       )}
+      <SuccessToast message={successMsg} onClose={() => setSuccessMsg("")} />
+      <ErrorToast message={errorMsg} onClose={() => setErrorMsg("")} />
     </div>
   );
 };
