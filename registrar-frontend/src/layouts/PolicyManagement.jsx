@@ -4,35 +4,10 @@ import {
   PlusIcon, 
   XMarkIcon
 } from "@heroicons/react/24/outline";
-import { getSystemUsers } from "../services/api";
+import { getSystemUsers, getPolicies, createPolicy, updatePolicy, deletePolicy } from "../services/api";
 import MultiSelection from "../components/MultiSelection";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
-
-const DEFAULT_POLICIES = [
-  {
-    name: "Student Staff",
-    permissions: "Dashboard, Inbox",
-    rawPermissions: {
-      dashboard: ["Access"],
-      inbox: ["Access"],
-      analytics: [],
-      logbook: [],
-      profile: []
-    }
-  },
-  {
-    name: "Registrar Staff",
-    permissions: "Admin Analytics, Admin Logbook",
-    rawPermissions: {
-      dashboard: [],
-      inbox: [],
-      analytics: ["Access"],
-      logbook: ["Access"],
-      profile: []
-    }
-  }
-];
 
 const MODULE_OPTIONS = [
   "Dashboard",
@@ -61,15 +36,12 @@ const KEY_TO_LABEL = {
 const PolicyManagement = () => {
   const { isDark } = useTheme();
   const [search, setSearch] = useState("");
-  
-  const [policies, setPolicies] = useState(() => {
-    try {
-      const saved = localStorage.getItem("ris_system_policies");
-      return saved ? JSON.parse(saved) : DEFAULT_POLICIES;
-    } catch {
-      return DEFAULT_POLICIES;
-    }
-  });
+
+  // Policies now come straight from the backend (policies table) —
+  // shape per row: { policy_id, name, is_system, type, permissions,
+  // permissions_label, admins_count, created_at, updated_at }.
+  const [policies, setPolicies] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [users, setUsers] = useState([]);
   const [successMsg, setSuccessMsg] = useState("");
@@ -84,7 +56,8 @@ const PolicyManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingPolicyIndex, setEditingPolicyIndex] = useState(null);
-  
+  const [submitting, setSubmitting] = useState(false);
+
   // Form fields
   const [policyName, setPolicyName] = useState("");
   const [selectedModuleValues, setSelectedModuleValues] = useState([]);
@@ -93,7 +66,20 @@ const PolicyManagement = () => {
   const [isAdminListOpen, setIsAdminListOpen] = useState(false);
   const [selectedPolicyForAdmins, setSelectedPolicyForAdmins] = useState(null);
 
-  // Fetch users to count assignments
+  // Fetch policies from the backend
+  const fetchPolicies = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getPolicies();
+      setPolicies(res.data.data || []);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Failed to load policies.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch users so we can show real "attached admins" per policy
   const fetchUsers = useCallback(async () => {
     try {
       const res = await getSystemUsers();
@@ -104,8 +90,9 @@ const PolicyManagement = () => {
   }, []);
 
   useEffect(() => {
+    fetchPolicies();
     fetchUsers();
-  }, [fetchUsers]);
+  }, [fetchPolicies, fetchUsers]);
 
   // Reset pagination/selections on filter change
   useEffect(() => {
@@ -113,50 +100,20 @@ const PolicyManagement = () => {
     setSelectedPolicyIndices([]);
   }, [search]);
 
-  const getUserPolicy = useCallback((user) => {
-    if (user.role_id === 4) return "Full access — no policy";
-    try {
-      const saved = localStorage.getItem("ris_user_policies");
-      const userPolicies = saved ? JSON.parse(saved) : {};
-      return userPolicies[user.user_id] || getDefaultPolicy(user);
-    } catch {
-      return getDefaultPolicy(user);
-    }
-  }, []);
+  // A policy is "attached" to an admin when user.policy_id matches —
+  // this is the real, server-persisted attachment (see users.policy_id
+  // and SystemUserController::attachPolicy()), not a name-based guess.
+  const getAssignedAdmins = useCallback((policy) => {
+    return users.filter(user => user.role_id === 3 && user.policy_id === policy.policy_id);
+  }, [users]);
 
-  const getDefaultPolicy = (user) => {
-    const email = user.email?.toLowerCase() || "";
-    const profile = user.admin_profile;
-    const fullName = profile
-      ? [profile.first_name, profile.last_name].filter(Boolean).join(" ").toLowerCase()
-      : "";
-    if (fullName.includes("sigmund") || email.includes("sigmund")) return "Registrar Frontliner";
-    if (fullName.includes("mhel") || email.includes("mhel")) return "Certificate Reviewer";
-    return "Registrar Frontliner";
-  };
-
-  const getAssignedAdmins = useCallback((policyName) => {
-    return users.filter(user => user.role_id === 3 && getUserPolicy(user) === policyName);
-  }, [users, getUserPolicy]);
-
-  const getPolicyType = (policy) => {
-    return DEFAULT_POLICIES.some(p => p.name === policy.name) ? "System managed" : "Custom policy";
-  };
-
-  const savePoliciesToStorage = (updated) => {
-    setPolicies(updated);
-    localStorage.setItem("ris_system_policies", JSON.stringify(updated));
-  };
-
-  // Generate descriptive permissions string
-  const formatPermissionsString = (raw) => {
-    const parts = [];
-    if (raw.dashboard && raw.dashboard.length > 0) parts.push("Dashboard");
-    if (raw.inbox && raw.inbox.length > 0) parts.push("Inbox");
-    if (raw.analytics && raw.analytics.length > 0) parts.push("Admin Analytics");
-    if (raw.logbook && raw.logbook.length > 0) parts.push("Admin Logbook");
-    if (raw.profile && raw.profile.length > 0) parts.push("Admin Profile");
-    return parts.length > 0 ? parts.join(", ") : "No permissions assigned";
+  // Generate rawPermissions object from selected module labels
+  const buildPermissions = (selectedLabels) => {
+    const raw = {};
+    Object.entries(LABEL_TO_KEY).forEach(([label, key]) => {
+      raw[key] = selectedLabels.includes(label) ? ["Access"] : [];
+    });
+    return raw;
   };
 
   const handleOpenCreate = () => {
@@ -171,10 +128,10 @@ const PolicyManagement = () => {
     setEditingPolicyIndex(index);
     const p = policies[index];
     setPolicyName(p.name);
-    
-    // Map rawPermissions object back to selectedModuleValues
+
+    // Map permissions object back to selectedModuleValues
     const labels = [];
-    Object.entries(p.rawPermissions || {}).forEach(([key, val]) => {
+    Object.entries(p.permissions || {}).forEach(([key, val]) => {
       if (val && val.length > 0) {
         const label = KEY_TO_LABEL[key];
         if (label) labels.push(label);
@@ -193,30 +150,38 @@ const PolicyManagement = () => {
     }
   };
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = async () => {
     if (selectedPolicyIndices.length === 0) return;
 
     const selectedPolicies = selectedPolicyIndices.map(idx => policies[idx]).filter(Boolean);
-    const defaultSelected = selectedPolicies.filter(p => DEFAULT_POLICIES.some(dp => dp.name === p.name));
-    const customSelected = selectedPolicies.filter(p => !DEFAULT_POLICIES.some(dp => dp.name === p.name));
+    const systemSelected = selectedPolicies.filter(p => p.is_system);
+    const customSelected = selectedPolicies.filter(p => !p.is_system);
 
-    if (defaultSelected.length > 0 && customSelected.length === 0) {
+    if (customSelected.length === 0) {
       setErrorMsg("System-managed policies cannot be deleted.");
       return;
     }
 
-    const updated = policies.filter(p => !customSelected.some(cs => cs.name === p.name));
-    savePoliciesToStorage(updated);
-    setSelectedPolicyIndices([]);
+    try {
+      // The backend rejects deletion of is_system policies (422), so only
+      // custom ones are sent — matches the guard already shown in the UI.
+      await Promise.all(customSelected.map(p => deletePolicy(p.policy_id)));
 
-    if (defaultSelected.length > 0) {
-      setSuccessMsg(`Deleted ${customSelected.length} custom policy/policies. System-managed policies were preserved.`);
-    } else {
-      setSuccessMsg(`Successfully deleted ${customSelected.length} policy/policies.`);
+      if (systemSelected.length > 0) {
+        setSuccessMsg(`Deleted ${customSelected.length} custom policy/policies. System-managed policies were preserved.`);
+      } else {
+        setSuccessMsg(`Successfully deleted ${customSelected.length} policy/policies.`);
+      }
+
+      setSelectedPolicyIndices([]);
+      await fetchPolicies();
+      await fetchUsers();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Failed to delete policy/policies.");
     }
   };
 
-  const handleSavePolicy = (e) => {
+  const handleSavePolicy = async (e) => {
     e.preventDefault();
     setErrorMsg("");
 
@@ -230,36 +195,26 @@ const PolicyManagement = () => {
       return;
     }
 
-    const rawPermissions = {
-      dashboard: selectedModuleValues.includes("Dashboard") ? ["Access"] : [],
-      inbox: selectedModuleValues.includes("Inbox") ? ["Access"] : [],
-      analytics: selectedModuleValues.includes("Admin Analytics") ? ["Access"] : [],
-      logbook: selectedModuleValues.includes("Admin Logbook") ? ["Access"] : [],
-      profile: selectedModuleValues.includes("Admin Profile") ? ["Access"] : []
-    };
+    const permissions = buildPermissions(selectedModuleValues);
+    setSubmitting(true);
 
-    const permissionsStr = formatPermissionsString(rawPermissions);
-    const newPolicy = {
-      name: policyName.trim(),
-      permissions: permissionsStr,
-      rawPermissions
-    };
-
-    let updatedPolicies = [...policies];
-    if (isEditMode) {
-      updatedPolicies[editingPolicyIndex] = newPolicy;
-      setSuccessMsg("Policy updated successfully.");
-    } else {
-      if (policies.some(p => p.name.toLowerCase() === policyName.trim().toLowerCase())) {
-        setErrorMsg("A policy with this name already exists.");
-        return;
+    try {
+      if (isEditMode) {
+        const policyId = policies[editingPolicyIndex].policy_id;
+        await updatePolicy(policyId, { name: policyName.trim(), permissions });
+        setSuccessMsg("Policy updated successfully.");
+      } else {
+        await createPolicy({ name: policyName.trim(), permissions });
+        setSuccessMsg("Policy created successfully.");
       }
-      updatedPolicies.push(newPolicy);
-      setSuccessMsg("Policy created successfully.");
-    }
 
-    savePoliciesToStorage(updatedPolicies);
-    setIsModalOpen(false);
+      setIsModalOpen(false);
+      await fetchPolicies();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Failed to save policy.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleOpenAdminList = (policy) => {
@@ -270,7 +225,7 @@ const PolicyManagement = () => {
   // Filter policies based on Search
   const filteredPolicies = policies.filter((p) => {
     return p.name.toLowerCase().includes(search.toLowerCase()) ||
-           p.permissions.toLowerCase().includes(search.toLowerCase());
+           (p.permissions_label || "").toLowerCase().includes(search.toLowerCase());
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredPolicies.length / PER_PAGE));
@@ -403,7 +358,13 @@ const PolicyManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-gray-500">
+                    Loading policies...
+                  </td>
+                </tr>
+              ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-gray-500">
                     No policies found matching your criteria.
@@ -411,8 +372,7 @@ const PolicyManagement = () => {
                 </tr>
               ) : (
                 paginated.map((policy, idx) => {
-                  const type = getPolicyType(policy);
-                  const admins = getAssignedAdmins(policy.name);
+                  const admins = getAssignedAdmins(policy);
                   const usedAsText = admins.length > 0 
                     ? `Permissions policy (${admins.length})` 
                     : "None";
@@ -421,7 +381,7 @@ const PolicyManagement = () => {
 
                   return (
                     <tr 
-                      key={idx}
+                      key={policy.policy_id}
                       className={`border-b last:border-0 transition-colors ${
                         isDark 
                           ? 'border-[#3e4042] hover:bg-[#2a2a2f]' 
@@ -461,7 +421,7 @@ const PolicyManagement = () => {
 
                       {/* Type */}
                       <td className={`px-4 py-3 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                        {type}
+                        {policy.type}
                       </td>
 
                       {/* Assigned admins count link */}
@@ -482,7 +442,7 @@ const PolicyManagement = () => {
 
                       {/* Description */}
                       <td className={`px-4 py-3 max-w-xs truncate ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {policy.permissions}
+                        {policy.permissions_label}
                       </td>
                     </tr>
                   );
@@ -576,13 +536,14 @@ const PolicyManagement = () => {
                 </button>
                 <button 
                   type="submit"
-                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow ${
+                  disabled={submitting}
+                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed ${
                     isDark 
                       ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' 
                       : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
                   }`}
                 >
-                  {isEditMode ? "Save Changes" : "Save Policy"}
+                  {submitting ? "Saving..." : (isEditMode ? "Save Changes" : "Save Policy")}
                 </button>
               </div>
             </form>
@@ -621,13 +582,13 @@ const PolicyManagement = () => {
             <div className="h-1 w-full bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
 
             <div className="p-6 space-y-4 max-h-[50vh] overflow-y-auto">
-              {getAssignedAdmins(selectedPolicyForAdmins.name).length === 0 ? (
+              {getAssignedAdmins(selectedPolicyForAdmins).length === 0 ? (
                 <div className={`text-center py-6 text-sm ${isDark ? 'text-gray-400' : 'text-gray-505'}`}>
                   No admins currently assigned to this policy.
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {getAssignedAdmins(selectedPolicyForAdmins.name).map((user) => {
+                  {getAssignedAdmins(selectedPolicyForAdmins).map((user) => {
                     const fullName = user.admin_profile
                       ? [user.admin_profile.first_name, user.admin_profile.last_name].filter(Boolean).join(" ")
                       : "Unnamed Admin";

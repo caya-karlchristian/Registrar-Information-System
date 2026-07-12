@@ -20,6 +20,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\PolicyController;
 
 /*
 |--------------------------------------------------------------------------
@@ -165,6 +166,15 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Superadmin only (role 4)
     Route::middleware('role:4')->group(function () {
         Route::apiResource('system-users', SystemUserController::class);
+        Route::patch('system-users/{id}/policy', [SystemUserController::class, 'attachPolicy']);
+
+        // User Management — Policy Attachment: reusable admin permission
+        // policies, plus attaching one to a specific admin above.
+        Route::get('policies',           [PolicyController::class, 'index']);
+        Route::post('policies',          [PolicyController::class, 'store']);
+        Route::put('policies/{id}',      [PolicyController::class, 'update']);
+        Route::delete('policies/{id}',   [PolicyController::class, 'destroy']);
+
         Route::get('audit-logs',         [AuditLogController::class, 'index']);
         Route::get('audit-logs/filters', [AuditLogController::class, 'filters']);
         Route::post('announcements',                      [AnnouncementController::class, 'store']);
