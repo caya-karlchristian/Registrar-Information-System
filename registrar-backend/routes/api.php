@@ -165,7 +165,15 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // Superadmin only (role 4)
     Route::middleware('role:4')->group(function () {
-        Route::apiResource('system-users', SystemUserController::class);
+        // Admin creation gets its own dedicated, tighter throttle on top of
+        // the group's throttle:60,1 — this is now the primary defense
+        // against bulk/automated admin creation (see IdpClient::createUser()
+        // docblock re: x-api-key-only auth on the IdP side).
+        Route::apiResource('system-users', SystemUserController::class)->except(['store']);
+        Route::post('system-users', [SystemUserController::class, 'store'])
+            ->middleware('throttle:5,1')
+            ->name('system-users.store');
+
         Route::patch('system-users/{id}/policy', [SystemUserController::class, 'attachPolicy']);
 
         // User Management — Policy Attachment: reusable admin permission

@@ -137,7 +137,11 @@ class AdminUserService
             throw $e;
         }
 
-        $this->auditLogger->log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
+        $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_CREATED, [
+            'target_user_id' => $user->user_id,
+            'target_email'   => $user->email,
+            'role_id'        => $user->role_id,
+        ]);
 
         return $user;
     }
@@ -204,7 +208,10 @@ class AdminUserService
             return $user->fresh();
         });
 
-        $this->auditLogger->log($request, $user, AuditLog::ACTION_ADMIN_UPDATED);
+        $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_UPDATED, [
+            'target_user_id' => $user->user_id,
+            'target_email'   => $user->email,
+        ]);
 
         // Push profile changes back to OCMS hub — runs OUTSIDE the DB transaction
         // so an OCMS failure cannot rollback a successful local update.
@@ -220,7 +227,10 @@ class AdminUserService
     public function delete(SystemUser $user, Request $request): void
     {
         // Audit BEFORE delete so we still have the actor context
-        $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_DELETED);
+        $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_DELETED, [
+            'target_user_id' => $user->user_id,
+            'target_email'   => $user->email,
+        ]);
 
         if ($user->idp_user_id) {
             try {
