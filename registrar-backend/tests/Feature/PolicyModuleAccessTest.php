@@ -23,29 +23,40 @@ function makeAdmin(?int $policyId = null): SystemUser
 
 function seedStudentStaffAndRegistrarPolicies(): array
 {
-    $studentStaff = Policy::create([
-        'name'        => 'Student Staff',
-        'permissions' => [
-            'dashboard' => ['Access'],
-            'inbox'     => ['Access'],
-            'analytics' => [],
-            'logbook'   => [],
-            'profile'   => [],
-        ],
-        'is_system' => true,
-    ]);
+    // The create_policies_table migration already seeds "Student Staff"
+    // and "Registrar Staff" as is_system rows (RefreshDatabase runs
+    // migrations once, so they exist before any test body runs). Use
+    // updateOrCreate rather than create() so this helper works regardless
+    // of that pre-seeded state, and so this fixture's intentionally
+    // different "Registrar Staff" permissions (full access, for exercising
+    // the happy path) win over the migration's more restrictive defaults.
+    $studentStaff = Policy::updateOrCreate(
+        ['name' => 'Student Staff'],
+        [
+            'permissions' => [
+                'dashboard' => ['Access'],
+                'inbox'     => ['Access'],
+                'analytics' => [],
+                'logbook'   => [],
+                'profile'   => [],
+            ],
+            'is_system' => true,
+        ]
+    );
 
-    $registrarStaff = Policy::create([
-        'name'        => 'Registrar Staff',
-        'permissions' => [
-            'dashboard' => ['Access'],
-            'inbox'     => ['Access'],
-            'analytics' => ['Access'],
-            'logbook'   => ['Access'],
-            'profile'   => ['Access'],
-        ],
-        'is_system' => true,
-    ]);
+    $registrarStaff = Policy::updateOrCreate(
+        ['name' => 'Registrar Staff'],
+        [
+            'permissions' => [
+                'dashboard' => ['Access'],
+                'inbox'     => ['Access'],
+                'analytics' => ['Access'],
+                'logbook'   => ['Access'],
+                'profile'   => ['Access'],
+            ],
+            'is_system' => true,
+        ]
+    );
 
     return compact('studentStaff', 'registrarStaff');
 }
@@ -92,7 +103,13 @@ test('admin with no policy_id falls back to the default policy, not full access'
 });
 
 test('admin falls back to deny when even the default policy is missing', function () {
-    // No policies seeded at all in this test.
+    // The create_policies_table migration seeds "Registrar Staff" (the
+    // DEFAULT_NAME policy) as an is_system row, and RefreshDatabase only
+    // migrates once — so that row exists by default in every test in this
+    // run. To actually exercise "the default policy is missing", delete
+    // it explicitly rather than relying on a blank slate.
+    Policy::where('name', Policy::DEFAULT_NAME)->delete();
+
     $admin = makeAdmin(null);
 
     expect($admin->hasModuleAccess('analytics'))->toBeFalse();

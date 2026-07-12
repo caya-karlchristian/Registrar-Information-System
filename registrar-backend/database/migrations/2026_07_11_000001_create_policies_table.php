@@ -120,12 +120,34 @@ return new class extends Migration
 
     /**
      * Portable "does this FK constraint already exist" check.
-     * information_schema works the same way whether the connection is
-     * MySQL/MariaDB (this project's DB — see docker-compose.yml), so this
-     * avoids depending on doctrine/dbal just to inspect one constraint.
+     *
+     * information_schema.TABLE_CONSTRAINTS works on MySQL/MariaDB (this
+     * project's production DB — see docker-compose.yml) and on Postgres,
+     * but NOT on SQLite, which the test suite uses for speed (see
+     * phpunit.xml). SQLite has no information_schema at all, so this must
+     * branch by driver rather than assume one dialect everywhere.
      */
     private function hasForeignKey(string $table, string $constraintName): bool
     {
+        $connection = Schema::getConnection();
+
+        if ($connection->getDriverName() === 'sqlite') {
+            // SQLite doesn't track FK constraint names the way MySQL/Postgres
+            // do, so we approximate "does this FK already exist" by matching
+            // on the (from column, referenced table) pair instead of the
+            // constraint name — sufficient for this migration's idempotency
+            // purposes, since in tests the table is always created fresh.
+            $foreignKeys = $connection->select("PRAGMA foreign_key_list($table)");
+
+            foreach ($foreignKeys as $fk) {
+                if ($fk->from === 'policy_id' && $fk->table === 'policies') {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $database = DB::getDatabaseName();
 
         $result = DB::selectOne(
