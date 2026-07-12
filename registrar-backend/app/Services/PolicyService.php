@@ -21,6 +21,13 @@ use Illuminate\Support\Facades\DB;
  */
 class PolicyService
 {
+    /**
+     * Alias kept for readability at call sites / docblocks that predate
+     * the constant living on the model — always resolves to
+     * Policy::DEFAULT_NAME so there is still only one literal value.
+     */
+    public const DEFAULT_POLICY_NAME = Policy::DEFAULT_NAME;
+
     public function __construct(private AuditLogger $auditLogger) {}
 
     // -------------------------------------------------------------------------
@@ -37,7 +44,7 @@ class PolicyService
         return DB::transaction(function () use ($validated, $request) {
             $policy = Policy::create([
                 'name'        => $validated['name'],
-                'permissions' => $validated['permissions'] ?? [],
+                'permissions' => $this->sanitizePermissions($validated['permissions'] ?? []),
                 // Policies created through the API are always custom —
                 // only the two seeded defaults are is_system = true.
                 'is_system'   => false,
@@ -53,8 +60,10 @@ class PolicyService
     {
         return DB::transaction(function () use ($policy, $validated, $request) {
             $fields = array_filter([
-                'name'        => $validated['name']        ?? null,
-                'permissions' => $validated['permissions']  ?? null,
+                'name'        => $validated['name'] ?? null,
+                'permissions' => array_key_exists('permissions', $validated)
+                    ? $this->sanitizePermissions($validated['permissions'])
+                    : null,
             ], fn ($v) => !is_null($v));
 
             if (!empty($fields)) {
@@ -65,6 +74,20 @@ class PolicyService
 
             return $policy->fresh();
         });
+    }
+
+    /**
+     * Drop any module key that isn't in Policy::MODULE_KEYS before
+     * persisting. The store()/update() request validation only checks
+     * shape ("is this an array of arrays"), not the key names — this
+     * is what actually keeps `permissions` limited to modules the
+     * EnsureModuleAccess middleware (and the frontend) know how to
+     * enforce, so a typo'd or malicious key can never silently create
+     * an ungated "module".
+     */
+    private function sanitizePermissions(array $permissions): array
+    {
+        return array_intersect_key($permissions, array_flip(Policy::MODULE_KEYS));
     }
 
     /**

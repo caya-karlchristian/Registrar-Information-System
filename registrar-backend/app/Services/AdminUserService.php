@@ -86,8 +86,13 @@ class AdminUserService
         try {
             $user = DB::transaction(function () use ($validated, $idpId) {
                 $user = SystemUser::create([
-                    'email'       => $validated['email'],
-                    'password'    => Hash::make($validated['password']),
+                    'email'               => $validated['email'],
+                    'password'            => Hash::make($validated['password']),
+                    // A bcrypt password is set above, so local auth must be
+                    // switched on here too — otherwise LocalAuthService::attempt()
+                    // rejects the account with "local auth not enabled" even
+                    // though a valid password exists, and only IDP login works.
+                    'local_auth_enabled'  => 1,
                     'role_id'     => $validated['role_id'],
                     'status'      => 'Activated',
                     'idp_user_id' => $idpId,

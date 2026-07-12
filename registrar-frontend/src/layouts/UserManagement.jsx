@@ -268,10 +268,14 @@ const UserManagement = () => {
     setErrorMsg("");
     try {
       const policy = systemPolicies.find(p => p.name === selectedPolicyName);
-      const { data: updatedUser } = await attachUserPolicy(
+      const { data } = await attachUserPolicy(
         selectedUserForAccess.user_id,
         policy ? policy.policy_id : null
       );
+      // attachPolicy() returns a single UserResource, which Laravel wraps
+      // in a `data` envelope by default — unwrap it (matches the
+      // res.data.data pattern used by fetchUsers/fetchPolicies above).
+      const updatedUser = data.data;
 
       // Reflect the server response immediately without a full refetch.
       setUsers(prev => prev.map(u => u.user_id === updatedUser.user_id ? updatedUser : u));

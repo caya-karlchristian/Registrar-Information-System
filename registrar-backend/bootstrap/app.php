@@ -52,7 +52,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // ── Route middleware aliases ─────────────────────────────────────────
         $middleware->alias([
-            'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'role'   => \App\Http\Middleware\RoleMiddleware::class,
+            // Fine-grained policy enforcement on top of 'role' — see
+            // EnsureModuleAccess docblock for how the two interact.
+            'module' => \App\Http\Middleware\EnsureModuleAccess::class,
         ]);
 
         // ── Auth redirect behaviour ──────────────────────────────────────────

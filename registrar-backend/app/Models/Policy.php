@@ -23,6 +23,25 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Policy extends Model
 {
+    /**
+     * Canonical list of module keys that a policy's `permissions` JSON
+     * may grant. This is the single source of truth for "what is a
+     * valid module" — PolicyResource's labels, PolicyService's input
+     * sanitization, and EnsureModuleAccess's gating all key off this
+     * list, so adding a new gate-able module only ever requires
+     * touching this array (plus the frontend's mirrored MODULE_KEYS in
+     * src/utils/policy.js).
+     */
+    public const MODULE_KEYS = ['dashboard', 'inbox', 'analytics', 'logbook', 'profile'];
+
+    /**
+     * The policy new/legacy admin accounts fall back to when they have
+     * no policy_id attached (see SystemUser::effectivePermissions()).
+     * Must match one of the `is_system` rows seeded in the
+     * create_policies_table migration.
+     */
+    public const DEFAULT_NAME = 'Registrar Staff';
+
     protected $table = 'policies';
     protected $primaryKey = 'policy_id';
 

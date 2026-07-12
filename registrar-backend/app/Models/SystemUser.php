@@ -162,6 +162,76 @@ class SystemUser extends Authenticatable
     }
 
     // -------------------------------------------------------
+    // POLICY / MODULE-PERMISSION HELPERS
+    //
+    // Single source of truth for "what can this admin actually reach".
+    // Both EnsureModuleAccess (backend gate) and UserResource
+    // (effective_permissions sent to the frontend) call through here,
+    // so there is exactly one place that resolves "no policy attached"
+    // -> default policy -> deny.
+    // -------------------------------------------------------
+
+    /**
+     * The module => actions permissions map that actually applies to
+     * this user right now — their own policy if attached, otherwise
+     * the system default policy, otherwise nothing (fail closed).
+     *
+     * Only meaningful for admins. Super admins have unrestricted
+     * access (see hasModuleAccess()) and other roles aren't gated by
+     * the policy system at all, so this always returns [] for them —
+     * callers should not use this to make access decisions for
+     * non-admins.
+     */
+    public function effectivePermissions(): array
+    {
+        if (!$this->isAdmin()) {
+            return [];
+        }
+
+        // `policy` may already be eager-loaded (see loadIdentityRelations());
+        // this only issues a query the first time it's touched otherwise.
+        $policy = $this->policy;
+
+        if (!$policy) {
+            $policy = Policy::where('name', Policy::DEFAULT_NAME)->first();
+        }
+
+        return $policy->permissions ?? [];
+    }
+
+    /**
+     * Can this user access the given module ("dashboard", "analytics",
+     * "logbook", ...)? This is the one method both the API middleware
+     * and any future frontend/backend check should call — never
+     * inspect policy_id / permissions directly.
+     *
+     * - Super admins: always true (unrestricted, per product policy).
+     * - Students / alumni: always true — the policy-attachment feature
+     *   only ever restricts admin accounts.
+     * - Admins: true only if their effective policy explicitly grants
+     *   the module. Unknown module or no resolvable policy => false
+     *   (fail closed, not fail open).
+     */
+    public function hasModuleAccess(string $module): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if (!$this->isAdmin()) {
+            return true;
+        }
+
+        if (!in_array($module, Policy::MODULE_KEYS, true)) {
+            return false;
+        }
+
+        $granted = $this->effectivePermissions()[$module] ?? null;
+
+        return !empty($granted);
+    }
+
+    // -------------------------------------------------------
     // IDENTITY RELATION LOADER
     // Called by AuthController@me to attach role-specific data
     // -------------------------------------------------------

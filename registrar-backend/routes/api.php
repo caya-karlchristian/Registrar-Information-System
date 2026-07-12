@@ -88,7 +88,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Document requests
     Route::prefix('document-requests')->group(function () {
         Route::get('/',                           [DocumentRequestController::class, 'index']);
-        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware('role:3,4');
+        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware(['role:3,4', 'module:logbook']);
         Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware('role:3,4');
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show']);
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
@@ -106,7 +106,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.
-    Route::middleware('role:3,4')->prefix('request-history')->group(function () {
+    Route::middleware(['role:3,4', 'module:logbook'])->prefix('request-history')->group(function () {
         Route::get('/',    [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
     });
@@ -143,7 +143,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::apiResource('students',         StudentProfileController::class);
         Route::apiResource('academic-records', StudentAcademicRecordController::class);
 
-        Route::prefix('analytics')->middleware('throttle:60,1')->group(function () {
+        Route::prefix('analytics')->middleware(['throttle:60,1', 'module:analytics'])->group(function () {
             Route::get('overview',         [AnalyticsController::class, 'overview']);
             Route::get('volume-trend',     [AnalyticsController::class, 'volumeTrend']);
             Route::get('by-document-type', [AnalyticsController::class, 'byDocumentType']);
