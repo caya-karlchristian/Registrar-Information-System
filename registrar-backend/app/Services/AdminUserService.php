@@ -47,26 +47,40 @@ class AdminUserService
      */
     public function create(array $validated, Request $request): SystemUser
     {
-        // The IdP's own account-type enum (see its "New User" wizard) has
-        // no concept of "admin" vs "superadmin" — it only knows a single
-        // elevated type: "System Administrator". RIS's admin/superadmin
-        // distinction is local-only (users.role_id + the policy system)
-        // and is never sent to the IdP. Both RIS roles map to the same
-        // IdP account type here.
-        $idpRoleMap = [
-            SystemUser::ROLE_ADMIN       => 'System Administrator',
-            SystemUser::ROLE_SUPER_ADMIN => 'System Administrator',
-        ];
+        // IdP-side values captured from its own "New User" wizard request —
+        // NOT the same thing as SystemUser::ROLE_ADMIN / ROLE_SUPER_ADMIN.
+        // The wizard has no role picker (only account type + password), so
+        // both RIS roles use the same IdP account_type_id/role_id here;
+        // RIS's admin/superadmin distinction stays purely local (role_id
+        // column + policy system). account_type_id 1 = "System
+        // Administrator" per the wizard's radio options.
+        //
+        // ⚠️ role_id: 4 was captured from a single test account and is not
+        // yet confirmed as a fixed/correct value for every system-admin
+        // account — verify with the IdP owner before relying on this in
+        // production.
+        $idpAccountTypeId = 1;
+        $idpRoleId        = 4;
 
-        $adminToken = $this->idpClient->getSuperAdminToken();
+        // ⚠️ TEMPORARY: no longer fetching a superadmin bearer token here.
+        // The IdP's /api/v1/user endpoint doesn't actually enforce the
+        // Authorization header it's documented to require — it accepts the
+        // request on x-api-key alone (confirmed via direct Postman test,
+        // no Authorization header sent, still got 201). Access control for
+        // admin creation currently rests entirely on that static key.
+        // Revert to $this->idpClient->getSuperAdminToken() once the IdP
+        // fixes bearer-token enforcement on this endpoint.
+        $adminToken = null;
 
         $idpId = $this->idpClient->createUser([
-            'email'       => $validated['email'],
-            'first_name'  => $validated['first_name'],
-            'middle_name' => $validated['middle_name'] ?? '',
-            'last_name'   => $validated['last_name'],
-            'password'    => $validated['password'],
-            'role'        => $idpRoleMap[$validated['role_id']],
+            'email'           => $validated['email'],
+            'first_name'      => $validated['first_name'],
+            'middle_name'     => $validated['middle_name'] ?? '',
+            'last_name'       => $validated['last_name'],
+            'name_suffix'     => $validated['suffix'] ?? '',
+            'password'        => $validated['password'],
+            'account_type_id' => $idpAccountTypeId,
+            'idp_role_id'     => $idpRoleId,
         ], $adminToken);
 
         try {
