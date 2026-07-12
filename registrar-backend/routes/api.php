@@ -20,6 +20,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\PolicyController;
 
 /*
 |--------------------------------------------------------------------------
@@ -87,7 +88,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // Document requests
     Route::prefix('document-requests')->group(function () {
         Route::get('/',                           [DocumentRequestController::class, 'index']);
-        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware('role:3,4');
+        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware(['role:3,4', 'module:logbook']);
         Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware('role:3,4');
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show']);
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
@@ -105,7 +106,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.
-    Route::middleware('role:3,4')->prefix('request-history')->group(function () {
+    Route::middleware(['role:3,4', 'module:logbook'])->prefix('request-history')->group(function () {
         Route::get('/',    [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
     });
@@ -142,7 +143,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::apiResource('students',         StudentProfileController::class);
         Route::apiResource('academic-records', StudentAcademicRecordController::class);
 
-        Route::prefix('analytics')->middleware('throttle:60,1')->group(function () {
+        Route::prefix('analytics')->middleware(['throttle:60,1', 'module:analytics'])->group(function () {
             Route::get('overview',         [AnalyticsController::class, 'overview']);
             Route::get('volume-trend',     [AnalyticsController::class, 'volumeTrend']);
             Route::get('by-document-type', [AnalyticsController::class, 'byDocumentType']);
@@ -164,7 +165,24 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
     // Superadmin only (role 4)
     Route::middleware('role:4')->group(function () {
-        Route::apiResource('system-users', SystemUserController::class);
+        // Admin creation gets its own dedicated, tighter throttle on top of
+        // the group's throttle:60,1 — this is now the primary defense
+        // against bulk/automated admin creation (see IdpClient::createUser()
+        // docblock re: x-api-key-only auth on the IdP side).
+        Route::apiResource('system-users', SystemUserController::class)->except(['store']);
+        Route::post('system-users', [SystemUserController::class, 'store'])
+            ->middleware('throttle:5,1')
+            ->name('system-users.store');
+
+        Route::patch('system-users/{id}/policy', [SystemUserController::class, 'attachPolicy']);
+
+        // User Management — Policy Attachment: reusable admin permission
+        // policies, plus attaching one to a specific admin above.
+        Route::get('policies',           [PolicyController::class, 'index']);
+        Route::post('policies',          [PolicyController::class, 'store']);
+        Route::put('policies/{id}',      [PolicyController::class, 'update']);
+        Route::delete('policies/{id}',   [PolicyController::class, 'destroy']);
+
         Route::get('audit-logs',         [AuditLogController::class, 'index']);
         Route::get('audit-logs/filters', [AuditLogController::class, 'filters']);
         Route::post('announcements',                      [AnnouncementController::class, 'store']);

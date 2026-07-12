@@ -22,9 +22,10 @@ const EMPTY_FORM = {
   password: "",
   role: "Admin",
   status: "Activated",
+  policy: "",
 };
 
-const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = false }) => {
+const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = false, systemPolicies = [] }) => {
   const isEdit = !!editData;
   const { isDark } = useTheme();
   const [showPassword, setShowPassword] = useState(false);
@@ -45,6 +46,9 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
         password: "",
         role: ID_TO_ROLE[editData.role_id] || "Admin",
         status: editData.status || "Activated",
+        // Editing an existing user's policy still goes through "Manage
+        // Access" (PolicyModal) — this modal only sets it at creation time.
+        policy: "",
       });
     } else {
       setForm(EMPTY_FORM);
@@ -92,6 +96,14 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
     // Only include password if it was filled in
     if (form.password) {
       payload.password = form.password;
+    }
+
+    // Policy attachment only applies to new admins (role_id 3) — super
+    // admins always have full access, and editing an existing user's
+    // policy goes through the separate "Manage Access" flow instead.
+    if (!isEdit && form.role === "Admin" && form.policy) {
+      const policy = systemPolicies.find((p) => p.name === form.policy);
+      if (policy) payload.policy_id = policy.policy_id;
     }
 
     onSubmit?.(payload, editData?.user_id);
@@ -185,6 +197,25 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
                 <DropDown label="Status" name="status" value={form.status}
                   onChange={handleChange} options={STATUS_OPTIONS} required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
               </div>
+
+              {/* Policy attachment — new admins only. Super admins have
+                  full access by default, and existing admins already have
+                  a dedicated "Manage Access" action for this. */}
+              {!isEdit && form.role === "Admin" && (
+                <div>
+                  <DropDown
+                    label="Attach Policy"
+                    name="policy"
+                    value={form.policy}
+                    onChange={handleChange}
+                    options={systemPolicies.map((p) => p.name)}
+                    labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+                  />
+                  <p className={`text-xs mt-1 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
+                    Optional — determines which modules this admin can access. Leave blank to attach one later from Manage Access.
+                  </p>
+                </div>
+              )}
 
             </div>
 

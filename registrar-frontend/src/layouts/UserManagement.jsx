@@ -13,11 +13,13 @@ import DropDown from '../components/DropDown';
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import UserModal from "../components/UserModal";
 import ConfirmationModal from "../components/ConfirmationModal";
-import { 
-  getSystemUsers, 
-  createSystemUser, 
-  updateSystemUser, 
-  deleteSystemUser 
+import {
+  getSystemUsers,
+  createSystemUser,
+  updateSystemUser,
+  deleteSystemUser,
+  getPolicies,
+  attachUserPolicy
 } from "../services/api";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
@@ -27,9 +29,13 @@ import PolicyModal from "../components/PolicyModal";
 import DashboardDropdown from "../components/DashboardDropdown.jsx";
 
 /**
- * UserManagement Updates:
- * - Added 'Policy attached' and 'Access' columns inside the user accounts table.
- * - Integrated the simplified 'Attach policy' modal containing a dropdown selector and pill action buttons.
+ * UserManagement — User Management: Policy Attachment
+ * -----------------------------------------------------
+ * "Policy attached" and "Access" columns show each admin's real,
+ * server-persisted policy (users.policy_id — see PolicyService and
+ * SystemUserController::attachPolicy()). The "Attach policy" modal
+ * (PolicyModal) now saves through PATCH /system-users/{id}/policy
+ * instead of localStorage.
  */
 const ROLE_MAP     = { 3: "Admin", 4: "Super Admin" };
 const ROLE_FILTERS = ["All", "Admin", "Super Admin"];
@@ -116,50 +122,18 @@ const UserManagement = () => {
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [selectedUserForAccess, setSelectedUserForAccess] = useState(null);
   const [accessSubmitting, setAccessSubmitting] = useState(false);
-  const [systemPolicies, setSystemPolicies] = useState(() => {
-    try {
-      const saved = localStorage.getItem("ris_system_policies");
-      return saved ? JSON.parse(saved) : [
-        { name: "Registrar Staff" },
-        { name: "Student Staff" }
-      ];
-    } catch {
-      return [
-        { name: "Registrar Staff" },
-        { name: "Student Staff" }
-      ];
-    }
-  });
 
-  // Client-side Policy attached mappings (saved in localStorage for mock persistence)
-  const [userPolicies, setUserPolicies] = useState(() => {
-    try {
-      const saved = localStorage.getItem("ris_user_policies");
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  // Policies come from the backend now (policies table via GET /policies).
+  const [systemPolicies, setSystemPolicies] = useState([]);
 
   // -------------------------------------------------------
-  // Default policy resolver
+  // Policy resolver — reads the real attachment straight off the
+  // user record (user.policy / user.policy_id), no more guessing.
   // -------------------------------------------------------
-  const getDefaultPolicy = useCallback((user) => {
-    if (user.role_id === 4) return "Full Access";
-    const email = user.email?.toLowerCase() || "";
-    const profile = user.admin_profile;
-    const fullName = profile
-      ? [profile.first_name, profile.last_name].filter(Boolean).join(" ").toLowerCase()
-      : "";
-    if (fullName.includes("sigmund") || email.includes("sigmund")) return "Registrar Staff";
-    if (fullName.includes("mhel") || email.includes("mhel")) return "Student Staff";
-    return "Registrar Staff";
-  }, []);
-
   const getUserPolicy = useCallback((user) => {
     if (user.role_id === 4) return "Full Access";
-    return userPolicies[user.user_id] || getDefaultPolicy(user);
-  }, [userPolicies, getDefaultPolicy]);
+    return user.policy?.name || "No policy attached";
+  }, []);
 
   // -------------------------------------------------------
   // Fetch users
@@ -177,9 +151,19 @@ const UserManagement = () => {
     }
   }, []);
 
+  const fetchPolicies = useCallback(async () => {
+    try {
+      const res = await getPolicies();
+      setSystemPolicies(res.data.data || []);
+    } catch (err) {
+      console.warn("Failed to load policies:", err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+    fetchPolicies();
+  }, [fetchUsers, fetchPolicies]);
 
   // -------------------------------------------------------
   // Filter + sort (client-side — small dataset)
@@ -274,34 +258,30 @@ const UserManagement = () => {
   // -------------------------------------------------------
   const handleOpenAccess = (user) => {
     setSelectedUserForAccess(user);
-    
-    // reload system policies
-    try {
-      const saved = localStorage.getItem("ris_system_policies");
-      if (saved) {
-        setSystemPolicies(JSON.parse(saved));
-      }
-    } catch {}
-    
+    fetchPolicies();
     setIsAccessModalOpen(true);
   };
 
-  const handleSaveAccess = async (selectedPolicy) => {
+  const handleSaveAccess = async (selectedPolicyName) => {
     if (!selectedUserForAccess) return;
     setAccessSubmitting(true);
     setErrorMsg("");
     try {
-      // Update policy locally
-      const updatedPolicies = {
-        ...userPolicies,
-        [selectedUserForAccess.user_id]: selectedPolicy
-      };
-      setUserPolicies(updatedPolicies);
-      localStorage.setItem("ris_user_policies", JSON.stringify(updatedPolicies));
+      const policy = systemPolicies.find(p => p.name === selectedPolicyName);
+      const { data } = await attachUserPolicy(
+        selectedUserForAccess.user_id,
+        policy ? policy.policy_id : null
+      );
+      // attachPolicy() returns a single UserResource, which Laravel wraps
+      // in a `data` envelope by default — unwrap it (matches the
+      // res.data.data pattern used by fetchUsers/fetchPolicies above).
+      const updatedUser = data.data;
+
+      // Reflect the server response immediately without a full refetch.
+      setUsers(prev => prev.map(u => u.user_id === updatedUser.user_id ? updatedUser : u));
 
       setSuccessMsg("Policy attached successfully.");
       setIsAccessModalOpen(false);
-      fetchUsers();
     } catch (err) {
       setErrorMsg(err.response?.data?.message || "Failed to attach policy.");
     } finally {
@@ -500,9 +480,9 @@ const UserManagement = () => {
                         </span>
                       ) : (
                         <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                          isDark 
-                            ? 'bg-[#0f213d] text-[#5c93e6]' 
-                            : 'bg-[#e0f2fe] text-[#0369a1]'
+                          user.policy_id
+                            ? (isDark ? 'bg-[#0f213d] text-[#5c93e6]' : 'bg-[#e0f2fe] text-[#0369a1]')
+                            : (isDark ? 'bg-[#3a3b3c] text-[#b0b3b8]' : 'bg-gray-100 text-gray-500')
                           }`}>
                             {policy}
                        </span>
@@ -589,6 +569,7 @@ const UserManagement = () => {
         onSubmit={handleSubmit}
         editData={editUser}
         submitting={submitting}
+        systemPolicies={systemPolicies}
       />
 
       <ConfirmationModal

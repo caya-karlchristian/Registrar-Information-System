@@ -32,6 +32,8 @@ import CertificateTemplateManagement from './layouts/CertificateTemplateManageme
 // Auth
 import { ROLES } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
+import ModuleRoute from './components/ModuleRoute';
+import { MODULE_KEYS } from './utils/policy';
 import ForbiddenPage from './components/ForbiddenPage';
 import SsoCallbackPage from './pages/SsoCallbackPage.jsx';
 
@@ -102,16 +104,28 @@ const App = () => {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<StaffDashboardPage />} />
-                <Route path="dashboard" element={<StaffDashboardPage />} />
+                <Route index element={
+                  <ModuleRoute module={MODULE_KEYS.DASHBOARD}><StaffDashboardPage /></ModuleRoute>
+                } />
+                <Route path="dashboard" element={
+                  <ModuleRoute module={MODULE_KEYS.DASHBOARD}><StaffDashboardPage /></ModuleRoute>
+                } />
                 <Route path="request" element={<WalkInRequest />} />
                 <Route path="request/student" element={<RequestForm showProfileStep />} />
                 <Route path="request/alumni" element={<AlumniRequest showProfileStep />} />
-                <Route path="analytics" element={<AnalyticsDashboard />} />
-                <Route path="logbook" element={<Logbook />} />
-                <Route path="profile" element={<ProfilePage userType="admin" />} />
+                <Route path="analytics" element={
+                  <ModuleRoute module={MODULE_KEYS.ANALYTICS}><AnalyticsDashboard /></ModuleRoute>
+                } />
+                <Route path="logbook" element={
+                  <ModuleRoute module={MODULE_KEYS.LOGBOOK}><Logbook /></ModuleRoute>
+                } />
+                <Route path="profile" element={
+                  <ModuleRoute module={MODULE_KEYS.PROFILE}><ProfilePage userType="admin" /></ModuleRoute>
+                } />
                 <Route path="contact" element={<RegistrarContact />} />
-                <Route path="inbox" element={<InboxCenter />} />
+                <Route path="inbox" element={
+                  <ModuleRoute module={MODULE_KEYS.INBOX}><InboxCenter /></ModuleRoute>
+                } />
               </Route>
 
               {/* SUPER ADMIN (role: super_admin) */}
