@@ -440,7 +440,6 @@ const DocumentManagement = ({
                             onClick={(e) => {
                               e.stopPropagation();
                               onArchiveDoc(doc.document_type_id);
-                              setSuccessMsg("Document archived successfully!");
                               if (selected?.document_type_id === doc.document_type_id) {
                                 handleCancel();
                               }
@@ -576,7 +575,6 @@ const DocumentManagement = ({
                             onClick={(e) => {
                               e.stopPropagation();
                               onArchiveCert(cert.certificate_type_id);
-                              setSuccessMsg("Certificate archived successfully!");
                               if (selected?.certificate_type_id === cert.certificate_type_id) {
                                 handleCancel();
                               }

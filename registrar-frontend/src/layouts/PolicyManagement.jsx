@@ -1,3 +1,14 @@
+/**
+ * PolicyManagement — Admin Permission Policies
+ * -----------------------------------------------------
+ * Policies come straight from the backend (policies table) — see
+ * PolicyController and PolicyResource. "is_system" (returned per
+ * policy) drives which rows can be deleted; system-managed policies
+ * are rejected by the backend (422) and filtered out client-side
+ * before the delete request is sent. Bulk delete goes through a
+ * confirmation modal before calling deletePolicy() for each
+ * selected custom policy.
+ */
 import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { 
@@ -8,6 +19,7 @@ import { getSystemUsers, getPolicies, createPolicy, updatePolicy, deletePolicy }
 import MultiSelection from "../components/MultiSelection";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 const MODULE_OPTIONS = [
   "Dashboard",
@@ -65,6 +77,7 @@ const PolicyManagement = () => {
   // Admin list modal
   const [isAdminListOpen, setIsAdminListOpen] = useState(false);
   const [selectedPolicyForAdmins, setSelectedPolicyForAdmins] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Fetch policies from the backend
   const fetchPolicies = useCallback(async () => {
@@ -150,17 +163,24 @@ const PolicyManagement = () => {
     }
   };
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedPolicyIndices.length === 0) return;
 
     const selectedPolicies = selectedPolicyIndices.map(idx => policies[idx]).filter(Boolean);
-    const systemSelected = selectedPolicies.filter(p => p.is_system);
     const customSelected = selectedPolicies.filter(p => !p.is_system);
 
     if (customSelected.length === 0) {
       setErrorMsg("System-managed policies cannot be deleted.");
       return;
     }
+
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    const selectedPolicies = selectedPolicyIndices.map(idx => policies[idx]).filter(Boolean);
+    const systemSelected = selectedPolicies.filter(p => p.is_system);
+    const customSelected = selectedPolicies.filter(p => !p.is_system);
 
     try {
       // The backend rejects deletion of is_system policies (422), so only
@@ -270,8 +290,7 @@ const PolicyManagement = () => {
             Create policy
           </button>
         </div>
-      </div>      
-      {/* Main Container */}
+      </div>      {/* Main Container */}
       <div className={`rounded-xl overflow-hidden border mt-4 ${
         isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-200 shadow-sm'
       }`}>
@@ -325,7 +344,7 @@ const PolicyManagement = () => {
 
         {/* Table element inside container */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-200 text-sm">
+          <table className="w-full min-w-[800px] text-sm">
             <thead>
               <tr className={`border-b text-xs font-bold uppercase tracking-wider ${
                 isDark ? 'border-[#3e4042] text-[#a09e9a]' : 'border-gray-200 text-gray-500'
@@ -460,7 +479,8 @@ const PolicyManagement = () => {
             className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} 
             onClick={() => setIsModalOpen(false)} 
           />
-          <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl mx-4 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>            
+          <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl mx-4 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
+            
             {/* Header */}
             <div className={`px-6 py-5 flex items-center justify-between rounded-t-2xl ${isDark ? 'bg-[#2a2a2f] border-b border-[#3e4042]' : 'bg-pup-dark-maroon text-white'}`}>
               <div>
@@ -483,7 +503,7 @@ const PolicyManagement = () => {
             <div className="h-1 w-full bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
 
             <form onSubmit={handleSavePolicy}>
-              <div className="p-6 space-y-5 overflow-visible min-h-50">
+              <div className="p-6 space-y-5 overflow-visible min-h-[460px]">
                 {/* Policy Name */}
                 <div>
                   <label className={`block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-[#b0b3b8]' : 'text-gray-655'} mb-1.5`}>
@@ -503,7 +523,7 @@ const PolicyManagement = () => {
                   />
                 </div>
 
-                {/* Single module selection card with MultiSelect*/}
+                {/* Single module selection card with MultiSelectDropdown */}
                 <div className={`p-4 rounded-xl border flex flex-col relative overflow-visible ${
                   isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200'
                 }`}>
@@ -511,7 +531,7 @@ const PolicyManagement = () => {
                     <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Select a module</span>
                   </div>
 
-                  <div className="mt-1 z-50">
+                  <div className="mt-1">
                     <MultiSelection
                       name="policy-modules"
                       label=""
@@ -636,6 +656,15 @@ const PolicyManagement = () => {
       <ErrorToast 
         message={errorMsg} 
         onClose={() => setErrorMsg("")} 
+      />
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Selected Policies?"
+        message="Are you sure you want to delete the selected policy/policies? This action cannot be undone."
+        type="danger"
       />
     </div>
   );
