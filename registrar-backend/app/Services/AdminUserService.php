@@ -47,9 +47,15 @@ class AdminUserService
      */
     public function create(array $validated, Request $request): SystemUser
     {
+        // The IdP's own account-type enum (see its "New User" wizard) has
+        // no concept of "admin" vs "superadmin" — it only knows a single
+        // elevated type: "System Administrator". RIS's admin/superadmin
+        // distinction is local-only (users.role_id + the policy system)
+        // and is never sent to the IdP. Both RIS roles map to the same
+        // IdP account type here.
         $idpRoleMap = [
-            SystemUser::ROLE_ADMIN       => 'RIS:admin',
-            SystemUser::ROLE_SUPER_ADMIN => 'RIS:superadmin',
+            SystemUser::ROLE_ADMIN       => 'System Administrator',
+            SystemUser::ROLE_SUPER_ADMIN => 'System Administrator',
         ];
 
         $adminToken = $this->idpClient->getSuperAdminToken();
@@ -60,7 +66,7 @@ class AdminUserService
             'middle_name' => $validated['middle_name'] ?? '',
             'last_name'   => $validated['last_name'],
             'password'    => $validated['password'],
-            'roles'       => [$idpRoleMap[$validated['role_id']]],
+            'role'        => $idpRoleMap[$validated['role_id']],
         ], $adminToken);
 
         try {
@@ -71,6 +77,12 @@ class AdminUserService
                     'role_id'     => $validated['role_id'],
                     'status'      => 'Activated',
                     'idp_user_id' => $idpId,
+                    // Only admins (role_id = 3) carry a policy — super admins
+                    // always have unrestricted access, so silently ignore a
+                    // policy_id sent for a super-admin create.
+                    'policy_id'   => $validated['role_id'] === SystemUser::ROLE_ADMIN
+                        ? ($validated['policy_id'] ?? null)
+                        : null,
                 ]);
 
                 DB::table('admin_profile')->insert([

@@ -74,6 +74,10 @@ class SystemUserController extends Controller
             'middle_name' => 'nullable|string|max:100',
             'last_name'   => 'required|string|max:100',
             'suffix'      => 'nullable|string|max:20',
+            // Optional — lets "Add Admin" attach a policy in the same step
+            // instead of requiring a separate "Manage Access" action.
+            // Only meaningful when role_id = 3 (admin); ignored otherwise.
+            'policy_id'   => 'nullable|integer|exists:policies,policy_id',
         ]);
 
         try {
@@ -86,6 +90,8 @@ class SystemUserController extends Controller
                 'detail'  => $e->getMessage(),
             ], 500);
         }
+
+        $user->load(['adminProfile', 'policy']);
 
         return (new UserResource($user))->response()->setStatusCode(201);
     }

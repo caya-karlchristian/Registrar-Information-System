@@ -565,6 +565,7 @@ const UserManagement = () => {
         onSubmit={handleSubmit}
         editData={editUser}
         submitting={submitting}
+        systemPolicies={systemPolicies}
       />
 
       <ConfirmationModal
