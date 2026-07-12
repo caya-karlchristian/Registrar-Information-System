@@ -20,6 +20,7 @@ import { useAuth } from "../context/AuthProvider";
 import { useTheme } from "../context/ThemeContext";
 import ConfirmationModal from "../components/ConfirmationModal";
 import LineLoading from "../components/LineLoading.jsx";
+import { MODULE_KEYS, hasModuleAccess } from "../utils/policy";
 
 const ROLE_CONFIG = {
   student: {
@@ -50,12 +51,12 @@ const ROLE_CONFIG = {
     profileKey: 'admin_profile',
     profileLabel: (user) => user?.email,
     items: [
-      { name: 'Dashboard', to: 'dashboard', icon: Squares2X2Icon },
-      { name: 'Inbox', to: 'inbox', icon: InboxIcon },
+      { name: 'Dashboard', to: 'dashboard', icon: Squares2X2Icon, module: MODULE_KEYS.DASHBOARD },
+      { name: 'Inbox', to: 'inbox', icon: InboxIcon, module: MODULE_KEYS.INBOX },
       // { name: 'Walk-In Request', to: 'request', icon: AcademicCapIcon },
-      { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon },
-      { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon },
-      { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon },
+      { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon, module: MODULE_KEYS.ANALYTICS },
+      { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon, module: MODULE_KEYS.LOGBOOK },
+      { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon, module: MODULE_KEYS.PROFILE },
     ],
   },
   superAdmin: {
@@ -120,7 +121,16 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
     return () => resizeObserver.disconnect();
   }, []);
 
-  const config = ROLE_CONFIG[role] || ROLE_CONFIG.student;
+  const baseConfig = ROLE_CONFIG[role] || ROLE_CONFIG.student;
+  // Items without a `module` tag (student/alumni/superAdmin items, plus
+  // any future staff item not covered by the policy system) always pass
+  // through. Items tagged with a `module` are only shown if the current
+  // user's assigned policy actually grants that module — see
+  // src/utils/policy.js.
+  const config = useMemo(() => ({
+    ...baseConfig,
+    items: baseConfig.items.filter((item) => !item.module || hasModuleAccess(user, item.module)),
+  }), [baseConfig, user]);
   const profile = config.profileKey ? user?.[config.profileKey] : null;
 
   const fullName = useMemo(() => {

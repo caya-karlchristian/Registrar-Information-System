@@ -43,6 +43,19 @@ export const createSystemUser = (data)    => api.post("/system-users", data);
 export const updateSystemUser = (id, data)=> api.put(`/system-users/${id}`, data);
 export const deleteSystemUser = (id)      => api.delete(`/system-users/${id}`);
 
+// User Management — Policy Attachment (Super Admin only).
+// Attaching `null` detaches the currently-assigned policy from the admin.
+export const attachUserPolicy = (userId, policyId) =>
+  api.patch(`/system-users/${userId}/policy`, { policy_id: policyId });
+
+// -------------------------------------------------------
+// POLICIES (Super Admin only)
+// -------------------------------------------------------
+export const getPolicies   = ()          => api.get("/policies");
+export const createPolicy  = (data)      => api.post("/policies", data);
+export const updatePolicy  = (id, data)  => api.put(`/policies/${id}`, data);
+export const deletePolicy  = (id)        => api.delete(`/policies/${id}`);
+
 // -------------------------------------------------------
 // ACADEMIC RECORDS
 // -------------------------------------------------------

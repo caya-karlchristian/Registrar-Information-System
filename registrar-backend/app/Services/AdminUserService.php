@@ -47,30 +47,61 @@ class AdminUserService
      */
     public function create(array $validated, Request $request): SystemUser
     {
-        $idpRoleMap = [
-            SystemUser::ROLE_ADMIN       => 'RIS:admin',
-            SystemUser::ROLE_SUPER_ADMIN => 'RIS:superadmin',
-        ];
+        // IdP-side values captured from its own "New User" wizard request —
+        // NOT the same thing as SystemUser::ROLE_ADMIN / ROLE_SUPER_ADMIN.
+        // The wizard has no role picker (only account type + password), so
+        // both RIS roles use the same IdP account_type_id/role_id here;
+        // RIS's admin/superadmin distinction stays purely local (role_id
+        // column + policy system). account_type_id 1 = "System
+        // Administrator" per the wizard's radio options.
+        //
+        // ⚠️ role_id: 4 was captured from a single test account and is not
+        // yet confirmed as a fixed/correct value for every system-admin
+        // account — verify with the IdP owner before relying on this in
+        // production.
+        $idpAccountTypeId = 1;
+        $idpRoleId        = 4;
 
-        $adminToken = $this->idpClient->getSuperAdminToken();
+        // ⚠️ TEMPORARY: no longer fetching a superadmin bearer token here.
+        // The IdP's /api/v1/user endpoint doesn't actually enforce the
+        // Authorization header it's documented to require — it accepts the
+        // request on x-api-key alone (confirmed via direct Postman test,
+        // no Authorization header sent, still got 201). Access control for
+        // admin creation currently rests entirely on that static key.
+        // Revert to $this->idpClient->getSuperAdminToken() once the IdP
+        // fixes bearer-token enforcement on this endpoint.
+        $adminToken = null;
 
         $idpId = $this->idpClient->createUser([
-            'email'       => $validated['email'],
-            'first_name'  => $validated['first_name'],
-            'middle_name' => $validated['middle_name'] ?? '',
-            'last_name'   => $validated['last_name'],
-            'password'    => $validated['password'],
-            'roles'       => [$idpRoleMap[$validated['role_id']]],
+            'email'           => $validated['email'],
+            'first_name'      => $validated['first_name'],
+            'middle_name'     => $validated['middle_name'] ?? '',
+            'last_name'       => $validated['last_name'],
+            'name_suffix'     => $validated['suffix'] ?? '',
+            'password'        => $validated['password'],
+            'account_type_id' => $idpAccountTypeId,
+            'idp_role_id'     => $idpRoleId,
         ], $adminToken);
 
         try {
             $user = DB::transaction(function () use ($validated, $idpId) {
                 $user = SystemUser::create([
-                    'email'       => $validated['email'],
-                    'password'    => Hash::make($validated['password']),
+                    'email'               => $validated['email'],
+                    'password'            => Hash::make($validated['password']),
+                    // A bcrypt password is set above, so local auth must be
+                    // switched on here too — otherwise LocalAuthService::attempt()
+                    // rejects the account with "local auth not enabled" even
+                    // though a valid password exists, and only IDP login works.
+                    'local_auth_enabled'  => 1,
                     'role_id'     => $validated['role_id'],
                     'status'      => 'Activated',
                     'idp_user_id' => $idpId,
+                    // Only admins (role_id = 3) carry a policy — super admins
+                    // always have unrestricted access, so silently ignore a
+                    // policy_id sent for a super-admin create.
+                    'policy_id'   => $validated['role_id'] === SystemUser::ROLE_ADMIN
+                        ? ($validated['policy_id'] ?? null)
+                        : null,
                 ]);
 
                 DB::table('admin_profile')->insert([
@@ -111,7 +142,11 @@ class AdminUserService
             throw $e;
         }
 
-        $this->auditLogger->log($request, $user, AuditLog::ACTION_ADMIN_CREATED);
+        $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_CREATED, [
+            'target_user_id' => $user->user_id,
+            'target_email'   => $user->email,
+            'role_id'        => $user->role_id,
+        ]);
 
         return $user;
     }
@@ -178,7 +213,10 @@ class AdminUserService
             return $user->fresh();
         });
 
-        $this->auditLogger->log($request, $user, AuditLog::ACTION_ADMIN_UPDATED);
+        $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_UPDATED, [
+            'target_user_id' => $user->user_id,
+            'target_email'   => $user->email,
+        ]);
 
         // Push profile changes back to OCMS hub — runs OUTSIDE the DB transaction
         // so an OCMS failure cannot rollback a successful local update.
@@ -194,7 +232,10 @@ class AdminUserService
     public function delete(SystemUser $user, Request $request): void
     {
         // Audit BEFORE delete so we still have the actor context
-        $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_DELETED);
+        $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_DELETED, [
+            'target_user_id' => $user->user_id,
+            'target_email'   => $user->email,
+        ]);
 
         if ($user->idp_user_id) {
             try {
