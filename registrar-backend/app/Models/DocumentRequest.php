@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Scopes\ExcludeArchivedScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
@@ -27,18 +28,27 @@ class DocumentRequest extends Model
         'student_academic_id',
         'alumni_profile_id',
         'alumni_academic_id',
+        'is_archived',
+        'archived_on',
+        'archived_by',
     ];
 
     protected $casts = [
         'requested_at' => 'datetime',
         'receipt_date' => 'date',
         'deleted_at'   => 'datetime',
+        'is_archived'  => 'boolean',
+        'archived_on'  => 'datetime',
     ];
 
     /**
      * Auto-generate a UUID for every new request.
      * The uuid is exposed in the UI instead of the integer PK
      * to avoid leaking record counts and enabling enumeration.
+     *
+     * Also registers ExcludeArchivedScope so archived requests are
+     * invisible to every query by default — see the scope's docblock
+     * for why this is a global scope rather than a per-call-site filter.
      */
     protected static function booted(): void
     {
@@ -47,6 +57,8 @@ class DocumentRequest extends Model
                 $request->uuid = (string) Str::uuid();
             }
         });
+
+        static::addGlobalScope(new ExcludeArchivedScope());
     }
 
     public function user()
@@ -102,5 +114,15 @@ class DocumentRequest extends Model
     public function notifications()
     {
         return $this->hasMany(Notification::class, 'request_id');
+    }
+
+    // Named archivedByUser() (not archivedBy()) so it serializes to
+    // "archived_by_user" — "archived_by" is already the raw FK column,
+    // and Eloquent's relationsToArray() overwrites same-named attributes
+    // when a relation is loaded. Same reasoning as AuditLog::targetUser()
+    // vs. its target_user_id column.
+    public function archivedByUser()
+    {
+        return $this->belongsTo(SystemUser::class, 'archived_by', 'user_id');
     }
 }

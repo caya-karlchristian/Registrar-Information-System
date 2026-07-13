@@ -67,4 +67,20 @@ class DocumentRequestPolicy
     {
         return $user->isStaff();
     }
+
+    // -------------------------------------------------------
+    // Archive / restore a request
+    // Per the Archive Eligibility Policy – Administrator, any
+    // authorized admin/super admin may archive or restore a request
+    // regardless of its current status.
+    // -------------------------------------------------------
+    public function archive(SystemUser $user, DocumentRequest $request): bool
+    {
+        return $user->isStaff();
+    }
+
+    public function restore(SystemUser $user, DocumentRequest $request): bool
+    {
+        return $user->isStaff();
+    }
 }

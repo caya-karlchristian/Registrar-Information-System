@@ -39,6 +39,8 @@ class AuditLog extends Model
     public const ACTION_ADMIN_UPDATED   = 'admin_updated';  
     public const ACTION_ROLE_ASSIGNED   = 'role_assigned';
     public const ACTION_REQUEST_STATUS_CHANGED = 'request_status_changed';
+    public const ACTION_REQUEST_ARCHIVED       = 'request_archived';
+    public const ACTION_REQUEST_RESTORED       = 'request_restored';
 
     // User management — policy attachment (admins only)
     public const ACTION_POLICY_CREATED  = 'policy_created';

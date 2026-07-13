@@ -119,6 +119,12 @@ export const createDocumentRequest = (data)       => api.post("/document-request
 export const updateDocumentRequest = (id, data)   => api.put(`/document-requests/${id}`, data);
 export const deleteDocumentRequest = (id)         => api.delete(`/document-requests/${id}`);
 
+// Archive / restore (Admin+) — reversible, does not change status_id.
+export const archiveDocumentRequest  = (id)  => api.patch(`/document-requests/${id}/archive`);
+export const restoreDocumentRequest  = (id)  => api.patch(`/document-requests/${id}/restore`);
+export const archiveDocumentRequests = (ids) => api.post(`/document-requests/archive-bulk`, { request_ids: ids });
+export const restoreDocumentRequests = (ids) => api.post(`/document-requests/restore-bulk`, { request_ids: ids });
+
 // -------------------------------------------------------
 // REQUEST HISTORY (read-only from the frontend)
 // -------------------------------------------------------
