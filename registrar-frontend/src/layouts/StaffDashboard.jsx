@@ -15,6 +15,10 @@ import {
   getRequestStatuses,
   updateDocumentRequest,
   deleteDocumentRequest,
+  archiveDocumentRequest,
+  restoreDocumentRequest,
+  archiveDocumentRequests,
+  restoreDocumentRequests,
 } from '../services/api';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -147,7 +151,6 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
       READY: lowerNameToId['ready to claim'] ?? STATUS_FALLBACK.READY,
       COMPLETED: lowerNameToId.completed ?? STATUS_FALLBACK.COMPLETED,
       FORFEITED: lowerNameToId.forfeited ?? STATUS_FALLBACK.FORFEITED,
-      ARCHIVED: lowerNameToId.archived ?? 10,
     };
   }, [requestStatuses]);
 
@@ -157,10 +160,17 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
   const fetchData = useCallback(async (showOverlay = true) => {
     try {
       if (showOverlay) setLoading(true);
-      // BACKEND: Once the backend supports fetching archived requests, change this call to:
-      // getDocumentRequests({ per_page: 200, all_statuses: true })
       const [requestsRes, statusesRes] = await Promise.all([
-        getDocumentRequests({ per_page: 200 }),
+        getDocumentRequests({
+          per_page: 200,
+          // Archived tab: ask the backend for archived-only records
+          // (bypasses the actionable-work window entirely).
+          // Active tab: ask for every status — this dashboard already
+          // applies its own isDefaultVisible() windowing below, so
+          // asking the backend to pre-filter as well would just hide
+          // Forfeited/old-Completed rows from the status filter dropdown.
+          ...(viewMode === 'archived' ? { view: 'archived' } : { all_statuses: true }),
+        }),
         getRequestStatuses(),
       ]);
 
@@ -179,7 +189,6 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
           READY: lowerNameToId['ready to claim'] ?? STATUS_FALLBACK.READY,
           COMPLETED: lowerNameToId.completed ?? STATUS_FALLBACK.COMPLETED,
           FORFEITED: lowerNameToId.forfeited ?? STATUS_FALLBACK.FORFEITED,
-          ARCHIVED: lowerNameToId.archived ?? 10,
         };
       })();
 
@@ -191,10 +200,13 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
         let computedStatusId = r.status?.status_id;
         let computedStatusName = r.status?.status_name;
 
+        const isArchived = Boolean(r.is_archived);
+
         const alreadyForfeited = computedStatusId === STATUS.FORFEITED || String(computedStatusName).toLowerCase() === 'forfeited';
         const alreadyCompleted = computedStatusId === STATUS.COMPLETED || String(computedStatusName).toLowerCase() === 'completed';
-        const alreadyArchived = computedStatusId === STATUS.ARCHIVED || String(computedStatusName).toLowerCase() === 'archived';
-        if (!alreadyForfeited && !alreadyCompleted && !alreadyArchived && diffDays >= 90) {
+        // Archived records are read-only (Archive Rules policy) — never
+        // auto-transition their status client-side while archived.
+        if (!alreadyForfeited && !alreadyCompleted && !isArchived && diffDays >= 90) {
           computedStatusId = STATUS.FORFEITED;
           computedStatusName = 'Forfeited';
           updateDocumentRequest(r.request_id, { status_id: STATUS.FORFEITED }).catch(err => {
@@ -289,35 +301,15 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
           statusId: computedStatusId,
           statusName: computedStatusName,
           timestamp: requestDate ? requestDate.getTime() : 0,
+
+          // Archive state — a flag independent of status_id, not a status
+          // itself. Restoring a record leaves statusId/statusName exactly
+          // as they were (Archive Rules policy).
+          isArchived,
+          archivedOn: r.archived_on ?? null,
+          archivedBy: r.archived_by_user?.email ?? null,
         };
       });
- // UI-only demo: inject an example archived record so the Archived tab is not empty by default
-      const mockArchivedRecord = {
-        id: 'DEMO-ARCHIVE-1',
-        rawRequest: {
-          request_id: 'DEMO-ARCHIVE-1',
-          status: { status_id: 10, status_name: 'Archived' },
-          student_profile: { first_name: 'John', last_name: 'Doe' },
-          academic_record: { student_number: '2023-00001-MN-0' },
-          requested_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        studentName: 'John Doe',
-        studentNumber: '2023-00001-MN-0',
-        userType: 'Student',
-        certName: null,
-        isCertificate: false,
-        copies: 1,
-        documentDetailsArray: ['Transcript of Records (TOR)'],
-        date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', {
-          day: '2-digit', month: 'long', year: 'numeric',
-        }),
-        time: '10:00:00',
-        statusId: 10,
-        statusName: 'Archived',
-        timestamp: Date.now() - 30 * 24 * 60 * 60 * 1000,
-      };
-
-      formatted.push(mockArchivedRecord);
 
       setRequests(formatted);
     } catch (error) {
@@ -325,7 +317,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
     } finally {
       if (showOverlay) setLoading(false);
     }
-  }, []);
+  }, [viewMode]);
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -390,14 +382,11 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
 
   const filteredData = requests
     .filter(r => {
-      const isArchivedStatus = r.statusId === resolvedStatusIds.ARCHIVED || String(r.statusName).toLowerCase() === 'archived';
-
-      if (viewMode === 'archived') {
-        if (!isArchivedStatus) return false;
-      } else {
-        if (isArchivedStatus) return false;
-        // Default view: hide Forfeited, Cancelled, and old Completed records.
-        if (!isFiltering && !isDefaultVisible(r, resolvedStatusIds)) return false;
+      // The Active/Archived split now happens server-side (fetchData asks
+      // for ?view=archived or the default non-archived scope) — no need
+      // to re-derive it from a synthetic status here.
+      if (viewMode !== 'archived' && !isFiltering && !isDefaultVisible(r, resolvedStatusIds)) {
+        return false;
       }
 
       const matchesStatus =
@@ -506,22 +495,64 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
     }
   };
 
-  const handleArchiveSelected = () => {
+  const handleArchiveSelected = async () => {
     if (selectedIds.length === 0) return;
-    
-    // BACKEND TODO: Connect this to the API. Update the selected requests' status to Archived (status_id: 10).
-    // UI-only fallback (In-memory update):
-    setRequests(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, statusName: 'Archived', statusId: 10 } : r));
-    setSelectedIds([]);
+    try {
+      setActionLoading(true);
+      await archiveDocumentRequests(selectedIds);
+      setSelectedIds([]);
+      await fetchData(false);
+    } catch (err) {
+      console.error('Bulk archive failed', err);
+      alert('Error archiving requests: ' + (err?.response?.data?.message || err.message));
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const handleRestoreSelected = () => {
+  const handleRestoreSelected = async () => {
     if (selectedIds.length === 0) return;
+    try {
+      setActionLoading(true);
+      await restoreDocumentRequests(selectedIds);
+      setSelectedIds([]);
+      await fetchData(false);
+    } catch (err) {
+      console.error('Bulk restore failed', err);
+      alert('Error restoring requests: ' + (err?.response?.data?.message || err.message));
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-    // BACKEND TODO: Connect this to the API. Update the selected requests' status to Pending (status_id: 6). 
-    // UI-only fallback (In-memory update):
-    setRequests(prev => prev.map(r => selectedIds.includes(r.id) ? { ...r, statusName: 'Pending', statusId: 6 } : r));
-    setSelectedIds([]);
+  const handleArchiveOne = async (id) => {
+    try {
+      setUpdatingId(id);
+      setActionLoading(true);
+      await archiveDocumentRequest(id);
+      await fetchData(false);
+    } catch (err) {
+      console.error('Archive failed', err);
+      alert('Error archiving request: ' + (err?.response?.data?.message || err.message));
+    } finally {
+      setActionLoading(false);
+      setUpdatingId(null);
+    }
+  };
+
+  const handleRestoreOne = async (id) => {
+    try {
+      setUpdatingId(id);
+      setActionLoading(true);
+      await restoreDocumentRequest(id);
+      await fetchData(false);
+    } catch (err) {
+      console.error('Restore failed', err);
+      alert('Error restoring request: ' + (err?.response?.data?.message || err.message));
+    } finally {
+      setActionLoading(false);
+      setUpdatingId(null);
+    }
   };
 
   const markCertificateAsPrinted = (requestId) => {
@@ -540,7 +571,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
           <div className="grid grid-cols-1 gap-6 mb-8">
             <StatCard 
               title="Archived Requests" 
-              count={requests.filter(r => r.statusId === resolvedStatusIds.ARCHIVED || String(r.statusName).toLowerCase() === 'archived').length} 
+              count={requests.length} 
               color="blue" 
             />
           </div>
@@ -832,7 +863,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                     <Td center>{getStatusBadge(req.statusName)}</Td>
                     <Td center>
                       <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 sm:gap-2 min-w-0">
-                        {req.isCertificate && req.statusId === resolvedStatusIds.PENDING && (
+                        {!req.isArchived && req.isCertificate && req.statusId === resolvedStatusIds.PENDING && (
                           <button
                             title="Generate Certificate"
                             onClick={() => {
@@ -843,7 +874,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                             <ArrowDownTrayIcon className="w-5 h-5" />
                           </button>
                         )}
-                        {req.statusId === resolvedStatusIds.PENDING && (
+                        {!req.isArchived && req.statusId === resolvedStatusIds.PENDING && (
                           <button
                             disabled={updatingId === req.id || (req.isCertificate && !printedCertificateIds.includes(req.id))}
                             onClick={() => {
@@ -865,7 +896,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                           </button>
                         )}
 
-                        {req.statusId === resolvedStatusIds.READY && (
+                        {!req.isArchived && req.statusId === resolvedStatusIds.READY && (
                           <button
                             disabled={updatingId === req.id}
                             onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
@@ -874,18 +905,23 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                             <CheckCircleIcon className="w-4 h-4" /> Done
                           </button>
                         )}              
-                        {viewMode === 'archived' && (
+                        {viewMode === 'archived' ? (
                           <button
                             disabled={updatingId === req.id}
-                            onClick={() => {
-                              // BACKEND TODO: Connect this to the API. Update the request status to Pending.                       
-                              alert('Restore feature is UI-only: restoring request in memory.');
-                              setRequests(prev => prev.map(r => r.id === req.id ? { ...r, statusName: 'Pending', statusId: 6 } : r));
-                            }}
+                            onClick={() => handleRestoreOne(req.id)}
                             className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
-                            title="Restore request to Pending"
+                            title="Restore to Active Requests (original status kept)"
                           >
                             <CheckIcon className="w-4 h-4" /> Restore
+                          </button>
+                        ) : (
+                          <button
+                            disabled={updatingId === req.id}
+                            onClick={() => handleArchiveOne(req.id)}
+                            className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 ${isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-500 hover:bg-amber-700'}`}
+                            title="Archive this request"
+                          >
+                            <ArchiveBoxIcon className="w-4 h-4" /> Archive
                           </button>
                         )}
                         <button

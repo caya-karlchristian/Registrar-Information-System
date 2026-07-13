@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\DocumentRequest;
 use App\Models\SystemUser;
+use App\Models\AuditLog;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Services\DocumentRequestService;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use App\Services\CashierService;
 use App\Services\CashierDocumentMatcher;
@@ -29,12 +31,14 @@ class DocumentRequestController extends Controller
         'requestPurpose',
         'documents.documentType',
         'certificates.certificationType',
+        'archivedByUser',
     ];
 
     public function __construct(
         private DocumentRequestServiceInterface $requestService,
         private CashierService                  $cashierService,
         private CashierDocumentMatcher          $documentMatcher,
+        private AuditLogger                     $auditLogger,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -64,6 +68,20 @@ class DocumentRequestController extends Controller
 
         // Staff: potentially thousands of rows — keep pagination.
         $perPage = min((int) request()->query('per_page', 20), 200); // cap at 200
+
+        // Archived Records tab: bypass the default global scope entirely and
+        // return ONLY archived requests, regardless of status/age. Archived
+        // records are not part of "actionable work" so the all_statuses
+        // window below doesn't apply to them.
+        if (request()->query('view') === 'archived') {
+            return response()->json(
+                $query->withArchived()
+                    ->where('document_request.is_archived', true)
+                    ->orderByDesc('archived_on')
+                    ->paginate($perPage),
+                200
+            );
+        }
 
         // By default the dashboard only shows actionable work: Processing, ReadyToClaim,
         // and Completed requests that are less than 1 day old.  Forfeited, Cancelled, and
@@ -108,6 +126,12 @@ class DocumentRequestController extends Controller
             ->groupBy('request_status.status_name')
             ->pluck('total', 'status_name');
 
+        // Archived count is reported separately — it's a cross-cutting flag,
+        // not a status, so it doesn't belong in the status_name-keyed map above.
+        $counts['Archived'] = DocumentRequest::withArchived()
+            ->where('document_request.is_archived', true)
+            ->count();
+
         return response()->json($counts, 200);
     }
 
@@ -151,8 +175,13 @@ class DocumentRequestController extends Controller
     // -------------------------------------------------------------------------
     // GET /document-requests/{documentRequest}
     // -------------------------------------------------------------------------
-    public function show(DocumentRequest $documentRequest)
+    // Manual lookup (not implicit route-model binding) because
+    // ExcludeArchivedScope would otherwise 404 an archived record —
+    // Archive Rules requires archived records to remain viewable
+    // (read-only) from the Archived Records tab.
+    public function show($id)
     {
+        $documentRequest = DocumentRequest::withArchived()->findOrFail($id);
         $this->authorize('view', $documentRequest);
         return response()->json($documentRequest->load(self::RELATIONS), 200);
     }
@@ -287,5 +316,106 @@ class DocumentRequestController extends Controller
         $this->authorize('delete', $documentRequest);
         $documentRequest->delete();
         return response()->json(['message' => 'Request deleted successfully'], 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // Archive / Restore
+    //
+    // Reversible and independent of status_id — see Archive Eligibility
+    // Policy – Administrator. Uses manual lookups (DocumentRequest::withArchived())
+    // rather than implicit route-model binding since ExcludeArchivedScope
+    // would otherwise 404 the restore endpoint before it ever runs.
+    // -------------------------------------------------------------------------
+
+    // PATCH /document-requests/{id}/archive
+    public function archive($id)
+    {
+        $documentRequest = DocumentRequest::withArchived()->findOrFail($id);
+        $this->authorize('archive', $documentRequest);
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+        $documentRequest = $this->requestService->archiveRequest($documentRequest, $actor);
+
+        $this->auditLogger->log(request(), $actor, AuditLog::ACTION_REQUEST_ARCHIVED, [
+            'request_id' => $documentRequest->request_id,
+        ]);
+
+        return response()->json(
+            DocumentRequest::withArchived()->with(self::RELATIONS)->find($documentRequest->request_id),
+            200
+        );
+    }
+
+    // PATCH /document-requests/{id}/restore
+    public function restore($id)
+    {
+        $documentRequest = DocumentRequest::withArchived()->findOrFail($id);
+        $this->authorize('restore', $documentRequest);
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+        $documentRequest = $this->requestService->restoreRequest($documentRequest, $actor);
+
+        $this->auditLogger->log(request(), $actor, AuditLog::ACTION_REQUEST_RESTORED, [
+            'request_id' => $documentRequest->request_id,
+        ]);
+
+        return response()->json(
+            DocumentRequest::withArchived()->with(self::RELATIONS)->find($documentRequest->request_id),
+            200
+        );
+    }
+
+    // POST /document-requests/archive-bulk  { request_ids: [...] }
+    public function archiveBulk(Request $request)
+    {
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+        if (!$actor instanceof SystemUser || !$actor->isStaff()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'request_ids'   => 'required|array|min:1|max:200',
+            'request_ids.*' => 'integer|distinct',
+        ]);
+
+        $result = $this->requestService->archiveRequests($validated['request_ids'], $actor);
+
+        foreach ($result['archived'] as $requestId) {
+            $this->auditLogger->log($request, $actor, AuditLog::ACTION_REQUEST_ARCHIVED, [
+                'request_id' => $requestId,
+                'bulk'       => true,
+            ]);
+        }
+
+        return response()->json($result, 200);
+    }
+
+    // POST /document-requests/restore-bulk  { request_ids: [...] }
+    public function restoreBulk(Request $request)
+    {
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+        if (!$actor instanceof SystemUser || !$actor->isStaff()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'request_ids'   => 'required|array|min:1|max:200',
+            'request_ids.*' => 'integer|distinct',
+        ]);
+
+        $result = $this->requestService->restoreRequests($validated['request_ids'], $actor);
+
+        foreach ($result['restored'] as $requestId) {
+            $this->auditLogger->log($request, $actor, AuditLog::ACTION_REQUEST_RESTORED, [
+                'request_id' => $requestId,
+                'bulk'       => true,
+            ]);
+        }
+
+        return response()->json($result, 200);
     }
 }
