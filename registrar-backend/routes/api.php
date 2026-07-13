@@ -192,6 +192,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('announcements',                      [AnnouncementController::class, 'store']);
         Route::put('announcements/{announcement}',        [AnnouncementController::class, 'update']);
         Route::delete('announcements/{announcement}',     [AnnouncementController::class, 'destroy']);
+        Route::patch('announcements/{id}/archive',        [AnnouncementController::class, 'archive']);
+        Route::patch('announcements/{id}/restore',        [AnnouncementController::class, 'restore']);
     });
 });
 /*
