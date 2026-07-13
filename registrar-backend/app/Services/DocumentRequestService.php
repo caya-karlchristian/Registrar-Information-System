@@ -130,6 +130,14 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             $documentRequest = DocumentRequest::lockForUpdate()
                 ->findOrFail($documentRequest->request_id);
 
+            // Archive Rules: "Archived records cannot be processed, edited,
+            // or have their status updated while archived." Restoring must
+            // go through restoreRequest() instead — never through this
+            // general-purpose update path.
+            if ($documentRequest->is_archived) {
+                abort(422, 'This request is archived and is read-only. Restore it first.');
+            }
+
             $oldStatusId = $documentRequest->status_id;
             $oldOrNumber = $documentRequest->or_number;
 
@@ -202,6 +210,110 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
             return $documentRequest;
         }); // end DB::transaction
+    }
+
+    // -------------------------------------------------------------------------
+    // Archive / Restore
+    // -------------------------------------------------------------------------
+    //
+    // Deliberately separate from updateRequest(): archiving never touches
+    // status_id, so a restored record comes back with its original status
+    // untouched (Archive Rules policy). Any authorized admin may archive a
+    // request regardless of its current status_id — there is no eligibility
+    // check here, unlike document/certificate type archiving.
+
+    public function archiveRequest(DocumentRequest $documentRequest, SystemUser $actor): DocumentRequest
+    {
+        return DB::transaction(function () use ($documentRequest, $actor) {
+            $documentRequest = DocumentRequest::withArchived()
+                ->lockForUpdate()
+                ->findOrFail($documentRequest->request_id);
+
+            if (!$documentRequest->is_archived) {
+                $documentRequest->update([
+                    'is_archived' => true,
+                    'archived_on' => now(),
+                    'archived_by' => $actor->user_id,
+                ]);
+            }
+
+            return $documentRequest;
+        });
+    }
+
+    public function restoreRequest(DocumentRequest $documentRequest, SystemUser $actor): DocumentRequest
+    {
+        return DB::transaction(function () use ($documentRequest) {
+            $documentRequest = DocumentRequest::withArchived()
+                ->lockForUpdate()
+                ->findOrFail($documentRequest->request_id);
+
+            // status_id is intentionally left untouched — restoring returns
+            // the record to Active Requests with its original status.
+            if ($documentRequest->is_archived) {
+                $documentRequest->update([
+                    'is_archived' => false,
+                    'archived_on' => null,
+                    'archived_by' => null,
+                ]);
+            }
+
+            return $documentRequest;
+        });
+    }
+
+    public function archiveRequests(array $requestIds, SystemUser $actor): array
+    {
+        return DB::transaction(function () use ($requestIds, $actor) {
+            $eligible = DocumentRequest::withArchived()
+                ->whereIn('request_id', $requestIds)
+                ->where('is_archived', false)
+                ->lockForUpdate()
+                ->pluck('request_id')
+                ->all();
+
+            if (!empty($eligible)) {
+                DocumentRequest::withArchived()
+                    ->whereIn('request_id', $eligible)
+                    ->update([
+                        'is_archived' => true,
+                        'archived_on' => now(),
+                        'archived_by' => $actor->user_id,
+                    ]);
+            }
+
+            return [
+                'archived' => $eligible,
+                'skipped'  => array_values(array_diff($requestIds, $eligible)),
+            ];
+        });
+    }
+
+    public function restoreRequests(array $requestIds, SystemUser $actor): array
+    {
+        return DB::transaction(function () use ($requestIds) {
+            $eligible = DocumentRequest::withArchived()
+                ->whereIn('request_id', $requestIds)
+                ->where('is_archived', true)
+                ->lockForUpdate()
+                ->pluck('request_id')
+                ->all();
+
+            if (!empty($eligible)) {
+                DocumentRequest::withArchived()
+                    ->whereIn('request_id', $eligible)
+                    ->update([
+                        'is_archived' => false,
+                        'archived_on' => null,
+                        'archived_by' => null,
+                    ]);
+            }
+
+            return [
+                'restored' => $eligible,
+                'skipped'  => array_values(array_diff($requestIds, $eligible)),
+            ];
+        });
     }
 
     // -------------------------------------------------------------------------
