@@ -252,6 +252,14 @@ const CertificateTemplateManagement = () => {
     [dropdownCertifications, selectedCertId]
   );
 
+  // Per the Archive Policy — Document & Certificate Management: archiving a
+  // certificate automatically makes its template read-only, with no
+  // separate "locked" step. is_archived is the single source of truth —
+  // this flag just derives the UI lock state from it. The backend enforces
+  // the same rule server-side (updateLayout/uploadLayoutLogo reject
+  // archived certs with 423), so this is UX polish, not the real guard.
+  const isLockedCertification = Boolean(selectedCertification?.is_archived);
+
   const certificateOptions = useMemo(
     () => dropdownCertifications.map((item) => item.certificate_name),
     [dropdownCertifications]
@@ -486,6 +494,10 @@ const CertificateTemplateManagement = () => {
 
   const saveLayout = async () => {
     if (!selectedCertId) return;
+    if (isLockedCertification) {
+      setErrorMessage("This certificate is archived — its template is read-only. Restore it first to make changes.");
+      return;
+    }
     if (hasPreviewDataUrl(layout)) {
       console.warn("Skipping layout save until image uploads finish.");
       return;
@@ -541,7 +553,7 @@ const CertificateTemplateManagement = () => {
   };
 
   useEffect(() => {
-    if (!selectedCertId || !isPersistedCertification || loading || saving) return;
+    if (!selectedCertId || !isPersistedCertification || loading || saving || isLockedCertification) return;
     if (hasPreviewDataUrl(layout)) return;
 
     if (isUndoRedoActionRef.current) {
@@ -576,7 +588,7 @@ const CertificateTemplateManagement = () => {
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [layout, selectedCertId, isPersistedCertification, loading, saving, layoutsByCertId]);
+  }, [layout, selectedCertId, isPersistedCertification, loading, saving, layoutsByCertId, isLockedCertification]);
 
   const resetLayout = () => {
     pushToHistory(layout);
@@ -712,7 +724,8 @@ const CertificateTemplateManagement = () => {
               <button
                 id="btn-reset-logos"
                 onClick={resetLayout}
-                className={`rounded-md border px-3 py-2 text-sm font-semibold ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' :
+                disabled={isLockedCertification}
+                className={`rounded-md border px-3 py-2 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'border-[#3e4042] bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539]' :
                   'border-gray-300 bg-gray-100 hover:bg-gray-200'}`}
               >
                 Reset Logos
@@ -720,7 +733,7 @@ const CertificateTemplateManagement = () => {
               <button
                 id="btn-reset-all-logos"
                 onClick={() => setIsResetConfirmOpen(true)}
-                disabled={saving || loading}
+                disabled={saving || loading || isLockedCertification}
                 className={`rounded-md border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
                   isDark
                     ? 'border-red-950 bg-red-950/20 text-red-400 hover:bg-red-950/30'
@@ -732,7 +745,7 @@ const CertificateTemplateManagement = () => {
               <button
                 id="btn-save-layout"
                 onClick={saveLayout}
-                disabled={!selectedCertId || saving || saveSuccess || hasPreviewDataUrl(layout)}
+                disabled={!selectedCertId || saving || saveSuccess || hasPreviewDataUrl(layout) || isLockedCertification}
                 className={`rounded-md px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 disabled:cursor-not-allowed ${saveSuccess
                   ? 'bg-green-500 text-white border-green-600' // Turns green when successful!
                   : isDark
@@ -740,7 +753,7 @@ const CertificateTemplateManagement = () => {
                     : 'bg-yellow-400 text-slate-900 hover:bg-yellow-500 focus:ring-yellow-200 disabled:bg-yellow-200'
                   }`}
               >
-                {saving ? "Saving..." : saveSuccess ? "Saved!" : hasPreviewDataUrl(layout) ? "Waiting for upload..." : "Save Layout"}
+                {isLockedCertification ? "Archived — Read Only" : saving ? "Saving..." : saveSuccess ? "Saved!" : hasPreviewDataUrl(layout) ? "Waiting for upload..." : "Save Layout"}
               </button>
             </div>
           </div>
@@ -761,14 +774,20 @@ const CertificateTemplateManagement = () => {
                 />
               </div>
 
-              <UploadDropZone label="Main Logo" onFiles={updateMainLogo} disabled={!selectedCertId} />
+              {isLockedCertification && (
+                <div className={`rounded-lg border px-3 py-2 text-xs font-medium ${isDark ? 'border-yellow-900/50 bg-yellow-900/10 text-yellow-400' : 'border-yellow-300 bg-yellow-50 text-yellow-800'}`}>
+                  This certificate is archived — the template is read-only. Restore it from the Archived Documents tab to make changes.
+                </div>
+              )}
+
+              <UploadDropZone label="Main Logo" onFiles={updateMainLogo} disabled={!selectedCertId || isLockedCertification} />
               <label className="mt-1.5 mb-3 flex items-center gap-2 cursor-pointer select-none">
                 <input
                   id="checkbox-apply-main-logo"
                   type="checkbox"
                   checked={applyMainLogoToAll}
                   onChange={(e) => setApplyMainLogoToAll(e.target.checked)}
-                  disabled={!selectedCertId}
+                  disabled={!selectedCertId || isLockedCertification}
                   className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${isDark
                     ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
                     : 'border-gray-300 text-yellow-500'
@@ -779,14 +798,14 @@ const CertificateTemplateManagement = () => {
                 </span>
               </label>
 
-              <UploadDropZone label="Header Right Logo" onFiles={updateRightLogo} disabled={!selectedCertId} />
+              <UploadDropZone label="Header Right Logo" onFiles={updateRightLogo} disabled={!selectedCertId || isLockedCertification} />
               <label className="mt-1.5 mb-3 flex items-center gap-2 cursor-pointer select-none">
                 <input
                   id="checkbox-apply-right-logo"
                   type="checkbox"
                   checked={applyRightLogoToAll}
                   onChange={(e) => setApplyRightLogoToAll(e.target.checked)}
-                  disabled={!selectedCertId}
+                  disabled={!selectedCertId || isLockedCertification}
                   className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${isDark
                     ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
                     : 'border-gray-300 text-yellow-500'
@@ -812,14 +831,14 @@ const CertificateTemplateManagement = () => {
                 </label>
               </div>
 
-              <UploadDropZone label="Footer Logos" multiple onFiles={addFooterLogos} disabled={!selectedCertId} />
+              <UploadDropZone label="Footer Logos" multiple onFiles={addFooterLogos} disabled={!selectedCertId || isLockedCertification} />
               <label className="mt-1.5 mb-3 flex items-center gap-2 cursor-pointer select-none">
                 <input
                   id="checkbox-apply-footer-logos"
                   type="checkbox"
                   checked={applyFooterLogosToAll}
                   onChange={(e) => setApplyFooterLogosToAll(e.target.checked)}
-                  disabled={!selectedCertId}
+                  disabled={!selectedCertId || isLockedCertification}
                   className={`w-3.5 h-3.5 rounded border focus:ring-0 cursor-pointer disabled:cursor-not-allowed ${isDark
                     ? 'border-[#3e4042] bg-[#242526] text-yellow-500'
                     : 'border-gray-300 text-yellow-500'

@@ -87,7 +87,7 @@ export const getDocumentType   = (id)        => api.get(`/document-types/${id}`)
 export const createDocumentType = (data)     => api.post("/document-types", data);
 export const updateDocumentType = (id, data) => api.put(`/document-types/${id}`, data);
 export const deleteDocumentType = (id)       => api.delete(`/document-types/${id}`);
-export const archiveDocumentType = (id)      => api.patch(`/document-types/${id}/archive`);
+export const archiveDocumentType = (id, reason) => api.patch(`/document-types/${id}/archive`, { reason });
 export const restoreDocumentType = (id)      => api.patch(`/document-types/${id}/restore`);
 
 // -------------------------------------------------------
@@ -98,7 +98,7 @@ export const getCertification          = (id)        => api.get(`/certifications
 export const createCertification       = (data)      => api.post("/certifications", data);
 export const updateCertification       = (id, data)  => api.put(`/certifications/${id}`, data);
 export const deleteCertification       = (id)        => api.delete(`/certifications/${id}`);
-export const archiveCertification      = (id)        => api.patch(`/certifications/${id}/archive`);
+export const archiveCertification      = (id, reason)        => api.patch(`/certifications/${id}/archive`, { reason });
 export const restoreCertification      = (id)        => api.patch(`/certifications/${id}/restore`);
 export const getCertificationLayouts   = ()          => api.get("/certifications/layouts");
 export const updateCertificationLayout = (id, data)  => api.put(`/certifications/${id}/layout`, data);
@@ -154,10 +154,14 @@ export const postAnalyticsAiQuery      = (body  = {}) => api.post("/analytics/ai
 // -------------------------------------------------------
 export const getAnnouncements  = (page = 1, perPage = 4) =>
   api.get("/announcements", { params: { page, per_page: perPage } });
+export const getArchivedAnnouncements = (page = 1, perPage = 4) =>
+  api.get("/announcements", { params: { page, per_page: perPage, view: "archived" } });
 export const getAnnouncement   = (id)        => api.get(`/announcements/${id}`);
 export const createAnnouncement = (data)     => api.post("/announcements", data);
 export const updateAnnouncement = (id, data) => api.put(`/announcements/${id}`, data);
 export const deleteAnnouncement = (id)       => api.delete(`/announcements/${id}`);
+export const archiveAnnouncement = (id, reason) => api.patch(`/announcements/${id}/archive`, { reason });
+export const restoreAnnouncement = (id)      => api.patch(`/announcements/${id}/restore`);
 
 // -------------------------------------------------------
 // ALUMNI SYSTEM (PUPTAPS) — proxied through RIS backend

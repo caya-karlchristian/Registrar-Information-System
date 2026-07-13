@@ -4,9 +4,12 @@ import InputGroup from "../components/InputGroup";
 import VoiceTextareaInput from "../components/VoiceTextareaInput.jsx";
 import {
   getAnnouncements,
+  getArchivedAnnouncements,
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
+  archiveAnnouncement,
+  restoreAnnouncement,
 } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
 import { AnnouncementSkeleton } from '../components/LoadingSkeleton';
@@ -17,22 +20,13 @@ import ConfirmationModal from "../components/ConfirmationModal";
 const PER_PAGE = 4;
 const EMPTY_FORM = { title: "", content: "" };
 
-const MOCK_ARCHIVED_ANNOUNCEMENTS = [
-  {
-    id: "mock-archived-1",
-    title: "Capstone Defense Schedule",
-    content: "Please check the schedule for the upcoming Capstone Defense.",
-    enabled: false,
-    is_archived: true,
-    archived_on: "Jun 20, 2026"
-  }
-];
-
 const SystemSettings = () => {
   const { isDark } = useTheme();
   const [selectedTab, setSelectedTab] = useState("active");
   const [archivedCurrentPage, setArchivedCurrentPage] = useState(1);
-  const [archivedList, setArchivedList] = useState(MOCK_ARCHIVED_ANNOUNCEMENTS);
+  const [archivedList, setArchivedList] = useState([]);
+  const [archivedMeta, setArchivedMeta] = useState({ current_page: 1, last_page: 1 });
+  const [archivedLoading, setArchivedLoading] = useState(false);
 
   const [announcements, setAnnouncements] = useState([]);
   const [meta, setMeta]                   = useState({ current_page: 1, last_page: 1 });
@@ -61,9 +55,28 @@ const SystemSettings = () => {
     }
   }, []);
 
+  const fetchArchivedAnnouncements = useCallback(async (page = 1) => {
+    setArchivedLoading(true);
+    try {
+      const res = await getArchivedAnnouncements(page, PER_PAGE);
+      setArchivedList(res.data.data);
+      setArchivedMeta({ current_page: res.data.current_page, last_page: res.data.last_page });
+    } catch {
+      setErrorMsg("Failed to load archived announcements.");
+    } finally {
+      setArchivedLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAnnouncements(currentPage);
   }, [currentPage, fetchAnnouncements]);
+
+  useEffect(() => {
+    if (selectedTab === "archived") {
+      fetchArchivedAnnouncements(archivedCurrentPage);
+    }
+  }, [selectedTab, archivedCurrentPage, fetchArchivedAnnouncements]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -140,46 +153,47 @@ const SystemSettings = () => {
     if (selectedTab === "active") {
       return getPageNumbers(meta.current_page, meta.last_page);
     } else {
-      const archivedLastPage = Math.ceil(archivedList.length / PER_PAGE) || 1;
-      return getPageNumbers(archivedCurrentPage, archivedLastPage);
+      return getPageNumbers(archivedMeta.current_page, archivedMeta.last_page);
     }
   };
 
-  const handleArchive = (ann) => {
-    const newArchived = {
-      ...ann,
-      is_archived: true,
-      archived_on: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    };
-    
-    setArchivedList(prev => [newArchived, ...prev]);
-    setAnnouncements(prev => prev.filter(a => a.id !== ann.id));
-    setSuccessMsg("Announcement archived successfully!");
+  const handleArchive = async (ann) => {
+    try {
+      await archiveAnnouncement(ann.id);
+      setAnnouncements((prev) => prev.filter((a) => a.id !== ann.id));
+      setSuccessMsg("Announcement archived successfully!");
 
-    if (selected?.id === ann.id) {
-      handleCancel();
+      if (selected?.id === ann.id) {
+        handleCancel();
+      }
+      if (selectedTab === "archived") {
+        fetchArchivedAnnouncements(archivedCurrentPage);
+      }
+    } catch (err) {
+      console.error("Failed to archive announcement:", err);
+      const guardMessage = err?.response?.status === 422 ? err.response.data?.message : null;
+      setErrorMsg(guardMessage || "Couldn't archive this announcement. Please try again.");
     }
   };
 
-  const handleRestore = (ann) => {
-    setArchivedList(prev => prev.filter(a => a.id !== ann.id));
-    
-    const restoredAnn = { ...ann, is_archived: false };
-    delete restoredAnn.archived_on;
-    
-    setAnnouncements(prev => [restoredAnn, ...prev]);
-    setSuccessMsg("Announcement restored successfully!");
+  const handleRestore = async (ann) => {
+    try {
+      await restoreAnnouncement(ann.id);
+      setArchivedList((prev) => prev.filter((a) => a.id !== ann.id));
+      setSuccessMsg("Announcement restored successfully! It's back in Active as Disabled.");
+
+      if (selectedTab === "active") {
+        fetchAnnouncements(currentPage);
+      }
+    } catch (err) {
+      console.error("Failed to restore announcement:", err);
+      setErrorMsg("Couldn't restore this announcement. Please try again.");
+    }
   };
 
-  const filteredAnnouncements = announcements.filter(
-    (ann) => !archivedList.some((archived) => archived.id === ann.id)
-  );
+  const filteredAnnouncements = announcements;
 
-  const archivedLastPage = Math.ceil(archivedList.length / PER_PAGE) || 1;
-  const paginatedArchived = archivedList.slice(
-    (archivedCurrentPage - 1) * PER_PAGE,
-    archivedCurrentPage * PER_PAGE
-  );
+  const paginatedArchived = archivedList;
 
   return (
     <div className={`font-sans px-4 sm:px-6 py-8 flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
@@ -231,10 +245,10 @@ const SystemSettings = () => {
             <div className="px-4 pb-4 space-y-3 flex-1 overflow-y-auto">
               {error && <p className="text-center text-red-400 text-sm py-8">{error}</p>}
               
-              {loading ? (
-                <AnnouncementSkeleton isDark={isDark} count={4} />
-              ) : selectedTab === "active" ? (
-                filteredAnnouncements.length === 0 ? (
+              {selectedTab === "active" ? (
+                loading ? (
+                  <AnnouncementSkeleton isDark={isDark} count={4} />
+                ) : filteredAnnouncements.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12">
                     <div className={`w-16 h-16 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
                       <MagnifyingGlassIcon className={`w-8 h-8 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
@@ -285,6 +299,8 @@ const SystemSettings = () => {
                     </div>
                   ))
                 )
+              ) : archivedLoading ? (
+                <AnnouncementSkeleton isDark={isDark} count={4} />
               ) : (
                 paginatedArchived.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12">
@@ -363,11 +379,10 @@ const SystemSettings = () => {
                   if (selectedTab === "active") {
                     setCurrentPage((p) => Math.min(meta.last_page, p + 1));
                   } else {
-                    const archivedLastPage = Math.ceil(archivedList.length / PER_PAGE) || 1;
-                    setArchivedCurrentPage((p) => Math.min(archivedLastPage, p + 1));
+                    setArchivedCurrentPage((p) => Math.min(archivedMeta.last_page, p + 1));
                   }
                 }}
-                disabled={selectedTab === "active" ? meta.current_page === meta.last_page : archivedCurrentPage === (Math.ceil(archivedList.length / PER_PAGE) || 1)}
+                disabled={selectedTab === "active" ? meta.current_page === meta.last_page : archivedCurrentPage === archivedMeta.last_page}
                 className={`flex items-center gap-1 text-xs px-2 py-1 disabled:opacity-40 ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
               >
                 Next <ChevronRightIcon className="w-3 h-3" />

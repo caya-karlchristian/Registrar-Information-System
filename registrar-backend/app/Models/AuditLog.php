@@ -42,6 +42,17 @@ class AuditLog extends Model
     public const ACTION_REQUEST_ARCHIVED       = 'request_archived';
     public const ACTION_REQUEST_RESTORED       = 'request_restored';
 
+    // Document / certificate type management — archiving
+    public const ACTION_DOCUMENT_TYPE_ARCHIVED    = 'document_type_archived';
+    public const ACTION_DOCUMENT_TYPE_RESTORED    = 'document_type_restored';
+    public const ACTION_CERTIFICATE_TYPE_ARCHIVED = 'certificate_type_archived';
+    public const ACTION_CERTIFICATE_TYPE_RESTORED = 'certificate_type_restored';
+
+    // Announcement archiving (distinct from the enable/disable toggle,
+    // which is not audit-logged — see the Announcement Archive policy)
+    public const ACTION_ANNOUNCEMENT_ARCHIVED = 'announcement_archived';
+    public const ACTION_ANNOUNCEMENT_RESTORED = 'announcement_restored';
+
     // User management — policy attachment (admins only)
     public const ACTION_POLICY_CREATED  = 'policy_created';
     public const ACTION_POLICY_UPDATED  = 'policy_updated';
