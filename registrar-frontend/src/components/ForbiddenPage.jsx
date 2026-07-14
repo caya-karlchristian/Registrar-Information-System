@@ -5,9 +5,13 @@ export default function ForbiddenPage() {
   const navigate = useNavigate();
 
   const status = location.state?.status || 403;
-  const message = location.state?.reason === "unauthenticated"
-  ? "You must be logged in to access this page."
-  : "You don't have permission to access this page.";
+  const reason = location.state?.reason;
+  const message =
+    reason === "unauthenticated"
+      ? "You must be logged in to access this page."
+      : reason === "policy"
+      ? "This module isn't included in your account's assigned policy. Contact a super admin if you believe this is a mistake."
+      : "You don't have permission to access this page.";
   
   return (
     <div className="flex h-screen w-full items-center justify-center bg-white font-sans">

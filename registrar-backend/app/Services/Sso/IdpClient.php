@@ -201,28 +201,65 @@ class IdpClient
     /**
      * Create a user in the IdP. Returns the new user's IdP UUID.
      *
+     * Contract verified against a captured browser request from the IdP's
+     * own "New User" wizard (DevTools → Network → Payload):
+     *   {
+     *     email, first_name, middle_name, last_name, name_suffix,
+     *     password, status: "active",
+     *     account_type_id: 1,      // "System Administrator" in the wizard
+     *     role_id: 4,              // IdP-internal role tier — NOT the same
+     *                              // thing as SystemUser::ROLE_* (RIS's own
+     *                              // local role_id column)
+     *     allowed_appclients: ["<client-uuid>", ...],
+     *   }
+     *
+     * There is no `role`/`roles` string field at all — my earlier attempts
+     * at that were wrong. Two values below are still best-effort and NOT
+     * yet confirmed against IdP source of truth (see inline notes):
+     *   - `account_type_id` / `role_id` — assumed fixed at 1 / 4 for every
+     *     RIS admin/superadmin, mirroring the captured "test system admin"
+     *     request. Unconfirmed whether the IdP distinguishes RIS admin vs
+     *     superadmin here at all (its wizard has no role picker — only
+     *     account type + password), or whether 4 is specific to that one
+     *     test account.
+     *   - `allowed_appclients` — without this, previously-created accounts
+     *     may exist in the IdP but have no access to log into RIS at all.
+     *     Sends RIS's own `sso.client_id` so the created admin can
+     *     actually authenticate against this app.
+     *
      * @throws IdpException
+     *
+     * ⚠️ TEMPORARY: $adminToken is nullable and currently unused (passed as
+     * null from AdminUserService::create()). The IdP's /api/v1/user endpoint
+     * does not actually enforce the superadmin bearer token it's documented
+     * to require — it accepts requests carrying only a valid x-api-key.
+     * Access control for admin creation currently rests entirely on that
+     * static key. Revert this once the IdP fixes bearer-token enforcement
+     * — see IdpClient class docblock.
      */
-    public function createUser(array $data, string $adminToken): ?string
+    public function createUser(array $data, ?string $adminToken = null): ?string
     {
         [$body, $status] = $this->postWithAuth('/api/v1/user', [
-            'email'       => $data['email'],
-            'first_name'  => $data['first_name'],
-            'last_name'   => $data['last_name'],
-            'middle_name' => $data['middle_name'] ?? '',
-            'password'    => $data['password'],
-            'roles'       => $data['roles'],
-            'status'      => 'active',
-        ], $adminToken);
+            'email'              => $data['email'],
+            'first_name'         => $data['first_name'],
+            'middle_name'        => $data['middle_name'] ?? '',
+            'last_name'          => $data['last_name'],
+            'name_suffix'        => $data['name_suffix'] ?? '',
+            'password'           => $data['password'],
+            'account_type_id'    => $data['account_type_id'],
+            'role_id'            => $data['idp_role_id'],
+            'allowed_appclients' => [config('sso.client_id')],
+            'status'             => 'active',
+        ], $adminToken, withApiKey: true);
 
         if ($status >= 400) {
             throw new IdpException('Failed to create user in identity provider: ' . $body, 500);
         }
 
-        // Prefer the UUID returned directly in the create response body.
-        // Only fall back to a search if the IdP does not embed it, so we
-        // never silently return null for datasets larger than page 1.
         $created = json_decode($body, true) ?? [];
+
+        // Some IdP responses may embed the id directly — keep this as the
+        // first check for forward/backward compatibility.
         if (!empty($created['id'])) {
             return $created['id'];
         }
@@ -230,8 +267,18 @@ class IdpClient
             return $created['user']['id'];
         }
 
-        // Fallback: search by email using server-side filtering to avoid
-        // scanning a fixed page and missing newly created users.
+        // The actual contract: the UUID is embedded in a human-readable
+        // `message` string, e.g. "Created user with the id <uuid>".
+        if (!empty($created['message']) && preg_match(
+            '/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i',
+            $created['message'],
+            $matches
+        )) {
+            return $matches[0];
+        }
+
+        // Last-resort fallback: search by email using server-side filtering
+        // to avoid scanning a fixed page and missing newly created users.
         $query = http_build_query(['email' => $data['email'], 'per_page' => 1]);
         [$listBody, $listStatus] = $this->getWithAuth("/api/v1/user?{$query}", $adminToken);
 
@@ -244,11 +291,8 @@ class IdpClient
             }
         }
 
-        // IdpClient.php
         Log::warning('IdpClient: could not resolve UUID for newly created user', ['email' => $data['email']]);
         throw new IdpException('User was created in IdP but UUID could not be resolved. Check IdP manually.');
-        // Previously: return null;
-        return null;
     }
 
     /**
@@ -261,7 +305,8 @@ class IdpClient
         [$body, $code] = $this->patchWithAuth(
             "/api/v1/user/{$idpUserId}/status",
             ['new_status' => $status],
-            $adminToken
+            $adminToken,
+            withApiKey: true
         );
 
         if ($code >= 400) {
@@ -279,7 +324,8 @@ class IdpClient
         [$body, $code] = $this->patchWithAuth(
             "/api/v1/user/{$idpUserId}/password",
             ['new_password' => $newPassword],
-            $adminToken
+            $adminToken,
+            withApiKey: true
         );
 
         if ($code >= 400) {
@@ -290,9 +336,9 @@ class IdpClient
     /**
      * Delete a user from the IdP.
      */
-    public function deleteUser(string $idpUserId, string $adminToken): void
+    public function deleteUser(string $idpUserId, ?string $adminToken = null): void
     {
-        [$body, $code] = $this->deleteRequest("/api/v1/user/{$idpUserId}", $adminToken);
+        [$body, $code] = $this->deleteRequest("/api/v1/user/{$idpUserId}", $adminToken, withApiKey: true);
 
         if ($code >= 400) {
             Log::warning('SSO: IdP user delete failed', ['idp_user_id' => $idpUserId, 'body' => $body]);
@@ -326,18 +372,14 @@ class IdpClient
         return [$body, $status];
     }
 
-    private function postWithAuth(string $path, array $payload, string $token): array
+    private function postWithAuth(string $path, array $payload, ?string $token, bool $withApiKey = false): array
     {
         $ch = curl_init($this->baseUrl . $path);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'Accept: application/json',
-                'Authorization: Bearer ' . $token,
-            ],
+            CURLOPT_HTTPHEADER     => $this->buildHeaders($token, $withApiKey),
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
@@ -346,23 +388,46 @@ class IdpClient
         return [$body, $status];
     }
 
+    /**
+     * Standard JSON + bearer-token headers, optionally with the `x-api-key`
+     * header the IdP's /api/v1/user endpoints additionally require.
+     *
+     * $token is nullable: when absent (or empty), no Authorization header is
+     * sent at all — used for the create-admin call, which currently only
+     * needs the x-api-key. See createUser() docblock for why.
+     */
+    private function buildHeaders(?string $token, bool $withApiKey = false): array
+    {
+        $headers = [
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ];
+
+        if (!empty($token)) {
+            $headers[] = 'Authorization: Bearer ' . $token;
+        }
+
+        $apiKey = config('sso.api_key', '');
+        if ($withApiKey && !empty($apiKey)) {
+            $headers[] = 'x-api-key: ' . $apiKey;
+        }
+
+        return $headers;
+    }
+
     private function getWithAuth(string $path, string $token): array
     {
         return $this->get($path, $token);
     }
 
-    private function patchWithAuth(string $path, array $payload, string $token): array
+    private function patchWithAuth(string $path, array $payload, string $token, bool $withApiKey = false): array
     {
         $ch = curl_init($this->baseUrl . $path);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST  => 'PATCH',
             CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'Accept: application/json',
-                'Authorization: Bearer ' . $token,
-            ],
+            CURLOPT_HTTPHEADER     => $this->buildHeaders($token, $withApiKey),
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
         ]);
@@ -370,16 +435,16 @@ class IdpClient
         return [$body, $status];
     }
 
-    private function deleteRequest(string $path, string $token): array
+    private function deleteRequest(string $path, ?string $token, bool $withApiKey = false): array
     {
         $ch = curl_init($this->baseUrl . $path);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST  => 'DELETE',
-            CURLOPT_HTTPHEADER     => [
-                'Accept: application/json',
-                'Authorization: Bearer ' . $token,
-            ],
+            CURLOPT_HTTPHEADER     => array_values(array_filter(
+                $this->buildHeaders($token, $withApiKey),
+                fn ($h) => !str_starts_with($h, 'Content-Type:')
+            )),
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
         ]);

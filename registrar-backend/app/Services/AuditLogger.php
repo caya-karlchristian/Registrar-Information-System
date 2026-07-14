@@ -21,23 +21,44 @@ class AuditLogger
     // Log an action for a given user.
     //
     // Usage — inject via constructor, then call:
-    //   $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGIN);
+    //   $this->auditLogger->log($request, $actor, AuditLog::ACTION_LOGIN);
+    //
+    // $user is always the ACTOR — the authenticated user who performed the
+    // action, never the record being acted on. For actions performed ON
+    // another user (e.g. an admin being created/updated/deleted), pass
+    // that user's identity via $metadata using the 'target_user_id' /
+    // 'target_email' keys — they're lifted into dedicated indexed columns
+    // automatically so the target can be queried/joined on directly. Any
+    // other keys are kept as-is in the metadata JSON column.
+    //
+    //   $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_CREATED, [
+    //       'target_user_id' => $newAdmin->user_id,
+    //       'target_email'   => $newAdmin->email,
+    //   ]);
     //
     // The Request is needed to extract browser + IP address.
     // -------------------------------------------------------
     public function log(
         Request    $request,
         SystemUser $user,
-        string     $action
+        string     $action,
+        array      $metadata = []
     ): void {
+        $targetUserId = $metadata['target_user_id'] ?? null;
+        $targetEmail  = $metadata['target_email'] ?? null;
+        unset($metadata['target_user_id'], $metadata['target_email']);
+
         AuditLog::create([
-            'user_id'    => $user->user_id,
-            'email'      => $user->email,
-            'role_name'  => $this->resolveRoleName($user->role_id),
-            'action'     => $action,
-            'browser'    => $this->parseBrowser($request->userAgent()),
-            'ip_address' => $request->ip(),
-            'created_at' => now(),
+            'user_id'         => $user->user_id,
+            'email'           => $user->email,
+            'role_name'       => $this->resolveRoleName($user->role_id),
+            'target_user_id'  => $targetUserId,
+            'target_email'    => $targetEmail,
+            'action'          => $action,
+            'browser'         => $this->parseBrowser($request->userAgent()),
+            'ip_address'      => $request->ip(),
+            'metadata'        => !empty($metadata) ? $metadata : null,
+            'created_at'      => now(),
         ]);
     }
 
