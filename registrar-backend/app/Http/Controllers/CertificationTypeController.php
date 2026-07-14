@@ -2,8 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\CertificationType;
+use App\Models\SystemUser;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -14,6 +19,8 @@ use Illuminate\Support\Facades\Storage;
  */
 class CertificationTypeController extends Controller
 {
+    public function __construct(private AuditLogger $auditLogger) {}
+
     private function certColumns(): array
     {
         return [
@@ -29,6 +36,7 @@ class CertificationTypeController extends Controller
             'layout_footer_logo_size',
             'is_archived',
             'archived_on',
+            'archived_by',
         ];
     }
 
@@ -116,33 +124,89 @@ class CertificationTypeController extends Controller
 
     // -------------------------------------------------------------------------
     // Archive / Restore — reversible, distinct from destroy() above.
+    //
+    // Per the Archive Policy — Document & Certificate Management:
+    //   - A certificate type may only be archived if no request using it is
+    //     still Processing or Ready to Claim ("active").
+    //   - Archiving automatically locks the template (enforced in
+    //     updateLayout()/uploadLayoutLogo() below via is_archived — no
+    //     separate "locked" flag needed, and restoring unlocks it for free).
+    //   - Every archive/restore records who did it, when, and (for
+    //     archives) why.
     // -------------------------------------------------------------------------
 
-    public function archive($id)
+    public function archive(Request $request, $id)
     {
         $cert = CertificationType::find($id);
         if (!$cert) {
             return response()->json(['message' => 'Certification type not found'], 404);
         }
 
-        $cert->update([
-            'is_archived' => true,
-            'archived_on' => now(),
+        if ($cert->is_archived) {
+            return response()->json($this->freshRecord($id), 200);
+        }
+
+        $activeCount = $cert->activeRequestsCount();
+        if ($activeCount > 0) {
+            return response()->json([
+                'message' => sprintf(
+                    '%d active %s using this — can\'t archive yet.',
+                    $activeCount,
+                    $activeCount === 1 ? 'request is' : 'requests are'
+                ),
+                'active_requests' => $activeCount,
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        DB::transaction(function () use ($cert, $actor) {
+            $cert->update([
+                'is_archived' => true,
+                'archived_on' => now(),
+                'archived_by' => $actor->user_id,
+            ]);
+        });
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_CERTIFICATE_TYPE_ARCHIVED, [
+            'certificate_type_id' => $cert->certificate_type_id,
+            'certificate_name'    => $cert->certificate_name,
+            'reason'              => $validated['reason'] ?? null,
         ]);
 
         return response()->json($this->freshRecord($id), 200);
     }
 
-    public function restore($id)
+    public function restore(Request $request, $id)
     {
         $cert = CertificationType::find($id);
         if (!$cert) {
             return response()->json(['message' => 'Certification type not found'], 404);
         }
 
-        $cert->update([
-            'is_archived' => false,
-            'archived_on' => null,
+        if (!$cert->is_archived) {
+            return response()->json($this->freshRecord($id), 200);
+        }
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        DB::transaction(function () use ($cert) {
+            $cert->update([
+                'is_archived' => false,
+                'archived_on' => null,
+                'archived_by' => null,
+            ]);
+        });
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_CERTIFICATE_TYPE_RESTORED, [
+            'certificate_type_id' => $cert->certificate_type_id,
+            'certificate_name'    => $cert->certificate_name,
         ]);
 
         return response()->json($this->freshRecord($id), 200);
@@ -153,6 +217,12 @@ class CertificationTypeController extends Controller
         $cert = CertificationType::find($id);
         if (!$cert) {
             return response()->json(['message' => 'Certification type not found'], 404);
+        }
+
+        if ($cert->is_archived) {
+            return response()->json([
+                'message' => 'This certificate is archived — its template is read-only. Restore it first to make changes.',
+            ], 423); // 423 Locked
         }
 
         $validated = $request->validate([
@@ -181,6 +251,12 @@ class CertificationTypeController extends Controller
         $cert = CertificationType::find($id);
         if (!$cert) {
             return response()->json(['message' => 'Certification type not found'], 404);
+        }
+
+        if ($cert->is_archived) {
+            return response()->json([
+                'message' => 'This certificate is archived — its template is read-only. Restore it first to make changes.',
+            ], 423); // 423 Locked
         }
 
         $validated = $request->validate([

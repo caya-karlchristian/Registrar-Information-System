@@ -134,7 +134,8 @@ const DocumentAndCertificateManagement = () => {
       setSuccessMsg("Document archived successfully!");
     } catch (err) {
       console.error("Failed to archive document type:", err);
-      setErrorMsg("Couldn't archive this document. Please try again.");
+      const guardMessage = err?.response?.status === 422 ? err.response.data?.message : null;
+      setErrorMsg(guardMessage || "Couldn't archive this document. Please try again.");
     }
   };
 
@@ -147,7 +148,8 @@ const DocumentAndCertificateManagement = () => {
       setSuccessMsg("Certificate archived successfully!");
     } catch (err) {
       console.error("Failed to archive certification type:", err);
-      setErrorMsg("Couldn't archive this certification. Please try again.");
+      const guardMessage = err?.response?.status === 422 ? err.response.data?.message : null;
+      setErrorMsg(guardMessage || "Couldn't archive this certification. Please try again.");
     }
   };
 
@@ -250,6 +252,7 @@ const DocumentAndCertificateManagement = () => {
           layoutsByCertId={layoutsByCertId}
           onRestoreDoc={handleRestoreDoc}
           onRestoreCert={handleRestoreCert}
+          
         />
       )}
       <SuccessToast message={successMsg} onClose={() => setSuccessMsg("")} />
