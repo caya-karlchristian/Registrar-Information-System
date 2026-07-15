@@ -30,10 +30,10 @@ import SystemSettings from './layouts/SystemSettings.jsx';
 import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
 
 // Auth
-import { ROLES } from './context/AuthProvider';
+import { ROLES, useAuth } from './context/AuthProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 import ModuleRoute from './components/ModuleRoute';
-import { MODULE_KEYS } from './utils/policy';
+import { MODULE_KEYS, hasModuleAccess } from './utils/policy';
 import ForbiddenPage from './components/ForbiddenPage';
 import SsoCallbackPage from './pages/SsoCallbackPage.jsx';
 
@@ -45,6 +45,28 @@ import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ReferenceDataProvider } from './context/ReferenceDataContext.jsx';
 import FloatingActionMenu from './components/FloatingActionMenu.jsx';
 
+
+const StaffIndexRedirect = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+
+  const items = [
+    { to: "dashboard", module: MODULE_KEYS.DASHBOARD },
+    { to: "inbox", module: MODULE_KEYS.INBOX },
+    { to: "analytics", module: MODULE_KEYS.ANALYTICS },
+    { to: "logbook", module: MODULE_KEYS.LOGBOOK },
+    { to: "profile", module: MODULE_KEYS.PROFILE },
+  ];
+
+  const firstAllowed = items.find(item => !item.module || hasModuleAccess(user, item.module));
+
+  if (firstAllowed) {
+    return <Navigate to={firstAllowed.to} replace />;
+  }
+
+  return <Navigate to="/forbidden" state={{ reason: "policy" }} replace />;
+};
 
 const App = () => {
   return (
@@ -66,7 +88,7 @@ const App = () => {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<RequestForm />} />
+                <Route index element={<Navigate to="/student/home" replace />} />
                 <Route path="home" element={<StudentDashboard />} />
                 <Route path="request" element={<RequestForm />} />
                 <Route path="lists" element={<DocumentLists />} />
@@ -85,7 +107,7 @@ const App = () => {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<AlumniRequest />} />
+                <Route index element={<Navigate to="/alumni/home" replace />} />
                 <Route path="home" element={<StudentDashboard />} />
                 <Route path="request" element={<AlumniRequest />} />
                 <Route path="lists" element={<AlumniDocumentList />} />
@@ -104,9 +126,7 @@ const App = () => {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={
-                  <ModuleRoute module={MODULE_KEYS.DASHBOARD}><StaffDashboardPage /></ModuleRoute>
-                } />
+                <Route index element={<StaffIndexRedirect />} />
                 <Route path="dashboard" element={
                   <ModuleRoute module={MODULE_KEYS.DASHBOARD}><StaffDashboardPage /></ModuleRoute>
                 } />
@@ -137,7 +157,7 @@ const App = () => {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<UserManagementPage />} />
+                <Route index element={<Navigate to="/super-admin/user" replace />} />
                 <Route path="contact" element={<RegistrarContact />} />
                 <Route path="user" element={<UserManagementPage />} />
                 <Route path="documents" element={<DocumentAndCertificateManagement />} />
