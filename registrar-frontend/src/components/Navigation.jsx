@@ -63,10 +63,10 @@ const ROLE_CONFIG = {
     profileKey: null,
     profileLabel: (user) => user?.email,
     items: [
-      { name: 'User Directory', to: 'user', icon: Squares2X2Icon },
-      { name: 'Certificate Template Management', to: 'documents', icon: TableCellsIcon },
-      { name: 'Report Management', to: 'report', icon: UserCircleIcon },
-      { name: 'System Settings', to: 'settings', icon: Cog6ToothIcon },
+      { name: 'Admin Management', to: 'user', icon: Squares2X2Icon },
+      { name: 'Document Management', to: 'documents', icon: TableCellsIcon },
+      { name: 'Audit Trail', to: 'report', icon: UserCircleIcon },
+      { name: 'Announcement Management', to: 'settings', icon: Cog6ToothIcon },
     ],
   },
 };

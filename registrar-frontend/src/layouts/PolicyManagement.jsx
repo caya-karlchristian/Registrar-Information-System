@@ -20,6 +20,7 @@ import MultiSelection from "../components/MultiSelection";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import ConfirmationModal from "../components/ConfirmationModal";
+import { PolicyTableSkeleton } from "../components/LoadingSkeleton";
 
 const MODULE_OPTIONS = [
   "Dashboard",
@@ -62,7 +63,7 @@ const PolicyManagement = () => {
   // Table selection (multi-selection) & pagination state
   const [selectedPolicyIndices, setSelectedPolicyIndices] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const PER_PAGE = 10;
+  const PER_PAGE = 5;
 
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -378,11 +379,7 @@ const PolicyManagement = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-500">
-                    Loading policies...
-                  </td>
-                </tr>
+                <PolicyTableSkeleton isDark={isDark} count={PER_PAGE} />
               ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-gray-500">

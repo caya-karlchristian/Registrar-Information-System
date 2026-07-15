@@ -190,7 +190,7 @@ export const DocumentListSkeleton = ({ isDark, count = 8 }) => {
   );
 };
 
-export const UserTableSkeleton = ({ isDark, count = 10 }) => {
+export const UserTableSkeleton = ({ isDark, count = 7 }) => {
   const bg = isDark ? 'bg-[#3a3b3c]' : 'bg-slate-200';
   const bgDim = isDark ? 'bg-[#2f3133]' : 'bg-slate-100';
   const borderColor = isDark ? 'border-[#3e4042]' : 'border-gray-50';
@@ -219,6 +219,11 @@ export const UserTableSkeleton = ({ isDark, count = 10 }) => {
             <div className={`h-6 w-20 mx-auto rounded-full ${bg}`} />
           </td>
           
+          {/* Policy attached */}
+          <td className="px-6 py-4">
+            <div className={`h-6 w-24 mx-auto rounded-full ${bgDim}`} />
+          </td>
+          
           {/* Joined Date */}
           <td className="px-4 py-3">
             <div className={`h-4 w-20 mx-auto rounded-md ${bgDim}`} />
@@ -229,10 +234,14 @@ export const UserTableSkeleton = ({ isDark, count = 10 }) => {
             <div className={`h-6 w-20 mx-auto rounded-full ${bg}`} />
           </td>
           
+          {/* Access */}
+          <td className="px-6 py-4">
+            <div className={`h-7 w-28 mx-auto rounded-full ${bg}`} />
+          </td>
+          
           {/* Actions */}
           <td className="px-4 py-3">
-            <div className="flex items-center justify-center gap-3">
-              <div className={`w-4 h-4 rounded ${bgDim}`} />
+            <div className="flex items-center justify-center">
               <div className={`w-4 h-4 rounded ${bgDim}`} />
             </div>
           </td>
@@ -326,8 +335,53 @@ export const DocumentSkeleton = ({ isDark, count = 5 }) => {
   );
 };
 
+export const PolicyTableSkeleton = ({ isDark, count = 5 }) => {
+  const bg = isDark ? 'bg-[#3a3b3c]' : 'bg-slate-200';
+  const bgDim = isDark ? 'bg-[#2f3133]' : 'bg-slate-100';
+  const borderColor = isDark ? 'border-[#3e4042]' : 'border-gray-50';
+
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <tr key={i} className={`border-b text-left animate-pulse ${borderColor}`}>
+          {/* Checkbox Select cell */}
+          <td className="px-4 py-3 text-center">
+            <div className={`w-4 h-4 mx-auto rounded ${bg}`} />
+          </td>
+
+          {/* Cube Block symbol */}
+          <td className="px-2 py-3 text-center">
+            <div className={`w-5 h-5 mx-auto rounded ${bg}`} />
+          </td>
+
+          {/* Policy name */}
+          <td className="px-4 py-3">
+            <div className={`h-4 w-40 rounded-md ${bg}`} />
+          </td>
+
+          {/* Type */}
+          <td className="px-4 py-3">
+            <div className={`h-4 w-16 rounded-md ${bgDim}`} />
+          </td>
+
+          {/* Assigned admins count link */}
+          <td className="px-4 py-3">
+            <div className={`h-4 w-32 rounded-md ${bg}`} />
+          </td>
+
+          {/* Description */}
+          <td className="px-4 py-3">
+            <div className={`h-4 w-60 rounded-md ${bgDim}`} />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+};
+
 export default function LoadingSkeleton({ isDark, variant = 'chart' }) {
   if (variant === 'stat') return <StatCardSkeleton isDark={isDark} />;
   if (variant === 'logbook') return <LogbookSkeleton isDark={isDark} />;
+  if (variant === 'policy') return <PolicyTableSkeleton isDark={isDark} />;
   return <ChartCardSkeleton isDark={isDark} />;
 }
