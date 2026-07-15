@@ -100,6 +100,20 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
     e.preventDefault();
     setLocalError("");
 
+    const missingFields = [];
+    if (!form.first_name.trim()) missingFields.push("First Name");
+    if (!form.last_name.trim()) missingFields.push("Last Name");
+    
+    if (!isEdit) {
+      if (!form.email.trim()) missingFields.push("Email");
+      if (!form.password.trim()) missingFields.push("Password");
+    }
+
+    if (missingFields.length > 0) {
+      setLocalError(`Please fill in all required fields: ${missingFields.join(", ")}.`);
+      return;
+    }
+
     if (isEdit && editData) {
       if (!hasChanges()) {
         setLocalError("No changes were made.");
@@ -145,7 +159,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
 
   return (
     <>
-      <div className="fixed inset-0 z-[10000] modal-overlay-container flex justify-center items-center p-4">
+      <div className="fixed inset-0 z-9999 flex justify-center items-center p-4">
         <div className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} onClick={handleRequestClose} />
 
         <div className={`relative rounded-2xl shadow-2xl w-full max-w-md max-h-[calc(100vh-32px)] overflow-hidden flex flex-col ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
@@ -168,7 +182,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
 
           <div className="h-1 w-full bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
 
-          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0">
             <div className={`px-6 py-6 space-y-4 flex-1 overflow-y-auto ${isDark ? 'text-[#e4e6eb]' : ''}`}>
 
               {/* First & Last Name */}
