@@ -252,6 +252,7 @@ const DocumentAndCertificateManagement = () => {
           layoutsByCertId={layoutsByCertId}
           onRestoreDoc={handleRestoreDoc}
           onRestoreCert={handleRestoreCert}
+          
         />
       )}
       <SuccessToast message={successMsg} onClose={() => setSuccessMsg("")} />

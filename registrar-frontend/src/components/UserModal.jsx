@@ -61,23 +61,47 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const hasChanges = () => {
+    if (isEdit && editData) {
+      const profile = editData.admin_profile || {};
+      return (
+        form.first_name !== (profile.first_name || "") ||
+        form.middle_name !== (profile.middle_name || "") ||
+        form.last_name !== (profile.last_name || "") ||
+        form.suffix !== (profile.suffix || "") ||
+        form.email !== (editData.email || "") ||
+        form.role !== (ID_TO_ROLE[editData.role_id] || "Admin") ||
+        form.status !== (editData.status || "Activated") ||
+        form.password !== ""
+      );
+    }
+    return (
+      form.first_name !== "" ||
+      form.middle_name !== "" ||
+      form.last_name !== "" ||
+      form.suffix !== "" ||
+      form.email !== "" ||
+      form.password !== "" ||
+      form.role !== "Admin" ||
+      form.status !== "Activated" ||
+      form.policy !== ""
+    );
+  };
+
+  const handleRequestClose = () => {
+    if (hasChanges()) {
+      setConfirmClose(true);
+    } else {
+      handleClose();
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setLocalError("");
 
     if (isEdit && editData) {
-      const profile = editData.admin_profile || {};
-      const noChanges =
-        form.first_name === (profile.first_name || "") &&
-        form.middle_name === (profile.middle_name || "") &&
-        form.last_name === (profile.last_name || "") &&
-        form.suffix === (profile.suffix || "") &&
-        form.email === (editData.email || "") &&
-        form.role === (ID_TO_ROLE[editData.role_id] || "Admin") &&
-        form.status === (editData.status || "Activated") &&
-        !form.password;
-
-      if (noChanges) {
+      if (!hasChanges()) {
         setLocalError("No changes were made.");
         return;
       }
@@ -122,7 +146,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
   return (
     <>
       <div className="fixed inset-0 z-[10000] modal-overlay-container flex justify-center items-center p-4">
-        <div className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} onClick={() => setConfirmClose(true)} />
+        <div className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} onClick={handleRequestClose} />
 
         <div className={`relative rounded-2xl shadow-2xl w-full max-w-md max-h-[calc(100vh-32px)] overflow-hidden flex flex-col ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
 
@@ -136,7 +160,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
                 {isEdit ? "Update the user details below" : "Fill in the details below"}
               </p>
             </div>
-            <button type="button" onClick={() => setConfirmClose(true)}
+            <button type="button" onClick={handleRequestClose}
               className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white">
               <XMarkIcon className="w-5 h-5" />
             </button>
@@ -164,38 +188,41 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
               </div>
 
               {/* Email */}
-              <InputGroup label="Email" name="email" type="email" value={form.email}
-                onChange={handleChange} placeholder="e.g. juan@pup.edu.ph" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
+              {!isEdit && (
+                <InputGroup label="Email" name="email" type="email" value={form.email}
+                  onChange={handleChange} placeholder="e.g. juan@pup.edu.ph" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
+              )}
 
               {/* Password */}
-              <div>
-                <label className={`block text-sm mb-1.5 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
-                  Password {!isEdit && <span className="text-red-400 ml-1">*</span>}
-                  {isEdit && <span className={`text-xs ml-1 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>(leave blank to keep current)</span>}
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    value={form.password}
-                    onChange={handleChange}
-                    placeholder={isEdit ? "Leave blank to keep current" : "Enter password"}
-                    required={!isEdit}
-                    className={`w-full px-3 py-3 rounded-lg text-sm shadow-sm transition-all duration-200 pr-10 focus:outline-none focus:ring-2 ${isDark ? 'bg-[#1f1f1f] text-[#e4e6eb] placeholder:text-[#9a9a9a] focus:ring-[#FFD700] border border-[#3e4042]' : 'bg-white text-gray-700 placeholder:text-gray-400 focus:ring-[#FFC72C]'}`}
-                  />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)}
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}>
-                    {showPassword ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                  </button>
+              {!isEdit && (
+                <div>
+                  <label className={`block text-sm mb-1.5 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                    Password <span className="text-red-400 ml-1">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={form.password}
+                      onChange={handleChange}
+                      placeholder="Enter password"
+                      required
+                      className={`w-full px-3 py-3 rounded-lg text-sm shadow-sm transition-all duration-200 pr-10 focus:outline-none focus:ring-2 ${isDark ? 'bg-[#1f1f1f] text-[#e4e6eb] placeholder:text-[#9a9a9a] focus:ring-[#FFD700] border border-[#3e4042]' : 'bg-white text-gray-700 placeholder:text-gray-400 focus:ring-[#FFC72C]'}`}
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}>
+                      {showPassword ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Role & Status */}
               <div className="grid grid-cols-2 gap-3">
                 <DropDown label="Role" name="role" value={form.role}
-                  onChange={handleChange} options={ROLE_OPTIONS} required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
+                  onChange={handleChange} options={ROLE_OPTIONS} required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} direction="up" />
                 <DropDown label="Status" name="status" value={form.status}
-                  onChange={handleChange} options={STATUS_OPTIONS} required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
+                  onChange={handleChange} options={STATUS_OPTIONS} required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} direction="up" />
               </div>
 
               {/* Policy attachment — new admins only. Super admins have
@@ -221,7 +248,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
 
             {/* Footer */}
             <div className={`px-6 pb-6 pt-2 flex items-center justify-end gap-3 border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
-              <button type="button" onClick={() => setConfirmClose(true)}
+              <button type="button" onClick={handleRequestClose}
                 className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-600 hover:bg-gray-100'}`}>
                 Cancel
               </button>
