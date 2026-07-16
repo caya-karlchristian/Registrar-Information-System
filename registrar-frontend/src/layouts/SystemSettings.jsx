@@ -20,6 +20,15 @@ import ConfirmationModal from "../components/ConfirmationModal";
 const PER_PAGE = 4;
 const EMPTY_FORM = { title: "", content: "" };
 
+const formatDate = (dateStr) => {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
 const SystemSettings = () => {
   const { isDark } = useTheme();
   const [selectedTab, setSelectedTab] = useState("active");
@@ -196,14 +205,19 @@ const SystemSettings = () => {
   const paginatedArchived = archivedList;
 
   return (
-    <div className={`font-sans px-4 sm:px-6 py-8 flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
-      <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-6 sm:gap-8 items-start justify-center">
-        {/* Left Panel */}
-        <div className="w-full lg:w-105 shrink-0">
-          <div className="mb-4">
-            
-          </div>
-          <div className={`rounded-xl w-full lg:max-w-lg flex flex-col overflow-hidden shadow-sm lg:self-start lg:sticky lg:top-0 lg:h-150 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
+    <div className="w-full flex flex-col font-sans">
+      <div className={`rounded-2xl p-4 sm:p-6 ${
+        isDark 
+          ? 'bg-[#242526] text-[#e4e6eb] border border-[#3e4042]' 
+          : 'bg-white text-gray-900 shadow-md border border-gray-200/80'
+      }`}>
+        <div className="w-full flex flex-col lg:flex-row gap-6 sm:gap-8 items-start lg:items-stretch">
+          {/* Left Panel */}
+          <div className="w-full lg:w-96 shrink-0">
+            <div>
+              
+            </div>
+            <div className={`rounded-xl w-full lg:max-w-lg flex flex-col overflow-hidden shadow-sm lg:h-full ${isDark ? 'bg-[#1f1f1f] border border-[#3e4042]' : 'bg-gray-50 border border-gray-200/50'}`}>
             <div className="px-6 pt-5 pb-3 text-center flex flex-col items-center">
               <h2 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-pup-dark-maroon'} mb-2`}>List of Announcements</h2>
               <div className={`inline-flex p-0.5 rounded-full ${isDark ? 'bg-[#18191a] border border-[#3e4042]' : 'bg-gray-300'}`}>
@@ -333,7 +347,7 @@ const SystemSettings = () => {
                         </div>
                       </div>
                       <p className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                        Archived {ann.archived_on}
+                        Archived {formatDate(ann.archived_on)}
                       </p>
                     </div>
                   ))
@@ -392,7 +406,7 @@ const SystemSettings = () => {
         </div>
 
         {/* Right Panel */}
-        <div className={`lg:flex-1 w-full rounded-2xl p-6 sm:p-8 mt-6 lg:mt-28 shadow-sm h-max ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-gray-200'}`}>
+        <div className={`w-full lg:flex-1 flex flex-col rounded-xl p-10 sm:p-8 shadow-sm lg:h-full ${isDark ? 'bg-[#1f1f1f] border border-[#3e4042]' : 'bg-gray-50 border border-gray-200/50'}`}>
           <form onSubmit={handleSave} className="flex flex-col gap-5">
             <h2 className={`font-bold text-2xl ${isDark ? 'text-white' : ''}`}>
               {isAdding ? "Announcement Creation" : "Edit Announcement"}
@@ -471,6 +485,7 @@ const SystemSettings = () => {
           />
         </div>
       </div>
+    </div>
     </div>
   );
 };

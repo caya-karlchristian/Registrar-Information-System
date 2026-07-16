@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   PencilSquareIcon,
-  TrashIcon,
   PlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -428,7 +427,7 @@ const UserManagement = () => {
           </thead>
           <tbody>
             {loading ? (
-              <UserTableSkeleton isDark={isDark} count={10} />            
+              <UserTableSkeleton isDark={isDark} count={7} />            
             ) : paginated.length === 0 ? (
             <tr>
                 <td colSpan={9} className="py-24">
@@ -522,10 +521,6 @@ const UserManagement = () => {
                         <button onClick={() => { setEditUser(user); setIsModalOpen(true); }}
                           className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
                           <PencilSquareIcon className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setDeleteTarget(user)}
-                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-red-300' : 'text-gray-400 hover:text-red-600'}`}>
-                          <TrashIcon className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
