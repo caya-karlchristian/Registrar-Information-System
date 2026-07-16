@@ -32,6 +32,16 @@ export const formatDateLong = (value, includeTime = false) => {
   return `${datePart} ${timePart}`;
 };
 
+/** Extract the gender/sex from a request row */
+export const getGender = (row) => {
+  const p =
+    row.student_profile ||
+    row.alumni_profile ||
+    row.user?.student_profile ||
+    row.user?.alumni_profile;
+  return p?.sex_at_birth || p?.gender || '---';
+};
+
 /** Format an ISO value as "Month DD, YYYY HH:MM" (24-hour) */
 export const formatDateTimeLong = (value) => {
   const datePart = formatDateLong(value);
