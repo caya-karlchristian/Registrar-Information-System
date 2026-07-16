@@ -65,7 +65,20 @@ class StudentProfileController extends Controller
     public function destroy($id)
     {
         $profile = StudentProfile::findOrFail($id);
-        $profile->delete();
+
+        try {
+            $profile->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // MySQL error 1451 — FK constraint violation
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete a student profile that still has academic records on file.',
+                ], 409);
+            }
+
+            throw $e;
+        }
+
         return response()->json(['message' => 'Profile deleted'], 200);
     }
 

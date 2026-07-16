@@ -187,7 +187,18 @@ class SystemUserController extends Controller
         }
 
         // Audit logging is handled inside AdminUserService::delete()
-        $this->adminUserService->delete($user, $request);
+        try {
+            $this->adminUserService->delete($user, $request);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // MySQL error 1451 — FK constraint violation
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete a user who still has associated requests, records, or history.',
+                ], 409);
+            }
+
+            throw $e;
+        }
 
         return response()->json(['message' => 'User deleted successfully'], 200);
     }

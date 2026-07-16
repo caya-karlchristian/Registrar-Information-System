@@ -48,7 +48,19 @@ class RequestStatusController extends Controller
         $status = RequestStatus::find($id);
         if (!$status) return response()->json(['message' => 'Status not found'], 404);
 
-        $status->delete();
+        try {
+            $status->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // MySQL error 1451 — FK constraint violation
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete a status that is referenced by existing document requests or request history.',
+                ], 409);
+            }
+
+            throw $e;
+        }
+
         return response()->json(['message' => 'Status deleted'], 200);
     }
 }

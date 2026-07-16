@@ -314,7 +314,20 @@ class DocumentRequestController extends Controller
     public function destroy(DocumentRequest $documentRequest)
     {
         $this->authorize('delete', $documentRequest);
-        $documentRequest->delete();
+
+        try {
+            $documentRequest->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // MySQL error 1451 — FK constraint violation
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete a request that still has associated documents, history, or notifications.',
+                ], 409);
+            }
+
+            throw $e;
+        }
+
         return response()->json(['message' => 'Request deleted successfully'], 200);
     }
 

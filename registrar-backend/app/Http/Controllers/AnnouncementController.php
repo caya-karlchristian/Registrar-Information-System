@@ -79,7 +79,17 @@ class AnnouncementController extends Controller
 
     public function destroy(Announcement $announcement)
     {
-        $announcement->delete();
+        try {
+            $announcement->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete this announcement because it is still referenced elsewhere.',
+                ], 409);
+            }
+
+            throw $e;
+        }
 
         return response()->json(['message' => 'Announcement deleted.']);
     }
