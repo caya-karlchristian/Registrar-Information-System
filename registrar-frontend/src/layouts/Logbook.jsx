@@ -8,6 +8,7 @@ import {
   getMinutesProcessed,
   getFullName,
   getCourse,
+  getGender,
   getEmail,
   getDocumentNames,
   getCertificationNames,
@@ -411,13 +412,14 @@ const LogbookRecords = () => {
           <table className="w-full min-w-225 border-collapse md:min-w-full">
             <thead>
               <tr className={`border-b-2 uppercase text-center ${isDark ? 'border-[#3e4042] text-[#9a9a9a]' : 'border-gray-300 text-gray-400'}`}>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Date/Time Requested</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[15%] whitespace-nowrap">Client Name</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Course</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[18%] whitespace-nowrap">Email</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Date/Time Processed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[11%] whitespace-nowrap">Date/Time Requested</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[14%] whitespace-nowrap">Client Name</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[11%] whitespace-nowrap">Course</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[8%] whitespace-nowrap">Gender</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[15%] whitespace-nowrap">Email</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[11%] whitespace-nowrap">Date/Time Processed</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[10%] whitespace-nowrap">No. of Minutes Processed</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[13%] whitespace-nowrap">Date Claimed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Date Claimed</th>
               </tr>
             </thead>
             <tbody>
@@ -443,6 +445,10 @@ const LogbookRecords = () => {
                         {getCourse(row)}
                       </td>
 
+                      <td className="p-3 sm:p-4 text-center whitespace-nowrap">
+                        {getGender(row)}
+                      </td>
+
                       <td className="p-3 sm:p-4 text-center truncate max-w-55 whitespace-nowrap">
                         {getEmail(row)}
                       </td>
@@ -466,7 +472,7 @@ const LogbookRecords = () => {
 
               {!loading && Array.from({ length: Math.max(0, rowsPerPage - currentData.length) }).map((_, i) => (
                 <tr key={`empty-${i}`} className="h-11.25 sm:h-13.25 border-b border-gray-100">
-                  <td colSpan="7"></td>
+                  <td colSpan="8"></td>
                 </tr>
               ))}
             </tbody>

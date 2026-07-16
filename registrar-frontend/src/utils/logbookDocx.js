@@ -7,6 +7,7 @@ import {
   formatMinutesDuration,
   getFullName,
   getCourse,
+  getGender,
   getEmail,
   getHistoryRows,
   getProcessedAt,
@@ -88,14 +89,14 @@ const buildHeader = async (pupLogoSrc, bpLogoSrc) => {
           new TableRow({
             children: [
               new TableCell({
-                width: { size: 12, type: WidthType.PERCENTAGE },
+                width: { size: 8, type: WidthType.PERCENTAGE },
                 borders: noBorder,
                 children: [
-                  new Paragraph({ alignment: AlignmentType.RIGHT, children: leftLogo ? [new ImageRun({ data: leftLogo, transformation: { width: 72, height: 72 } })] : [] }),
+                  new Paragraph({ alignment: AlignmentType.LEFT, children: leftLogo ? [new ImageRun({ data: leftLogo, transformation: { width: 72, height: 72 } })] : [] }),
                 ],
               }),
               new TableCell({
-                width: { size: 68, type: WidthType.PERCENTAGE },
+                width: { size: 80, type: WidthType.PERCENTAGE },
                 borders: noBorder,
                 children: [
                   new Paragraph({ alignment: AlignmentType.LEFT, spacing: { after: 0 }, children: [new TextRun({ text: 'REPUBLIC OF THE PHILIPPINES', size: 16, font: 'Lucida Fax' })] }),
@@ -106,9 +107,9 @@ const buildHeader = async (pupLogoSrc, bpLogoSrc) => {
                 ],
               }),
               new TableCell({
-                width: { size: 20, type: WidthType.PERCENTAGE },
+                width: { size: 12, type: WidthType.PERCENTAGE },
                 borders: noBorder,
-                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: rightLogo ? [new ImageRun({ data: rightLogo, transformation: { width: 72, height: 72 } })] : [] })],
+                children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: rightLogo ? [new ImageRun({ data: rightLogo, transformation: { width: 72, height: 72 } })] : [] })],
               }),
             ],
           }),
@@ -236,8 +237,8 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
   });
 
   // Column widths (percent, must sum to 100)
-  // Date Requested | Client Name | Course | Email | Date Processed | Minutes | Date Claimed
-  const colWidths = [13, 16, 15, 18, 13, 12, 13];
+  // Date Requested | Client Name | Course | Gender | Email | Date Processed | Minutes | Date Claimed
+  const colWidths = [12, 14, 13, 8, 16, 12, 12, 13];
 
   const headerRow = new TableRow({
     tableHeader: true,
@@ -246,10 +247,11 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
       buildHeaderRowCell('Date Requested', colWidths[0]),
       buildHeaderRowCell('Client Name', colWidths[1]),
       buildHeaderRowCell('Course/Year & Section', colWidths[2]),
-      buildHeaderRowCell('Email Address/Contact', colWidths[3]),
-      buildHeaderRowCell('Date/Time Processed', colWidths[4]),
-      buildHeaderRowCell('No. of Minutes Processed', colWidths[5]),
-      buildHeaderRowCell('Date Claimed', colWidths[6]),
+      buildHeaderRowCell('Gender', colWidths[3]),
+      buildHeaderRowCell('Email Address/Contact', colWidths[4]),
+      buildHeaderRowCell('Date/Time Processed', colWidths[5]),
+      buildHeaderRowCell('No. of Minutes Processed', colWidths[6]),
+      buildHeaderRowCell('Date Claimed', colWidths[7]),
     ],
   });
 
@@ -299,10 +301,11 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
       cell(formatDateLong(row.requested_at) || 'N/A', { width: colWidths[0], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
       cell(getFullName(row), { width: colWidths[1], align: AlignmentType.LEFT, size: DEFAULT_TEXT_SIZE }),
       cell(getCourse(row), { width: colWidths[2], align: AlignmentType.LEFT, size: DEFAULT_TEXT_SIZE }),
-      cell(getEmail(row), { width: colWidths[3], align: AlignmentType.LEFT, size: DEFAULT_TEXT_SIZE }),
-      cell(formatDateLong(getProcessedAt(row, historyByRequestId), true) || '---', { width: colWidths[4], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
-      cell(formatMinutesDuration(getMinutesProcessed(row, historyByRequestId)), { width: colWidths[5], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
-      cell(formatDateLong(getClaimedAt(row, historyByRequestId)) || 'Pending', { width: colWidths[6], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
+      cell(getGender(row), { width: colWidths[3], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
+      cell(getEmail(row), { width: colWidths[4], align: AlignmentType.LEFT, size: DEFAULT_TEXT_SIZE }),
+      cell(formatDateLong(getProcessedAt(row, historyByRequestId), true) || '---', { width: colWidths[5], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
+      cell(formatMinutesDuration(getMinutesProcessed(row, historyByRequestId)), { width: colWidths[6], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
+      cell(formatDateLong(getClaimedAt(row, historyByRequestId)) || 'Pending', { width: colWidths[7], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
     ],
   }));
 
