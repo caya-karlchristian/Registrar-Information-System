@@ -71,7 +71,18 @@ class DocumentTypeController extends Controller
             return response()->json(['message' => 'Document type not found'], 404);
         }
 
-        $docType->delete();
+        try {
+            $docType->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // MySQL error 1451 — FK constraint violation
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete a document type that is referenced by existing document requests.',
+                ], 409);
+            }
+
+            throw $e;
+        }
 
         return response()->json(['message' => 'Document type deleted'], 200);
     }

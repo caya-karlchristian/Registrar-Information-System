@@ -117,7 +117,18 @@ class CertificationTypeController extends Controller
             return response()->json(['message' => 'Certification type not found'], 404);
         }
 
-        $cert->delete();
+        try {
+            $cert->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // MySQL error 1451 — FK constraint violation
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete a certification type that is referenced by existing document requests.',
+                ], 409);
+            }
+
+            throw $e;
+        }
 
         return response()->json(['message' => 'Certification type deleted'], 200);
     }
