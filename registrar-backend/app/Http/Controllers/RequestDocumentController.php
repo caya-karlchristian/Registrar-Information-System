@@ -3,10 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\DocumentRequest;
+use App\Models\DocumentRequest;
 use App\Models\RequestDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Auth;
 
+/**
+ * Request document line-items.
+ *
+ * Explicit validation on all mutations — no $request->all() mass assignment.
+ */
 /**
  * Request document line-items.
  *
@@ -20,10 +27,15 @@ class RequestDocumentController extends Controller
             RequestDocument::with(['request', 'documentType'])->get(),
             200
         );
+        return response()->json(
+            RequestDocument::with(['request', 'documentType'])->get(),
+            200
+        );
     }
 
     public function show($id)
     {
+        $reqDoc = RequestDocument::with(['request', 'documentType'])->findOrFail($id);
         $reqDoc = RequestDocument::with(['request', 'documentType'])->findOrFail($id);
         return response()->json($reqDoc, 200);
     }
@@ -34,8 +46,20 @@ class RequestDocumentController extends Controller
             'request_id'       => 'required|integer|exists:document_request,request_id',
             'document_type_id' => 'required|integer|exists:document_type,document_type_id',
             'number_of_copies' => 'required|integer|min:1|max:10',
+        $validated = $request->validate([
+            'request_id'       => 'required|integer|exists:document_request,request_id',
+            'document_type_id' => 'required|integer|exists:document_type,document_type_id',
+            'number_of_copies' => 'required|integer|min:1|max:10',
         ]);
 
+        // Ensure the authenticated student/alumni owns the parent request.
+        // Without this check any student could append line-items to another
+        // student's request by guessing the integer request_id.
+        DocumentRequest::where('request_id', $validated['request_id'])
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        $reqDoc = RequestDocument::create($validated);
         // Ensure the authenticated student/alumni owns the parent request.
         // Without this check any student could append line-items to another
         // student's request by guessing the integer request_id.
@@ -55,7 +79,14 @@ class RequestDocumentController extends Controller
             'document_type_id' => 'sometimes|integer|exists:document_type,document_type_id',
             'number_of_copies' => 'sometimes|integer|min:1|max:10',
         ]);
+        $reqDoc = RequestDocument::findOrFail($id);
 
+        $validated = $request->validate([
+            'document_type_id' => 'sometimes|integer|exists:document_type,document_type_id',
+            'number_of_copies' => 'sometimes|integer|min:1|max:10',
+        ]);
+
+        $reqDoc->update($validated);
         $reqDoc->update($validated);
         return response()->json($reqDoc, 200);
     }
