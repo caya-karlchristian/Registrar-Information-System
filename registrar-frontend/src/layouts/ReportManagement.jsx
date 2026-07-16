@@ -17,13 +17,28 @@ const PER_PAGE = 10;
 const getRoleBadgeClasses = (roleName, isDark) => {
   const role = String(roleName || "").trim().toLowerCase();
 
-  if (role.includes("super")) { // Super Admin - PUP Yellow
+  if (role.includes("super")) { // Super Admin
     if (isDark) {
       return 'bg-red-950/40 text-red-400 border-red-800/50';
     }
     return 'bg-red-50 text-[#8B0000]/70 border-red-200';
   }
 
+  if (role.includes("student")) { // Student
+    if (isDark) {
+      return 'bg-yellow-950/30 text-yellow-400 border-yellow-900/50';
+    }
+    return 'bg-yellow-50 text-yellow-800 border-yellow-200';
+  }
+
+  if (role.includes("alumni")) { // Alumni
+    if (isDark) {
+      return 'bg-green-950/40 text-green-400 border-green-800/50';
+    }
+    return 'bg-green-50 text-green-700 border-green-200';
+  }
+
+  // Admin / Default
   if (isDark) {
     return 'bg-[#8B0000]/20 text-[#ffb3b3] border-[#8B0000]/30';
   }
@@ -145,9 +160,13 @@ const ReportManagement = () => {
   };
 
   return (
-    <div className={`font-sans sm:px-6 flex justify-center ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : 'bg-[#F5F5F5]'}`}>
-      <div className="w-full max-w-6xl flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+    <div className="w-full flex flex-col font-sans">
+      <div className={`rounded-2xl p-4 sm:p-6 ${
+        isDark 
+          ? 'bg-[#242526] text-[#e4e6eb] border border-[#3e4042]' 
+          : 'bg-white text-gray-900 shadow-md border border-gray-200/80'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div className="flex-1 min-w-0 sm:max-w-xs">
           <VoiceSearchInput
             value={search}
@@ -334,7 +353,7 @@ const ReportManagement = () => {
         message={errorMsg} 
         onClose={() => setErrorMsg("")} 
       />
-    </div>
+      </div>
     </div>
   );
 };
