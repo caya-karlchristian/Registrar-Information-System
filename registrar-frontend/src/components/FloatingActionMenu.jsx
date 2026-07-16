@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "../context/NotificationToastContext";
+import { useAlertToast } from "../context/AlertToastContext";
 import { useAuth } from "../context/AuthProvider";
 import useVoiceRecognition from "../utils/useVoiceRecognition";
 import { matchCommand, resolveVoiceRoute } from "../utils/voiceCommands";
@@ -9,7 +9,7 @@ import ConfirmationModal from "./ConfirmationModal";
 const FloatingActionMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
-  const { addToast } = useToast();
+  const { showError } = useAlertToast();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const menuRef = useRef(null);
@@ -46,11 +46,7 @@ const FloatingActionMenu = () => {
       siennaBtn.click();
     } else {
       console.warn("Sienna Accessibility widget launcher button (.asw-menu-btn) not found in the DOM.");
-      addToast({
-        type: "payment_invalid",
-        title: "Accessibility Menu",
-        message: "The accessibility widget is still loading. Please try again in a moment.",
-      });
+      showError("The accessibility widget is still loading. Please try again in a moment.");
     }
   };
 
@@ -66,11 +62,7 @@ const FloatingActionMenu = () => {
     const command = matchCommand(transcript);
 
     if (!command) {
-      addToast({
-        type: "payment_invalid",
-        title: "Voice Command",
-        message: `Didn't recognize "${transcript}". Try "open dashboard" or "logout".`,
-      });
+      showError(`Didn't recognize "${transcript}". Try "open dashboard" or "logout".`);
       return;
     }
 
@@ -87,25 +79,17 @@ const FloatingActionMenu = () => {
     if (command.type === "navigate") {
       const path = resolveVoiceRoute(command.target, user?.role_name);
       if (!path) {
-        addToast({
-          type: "payment_invalid",
-          title: "Voice Command",
-          message: "That section isn't available for your account.",
-        });
+        showError("That section isn't available for your account.");
         return;
       }
       setIsOpen(false);
       navigate(path);
     }
-  }, [addToast, navigate, user]);
+  }, [showError, navigate, user]);
 
   const handleVoiceError = useCallback(() => {
-    addToast({
-      type: "payment_invalid",
-      title: "Voice Speech",
-      message: "We couldn't access the microphone. Please check your browser permissions.",
-    });
-  }, [addToast]);
+    showError("We couldn't access the microphone. Please check your browser permissions.");
+  }, [showError]);
 
   const {
     isListening: isVoiceAnimating,
@@ -119,11 +103,7 @@ const FloatingActionMenu = () => {
 
   const handleVoiceSpeechClick = () => {
     if (!isVoiceSupported) {
-      addToast({
-        type: "payment_invalid",
-        title: "Voice Speech",
-        message: "Voice commands aren't supported in this browser. Try Chrome or Edge.",
-      });
+      showError("Voice commands aren't supported in this browser. Try Chrome or Edge.");
       return;
     }
     toggleVoiceRecognition();

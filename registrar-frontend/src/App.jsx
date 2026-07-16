@@ -41,6 +41,10 @@ import SsoCallbackPage from './pages/SsoCallbackPage.jsx';
 import { NotificationToastProvider } from './context/NotificationToastContext.jsx';
 import NotificationToast from './components/NotificationToast.jsx';
 
+// Lightweight alert toasts (ErrorToast / SuccessToast) — separate from the
+// notification system above.
+import { AlertToastProvider } from './context/AlertToastContext.jsx';
+
 import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ReferenceDataProvider } from './context/ReferenceDataContext.jsx';
 import FloatingActionMenu from './components/FloatingActionMenu.jsx';
@@ -71,6 +75,7 @@ const StaffIndexRedirect = () => {
 const App = () => {
   return (
     <NotificationToastProvider>
+      <AlertToastProvider>
       <ReferenceDataProvider>
         <NotificationsProvider>
           <div className="flex flex-col min-h-screen">
@@ -176,6 +181,7 @@ const App = () => {
           </div>
         </NotificationsProvider>
       </ReferenceDataProvider>
+      </AlertToastProvider>
     </NotificationToastProvider>
   );
 };

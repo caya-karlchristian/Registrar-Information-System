@@ -91,7 +91,17 @@ class StudentAcademicRecordController extends Controller
             return response()->json(['message' => 'Record not found'], 404);
         }
 
-        $record->delete();
+        try {
+            $record->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete this academic record because it is still referenced elsewhere.',
+                ], 409);
+            }
+
+            throw $e;
+        }
 
         return response()->json(['message' => 'Record deleted'], 200);
     }
