@@ -63,7 +63,19 @@ class RequestDocumentController extends Controller
     public function destroy($id)
     {
         $reqDoc = RequestDocument::findOrFail($id);
-        $reqDoc->delete();
+
+        try {
+            $reqDoc->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete this request document because it is still referenced elsewhere.',
+                ], 409);
+            }
+
+            throw $e;
+        }
+
         return response()->json(['message' => 'Request document deleted'], 200);
     }
 }

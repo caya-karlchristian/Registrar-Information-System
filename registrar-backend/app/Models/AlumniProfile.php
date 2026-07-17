@@ -8,7 +8,7 @@ class AlumniProfile extends Model
 {
     public $timestamps = false;
     protected $primaryKey = 'alumni_profile_id';
-    protected $guarded = [];
+    protected $fillable = ['alumni_id', 'first_name', 'middle_name', 'last_name', 'suffix', 'date_of_birth', 'place_of_birth', 'sex_at_birth'];
      protected $table = 'alumni_profile';
 
     // -------------------------------------------------------

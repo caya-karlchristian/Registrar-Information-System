@@ -35,8 +35,12 @@ class StudentProfileController extends Controller
             'middle_name'       => 'nullable|string|max:100',
             'last_name'         => 'required|string|max:100',
             'date_of_birth'     => 'required|date',
-            'permanent_address' => 'required|string|max:500',
-            'contact_number'    => 'required|string|max:20',
+            // permanent_address / contact_number removed — no such columns
+            // exist on student_profile (confirmed via SHOW CREATE TABLE).
+            // Both were marked 'required', so this endpoint 500'd on every
+            // call before this fix — validation always passed (fields were
+            // present) and create() always failed with a fatal "Unknown
+            // column" SQL error.
         ]);
 
         $profile = StudentProfile::create($validated);
@@ -52,8 +56,6 @@ class StudentProfileController extends Controller
             'middle_name'       => 'nullable|string|max:100',
             'last_name'         => 'sometimes|string|max:100',
             'date_of_birth'     => 'sometimes|date',
-            'permanent_address' => 'sometimes|string|max:500',
-            'contact_number'    => 'sometimes|string|max:20',
         ]);
 
         $profile->update($validated);
@@ -63,7 +65,20 @@ class StudentProfileController extends Controller
     public function destroy($id)
     {
         $profile = StudentProfile::findOrFail($id);
-        $profile->delete();
+
+        try {
+            $profile->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // MySQL error 1451 — FK constraint violation
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'message' => 'Cannot delete a student profile that still has academic records on file.',
+                ], 409);
+            }
+
+            throw $e;
+        }
+
         return response()->json(['message' => 'Profile deleted'], 200);
     }
 

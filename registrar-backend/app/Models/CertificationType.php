@@ -14,10 +14,17 @@ class CertificationType extends Model
     protected $keyType = 'int';
     public $incrementing = true;
     public $timestamps = false;
-    protected $guarded = [];
+    protected $fillable = [
+        'certificate_name', 'certificate_requirements', 'certificate_process_period', 'access_id',
+        'layout_header_left_url', 'layout_header_right_url', 'layout_footer_urls',
+        'layout_header_logo_size', 'layout_footer_logo_size',
+        'cashier_document_patterns', 'is_archived', 'archived_on', 'archived_by',
+    ];
 
     protected $casts = [
         'cashier_document_patterns' => 'array',
+        'is_archived'                => 'boolean',
+        'archived_on'                => 'datetime',
     ];
 
     // layout_footer_urls is stored as a JSON array of bare paths.
@@ -90,8 +97,44 @@ class CertificationType extends Model
         );
     }
 
-    public function documentRequests()
+    // Was documentRequests() referencing document_request.cert_type_id, which
+    // doesn't exist — certificate_type_id actually lives on request_certificate.
+    // Confirmed unused anywhere in the app before renaming/fixing.
+    public function requestCertificates()
     {
-        return $this->hasMany(DocumentRequest::class, 'cert_type_id');
+        return $this->hasMany(RequestCertificate::class, 'certificate_type_id');
+    }
+
+    public function accessType()
+    {
+        return $this->belongsTo(AccessType::class, 'access_id');
+    }
+
+    // Named archivedByUser() (not archivedBy()) so it serializes to
+    // "archived_by_user" — "archived_by" is the raw FK column, same
+    // convention as DocumentRequest::archivedByUser().
+    public function archivedByUser()
+    {
+        return $this->belongsTo(SystemUser::class, 'archived_by', 'user_id');
+    }
+
+    /**
+     * Number of non-archived requests currently using this certificate type
+     * that are still in an active (non-terminal) status — Processing or
+     * Ready to Claim. Backs the "N active requests are using this — can't
+     * archive yet" guard from the Archive Policy — Document & Certificate
+     * Management. DocumentRequest's own ExcludeArchivedScope excludes
+     * already-archived requests automatically.
+     */
+    public function activeRequestsCount(): int
+    {
+        return $this->requestCertificates()
+            ->whereHas('documentRequest', function ($query) {
+                $query->whereHas(
+                    'status',
+                    fn ($status) => $status->whereIn('status_name', ['Processing', 'Ready to Claim'])
+                );
+            })
+            ->count();
     }
 }

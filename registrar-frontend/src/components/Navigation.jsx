@@ -20,6 +20,7 @@ import { useAuth } from "../context/AuthProvider";
 import { useTheme } from "../context/ThemeContext";
 import ConfirmationModal from "../components/ConfirmationModal";
 import LineLoading from "../components/LineLoading.jsx";
+import { MODULE_KEYS, hasModuleAccess } from "../utils/policy";
 
 const ROLE_CONFIG = {
   student: {
@@ -50,23 +51,22 @@ const ROLE_CONFIG = {
     profileKey: 'admin_profile',
     profileLabel: (user) => user?.email,
     items: [
-      { name: 'Dashboard', to: 'dashboard', icon: Squares2X2Icon },
-      { name: 'Inbox', to: 'inbox', icon: InboxIcon },
+      { name: 'Dashboard', to: 'dashboard', icon: Squares2X2Icon, module: MODULE_KEYS.DASHBOARD },
+      { name: 'Inbox', to: 'inbox', icon: InboxIcon, module: MODULE_KEYS.INBOX },
       // { name: 'Walk-In Request', to: 'request', icon: AcademicCapIcon },
-      { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon },
-      { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon },
-      { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon },
+      { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon, module: MODULE_KEYS.ANALYTICS },
+      { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon, module: MODULE_KEYS.LOGBOOK },
+      { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon, module: MODULE_KEYS.PROFILE },
     ],
   },
   superAdmin: {
     profileKey: null,
     profileLabel: (user) => user?.email,
     items: [
-      { name: 'User Directory', to: 'user', icon: Squares2X2Icon },
+      { name: 'Admin Management', to: 'user', icon: Squares2X2Icon },
       { name: 'Document Management', to: 'documents', icon: TableCellsIcon },
-      { name: 'Certificate Management', to: 'certificates', icon: AcademicCapIcon },
-      { name: 'Report Management', to: 'report', icon: UserCircleIcon },
-      { name: 'System Settings', to: 'settings', icon: Cog6ToothIcon },
+      { name: 'Audit Trail', to: 'report', icon: UserCircleIcon },
+      { name: 'Announcement Management', to: 'settings', icon: Cog6ToothIcon },
     ],
   },
 };
@@ -121,7 +121,16 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
     return () => resizeObserver.disconnect();
   }, []);
 
-  const config = ROLE_CONFIG[role] || ROLE_CONFIG.student;
+  const baseConfig = ROLE_CONFIG[role] || ROLE_CONFIG.student;
+  // Items without a `module` tag (student/alumni/superAdmin items, plus
+  // any future staff item not covered by the policy system) always pass
+  // through. Items tagged with a `module` are only shown if the current
+  // user's assigned policy actually grants that module — see
+  // src/utils/policy.js.
+  const config = useMemo(() => ({
+    ...baseConfig,
+    items: baseConfig.items.filter((item) => !item.module || hasModuleAccess(user, item.module)),
+  }), [baseConfig, user]);
   const profile = config.profileKey ? user?.[config.profileKey] : null;
 
   const fullName = useMemo(() => {
@@ -224,7 +233,7 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
           type="button"
           onClick={() => setIsCollapsed(!isCollapsed)}
           className={`
-            hidden lg:flex absolute top-5 -right-3 z-50 items-center justify-center w-6 h-6 rounded-full border shadow-md transition-all duration-300 hover:scale-110
+            hidden lg:flex absolute top-5 -right-5 z-9999 items-center justify-center w-10 h-8 rounded-full border shadow-md transition-all duration-300 hover:scale-110
             ${isDark
               ? 'bg-[#18191a] border-[#3e4042] text-[#e4e6eb] hover:bg-[#3a3b3c]'
               : 'bg-[#E0E0E0] border-gray-300 text-[#700000] hover:bg-white'}
@@ -238,7 +247,7 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
           )}
         </button>
 
-        <div className={`flex flex-col h-full z-9999 ${isCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
+        <div className={`flex flex-col h-full ${isCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
           <div className={`shrink-0 transition-all duration-300 ${isCollapsed ? 'p-3' : 'p-6'}`}>
             <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
               <UserCircleIcon className={`transition-all duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-14 h-14 lg:w-17 lg:h-17'} ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`} />

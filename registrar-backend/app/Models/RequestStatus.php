@@ -9,7 +9,7 @@ class RequestStatus extends Model
     protected $table = 'request_status';
     protected $primaryKey = 'status_id';
     public $timestamps = false;
-    protected $guarded = [];
+    protected $fillable = ['status_name'];
 
     public function documentRequests()
     {
