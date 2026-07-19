@@ -1,0 +1,167 @@
+services:
+  # -------------------------------------------------------
+  # Laravel Backend — built from local source, not pulled from ECR.
+  # Local dev should always reflect your current branch.
+  # -------------------------------------------------------
+  backend:
+    build:
+      context: ./registrar-backend
+      dockerfile: Dockerfile
+    container_name: ris_local_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-ris_local}
+      DB_USERNAME: ${DB_USERNAME:-ris_local}
+      DB_PASSWORD: ${DB_PASSWORD:-local_dev_only}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-local_dev_only}
+      REDIS_CLIENT: predis
+      CACHE_STORE: redis
+      SESSION_DRIVER: redis
+      SESSION_SECURE_COOKIE: "false"
+      SESSION_SAME_SITE: lax
+      QUEUE_CONNECTION: sync
+      TELESCOPE_ENABLED: "true"
+      # Third-party integrations default to mock/off locally —
+      # override in your own .env only if you specifically need
+      # to test against a real sandbox/staging endpoint.
+      ALUMNI_MOCK: "true"
+      FILESYSTEM_DISK: local
+    volumes:
+      # Bind mount so code changes reflect immediately — this is the
+      # one meaningful difference from prod/staging compose files,
+      # which intentionally run from the built image only.
+      - ./registrar-backend:/var/www/html
+      # Named volume so the bind mount above doesn't shadow/hide the
+      # vendor/ folder Composer installed inside the image at build
+      # time. Without this, a fresh host checkout (no local vendor/)
+      # would boot the container with no dependencies at all.
+      - backend_vendor:/var/www/html/vendor
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - ris_local_network
+
+  # -------------------------------------------------------
+  # Reverb (WebSocket) — same image as backend, local build.
+  # -------------------------------------------------------
+  reverb:
+    build:
+      context: ./registrar-backend
+      dockerfile: Dockerfile
+    container_name: ris_local_reverb
+    restart: unless-stopped
+    env_file: .env
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    environment:
+      APP_ENV: local
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-local_dev_only}
+      DB_HOST: mysql
+      DB_DATABASE: ${DB_DATABASE:-ris_local}
+      DB_USERNAME: ${DB_USERNAME:-ris_local}
+      DB_PASSWORD: ${DB_PASSWORD:-local_dev_only}
+    volumes:
+      - ./registrar-backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    networks:
+      - ris_local_network
+
+  # -------------------------------------------------------
+  # MySQL — local, disposable, isolated from production/staging.
+  # Named volume persists data across restarts but never
+  # touches anything outside this compose file.
+  # -------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: ris_local_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-ris_local}
+      MYSQL_USER: ${DB_USERNAME:-ris_local}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-local_dev_only}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local_root_only}
+    ports:
+      # Exposed to host so you can connect a GUI client
+      # (TablePlus, DBeaver, etc.) directly if you want to.
+      # Safe here since this is local-only data, not production.
+      - "3307:3306"
+    volumes:
+      - ris_local_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ris_local_network
+
+  # -------------------------------------------------------
+  # Redis — local, no meaningful secret needed since it's
+  # never exposed beyond this compose network.
+  # -------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: ris_local_redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-local_dev_only}
+    networks:
+      - ris_local_network
+
+  # -------------------------------------------------------
+  # Frontend — Vite dev server with hot reload.
+  # -------------------------------------------------------
+  frontend:
+    image: node:20-alpine
+    container_name: ris_local_frontend
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    volumes:
+      - ./registrar-frontend:/app
+      - frontend_node_modules:/app/node_modules
+    environment:
+      # Relative + same-port-as-page values below mean the browser only ever
+      # talks to localhost:5173. Vite's dev-server proxy (vite.config.js)
+      # forwards /api, /broadcasting, and /app to the real backend/reverb
+      # containers behind the scenes — same trick CloudFront does in prod.
+      VITE_API_URL: /api
+      VITE_REVERB_APP_KEY: local
+      VITE_REVERB_HOST: localhost
+      VITE_REVERB_PORT: "5173"
+      VITE_REVERB_SCHEME: http
+      # Proxy-only targets (Node/Vite server side, not sent to the browser).
+      # Docker service names — reachable inside the compose network only.
+      VITE_BACKEND_URL: http://backend:8000
+      REVERB_INTERNAL_HOST: reverb
+      REVERB_INTERNAL_PORT: "8080"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - ris_local_network
+
+volumes:
+  ris_local_db_data:
+  backend_vendor:
+  frontend_node_modules:
+
+networks:
+  ris_local_network:
+    driver: bridge
