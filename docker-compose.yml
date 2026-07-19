@@ -3,10 +3,7 @@ services:
   # Laravel Backend
   # -------------------------------------------------------
   backend:
-    build:
-      context: ./registrar-backend
-      dockerfile: Dockerfile
-    image: ris_backend_image
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_backend
     restart: always
     environment:
@@ -52,9 +49,9 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       SESSION_SAME_SITE: ${SESSION_SAME_SITE:-none}
-      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}  
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
       ALUMNI_API_URL: http://host.docker.internal/api
-      ALUMNI_API_TOKEN: 1|lyXSPwWmlf5YYbHZVIbmTR1MhKHhS7F3eZUWU2Ur
+      ALUMNI_API_TOKEN: ${ALUMNI_API_TOKEN}
       OCMS_BASE_URL: ${OCMS_BASE_URL}
       OCMS_CLIENT_ID: ${OCMS_CLIENT_ID}
       OCMS_CLIENT_SECRET: ${OCMS_CLIENT_SECRET}
@@ -72,7 +69,7 @@ services:
   # Laravel Reverb (WebSocket Server)
   # -------------------------------------------------------
   reverb:
-    image: ris_backend_image
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_reverb
     restart: always
     command: php artisan reverb:start --host=0.0.0.0 --port=8080
@@ -113,7 +110,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       SESSION_SAME_SITE: ${SESSION_SAME_SITE:-none}
-      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}  
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
       CASHIER_API_KEY: ${CASHIER_API_KEY}
       CASHIER_API_URL: ${CASHIER_API_URL}
       CASHIER_SINGLE_USE: ${CASHIER_SINGLE_USE}
@@ -133,7 +130,7 @@ services:
   # Queue Worker
   # -------------------------------------------------------
   worker:
-    image: ris_backend_image
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_worker
     restart: unless-stopped
     command: >
@@ -178,7 +175,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       SESSION_SAME_SITE: ${SESSION_SAME_SITE:-none}
-      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}  
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
       CASHIER_API_KEY: ${CASHIER_API_KEY}
       CASHIER_API_URL: ${CASHIER_API_URL}
       CASHIER_SINGLE_USE: ${CASHIER_SINGLE_USE}
@@ -211,15 +208,15 @@ services:
   # lightweight: short timeout, fast sleep, restarts immediately on exit.
   # -------------------------------------------------------
   broadcast-worker:
-    image: ris_backend_image
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_broadcast_worker
     restart: unless-stopped
     command: >
-        php artisan queue:work database
-          --queue=broadcasts
-          --sleep=1
-          --tries=3
-          --timeout=30
+      php artisan queue:work database
+        --queue=broadcasts
+        --sleep=1
+        --tries=3
+        --timeout=30
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_KEY: ${APP_KEY}
@@ -255,7 +252,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       SESSION_SAME_SITE: ${SESSION_SAME_SITE:-none}
-      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}  
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
       CASHIER_API_KEY: ${CASHIER_API_KEY}
       CASHIER_API_URL: ${CASHIER_API_URL}
       CASHIER_SINGLE_USE: ${CASHIER_SINGLE_USE}
@@ -269,13 +266,13 @@ services:
     networks:
       - ris_network
 
-# -------------------------------------------------------
-# Scheduler — runs php artisan schedule:run every minute.
-# Handles: notifications:shred-expired-requests (08:00)
-#          notifications:send-unclaimed-reminders (08:05)
-# -------------------------------------------------------
+  # -------------------------------------------------------
+  # Scheduler — runs php artisan schedule:run every minute.
+  # Handles: notifications:shred-expired-requests (08:00)
+  #          notifications:send-unclaimed-reminders (08:05)
+  # -------------------------------------------------------
   scheduler:
-    image: ris_backend_image
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_scheduler
     restart: unless-stopped
     command: >
@@ -316,7 +313,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       SESSION_SAME_SITE: ${SESSION_SAME_SITE:-none}
-      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}  
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
       CASHIER_API_KEY: ${CASHIER_API_KEY}
       CASHIER_API_URL: ${CASHIER_API_URL}
       CASHIER_SINGLE_USE: ${CASHIER_SINGLE_USE}

@@ -17,6 +17,15 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Core reference data — request statuses, purposes, alumni/document/certificate types.
+        // roles, access_type, and programs must all run first — each has
+        // dependent tables with a foreign key into them (programs is
+        // required by student_academic_record.course_id, which is NOT
+        // NULL as of the fix_course_fk_and_history_index migration).
+        // None of these three were ever seeded anywhere before now.
+        $this->seedRoles();
+        $this->seedAccessType();
+        $this->seedPrograms();
+        $this->seedPolicies();
         $this->seedRequestStatus();
         $this->seedRequestPurpose();
         $this->seedAlumniType();
@@ -34,12 +43,124 @@ class DatabaseSeeder extends Seeder
         // unclaimed-document policy, on top of the base set seeded above.
         $this->call(NotificationTypeSeeder::class);
 
-        // Sets local-auth passwords for the accounts listed in that seeder.
-        // Safe to run on a DB with no users yet — it only updates existing
-        // rows by email match and is a no-op otherwise.
-        // IMPORTANT: rotate every password in that file before relying on it —
-        // it was found committed to source control with real plaintext values.
-        $this->call(LocalAuthPasswordSeeder::class);
+        // LocalAuthPasswordSeeder was removed — it contained real plaintext
+        // passwords committed to source control. Do not recreate it with
+        // real credentials. For local dev accounts, use LocalDevSeeder
+        // below, which generates fake accounts with Laravel's standard
+        // dev password via the existing factories.
+
+        // Fake accounts + sample data for local development only.
+        // Never runs against staging or production (guarded inside
+        // LocalDevSeeder itself, not just here, as a second safety check).
+        if (app()->environment('local')) {
+            $this->call(LocalDevSeeder::class);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // programs
+    // Referenced by student_academic_record.course_id, which is NOT NULL
+    // as of fix_course_fk_and_history_index (that migration also moved
+    // the FK from the now-unused courses table to this one). Generic
+    // curriculum data, confirmed against a real database export.
+    // ─────────────────────────────────────────────
+    private function seedPrograms(): void
+    {
+        $rows = [
+            ['ogos_course_id' => 1,  'code' => 'BSBA-HRM',     'name' => 'Bachelor of Science in Business Administration - Human Resource Management'],
+            ['ogos_course_id' => 2,  'code' => 'BSBA-MM',      'name' => 'Bachelor of Science in Business Administration - Marketing Management'],
+            ['ogos_course_id' => 3,  'code' => 'BSED-ENGLISH', 'name' => 'Bachelor of Science in Education - English'],
+            ['ogos_course_id' => 4,  'code' => 'BSED-MATH',    'name' => 'Bachelor of Science in Education - Mathematics'],
+            ['ogos_course_id' => 5,  'code' => 'BSECE',        'name' => 'Bachelor of Science in Electronics and Communications Engineering'],
+            ['ogos_course_id' => 6,  'code' => 'BSIT',         'name' => 'Bachelor of Science in Information Technology'],
+            ['ogos_course_id' => 8,  'code' => 'BSOA',         'name' => 'Bachelor of Science in Office Administration'],
+            ['ogos_course_id' => 9,  'code' => 'BSPSYCH',      'name' => 'Bachelor of Science in Psychology'],
+            ['ogos_course_id' => 10, 'code' => 'DIT',          'name' => 'Diploma in Information Technology'],
+            ['ogos_course_id' => 11, 'code' => 'DOMT',         'name' => 'Diploma in Office Management Technology'],
+        ];
+
+        foreach ($rows as $row) {
+            DB::table('programs')->updateOrInsert(
+                ['ogos_course_id' => $row['ogos_course_id']],
+                ['code' => $row['code'], 'name' => $row['name'], 'is_active' => 1]
+            );
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // policies
+    // Referenced by users.policy_id (admin-only — the module-permissions
+    // policy attached to an admin account). Only seeding the one policy
+    // actually used by LocalDevSeeder's admin test account for now;
+    // add more rows here if local testing needs additional policy
+    // variations. Permissions JSON confirmed against a real database
+    // export (policy_id=1, "Registrar Staff").
+    // ─────────────────────────────────────────────
+    private function seedPolicies(): void
+    {
+        DB::table('policies')->updateOrInsert(
+            ['policy_id' => 1],
+            [
+                'name'        => 'Registrar Staff',
+                'permissions' => json_encode([
+                    'inbox'      => ['Access'],
+                    'logbook'    => ['Access'],
+                    'profile'    => ['Access'],
+                    'analytics'  => ['Access'],
+                    'dashboard'  => ['Access'],
+                ]),
+                'is_system'   => 1,
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ]
+        );
+    }
+
+    // ─────────────────────────────────────────────
+    // roles
+    // Referenced by users.role_id (FK, restrict on delete). Values and
+    // exact string casing confirmed against a real database export —
+    // matches SystemUser::ROLE_* constants (1=student, 2=alumni,
+    // 3=admin, 4=super_admin).
+    // ─────────────────────────────────────────────
+    private function seedRoles(): void
+    {
+        $rows = [
+            ['role_id' => 1, 'role_name' => 'student'],
+            ['role_id' => 2, 'role_name' => 'alumni'],
+            ['role_id' => 3, 'role_name' => 'admin'],
+            ['role_id' => 4, 'role_name' => 'super_admin'],
+        ];
+
+        foreach ($rows as $row) {
+            DB::table('roles')->updateOrInsert(
+                ['role_id' => $row['role_id']],
+                ['role_name' => $row['role_name']]
+            );
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // access_type
+    // Referenced by document_type.access_id and certificate_type.access_id
+    // throughout this file: 1=student, 2=alumni, 3=both — matching the
+    // comment on seedDocumentTypes() and confirmed against a real
+    // database export.
+    // ─────────────────────────────────────────────
+    private function seedAccessType(): void
+    {
+        $rows = [
+            ['access_id' => 1, 'access_name' => 'Student'],
+            ['access_id' => 2, 'access_name' => 'Alumni'],
+            ['access_id' => 3, 'access_name' => 'Both'],
+        ];
+
+        foreach ($rows as $row) {
+            DB::table('access_type')->updateOrInsert(
+                ['access_id' => $row['access_id']],
+                ['access_name' => $row['access_name']]
+            );
+        }
     }
 
     // ─────────────────────────────────────────────
@@ -292,7 +413,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 2,
                 'document_name'           => 'Replacement of Lost Identification Card',
-                'document_description'    => 'This request is processed by the OSS for students who need replacement of their identification cards due to loss/theft.',
                 'document_requirements'   => "Current Registration Card - (1) Original Copy,\nApplication for Replacement of Lost Identification Card Form - (1) Original Copy,\nAttach with Parents/Guardian ID or Cedula (undergraduates only),\nProof of payment - (1) Original Copy,\nRemarks: Copy the link to view the copy of new/application of ID \nhttps://drive.google.com/file/d/150ijzdHofoMcJzc6L_fChnmM-HSe8GHo/view",
                 'document_process_period' => '2 working day/s, 23 minute/s',
                 'access_id'               => 1,
@@ -301,7 +421,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 5,
                 'document_name'           => 'Recommendation Letter',
-                'document_description'    => "A document which assesses the student's attributes, characteristics, and abilities. It is issued by the counselor or psychologist to the requesting student who is asking for recommendation for academic or employment purposes.",
                 'document_requirements'   => "ID card or Registration certificate - (1) Original Copy,\nCopy of Grades - (1) Photo Copy (from PUP SIS account),\nReferral Slip - (1) Original Copy,\nRemarks: Proceed to the Office of the Student's Services or Office of Admission Services",
                 'document_process_period' => '50 minute/s',
                 'access_id'               => 1,
@@ -310,7 +429,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 6,
                 'document_name'           => "Student/Alumni\nReferral and Recommendation",
-                'document_description'    => 'Letter that recommends a PUP Student/Alumni to an industry for a full–time, part-time, summer employment or internship opportunities.',
                 'document_requirements'   => 'Duly Accomplished Student/ Alumni Request Form - (1) Original Copy',
                 'document_process_period' => '53 minute/s',
                 'access_id'               => 3,
@@ -319,7 +437,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 8,
                 'document_name'           => "Application for Graduation\nSIS and Non-SIS",
-                'document_description'    => 'A student who has already completed all the academic requirements and cleared of all accountabilities can submit his application for graduation.',
                 'document_requirements'   => "Accomplished printed copy of Application for Graduation (SIS Account) - (1) Original Copy,\nAccomplished Application for Graduation (Non-SIS) - (1) Original Copy,\nRemarks: Proof of payment, if not covered by RA 10931 covered otherwise known as Universal Access to Quality Tertiary Act of 2017",
                 'document_process_period' => '2 working day/s, 2 hour/s, 33 minute/s',
                 'access_id'               => 1,
@@ -328,7 +445,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 9,
                 'document_name'           => 'Course/Subject Description',
-                'document_description'    => 'A Course/Subject Description is requested by the client to describe the content of the course taken by the student within the curriculum.',
                 'document_requirements'   => "Student's Request Letter - (1) Original Copy,\nGeneral Clearance showing the client is cleared of all accountabilities - (1) Original Copy,\n2 (two) pcs. '2x2' picture in Formal Attire - (1) Original Copy,\nDocumentary stamp - (1) Original Copy,\nProof of payment - (1) Original Copy,\n1 Long Brown Envelope,\nReminder: When claiming documents: Authorization letter and ID if the claimant is an immediate family member. Special Power of Attorney (SPA) if the claimant is other than the immediate family.",
                 'document_process_period' => '3 working days, 3 hours, 42 minutes',
                 'access_id'               => 1,
@@ -337,7 +453,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 10,
                 'document_name'           => "Correction of Entry of Grade,\nCompletion of Incomplete Grade,\nLate Reporting of Grade",
-                'document_description'    => 'Correction of entry should be accomplished within a period of one semester upon receipt of grade and the Late Reporting of Grades Form should be accomplished within a period of one year. Incomplete (Inc) is temporarily given to a student who may pass the subject, but not yet complied with all its requirements. Such requirements shall be satisfied within one year from the end of the term; otherwise the grade shall be lapsed "No Credit (N) or a failing mark.',
                 'document_requirements'   => "Accomplished Completion Form - (3) Original Copies (Download from PUP website),\nPhotocopy of Class Record of the Faculty - 1 Photo Copy,\nNotarized Affidavit for Change of Grade signed by Professor - Original Copy,\nProof of payment - (1) Original Copy,\nOfficial Logbook - (1) Original Copy",
                 'document_process_period' => '5 working day/s, 59 minute/s',
                 'access_id'               => 1,
@@ -346,7 +461,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 11,
                 'document_name'           => "Course Accreditation\n(SHS to Bridge)",
-                'document_description'    => 'Subjects taken in another Senior High School shall be accredited to Bridge Course Subject only and zero units as required in the PUP curriculum.',
                 'document_requirements'   => "Accomplished Course Accreditation Form (Download from PUP Website) - (1) Original Copy,\nCurriculum Sheet used upon admission - (1) Original Copy,\nInformative copy of grades for PUP SHS graduates - (1) Original Copy,\nForm 138 or 137 for graduates from other Senior High School- (1) Original Copy",
                 'document_process_period' => '1 working day/s, 5 hour/s, 30 minute/s',
                 'access_id'               => 1,
@@ -355,7 +469,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 12,
                 'document_name'           => "Course Accreditation\n(Transferees)",
-                'document_description'    => "Subjects taken in another university/college of recognized standing not exceeding 30 units including P.E. and NSTP shall be accredited provided they have the same subject description as those in the PUP curriculum. All subjects taken by transferees from branches and campuses of PUP are accredited provided the transferring student is enrolled in the same course. If not, only mandatory and general education subjects are accredited.",
                 'document_requirements'   => "A. FOR TRANSFEREES FROM ANOTHER UNIVERSITY/COLLEGE:\n1. Accomplished Course Accreditation Form (Download from PUP Website)\n2. Curriculum Sheet upon Admission to PUP - (1) Original Copy\n3. Certified Copy of TOR with Remarks: 'Copy for PUP' - (1) Original Copy\n4. Subject Description taken from other school/university - (1) Original Copy\n5. Proof of Payment - (1) Original Copy\nB. FOR TRANSFEREES FROM PUP BRANCH/CAMPUS TO MAIN:\n1. Accomplished Accreditation Form (Download from PUP Website)\n2. Curriculum Sheet upon Admission to PUP - (1) Original Copy\n3. Certified Copy of TOR with Remarks: 'Copy for PUP' - (1) Original Copy",
                 'document_process_period' => '1 working day/s, 5 hour/s, 30 minute/s',
                 'access_id'               => 1,
@@ -364,7 +477,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 13,
                 'document_name'           => 'CERTIFICATION',
-                'document_description'    => 'A student/client can apply for these certifications as needed while a Certificate of Transfer Credential/Honorable Dismissal is a document certifying that a student has no pending accountabilities thereby he/she is honorably dismissed from the University.',
                 'document_requirements'   => "Student's Request Letter - (1) Original Copy,\nGeneral Clearance showing the client is cleared of all accountabilities - (1) Original Copy,\n2 (two) pcs of 2x2 pictures in Formal Attire (Uploaded to ODRS),\nOfficial receipt for documentary stamp - (1) Original Copy,\nProof of payment - (1) Original Copy,\n1 Long Brown Envelope",
                 'document_process_period' => '3 working day/s, 3 hour/s, 43 minute/s',
                 'access_id'               => 3,
@@ -373,7 +485,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 14,
                 'document_name'           => 'CAV/APOSTILE',
-                'document_description'    => 'A graduated student/client can apply for the Certification, Verification, Authentication (CAV/Apostile) and submits a photocopy of his credentials to be certified and put in a sealed envelope for DFA, CHED or PRC.',
                 'document_requirements'   => "Student's Request Letter - (1) Original Copy,\nGeneral Clearance showing the client is cleared of all accountabilities - (1) Original Copy,\nLetter request addressed to CHED Regional Director (for CAV-CHED request only) - (1) Original Copy,\n2 (two) pcs of 2x2 pictures in Formal Attire,\nProof of payment - (1) Original Copy,\n1 Long Brown Envelope",
                 'document_process_period' => '2 working days, 7 hours, 10 minutes',
                 'access_id'               => 2,
@@ -382,7 +493,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 15,
                 'document_name'           => 'Transcript of Records (TOR)',
-                'document_description'    => "For process requests for credentials of students and alumni, transcript of Records (TOR) is one of the credentials requested. This is an official copy of a student's academic subjects enrolled/taken with corresponding remarks/grade given by course faculty with signature of the University Registrar and counter signed by a student record staff.",
                 'document_requirements'   => "A. FIRST COPY (For New Graduates/Transferees):\n1. Accomplished and printed copy of the application and payment voucher from the Campus registrar. - (1) Original (To be Printed by the Registrar)\n2. General Clearance showing the client is cleared of all accountabilities - (1) Original Copy (Printed from SIS)\n3. Certificate of Candidacy - (1) Original (Printed from SIS)\n4. Certificate of Conferment of Degree (Dummy Diploma) - (1) Original Copy (Remarks: Awarded during graduation ceremony)\n5. 2 (two) pcs of 2x2 picture in Academic Gown/Toga\n6. Documentary stamp - (1) Sample\n7. Proof of payment (if not covered by RA 10931) - (1) Original Copy\nReminder: When claiming documents: 8.1 Authorization letter and ID if claimant is immediate family member Special Power of Attorney (SPA) if the claimant is other than the immediate family.\nB. SECOND AND SUCCEEDING COPIES:\n1. Letter of request by the student - (1) Original (To Registrar's Office)\n2. 2 (two) pcs of2x2 picture in Formal Attire (To be submitted to the Admission and Registration Office)\n3. Documentary Stamp - (1) Sample\n4. Proof of Payment - (1) Original Copy\n5. Acknowledged/Signed Copy of Transfer - (1) Original (Remarks: School where applicant is presently enrolled)\nReminder: .When claiming documents: a.Authorization letter and ID if claimant is immediate family member Special Power of Attorney (SPA) if the claimant is other than the immediate family.",
                 'document_process_period' => '8 working day/s, 5 hour/s, 20 minute/s',
                 'access_id'               => 3,
@@ -399,7 +509,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 16,
                 'document_name'           => 'Informative Copy of Grades',
-                'document_description'    => 'Processes certified true copy of complete academic records or informative copy of credits and grades previously taken, duly signed by the Campus Registrar and Campus Director.',
                 'document_requirements'   => "Letter of request stating the purpose - (1) Original Copy,\nProof of payment - (1) Original Copy,\nPUP School Identification Card - (1) Original Copy,\nAuthorization letter (if claimed by a representative) - (1) Original Copy",
                 'document_process_period' => '1 working day/s, 1 hour/s, 18 minute/s',
                 'access_id'               => 1,
@@ -408,7 +517,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 17,
                 'document_name'           => 'Request for Leave of Absences',
-                'document_description'    => 'A student intends to take a leave of absence exceeding one semester but not to exceed one academic year shall file a letter of intent with the Academic Head concerned for approval, stating the reason for leave. If the leave exceeds one academic year, he/she shall lose status as a student in residence',
                 'document_requirements'   => "Letter of intent addressed to the Campus Registrar - (1) Original Copy,\nDocuments as proof (e.g., Medical Certificate, Employment Order) - (1) Original Copy,\nApplication for Change of Enrollment (ACE) if currently enrolled - (1) Original Copy",
                 'document_process_period' => '2 working day/s, 6 hour/s, 29 minute/s',
                 'access_id'               => 1,
@@ -417,7 +525,6 @@ class DatabaseSeeder extends Seeder
             [
                 'document_type_id'        => 18,
                 'document_name'           => 'Re-Admission',
-                'document_description'    => "Students considered for re-admission depending on their previous scholastic performance, and the availability of slots. He/she must have complied with all other requirements for re-admission. If re-admitted within two (2) years, returning students shall be allowed to follow their old course of study or curriculum; otherwise they shall follow the curriculum existing at the time of their re-admission.",
                 'document_requirements'   => "Accomplished re-admission form (To be uploaded in the ODRS) - (1) Original Copy,\nInformative Copy of Grades/Transcript of Records - (1) Original Copy,\nCurriculum Sheet - (1) Original Copy,\nLatest Certificate of Registration - (1) Original Copy,\n2 (two) pcs of 2x2 colored picture (White background with name) - (2) Samples,\nOfficial Receipt for re-admission - (1) Original Copy,\nMedical Clearance (PUP Clinic or Government Clinic) - (1) Original Copy",
                 'document_process_period' => '2 working day/s, 6 hour/s, 41 minute/s',
                 'access_id'               => 1,
