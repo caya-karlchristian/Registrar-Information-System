@@ -1,6 +1,7 @@
 // echo.js
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
+import api from './api';
 
 // Must be assigned unconditionally at module load —
 // Pusher reads window.Pusher synchronously when Echo is constructed.
@@ -46,18 +47,25 @@ export const getEcho = () => {
         // attempt (confirmed: raw WebSocket to wss://localhost works fine,
         // but Pusher goes disconnected→failed instantly with only ['wss']).
         enabledTransports: ['ws', 'wss'],
-        // Relative auth endpoint — avoids mixed-content blocks.
-        // nginx proxies /api/ → backend:8000.
-        authEndpoint: `${import.meta.env.VITE_API_URL}/broadcasting/auth`,
-        auth: {
-            // withCredentials causes the browser to send the HttpOnly 'token'
-            // cookie on the /api/broadcasting/auth request automatically.
-            // Sanctum reads and validates it server-side — no manual header needed.
-            headers: {
-                Accept: 'application/json',
+        // Custom authorizer — pusher-js's default XHR authorizer never sets
+        // xhr.withCredentials, so the old `auth: { withCredentials: true }`
+        // option below was silently ignored and the HttpOnly 'token' cookie
+        // was never sent on cross-origin /broadcasting/auth requests (this
+        // is invisible in production, where CloudFront makes frontend and
+        // API same-origin — but breaks local dev, where they're on
+        // different ports). Routing through the shared `api` axios
+        // instance guarantees credentials are actually attached, and keeps
+        // baseURL/interceptors in one place instead of duplicating them here.
+        authorizer: (channel) => ({
+            authorize: (socketId, callback) => {
+                api.post('/broadcasting/auth', {
+                    socket_id: socketId,
+                    channel_name: channel.name,
+                })
+                    .then((response) => callback(null, response.data))
+                    .catch((error) => callback(error, null));
             },
-            withCredentials: true,
-        },
+        }),
     });
 
     // Log any low-level Pusher/WebSocket errors globally.

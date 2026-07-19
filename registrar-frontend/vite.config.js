@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
           secure: false,
         },
         "/app": {
-          target: `ws://${env.VITE_REVERB_HOST ?? "localhost"}:${env.VITE_REVERB_PORT ?? 8080}`,
+          target: `ws://${env.REVERB_INTERNAL_HOST ?? "reverb"}:${env.REVERB_INTERNAL_PORT ?? 8080}`,
           ws: true,
           changeOrigin: true,
           secure: false,

@@ -169,6 +169,19 @@ class DatabaseSeeder extends Seeder
     private function seedRequestStatus(): void
     {
         $rows = [
+            // NOTE: confirmed against the production dump (request_status
+            // table) — prod has exactly 4 rows: 1=Processing, 2=Ready to
+            // Claim, 3=Completed, 4=Forfeited. No row is named "Pending".
+            // The frontend (StaffDashboard.jsx) resolves its "actionable"
+            // status via `lowerNameToId.pending ?? STATUS_FALLBACK.PENDING`
+            // (STATUS_FALLBACK.PENDING = 1). Since prod has no row named
+            // "pending", that lookup falls through to the fallback (1),
+            // which correctly matches status_id 1. Seeding an actual
+            // "Pending" row at a *different* status_id (this used to do it
+            // at status_id=6) hijacks that lookup and makes the Ready
+            // button disappear for every real request. Do not add a
+            // "Pending" name here — status_id 1 stays "Processing" to
+            // match prod exactly.
             ['status_id' => 1,  'status_name' => 'Processing'],
             ['status_id' => 2,  'status_name' => 'Ready to Claim'],
             ['status_id' => 3,  'status_name' => 'Completed'],
@@ -177,7 +190,6 @@ class DatabaseSeeder extends Seeder
             // — kept only so existing document_request rows with status_id=5 still
             // resolve to a valid request_status row. Do not use for new requests.
             ['status_id' => 5,  'status_name' => 'Cancelled'],
-            ['status_id' => 6,  'status_name' => 'Pending'],
             ['status_id' => 7,  'status_name' => 'On Hold'],
             ['status_id' => 8,  'status_name' => 'Rejected'],
             ['status_id' => 9,  'status_name' => 'Returned'],

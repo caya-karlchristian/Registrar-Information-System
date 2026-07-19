@@ -136,10 +136,20 @@ services:
       - ./registrar-frontend:/app
       - frontend_node_modules:/app/node_modules
     environment:
-      VITE_API_URL: http://localhost:8000/api
+      # Relative + same-port-as-page values below mean the browser only ever
+      # talks to localhost:5173. Vite's dev-server proxy (vite.config.js)
+      # forwards /api, /broadcasting, and /app to the real backend/reverb
+      # containers behind the scenes — same trick CloudFront does in prod.
+      VITE_API_URL: /api
+      VITE_REVERB_APP_KEY: local
       VITE_REVERB_HOST: localhost
-      VITE_REVERB_PORT: "8080"
+      VITE_REVERB_PORT: "5173"
       VITE_REVERB_SCHEME: http
+      # Proxy-only targets (Node/Vite server side, not sent to the browser).
+      # Docker service names — reachable inside the compose network only.
+      VITE_BACKEND_URL: http://backend:8000
+      REVERB_INTERNAL_HOST: reverb
+      REVERB_INTERNAL_PORT: "8080"
     ports:
       - "5173:5173"
     depends_on:
