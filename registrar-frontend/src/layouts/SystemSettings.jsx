@@ -112,6 +112,16 @@ const SystemSettings = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setError(null);
+    
+    const missingFields = [];
+    if (!form.title?.trim()) missingFields.push("Announcement Title");
+    if (!form.content?.trim()) missingFields.push("Announcement Content");
+
+    if (missingFields.length > 0) {
+      setErrorMsg(`Please fill in all required fields: ${missingFields.join(", ")}.`);
+      return;
+    }
+
     try {
       if (isAdding) {
         await createAnnouncement(form);
@@ -133,6 +143,7 @@ const SystemSettings = () => {
     if (!selected) return;
     try {
       await deleteAnnouncement(selected.id);
+      setSuccessMsg("Announcement deleted successfully!");
       setForm(EMPTY_FORM);
       setSelected(null);
       setIsAdding(true);
@@ -407,7 +418,7 @@ const SystemSettings = () => {
 
         {/* Right Panel */}
         <div className={`w-full lg:flex-1 flex flex-col rounded-xl p-10 sm:p-8 shadow-sm lg:h-full ${isDark ? 'bg-[#1f1f1f] border border-[#3e4042]' : 'bg-gray-50 border border-gray-200/50'}`}>
-          <form onSubmit={handleSave} className="flex flex-col gap-5">
+          <form onSubmit={handleSave} noValidate className="flex flex-col gap-5">
             <h2 className={`font-bold text-2xl ${isDark ? 'text-white' : ''}`}>
               {isAdding ? "Announcement Creation" : "Edit Announcement"}
             </h2>

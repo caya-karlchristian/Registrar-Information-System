@@ -288,7 +288,7 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
-                children: [new TextRun({ text: 'No data requests available', italics: true, size: DEFAULT_TEXT_SIZE, font: 'Lucida Fax' })],
+                children: [new TextRun({ text: 'No data available for this document and period', italics: true, size: DEFAULT_TEXT_SIZE, font: 'Lucida Fax' })],
               }),
             ],
           }),
@@ -326,9 +326,6 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
     // Only suppress the title for the generic "All Document" fallback (single-section flat export).
     // Every named document type gets its own visible section title, even in multi-section exports.
     const isUmbrella = lower === 'all document';
-
-    // Skip sections that have no rows (avoids blank pages for document types with zero activity)
-    if (section.rows.length === 0) return;
 
     if (isUmbrella) {
       // push table without the section title

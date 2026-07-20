@@ -152,6 +152,7 @@ const FAQPage = () => {
              {/* Email Registrar Section */}
               <div className={`${isDark ? 'mt-5 overflow-hidden rounded-2xl bg-[#242526] border border-[#3e4042] shadow-xl' : 'mt-5 overflow-hidden rounded-2xl bg-white border border-[#800000] shadow-xl'} transition-all duration-300 hover:shadow-2xl`}>
                 <a
+                 data-voice-action="compose-email" 
                  href="https://mail.google.com/mail/u/0/?view=cm&fs=1&to=taguig@pup.edu.ph%2Ctaguig.registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern"
                  target="_blank"
                  rel="noopener noreferrer" 
