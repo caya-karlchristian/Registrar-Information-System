@@ -260,6 +260,17 @@ const LogbookRecords = () => {
     }
   };
 
+  // Listen for voice command to export documents
+  useEffect(() => {
+    const handleVoiceExport = () => {
+      if (!loading && !exporting) {
+        handleExportDocx();
+      }
+    };
+    window.addEventListener('voice-command-export', handleVoiceExport);
+    return () => window.removeEventListener('voice-command-export', handleVoiceExport);
+  }, [loading, exporting]);
+
   // Convert text to Proper Case while preserving roman numerals and hyphenated parts
   const toProperCase = (value = '') => {
     return value
@@ -379,6 +390,7 @@ const LogbookRecords = () => {
               {/* Export button */}
               <div className="w-full md:w-60 md:ml-auto shrink-0">
                 <button
+                  data-voice-action="export"
                   onClick={handleExportDocx}
                   disabled={loading || exporting || sortedData.length === 0}
                   className={`w-full flex items-center justify-center px-3 py-3 
