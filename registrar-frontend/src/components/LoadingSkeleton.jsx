@@ -297,13 +297,16 @@ export const AnnouncementSkeleton = ({ isDark, count = 4 }) => {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className={`rounded-xl px-4 py-4 mb-3 animate-pulse ${isDark ? 'bg-[#1f1f1f] border border-[#3e4042]' : 'bg-white'}`}>
+        <div key={i} className={`rounded-xl mt-3 px-4 py-3.5 shadow-sm animate-pulse ${isDark ? 'bg-[#1f1f1f] border border-[#3e4042]' : 'bg-white'}`}>
           <div className="flex items-center justify-between mb-2">
             <div className={`h-4 w-1/3 rounded-full ${bg}`} />
-            <div className={`h-6 w-10 rounded-full ${bgDim}`} />
+            <div className="flex items-center gap-2">
+              <div className={`h-3 w-8 rounded-full ${bgDim}`} />
+              <div className={`h-5 w-9 rounded-full ${bgDim}`} />
+            </div>
           </div>
-          <div className={`h-3 w-full rounded-full mt-2 ${bgDim}`} />
-          <div className={`h-3 w-4/5 rounded-full mt-2 ${bgDim}`} />
+          <div className={`h-3 w-3/4 rounded-full mt-2 ${bgDim}`} />
+          <div className={`h-3 w-1/2 rounded-full mt-1.5 ${bgDim}`} />
         </div>
       ))}
     </>

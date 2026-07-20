@@ -345,7 +345,7 @@ const PolicyManagement = () => {
 
         {/* Table element inside container */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] text-sm">
+          <table className="w-full min-w-200 text-sm">
             <thead>
               <tr className={`border-b text-xs font-bold uppercase tracking-wider ${
                 isDark ? 'border-[#3e4042] text-[#a09e9a]' : 'border-gray-200 text-gray-500'
@@ -471,15 +471,15 @@ const PolicyManagement = () => {
 
       {/* Create / Edit Policy Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-20 modal-overlay-container flex items-center justify-center">
+        <div className="fixed inset-0 z-10000 flex items-center justify-center p-4">
           <div 
             className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} 
             onClick={() => setIsModalOpen(false)} 
           />
-          <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl mx-4 ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
+          <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl mx-auto flex flex-col overflow-visible ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
             
             {/* Header */}
-            <div className={`px-6 py-5 flex items-center justify-between rounded-t-2xl ${isDark ? 'bg-[#2a2a2f] border-b border-[#3e4042]' : 'bg-pup-dark-maroon text-white'}`}>
+            <div className={`px-6 py-5 flex items-center justify-between rounded-t-2xl shrink-0 ${isDark ? 'bg-[#2a2a2f] border-b border-[#3e4042]' : 'bg-pup-dark-maroon text-white'}`}>
               <div>
                 <h2 className="text-white font-bold text-lg uppercase tracking-wide">
                   {isEditMode ? "Edit Policy" : "Create Policy"}
@@ -491,16 +491,16 @@ const PolicyManagement = () => {
               <button 
                 type="button" 
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white"
+                className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white cursor-pointer"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="h-1 w-full bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
+            <div className="h-1 w-full shrink-0 bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
 
-            <form onSubmit={handleSavePolicy}>
-              <div className="p-6 space-y-5 overflow-visible min-h-[460px]">
+            <form onSubmit={handleSavePolicy} className="flex flex-col overflow-visible">
+              <div className="p-6 space-y-5 overflow-visible">
                 {/* Policy Name */}
                 <div>
                   <label className={`block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-[#b0b3b8]' : 'text-gray-655'} mb-1.5`}>
@@ -528,7 +528,7 @@ const PolicyManagement = () => {
                     <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Select a module</span>
                   </div>
 
-                  <div className="mt-1">
+                  <div className="mt-1 relative overflow-visible">
                     <MultiSelection
                       name="policy-modules"
                       label=""
@@ -541,11 +541,11 @@ const PolicyManagement = () => {
               </div>
 
               {/* Footer */}
-              <div className={`px-6 pb-6 pt-4 flex items-center justify-end gap-3 border-t rounded-b-2xl ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
+              <div className={`px-6 pb-6 pt-4 flex items-center justify-end gap-3 border-t shrink-0 rounded-b-2xl ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
                 <button 
                   type="button" 
                   onClick={() => setIsModalOpen(false)}
-                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
                     isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -554,7 +554,7 @@ const PolicyManagement = () => {
                 <button 
                   type="submit"
                   disabled={submitting}
-                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
                     isDark 
                       ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' 
                       : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
@@ -570,7 +570,7 @@ const PolicyManagement = () => {
 
       {/* Admin Assignment Details Modal */}
       {isAdminListOpen && selectedPolicyForAdmins && (
-        <div className="fixed inset-0 z-20 modal-overlay-container flex items-center justify-center">
+        <div className="fixed inset-0 z-10000 modal-overlay-container flex items-center justify-center p-4">
           <div 
             className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} 
             onClick={() => setIsAdminListOpen(false)} 

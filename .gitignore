@@ -1,6 +1,5 @@
 ris_backup.sql
 .env
-*.env*
 .env.production
 .DS_Store
 *.zip

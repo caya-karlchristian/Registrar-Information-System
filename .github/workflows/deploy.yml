@@ -6,6 +6,8 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_URI }}
+  AWS_REGION: ap-southeast-1
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
@@ -67,14 +69,53 @@ jobs:
         run: php artisan test
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 2 — Deploy backend to EC2.
-  # SSHes in, pulls latest code, prunes Docker disk space, rebuilds containers,
-  # runs migrations, and recaches config/routes.
+  # JOB 2 — Build the backend Docker image and push it to ECR.
+  # This replaces building directly on the EC2 box. Only runs if tests pass.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-and-push:
+    name: Build & Push Image to ECR
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      image_tag: ${{ steps.vars.outputs.tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: vars
+        run: echo "tag=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        working-directory: registrar-backend
+        run: |
+          docker build \
+            -t ${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} \
+            -t ${{ env.ECR_REPOSITORY }}:latest \
+            .
+          docker push ${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+          docker push ${{ env.ECR_REPOSITORY }}:latest
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 3 — Deploy backend to EC2.
+  # SSHes in, pulls the latest compose/config files, pulls the pre-built image
+  # from ECR (no building on the box), restarts containers, runs migrations.
   # ─────────────────────────────────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend (EC2)
     runs-on: ubuntu-latest
-    needs: test  # only runs if tests pass
+    needs: [test, build-and-push]
 
     steps:
       - name: Deploy to EC2 via SSH
@@ -83,18 +124,29 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE_TAG,ECR_REPOSITORY_URI
           script: |
             set -e
             cd /home/ubuntu/Registrar-Information-System
 
-            echo "── Pulling latest code ──────────────────────────"
+            echo "── Pulling latest config/compose files ──────────"
             git pull origin main
 
-            echo "── Pruning Docker build cache ───────────────────"
-            docker builder prune -f --filter "until=24h"
+            echo "── Logging in to ECR ────────────────────────────"
+            aws ecr get-login-password --region ap-southeast-1 | \
+              docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_URI }}
 
-            echo "── Rebuilding containers ────────────────────────"
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+            export ECR_REPOSITORY=${{ secrets.ECR_REPOSITORY_URI }}
+            export IMAGE_TAG=${{ needs.build-and-push.outputs.image_tag }}
+
+            echo "── Pulling image from ECR ───────────────────────"
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+
+            echo "── Starting containers ──────────────────────────"
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+            echo "── Running migrations ───────────────────────────"
+            docker exec ris_backend php artisan migrate --force
 
             echo "── Publishing Telescope assets ──────────────────"
             docker exec ris_backend php artisan vendor:publish --tag=telescope-assets --force
@@ -106,16 +158,19 @@ jobs:
             echo "── Verifying containers are up ──────────────────"
             docker compose ps
 
+            echo "── Pruning old images (keep disk clean) ─────────"
+            docker image prune -f
+
             echo "── Done ─────────────────────────────────────────"
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # JOB 2 — Build and deploy frontend to S3 + invalidate CloudFront cache.
-  # Runs in parallel with deploy-backend since they are independent.
+  # JOB 4 — Build and deploy frontend to S3 + invalidate CloudFront cache.
+  # Runs in parallel with the backend jobs since it's independent.
   # ─────────────────────────────────────────────────────────────────────────────
   deploy-frontend:
     name: Deploy Frontend (S3 + CloudFront)
     runs-on: ubuntu-latest
-    needs: test  # only runs if tests pass
+    needs: test
 
     defaults:
       run:

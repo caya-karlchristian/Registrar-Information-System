@@ -64,7 +64,8 @@ export const VOICE_COMMANDS = [
     target: "request",
     phrases: [
       "new request", "go to request", "open request", "make a request",
-      "request a document", "document request", "walk in request", "walk-in request",
+      "request a document", "document request", "walk in request", "walk-in request", 
+      "request form", "request page", "request"
     ],
   },
   {
@@ -72,7 +73,7 @@ export const VOICE_COMMANDS = [
     type: "navigate",
     target: "profile",
     phrases: [
-      "go to profile", "open profile", "show profile", "my profile", "view profile",
+      "go to profile", "open profile", "show profile", "my profile", "view profile", "profile",
     ],
   },
   {
@@ -81,7 +82,7 @@ export const VOICE_COMMANDS = [
     target: "faqs",
     phrases: [
       "go to faqs", "open faqs", "faqs", "frequently asked questions",
-      "help and support", "support page",
+      "help and support", "support page", "frequently asked", "help"
     ],
   },
   {
@@ -113,8 +114,8 @@ export const VOICE_COMMANDS = [
     type: "navigate",
     target: "users",
     phrases: [
-      "go to user management", "open user management", "user management",
-      "user directory", "manage users",
+      "go to admin management", "open admin management", "admin management",
+      "admin directory", "manage users", "accounts"
     ],
   },
   {
@@ -132,7 +133,7 @@ export const VOICE_COMMANDS = [
     target: "certificates",
     phrases: [
       "go to certificates", "open certificate management", "certificate management",
-      "certificate templates", "manage certificates",
+      "certificate templates", "manage certificates", "cetificates", "certificates management",
     ],
   },
   {
@@ -140,7 +141,9 @@ export const VOICE_COMMANDS = [
     type: "navigate",
     target: "reports",
     phrases: [
-      "go to reports", "open reports", "report management", "show reports",
+      "go to audit trail", "open audit trail", "show audit trail", "audit trail",
+      "audit logs", "go to audit logs", "open audit logs", "show audit logs",
+      "view audit trail", "view audit logs", "audit log",
     ],
   },
   {
@@ -148,7 +151,7 @@ export const VOICE_COMMANDS = [
     type: "navigate",
     target: "settings",
     phrases: [
-      "go to settings", "open settings", "system settings", "settings",
+      "go to settings", "open settings", "system settings", "settings", 
     ],
   },
   {
@@ -156,6 +159,52 @@ export const VOICE_COMMANDS = [
     type: "action",
     action: "logout",
     phrases: ["log out", "logout", "sign out", "log me out"],
+  },
+{
+    id: "action-theme-dark",
+    type: "action",
+    action: "dark-mode",
+    phrases: [
+      "turn on dark mode", "dark mode", "enable dark mode", "activate dark mode",
+      "switch to dark mode", "turn dark mode on", "go dark",
+    ],
+  },
+  {
+    id: "action-theme-light",
+    type: "action",
+    action: "light-mode",
+    phrases: [
+      "turn on light mode", "light mode", "enable light mode", "activate light mode",
+      "switch to light mode", "turn light mode on", 
+    ],
+  },
+  {
+    id: "action-theme-toggle",
+    type: "action",
+    action: "toggle-theme",
+    phrases: [
+      "toggle theme", "toggle dark mode", "change theme", "switch theme",
+    ],
+  },
+  {
+    id: "action-export-docx",
+    type: "action",
+    action: "export-docx",
+    phrases: [
+      "export docx", "export document", "export documents", "export logbook",
+      "export report", "export file", "download logbook", "download report",
+      "export logbook document", "export logbook report", "download docx",
+    ],
+  },
+  {
+    id: "action-compose-email",
+    type: "action",
+    action: "compose-email",
+    phrases: [
+      "compose email", "send email", "email registrar", "compose mail",
+      "send mail", "open email", "email support", "contact registrar email",
+      "compose email to registrar",
+    ],
   },
 ];
 

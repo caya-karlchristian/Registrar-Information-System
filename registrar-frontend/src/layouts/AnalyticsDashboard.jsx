@@ -253,6 +253,7 @@ const AnalyticsDashboard = () => {
           {/* Export monthly report */}
           <div className="w-full sm:w-65">
             <button
+              data-voice-action="export"
               onClick={() => setExportModalOpen(true)}
               className={`w-full flex items-center justify-center px-3 py-3 rounded-lg text-sm font-black uppercase tracking-wide shadow transition-colors ${isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] hover:bg-[#4e4f50]' : 'bg-[#800000] text-white hover:bg-[#6b0000]'}`}
             >
@@ -338,7 +339,7 @@ const AnalyticsDashboard = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
                       <XAxis dataKey="label" tick={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
+                      <Tooltip content={(props) => <CustomTooltip {...props} isDark={isDark} unit="Requests" />} />
                       <Area type="monotone" dataKey="total" stroke="#800000" strokeWidth={3} fillOpacity={1} fill="url(#colorMaroon)" />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -354,7 +355,7 @@ const AnalyticsDashboard = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
                       <XAxis dataKey="document_name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: isDark ? '#b0b3b8' : '#64748b' }} />
                       <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} cursor={{ fill: 'transparent' }} />
+                      <Tooltip content={(props) => <CustomTooltip {...props} isDark={isDark} unit="Requests" />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }} />
                       <Bar dataKey="total_requests" radius={[10, 10, 0, 0]}>
                         {docTypeData.slice(0, 6).map((_, i) => (
                           <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
@@ -377,7 +378,7 @@ const AnalyticsDashboard = () => {
                           <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} cornerRadius={10} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
+                      <Tooltip position={{ y: 0 }} content={(props) => <CustomTooltip {...props} isDark={isDark} unit="Requests" />} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -413,10 +414,7 @@ const AnalyticsDashboard = () => {
                       <XAxis dataKey="label" tick={{ fontSize: 9, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false}
                         interval={3} />
                       <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                      <Tooltip
-                        formatter={(val, name) => [val, 'Requests']}
-                        contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }}
-                      />
+                      <Tooltip content={(props) => <CustomTooltip {...props} isDark={isDark} unit="Requests" />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }} />
                       <Bar dataKey="total" fill={HOUR_COLOR} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -433,7 +431,7 @@ const AnalyticsDashboard = () => {
                       <XAxis type="number" tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
                       <YAxis type="category" dataKey="purpose_name" tick={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#b0b3b8' : '#64748b' }}
                         axisLine={false} tickLine={false} width={110} />
-                      <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }} />
+                      <Tooltip content={(props) => <CustomTooltip {...props} isDark={isDark} unit="Requests" />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }} />
                       <Bar dataKey="total" radius={[0, 6, 6, 0]}>
                         {purposeData.map((_, i) => (
                           <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
@@ -456,8 +454,8 @@ const AnalyticsDashboard = () => {
                       <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false}
                         label={{ value: 'min', angle: -90, position: 'insideLeft', fontSize: 10, fill: isDark ? '#b0b3b8' : '#64748b' }} />
                       <Tooltip
-                        formatter={(val) => [`${val} min`, 'Avg Time']}
-                        contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: isDark ? '#3a3b3c' : '#fff', color: isDark ? '#e4e6eb' : '#000' }}
+                        content={(props) => <CustomTooltip {...props} isDark={isDark} valueFormatter={(val) => `${val} min`} />}
+                        cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}
                       />
                       <Bar dataKey="avg_minutes" radius={[8, 8, 0, 0]}>
                         {(processingData.by_document_type ?? []).map((_, i) => (
@@ -532,6 +530,50 @@ const AnalyticsDashboard = () => {
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────
+
+const CustomTooltip = ({ active, payload, label, isDark, unit = 'Requests', valueFormatter }) => {
+  if (!active || !payload || !payload.length) return null;
+
+  const item = payload[0];
+  let title = label;
+  if (!title) {
+    title = item.name || item.payload?.status_name || item.payload?.document_name || item.payload?.purpose_name;
+  }
+
+  const val = item.value;
+  const formattedVal = valueFormatter
+    ? valueFormatter(val)
+    : `${val} ${val === 1 && unit === 'Requests' ? 'Request' : unit}`;
+
+  const dotColor = item.color || item.fill || item.payload?.fill;
+
+  return (
+    <div
+      className={`px-3.5 py-2.5 rounded-2xl text-xs border transition-all pointer-events-none ${
+        isDark
+          ? 'bg-[#242526] border-[#3e4042] text-[#e4e6eb]'
+          : 'bg-white border-slate-200/90 text-slate-800'
+      }`}
+      style={{
+        boxShadow: isDark
+          ? '0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6)'
+          : '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.08)',
+      }}
+    >
+      {title && (
+        <div className={`font-bold mb-1 text-[10px] uppercase tracking-wider ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>
+          {title}
+        </div>
+      )}
+      <div className="flex items-center gap-2 font-extrabold text-sm">
+        {dotColor && dotColor !== 'none' && (
+          <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: dotColor }} />
+        )}
+        <span>{formattedVal}</span>
+      </div>
+    </div>
+  );
+};
 
 const ChartHeader = ({ title, sub, isDark }) => (
   <div className="mb-4">

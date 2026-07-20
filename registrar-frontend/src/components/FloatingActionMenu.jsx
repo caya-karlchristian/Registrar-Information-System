@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAlertToast } from "../context/AlertToastContext";
 import { useAuth } from "../context/AuthProvider";
+import { useTheme } from "../context/ThemeContext";
 import useVoiceRecognition from "../utils/useVoiceRecognition";
 import { matchCommand, resolveVoiceRoute } from "../utils/voiceCommands";
 import ConfirmationModal from "./ConfirmationModal";
@@ -11,6 +12,7 @@ const FloatingActionMenu = () => {
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const { showError } = useAlertToast();
   const { user, logout } = useAuth();
+  const { setTheme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const menuRef = useRef(null);
 
@@ -56,24 +58,64 @@ const FloatingActionMenu = () => {
   // onResult fires once per finished utterance (continuous: false stops
   // listening automatically after the first final transcript, so we don't
   // need a manual timeout). We match it against the command grammar and
-  // either navigate to a role-resolved route or trigger an auth action.
+  // either navigate to a role-resolved route or trigger an auth/theme action.
   // -------------------------------------------------------
   const handleVoiceResult = useCallback((transcript) => {
     const command = matchCommand(transcript);
 
     if (!command) {
-      showError(`Didn't recognize "${transcript}". Try "open dashboard" or "logout".`);
+      showError(`"${transcript}" isn't a supported voice command. Please try again or use one of the available commands.`);
       return;
     }
 
-    if (command.type === "action" && command.action === "logout") {
-      // Voice recognition has a real false-positive rate, and logging out
-      // is state-changing, so we route through the same confirmation step
-      // as the manual Logout button (see Navigation.jsx) instead of acting
-      // on a single (possibly misheard) utterance.
-      setIsOpen(false);
-      setIsLogoutConfirmOpen(true);
-      return;
+    if (command.type === "action") {
+      if (command.action === "logout") {
+        setIsOpen(false);
+        setIsLogoutConfirmOpen(true);
+        return;
+      }
+      if (command.action === "dark-mode") {
+        setIsOpen(false);
+        setTheme("dark");
+        return;
+      }
+      if (command.action === "light-mode") {
+        setIsOpen(false);
+        setTheme("light");
+        return;
+      }
+      if (command.action === "toggle-theme") {
+        setIsOpen(false);
+        toggleTheme();
+        return;
+      }
+      if (command.action === "export-docx") {
+        setIsOpen(false);
+        const btn = document.querySelector('[data-voice-action="export"]');
+        if (btn) {
+          if (btn.disabled) {
+            showError("Document export is currently unavailable or loading.");
+          } else {
+            btn.click();
+          }
+        } else {
+          showError("Exporting documents is only available on the Logbook and Analytics pages.");
+        }
+        return;
+      }
+      if (command.action === "compose-email") {
+        setIsOpen(false);
+        const link = document.querySelector('[data-voice-action="compose-email"]');
+        if (link) {
+          link.click();
+        } else {
+          window.open(
+            "https://mail.google.com/mail/u/0/?view=cm&fs=1&to=taguig@pup.edu.ph%2Ctaguig.registrar@pup.edu.ph&su=Inquiry%3A%20PUP%20Registrar%20Office%20Concern",
+            "_blank"
+          );
+        }
+        return;
+      }
     }
 
     if (command.type === "navigate") {
@@ -85,7 +127,7 @@ const FloatingActionMenu = () => {
       setIsOpen(false);
       navigate(path);
     }
-  }, [showError, navigate, user]);
+  }, [showError, navigate, user, setTheme, toggleTheme]);
 
   const handleVoiceError = useCallback(() => {
     showError("We couldn't access the microphone. Please check your browser permissions.");

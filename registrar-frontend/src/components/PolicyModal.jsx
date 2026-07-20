@@ -36,14 +36,14 @@ const PolicyModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-20 modal-overlay-container flex items-center justify-center">
+    <div className="fixed inset-0 z-10000 flex items-center justify-center p-4">
       <div
         className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`}
         onClick={onClose}
       />
       <div
-            className={`relative rounded-2xl shadow-2xl w-full max-w-md mx-4 ${
-            isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'
+        className={`relative rounded-2xl shadow-2xl w-full max-w-md mx-auto overflow-visible ${
+          isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'
         }`}
       >
         {/* Header */}
