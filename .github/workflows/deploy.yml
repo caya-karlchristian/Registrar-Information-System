@@ -102,10 +102,8 @@ jobs:
         run: |
           docker build \
             -t ${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} \
-            -t ${{ env.ECR_REPOSITORY }}:latest \
             .
           docker push ${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
-          docker push ${{ env.ECR_REPOSITORY }}:latest
 
   # ─────────────────────────────────────────────────────────────────────────────
   # JOB 3 — Deploy backend to EC2.
