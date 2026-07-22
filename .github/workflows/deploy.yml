@@ -169,7 +169,7 @@ jobs:
             docker compose ps
 
             echo "── Pruning old images (keep disk clean) ─────────"
-            docker image prune -f
+            docker image prune -a -f
 
             echo "── Done ─────────────────────────────────────────"
 
