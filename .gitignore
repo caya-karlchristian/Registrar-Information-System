@@ -10,3 +10,4 @@ registrar-frontend/certs/
 /node_modules/
 /storage/logs/*.bak
 *.bak_*
+.env.staging
