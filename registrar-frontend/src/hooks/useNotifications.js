@@ -138,7 +138,7 @@ export const useNotifications = (onNewNotification = null) => {
         let unsubscribed = false;
 
         const subscribe = () => {
-            console.info('[Echo] subscribing to', channelName);
+            // console.info('[Echo] subscribing to', channelName);
             echo.private(channelName)
                 .listen('.NotificationSent', handleNewNotification)
                 .error((err) => {
@@ -159,12 +159,12 @@ export const useNotifications = (onNewNotification = null) => {
         // triggers a refresh for the lifetime of this effect.
         // -------------------------------------------------------
         const handleStateChange = ({ current, previous }) => {
-            console.info(`[Echo] connection → ${current}`);
+            // console.info(`[Echo] connection → ${current}`);
             // 'disconnected' → 'connected' means a real reconnect after a drop.
             // Skip initialized → connected (first-ever connect) because
             // fetchNotifications() already ran at effect start above.
             if (current === 'connected' && previous === 'disconnected') {
-                console.info('[Echo] reconnected — refreshing missed notifications');
+                // console.info('[Echo] reconnected — refreshing missed notifications');
                 fetchNotifications();
             }
         };
