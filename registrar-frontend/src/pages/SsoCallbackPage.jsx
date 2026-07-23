@@ -40,11 +40,14 @@ const SsoCallbackPage = () => {
 
     const code = codeRef.current;
     // Log the first 8 chars so you can confirm a non-empty code arrives
-    // without exposing the full token in the console.
-    // console.log(
-    //   '[SSO] callback code:',
-    //   code ? `${code.slice(0, 8)}\u2026` : 'EMPTY \u2014 initiating OAuth flow',
-    // );
+    // without exposing the full token in the console. DEV-only — never
+    // logged in a production build.
+    if (import.meta.env.DEV) {
+      console.log(
+        '[SSO] callback code:',
+        code ? `${code.slice(0, 8)}\u2026` : 'EMPTY \u2014 initiating OAuth flow',
+      );
+    }
 
     if (!code) {
       // No code means the One Portal linked directly to /auth/callback without
