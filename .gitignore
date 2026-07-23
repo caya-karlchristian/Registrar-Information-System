@@ -11,3 +11,4 @@ registrar-frontend/certs/
 /storage/logs/*.bak
 *.bak_*
 .env.staging
+!registrar-frontend/.env.staging
