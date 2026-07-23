@@ -3,6 +3,11 @@ import { useAuth } from '../context/AuthProvider';
 import { getEcho, resetEcho } from '../services/echo';
 import api from '../services/api';
 
+// True in `vite dev` / `vite build --mode development`, false in a
+// production build — so these Echo debug logs are available locally
+// but never ship to prod/staging consoles.
+const DEBUG_ECHO = import.meta.env.DEV;
+
 export const useNotifications = (onNewNotification = null) => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState([]);
@@ -138,11 +143,11 @@ export const useNotifications = (onNewNotification = null) => {
         let unsubscribed = false;
 
         const subscribe = () => {
-            console.info('[Echo] subscribing to', channelName);
+            if (DEBUG_ECHO) console.info('[Echo] subscribing to', channelName);
             echo.private(channelName)
                 .listen('.NotificationSent', handleNewNotification)
                 .error((err) => {
-                    console.error('[Echo] private channel auth failed:', err);
+                    if (DEBUG_ECHO) console.error('[Echo] private channel auth failed:', err);
                 });
         };
 
@@ -159,12 +164,12 @@ export const useNotifications = (onNewNotification = null) => {
         // triggers a refresh for the lifetime of this effect.
         // -------------------------------------------------------
         const handleStateChange = ({ current, previous }) => {
-            console.info(`[Echo] connection → ${current}`);
+            if (DEBUG_ECHO) console.info(`[Echo] connection → ${current}`);
             // 'disconnected' → 'connected' means a real reconnect after a drop.
             // Skip initialized → connected (first-ever connect) because
             // fetchNotifications() already ran at effect start above.
             if (current === 'connected' && previous === 'disconnected') {
-                console.info('[Echo] reconnected — refreshing missed notifications');
+                if (DEBUG_ECHO) console.info('[Echo] reconnected — refreshing missed notifications');
                 fetchNotifications();
             }
         };

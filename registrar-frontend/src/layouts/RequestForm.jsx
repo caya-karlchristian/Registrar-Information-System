@@ -262,7 +262,7 @@ const RequestForm = ({ showProfileStep = false }) => {
 
       const response = await createDocumentRequest(payload);
 
-      console.log("Submission successful:", response.data);
+      // console.log("Submission successful:", response.data);
       setIsSubmitted(true);
     } catch (error) {
       console.error("Submission error:", error.response?.data || error);
