@@ -240,11 +240,55 @@ const DocumentManagement = ({
     setErrorMsg("");
     setSuccessMsg("");
 
-    if (!form.document_process_period || !form.document_process_period.trim()) {
-      setErrorMsg("Process Period is required.");
+    // Validate Document/Certificate Name
+    if (!form.document_name || !form.document_name.trim()) {
+      const fieldName = selectedType === "document" ? "Document Name" : "Certificate Name";
+      setErrorMsg(`${fieldName} is required.`);
       return;
     }
 
+    // Validate Document Description (only for document type)
+    if (selectedType === "document" && (!form.document_description || !form.document_description.trim())) {
+      setErrorMsg("Document Description is required.");
+      return;
+    }
+
+    // Validate List of Requirements
+    if (!form.document_requirements || !form.document_requirements.trim()) {
+      setErrorMsg("List of Requirements is required.");
+      return;
+    }
+
+    // Validate Process Period
+    if (!form.document_process_period || !form.document_process_period.trim()) {
+      setErrorMsg("Process Period must be a whole number between 1 and 30 working days.");
+      return;
+    }
+
+    // Validate process period according to policy:
+    // Whole numbers only, min 1, max 30, field required, prevent saving.
+    const processPeriodStr = form.document_process_period.trim().toLowerCase();
+    let dayMatch = processPeriodStr.match(/^([^\s,]+)\s*(?:working\s*day\/s|working\s*days|working\s*day|days|day)/);
+    if (!dayMatch) {
+      dayMatch = processPeriodStr.match(/^([^\s,]+)$/);
+    }
+    
+    let isProcessPeriodValid = false;
+    if (dayMatch) {
+      const rawDays = dayMatch[1];
+      const hasDecimal = rawDays.includes(".");
+      const daysVal = parseInt(rawDays, 10);
+      if (!hasDecimal && !isNaN(daysVal) && daysVal >= 1 && daysVal <= 30) {
+        isProcessPeriodValid = true;
+      }
+    }
+
+    if (!isProcessPeriodValid) {
+      setErrorMsg("Process Period must be a whole number between 1 and 30 working days.");
+      return;
+    }
+
+    // Validate Exclusive For
     if (!form.access_id) {
       setErrorMsg("Exclusive For is required.");
       return;
@@ -670,7 +714,7 @@ const DocumentManagement = ({
 
         </div>
 
-        <form onSubmit={handleSave} className={`rounded-xl p-6 sm:p-10 py-4 w-full flex flex-col gap-5 shadow h-fit ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white border border-gray-200'}`}>
+        <form onSubmit={handleSave} noValidate className={`rounded-xl p-6 sm:p-10 py-4 w-full flex flex-col gap-5 shadow h-fit ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white border border-gray-200'}`}>
           <h2 className={`font-bold text-xl mb-2 ${isDark ? 'text-white' : 'text-pup-dark-maroon'}`}>
             {isAdding
               ? (selectedType === "document" ? "Add Document" : "Add Certificate")

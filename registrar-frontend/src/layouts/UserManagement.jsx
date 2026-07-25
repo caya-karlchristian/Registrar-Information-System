@@ -96,7 +96,6 @@ const UserManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [submitting, setSubmitting]   = useState(false);
-  const [selected, setSelected]       = useState([]);
 
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -189,18 +188,6 @@ const UserManagement = () => {
   const safePage   = Math.min(currentPage, totalPages);
   const paginated  = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
-      const allSelected =
-    paginated.length > 0 &&
-    paginated.every((u) => selected.includes(u.user_id));
-
-  const toggleAll = () =>
-    allSelected
-      ? setSelected((s) => s.filter((id) => !paginated.map((u) => u.user_id).includes(id)))
-      : setSelected((s) => [...new Set([...s, ...paginated.map((u) => u.user_id)])]);
-
-  const toggleOne = (id) =>
-    setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
-
   const handleFilterChange = () => setCurrentPage(1);
 
     // -------------------------------------------------------
@@ -234,7 +221,6 @@ const UserManagement = () => {
     try {
       await deleteSystemUser(deleteTarget.user_id);
       await fetchUsers();
-      setSelected((s) => s.filter((id) => id !== deleteTarget.user_id));
       setSuccessMsg(`User ${deleteTarget.email} has been deleted.`);
     } catch (err) {
       setErrorMsg(err.response?.data?.message ||"Failed to delete user.");
@@ -338,10 +324,6 @@ const UserManagement = () => {
           <table className="w-full min-w-190 text-sm">
           <thead>
             <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
-              <th className="px-4 py-3 text-left w-10">
-                <input type="checkbox" checked={allSelected} onChange={toggleAll}
-                  className={`rounded accent-pup-dark-maroon ${isDark ? 'border-[#4e4f50] bg-[#1f1f1f]' : 'border-gray-300'}`} />
-              </th>
               <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Name</th>
               <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Email</th>
               
@@ -430,7 +412,7 @@ const UserManagement = () => {
               <UserTableSkeleton isDark={isDark} count={7} />            
             ) : paginated.length === 0 ? (
             <tr>
-                <td colSpan={9} className="py-24">
+                <td colSpan={8} className="py-24">
                   <div className="flex flex-col items-center justify-center">
                     <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
                       <MagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
@@ -455,11 +437,6 @@ const UserManagement = () => {
 
                 return (
                   <tr key={user.user_id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
-                    <td className="px-4 py-3">
-                      <input type="checkbox" checked={selected.includes(user.user_id)}
-                        onChange={() => toggleOne(user.user_id)}
-                        className={`rounded accent-pup-dark-maroon ${isDark ? 'border-[#4e4f50] bg-[#1f1f1f]' : 'border-gray-300'}`} />
-                    </td>
                     <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
                       {fullName}
                     </td>
@@ -552,11 +529,7 @@ const UserManagement = () => {
           </button>
         </div>
       </div>
-      {selected.length > 0 && (
-        <div className={`mt-3 text-xs ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>
-          {selected.length} user{selected.length > 1 ? "s" : ""} selected
-        </div>
-      )}
+
 
       <UserModal
         isOpen={isModalOpen}
