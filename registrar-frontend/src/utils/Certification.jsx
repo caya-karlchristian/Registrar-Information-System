@@ -241,9 +241,16 @@ export const CERT_CONFIG = {
             whatever legal purpose it may serve.
           </p>
         </div>
-        <TextBlock className="mt-6 mb-5 px-27 text-right print:text-[11pt]">Very truly yours,</TextBlock>
-        <DirectorSignature signee={data.signee} />
-        <ReceiptInfo officialReceiptNum={data.officialReceiptNum} date={bold(formatDateFormal(data.date))} />
+        <DirectorSignature
+          signee={data.signee}
+          salutation="Very truly yours,"
+          className="mb-2 mt-4 flex justify-end print:mt-6"
+        />
+        <ReceiptInfo
+          officialReceiptNum={data.officialReceiptNum}
+          date={bold(formatDateFormal(data.date))}
+          className="mt-6 pt-2 print:mt-10 font-lucida"
+        />
       </div>
     ),
   },
@@ -320,14 +327,14 @@ export const CERT_CONFIG = {
           <p>{formatDateFormal(data.date)}</p>
           <p className="text-[10px] text-gray-500">Date</p>
         </TextBlock>
-        <TextBlock className="mb-6 text-[12px] sm:text-[13px] font-lucida">
-          <p className="mb-2">CAV Request Letter</p>
+        <TextBlock className="mb-3 text-[11px] sm:text-[12px] print:text-[9.5pt] print:leading-tight font-lucida">
+          <p className="mb-1">CAV Request Letter</p>
           <p>Atty. Marco Cicero F. Domingo, CESE</p>
           <p>Director IV</p>
           <p>CHED-NCR</p>
         </TextBlock>
-        <TextBlock className="mb-3 text-[12px] sm:text-[13px] font-lucida">Madam:</TextBlock>
-        <TextBlock className="indent-8 text-[12px] sm:text-[13px] leading-relaxed font-lucida text-justify mb-6">
+        <TextBlock className="mb-2 text-[11px] sm:text-[12px] print:text-[9.5pt] font-lucida">Madam:</TextBlock>
+        <TextBlock className="indent-8 text-[11px] sm:text-[12px] print:text-[9.5pt] print:leading-normal leading-relaxed font-lucida text-justify mb-3">
           I, <strong className="underline">{fillOrLine(data.fullName)}</strong>, would
           like to request your good office, for the authentication of my academic records in{" "}
           <strong className="underline">
@@ -337,57 +344,65 @@ export const CERT_CONFIG = {
           issued by Polytechnic University of the Philippines - Taguig. In this connection, I am
           submitting the following records through the Office of the Branch Registrar.
         </TextBlock>
-        <EndorsementNoteBlock items={[
-          "Certified True Copy of Transcript of Records",
-          "Certified True Copy of Diploma",
-          "Certification of Non-Issuance of Special Order",
-        ]} />
-        <TextBlock className="text-[12px] sm:text-[13px] font-lucida mb-10">Thank you,</TextBlock>
-        <TextBlock className="flex justify-end pr-4 sm:pr-8 -mt-4 font-lucida">
+        <EndorsementNoteBlock
+          items={[
+            "Certified True Copy of Transcript of Records",
+            "Certified True Copy of Diploma",
+            "Certification of Non-Issuance of Special Order",
+          ]}
+          twoCol={false}
+          className="print:text-[9.5pt] mb-2"
+        />
+        <TextBlock className="text-[11px] sm:text-[12px] print:text-[9.5pt] font-lucida mb-3">Thank you,</TextBlock>
+        <TextBlock className="flex justify-end pr-4 sm:pr-8 -mt-3 font-lucida">
           <div className="text-center w-56">
-            <p className="text-[12px] sm:text-[13px] -mt-5 mb-3 font-lucida">Respectfully yours,</p>
-            <p className="mt-2 border-b border-gray-800 font-lucida w-full text-[12px] sm:text-[13px]">
+            <p className="text-[11px] sm:text-[12px] print:text-[9.5pt] mb-1 font-lucida">Respectfully yours,</p>
+            <p className="mt-4 border-b border-gray-800 font-lucida w-full text-[11px] sm:text-[12px] print:text-[9.5pt]">
               {fillOrLine(data.fullName)}
             </p>
-            <p className="text-[11px] sm:text-[12px] mt-1 font-lucida">Student</p>
-            <p className="text-[10px] sm:text-[11px] text-gray-600 font-lucida">(Signature over printed name)</p>
+            <p className="text-[10px] sm:text-[11px] print:text-[9pt] mt-0.5 font-lucida">Student</p>
+            <p className="text-[8px] sm:text-[9px] print:text-[8pt] text-gray-500 font-lucida">(Signature over printed name)</p>
           </div>
         </TextBlock>
-        <TextBlock className="border-t-2 border-gray-800 text-center py-1 my-4 font-lucida">
-          <p className="font-bold text-[12px] sm:text-[13px]">1<sup>st</sup> Endorsement</p>
+        <TextBlock className="border-t-2 border-gray-800 text-center py-0.5 my-2 font-lucida mb-0">
+          <p className="font-bold text-[11px] sm:text-[12px] print:text-[10pt]">1<sup>st</sup> Endorsement</p>
         </TextBlock>
         <PupLetterhead date={data.date} layout={layout}/>
-        <TextBlock className="text-[12px] sm:text-[13px] leading-relaxed text-justify mb-4">
+        <TextBlock className="text-[11px] sm:text-[12px] print:text-[9.5pt] print:leading-normal leading-relaxed text-justify mb-2 font-lucida">
           Respectfully forwarded to the Director IV, Commission on Higher Education-National Capital
           Region, the request of
         </TextBlock>
-        <div className="flex gap-4 mb-1 font-lucida">
+        <div className="flex gap-4 mb-2 mt-1 font-lucida">
           {[
             [fillOrLine(data.fullName), "(Name of Student,"],
             [fillOrLine(data.studentStatus), "Status"],
             [fillOrLine(data.course), "etc.)"],
           ].map(([value, label], i) => (
             <div key={i} className="flex-1 text-center">
-              <p className="font-bold text-[12px] sm:text-[13px] border-b border-gray-800 pb-1">{value}</p>
-              <p className="text-[10px] text-gray-600">{label}</p>
+              <p className="font-bold text-[11px] sm:text-[12px] print:text-[9.5pt] border-b border-gray-800 pb-0.5">{value}</p>
+              <p className="text-[9px] print:text-[8.5pt] text-gray-500">{label}</p>
             </div>
           ))}
         </div>
-        <TextBlock className="text-[12px] sm:text-[13px] leading-relaxed text-justify mb-8 font-lucida">
+        <TextBlock className="text-[11px] sm:text-[12px] print:text-[9.5pt] print:leading-normal leading-relaxed text-justify mb-3 font-lucida">
           for the Authentication of her record, recommending approval, with the certification that
           the documents forwarded herewith are true and authentic copies of the documents issued
           and/or kept by this institution
         </TextBlock>
-        <div className="flex justify-end pr-4 sm:pr-8 -mt-3 font-lucida">
+        <div className="flex justify-end pr-4 sm:pr-8 font-lucida mb-2">
           <div className="text-center">
-            <DirectorSignature signee={data.signee} />
+            <DirectorSignature signee={data.signee} className="mb-1 mt-2 flex justify-end print:mt-4" />
           </div>
         </div>
-        <EndorsementNoteBlock items={[
-          "Certified True Copy of Transcript of Records",
-          "Certified True Copy of Diploma",
-          "Certification of Non-Issuance of Special Order",
-        ]} />
+        <EndorsementNoteBlock
+          items={[
+            "Certified True Copy of Transcript of Records",
+            "Certified True Copy of Diploma",
+            "Certification of Non-Issuance of Special Order",
+          ]}
+          twoCol={false}
+          className="print:text-[9.5pt] mb-2"
+        />
       </>
     ),
   },
@@ -511,17 +526,17 @@ export const CERT_CONFIG = {
     fields: ["fullName", "course", "major", "date"],
     renderBody: (data, layout) => (
       <>
-        <TextBlock className="text-right text-xs sm:text-sm text-gray-700 -mt-5">
+        <TextBlock className="text-right text-xs sm:text-sm text-gray-700 -mt-5 font-lucida">
           <p>{formatDateFormal(data.date)}</p>
         </TextBlock>
-        <TextBlock className="mb-6 text-[12px] sm:text-[13px]">
-          <p className="mb-2">The Head</p>
+        <TextBlock className="mb-3 text-[11px] sm:text-[12px] print:text-[9.5pt] print:leading-tight font-lucida">
+          <p className="mb-1">The Head</p>
           <p>DFA Authentical Division</p>
           <p>Roxas Boulevard</p>
           <p>Pasay City</p>
         </TextBlock>
-        <TextBlock className="mb-6 text-[12px] sm:text-[13px]">Dear Sir/Madame:</TextBlock>
-        <TextBlock className="indent-6 text-[12px] sm:text-[13px] leading-relaxed text-justify mb-6">
+        <TextBlock className="mb-2 text-[11px] sm:text-[12px] print:text-[9.5pt] font-lucida">Dear Sir/Madame:</TextBlock>
+        <TextBlock className="indent-6 text-[11px] sm:text-[12px] print:text-[9.5pt] print:leading-normal leading-relaxed text-justify mb-3 font-lucida">
           I, <strong className="underline">{fillOrLine(data.fullName)}</strong>, would
           like to request your good office, for the authentication of my academic records in{" "}
           <strong className="underline">
@@ -531,52 +546,60 @@ export const CERT_CONFIG = {
           issued by Polytechnic University of the Philippines - Taguig. In this connection, I am
           submitting the following records through the Office of the Branch Registrar.
         </TextBlock>
-        <EndorsementNoteBlock items={[
-          "Official Transcript of Records",
-          "Diploma",
-          "Certification of Enrollment (for undergraduate only)",
-          "Certification of Clinical Experience (if applicable)",
-          "Certified Copy of Special Order"
-        ]} />
-        <TextBlock className="text-[12px] sm:text-[13px] mb-10">Thank you,</TextBlock>
-        <div className="flex justify-end pr-4 sm:pr-8 -mt-4">
+        <EndorsementNoteBlock
+          items={[
+            "Official Transcript of Records",
+            "Diploma",
+            "Certification of Enrollment (for undergraduate only)",
+            "Certification of Clinical Experience (if applicable)",
+            "Certified Copy of Special Order"
+          ]}
+          twoCol={false}
+          className="print:text-[9.5pt] mb-2"
+        />
+        <TextBlock className="text-[11px] sm:text-[12px] print:text-[9.5pt] font-lucida mb-3">Thank you,</TextBlock>
+        <div className="flex justify-end pr-4 sm:pr-8 -mt-3 font-lucida">
           <div className="text-center w-56">
-            <TextBlock className="text-[12px] sm:text-[13px]">Respectfully yours,</TextBlock>
-            <TextBlock className="mt-8 text-center">
-              <p className="text-[11px] sm:text-[12px] font-semibold font-lucida">
+            <TextBlock className="text-[11px] sm:text-[12px] print:text-[9.5pt] mb-0 font-lucida font-lucida">Respectfully yours,</TextBlock>
+            <TextBlock className="mt-4 text-center">
+              <p className="text-[10px] sm:text-[11px] print:text-[9.5pt] font-semibold font-lucida">
                 {fillOrLine(data.fullName)}
               </p>
               <div className="border-b border-gray-800 w-48 mx-auto mt-1" />
-              <p className="text-[10px] sm:text-[11px] semi-bold mt-1 font-lucida">
+              <p className="text-[9px] sm:text-[10px] print:text-[8.5pt] mt-0.5 font-lucida">
                 Student
               </p>
-          </TextBlock>
+            </TextBlock>
           </div>
         </div>
-        <div className="border-t-2 border-gray-800 text-center py-1 my-4">
-          <TextBlock className="font-bold text-[12px] sm:text-[13px]">1<sup>st</sup> Endorsement</TextBlock>
+        <div className="border-t-2 border-gray-800 text-center py-0.5 my-2 font-lucida mb-0">
+          <TextBlock className="mb-0 font-bold text-[11px] sm:text-[12px] print:text-[10pt]">1<sup>st</sup> Endorsement</TextBlock>
         </div>
         <PupLetterhead date={data.date} layout={layout} />
-        <TextBlock className="indent-6 text-[12px] sm:text-[13px] leading-relaxed text-justify mb-4">
+        <TextBlock className="indent-6 text-[11px] sm:text-[12px] print:text-[9.5pt] print:leading-normal leading-relaxed text-justify mb-2 font-lucida">
           Respectfully forwarded to the Director, Authentication Department Region, the request of{" "}
           {fillOrLine(data.fullName)} {bold("GRADUATED -")} {fillOrLine(data.course)} for the
           Authentication of her record, recommending approval, with the certification that the
           documents forwarded herewith are true and authentic copies of the documents issued and/or
           kept by this institution
         </TextBlock>
-        <div className="flex justify-end pr-4 sm:pr-8 mb-6">
+        <div className="flex justify-end pr-4 sm:pr-8 font-lucida mb-2">
           <div className="text-center">
-            <DirectorSignature signee={data.signee} />
+            <DirectorSignature signee={data.signee} className="mb-1 mt-2 flex justify-end print:mt-4" />
           </div>
         </div>
-        <EndorsementNoteBlock items={[
-          "Diploma",
-          "Transcript of Records",
-          "Certification of Graduation",
-          "Certification of without Special Order",
-          "Certification of Enrollment (for undergraduate only)",
-          "Others__________________________________________",
-        ]} />
+        <EndorsementNoteBlock
+          items={[
+            "Diploma",
+            "Transcript of Records",
+            "Certification of Graduation",
+            "Certification of without Special Order",
+            "Certification of Enrollment (for undergraduate only)",
+            "Others__________________________________________",
+          ]}
+          twoCol={false} //true if you want two columns, false for one column
+          className="print:text-[9.5pt] mb-2"
+        />
       </>
     ),
   },
@@ -659,8 +682,12 @@ export const CERT_CONFIG = {
               <TextBlock className="border-t border-gray-800 pt-1 w-48">
                 <p className="text-[10px] italic text-center">Registrar's Signature over printed name</p>
               </TextBlock>
-              <TextBlock className="border-t border-gray-800 pt-1 w-48">
-                <p className="text-[10px] italic text-center">Student's Signature over printed name</p>
+              <TextBlock className="w-48 text-center mb-0">
+                <p className="font-semibold text-[10px] uppercase font-lucida text-center">
+                  {fillOrLine(data.fullName)}
+                </p>
+                <div className="border-t border-gray-800 w-full mt-1" />
+                <p className="text-[10px] italic text-center mt-1">Student's Signature over printed name</p>
               </TextBlock>
             </div>
           </div>

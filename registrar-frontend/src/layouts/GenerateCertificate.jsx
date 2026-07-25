@@ -100,17 +100,40 @@ const buildFieldConfig = (courseOptions) => [
 ];
 
 // ─── Memoized Certificate Preview ───
-// Make sure your code looks exactly like this:
-  const CertificatePreview = React.memo(({ certConfig, activeLayout, debouncedFormData, isDark }) => (
-    <div id="print-area" className="...">
-      {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
-      
-      {/* 👇 THIS IS THE MOST IMPORTANT PART! 👇 */}
-      <div className="flex-1">{certConfig?.renderBody(debouncedFormData, activeLayout)}</div>
-      
-      {!certConfig?.hideHeaderFooter && <CertFooter layout={activeLayout} />}
-    </div>
-  ));
+  const CertificatePreview = React.memo(({ certConfig, activeLayout, debouncedFormData, isDark, pageDimensions, marginValue }) => {
+    const pageSizeSpec = `${pageDimensions.widthInches}in ${pageDimensions.heightInches}in`;
+    return (
+      <div 
+        id="print-area" 
+        style={{
+          "--print-margin": `${marginValue}in`,
+          "--header-logo-size": `${activeLayout?.headerLogoSize ?? 120}px`,
+          "--footer-logo-size": `${activeLayout?.footerLogoSize ?? 45}px`,
+          padding: "var(--print-margin)",
+          backgroundColor: "white",
+          color: "black",
+          width: `${pageDimensions.width}px`,
+          height: `${pageDimensions.height}px`,
+          display: "flex",
+          flexDirection: "column",
+          boxSizing: "border-box",
+        }}
+        className="bg-white text-black"
+      >
+        <style dangerouslySetInnerHTML={{__html: `
+          @page {
+            size: ${pageSizeSpec};
+            margin: 0;
+          }
+        `}} />
+        {!certConfig?.hideHeaderFooter && <CertHeader layout={activeLayout} />}
+        
+        <div className="flex-1 overflow-visible">{certConfig?.renderBody(debouncedFormData, activeLayout)}</div>
+        
+        {!certConfig?.hideHeaderFooter && <CertFooter layout={activeLayout} />}
+      </div>
+    );
+  });
 
 CertificatePreview.displayName = 'CertificatePreview';
 
@@ -152,6 +175,10 @@ const GenerateCertification = ({ initialData, onClose, onCertificatePrinted, onL
   const [certNameById, setCertNameById] = useState(certIdToName);
   const [formData, setFormData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
   const [savedData, setSavedData] = useState({ ...DEFAULT_FORM, ...(initialData ?? {}) });
+
+  const [paperSize, setPaperSize] = useState("Letter");
+  const [orientation, setOrientation] = useState("Portrait");
+  const [margins, setMargins] = useState("Narrow (0.25\")");
 
   const requestedDocTypeId = useMemo(() => Number(initialData?.docType), [initialData?.docType]);
 
@@ -214,7 +241,6 @@ useEffect(() => {
           }
         });
 
-        // 3. ✨ DETERMINE DROPDOWN OPTIONS HERE ✨
         let finalDocTypeOptions = fetchedIds; // Default: show all
 
         // If this request came from a specific student application, lock the dropdown
@@ -375,6 +401,16 @@ useEffect(() => {
   const resolvedFormDocTypeId = resolveCertConfigId(formData.docType);
   const resolvedPreviewDocTypeId = resolveCertConfigId(savedData.docType);
 
+  useEffect(() => {
+    if (!resolvedPreviewDocTypeId) return;
+    const config = CERT_CONFIG[resolvedPreviewDocTypeId];
+    if (config) {
+      setPaperSize(config.defaultPaperSize || "Letter");
+      setOrientation(config.defaultOrientation || "Portrait");
+      setMargins(config.defaultMargins || "Narrow (0.25\")");
+    }
+  }, [resolvedPreviewDocTypeId]);
+
   const formCertConfig = resolvedFormDocTypeId ? CERT_CONFIG[resolvedFormDocTypeId] : undefined;
   const previewCertConfig = resolvedPreviewDocTypeId ? CERT_CONFIG[resolvedPreviewDocTypeId] : undefined;
   const shouldShow = useCallback((fieldName) => formCertConfig?.fields.includes(fieldName), [formCertConfig]);
@@ -392,6 +428,48 @@ useEffect(() => {
     return layoutsByCertId[id] ?? DEFAULT_CERTIFICATE_LAYOUT;
   }, [resolvedPreviewDocTypeId, layoutsByCertId]);
 
+  const pageDimensions = useMemo(() => {
+    let w = 8.5;
+    let h = 11;
+    if (paperSize === "A4") {
+      w = 8.27;
+      h = 11.69;
+    } else if (paperSize === "Legal") {
+      w = 8.5;
+      h = 14;
+    }
+    return orientation === "Portrait"
+      ? { width: Math.round(w * 96), height: Math.round(h * 96), widthInches: w, heightInches: h }
+      : { width: Math.round(h * 96), height: Math.round(w * 96), widthInches: h, heightInches: w };
+  }, [paperSize, orientation]);
+
+  const marginValue = useMemo(() => {
+    if (margins.startsWith("Narrow")) return 0.25;
+    if (margins.startsWith("Wide")) return 1.0;
+    if (margins.startsWith("None")) return 0;
+    return 0.75; // Default: Normal (0.75")
+  }, [margins]);
+
+  const [scale, setScale] = useState(1);
+  const previewContainerRef = useRef(null);
+
+  const updateScale = useCallback(() => {
+    if (!previewContainerRef.current) return;
+    const containerWidth = previewContainerRef.current.clientWidth;
+    const availableWidth = Math.max(200, containerWidth - 32); 
+    const targetWidth = pageDimensions.width;
+    setScale(Math.min(1, availableWidth / targetWidth));
+  }, [pageDimensions.width]);
+
+  useEffect(() => {
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    if (previewContainerRef.current) {
+      observer.observe(previewContainerRef.current);
+    }
+    return () => observer.disconnect();
+  }, [updateScale]);
+
   const { isDark } = useTheme();
   const { programs } = useReferenceData();
 
@@ -408,15 +486,37 @@ useEffect(() => {
       {/* Header Toolbar */}
       <div className="relative z-10 w-full max-w-7xl mx-auto px-4 pt-4 pb-3 md:px-6 md:pt-6 md:pb-4 print:hidden">
         <div className={`flex flex-col gap-4 rounded-2xl px-4 py-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-white/10 md:flex-row md:items-end md:justify-between md:px-5 md:py-5 ${isDark ? 'border-[#3e4042] bg-[#0f0f0f]' : 'border-stone-200/80 bg-white/90'}`}>
-          <div className="relative z-10 w-full md:max-w-xs">
-            <DropDown
-              label="Certification Type"
-              name="docType"
-              value={certIdToName[formData.docType] || "Certificate"}
-              onChange={handleChange}
-              options={docTypeDisplayOptions}
-              labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
-            />
+          <div className="flex flex-wrap items-end gap-4 relative z-10 w-full md:flex-1">
+            <div className="w-full md:max-w-xs shrink-0">
+              <DropDown
+                label="Certification Type"
+                name="docType"
+                value={certIdToName[formData.docType] || "Certificate"}
+                onChange={handleChange}
+                options={docTypeDisplayOptions}
+                labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+              />
+            </div>
+            <div className="w-[120px] md:w-[140px] shrink-0">
+              <DropDown
+                label="Size"
+                name="paperSize"
+                value={paperSize}
+                onChange={(e) => setPaperSize(e.target.value)}
+                options={["Letter", "A4", "Legal"]}
+                labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+              />
+            </div>
+            <div className="w-[150px] md:w-[180px] shrink-0">
+              <DropDown
+                label="Margins"
+                name="margins"
+                value={margins}
+                onChange={(e) => setMargins(e.target.value)}
+                options={["Normal (0.75\")", "Narrow (0.25\")", "Wide (1.0\")", "None"]}
+                labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+              />
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
             {onClose && (
@@ -457,6 +557,8 @@ useEffect(() => {
               <h3 className={`mb-6 text-base font-extrabold uppercase tracking-tight md:text-lg ${isDark ? 'text-white' : 'text-[#800000]'}`}>Edit Information</h3>
               <form className={`space-y-4 md:space-y-6 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
                 {loading && <p className="text-xs md:text-sm text-stone-500 animate-pulse">Fetching academic records...</p>}
+
+
 
                 {FIELD_CONFIG.map(([name, type, label, props]) => {
                   if (!shouldShow(name)) return null;
@@ -527,7 +629,8 @@ useEffect(() => {
         <div className={`relative order-2 flex flex-1 flex-col overflow-y-auto custom-scrollbar rounded-2xl min-h-96 
           sm:min-h-120 lg:min-h-150 max-h-[78vh] lg:max-h-[80vh] print:bg-white print:text-black print:rounded-none 
           print:border-0 print:min-h-0 print:max-h-none print:overflow-visible ${isDark ? 'border-[#3e4042] bg-[#242526]/90 text-[#e4e6eb]' : 
-          'border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70'}`}>          <div className="pointer-events-none absolute inset-0 
+          'border-stone-200/80 bg-white/90 shadow-lg shadow-stone-200/70'}`}>
+          <div className="pointer-events-none absolute inset-0 
           bg-[radial-gradient(circle_at_15%_20%,rgba(90,90,90,0.07),transparent_40%),radial-gradient(circle_at_85%_10%,rgba(120,120,120,0.06),transparent_35%)] 
           print:hidden" />
           <div className={`relative p-4 border-b shrink-0 print:hidden ${isDark ? 'bg-[#242526]/95 border-[#3e4042]' : 'bg-white/95 border-stone-200'}`}>
@@ -535,8 +638,42 @@ useEffect(() => {
               <h2 className={`text-lg font-extrabold uppercase tracking-tight ${isDark ? 'text-white' : 'text-stone-800'}`}>Certificate Preview</h2>
             </div>
           </div>
-          <div className="relative flex-1 p-3 sm:p-6 lg:p-8 print:p-0 print:overflow-visible">
-            <CertificatePreview certConfig={previewCertConfig} activeLayout={activeLayout} debouncedFormData={savedData} isDark={isDark} />
+          
+          <div 
+            ref={previewContainerRef}
+            className="flex-1 flex justify-center items-start p-4 overflow-auto min-h-0 print:p-0 print:overflow-visible"
+          >
+            <div 
+              style={{
+                width: `${pageDimensions.width * scale}px`,
+                height: `${pageDimensions.height * scale}px`,
+                overflow: "hidden",
+                position: "relative",
+              }}
+              className="shadow-xl rounded border border-stone-200 dark:border-stone-800 print:shadow-none print:border-0 print:w-full print:h-full shrink-0"
+            >
+              <div
+                style={{
+                  width: `${pageDimensions.width}px`,
+                  height: `${pageDimensions.height}px`,
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left",
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                }}
+                className="print:static print:transform-none"
+              >
+                <CertificatePreview 
+                  certConfig={previewCertConfig} 
+                  activeLayout={activeLayout} 
+                  debouncedFormData={savedData} 
+                  isDark={isDark} 
+                  pageDimensions={pageDimensions}
+                  marginValue={marginValue}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

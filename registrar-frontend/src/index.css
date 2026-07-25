@@ -129,8 +129,7 @@
 }
 
 @page {
-  size: 8.5in 11in;
-  margin: 0cm;
+  margin: 0;
 }
 @media print {
   body > *:not(#cert-modal-root) {
@@ -168,7 +167,7 @@
     left: 0 !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 1.5cm !important;
+    padding: var(--print-margin, 1.5cm) !important;
     box-shadow: none !important;
     border: none !important;
     background: white !important;
@@ -179,13 +178,13 @@
   }
 
   /* ── Images ── */
-  #print-area img {
-    width: 80px !important;
-    height: 80px !important;
+  #print-area img:not(.footer-accreditation-img) {
+    width: var(--header-logo-size, 80px) !important;
+    height: var(--header-logo-size, 80px) !important;
   }
 
   #print-area .footer-accreditation-img {
-    height: 90px !important;    
+    height: var(--footer-logo-size, 90px) !important;    
     width: auto !important;      
     max-width: 400px !important; 
     
@@ -193,11 +192,6 @@
     object-fit: contain !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-  }
-
-  .footer-accreditation-img {
-    height: 80px;
-    width: auto;
   }
 
   .txt-certification { 
@@ -209,7 +203,6 @@
   #print-area, #print-area * {
     font-family: 'Lucida Fax', 'Lucida Sans Typewriter', 'Times New Roman', serif !important;
   }
-
 }
 
 .asw-menu-btn {
