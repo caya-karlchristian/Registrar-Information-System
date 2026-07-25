@@ -31,9 +31,14 @@ export const CertificateTitle = ({ title }) => (
   </div>
 );
 
-export const SignatureBlock = ({ name, position }) => (
-  <div className="mb-4 mt-10 flex justify-end print:mt-15">
+export const SignatureBlock = ({ name, position, className = "", salutation = "" }) => (
+  <div className={className || "mb-4 mt-10 flex justify-end print:mt-15"}>
     <TextBlock className="inline-block text-center mb-0">
+      {salutation && (
+        <p className="font-lucida text-xs sm:text-sm print:text-[10pt] text-gray-900 mb-6">
+          {salutation}
+        </p>
+      )}
       <p className="font-bold px-10 text-xs sm:text-sm uppercase font-lucida text-gray-900 print:text-[10pt]">
         {name}
       </p>
@@ -80,8 +85,8 @@ export const FooterInfo = ({ diplomaNum, date }) => (
   </TextBlock>
 );
 
-export const ReceiptInfo = ({ officialReceiptNum, date }) => (
-  <TextBlock className="mt-15 pt-3 print:mt-25 font-lucida">
+export const ReceiptInfo = ({ officialReceiptNum, date, className = "" }) => (
+  <TextBlock className={className || "mt-15 pt-3 print:mt-25 font-lucida"}>
     <p className="text-[6px] sm:text-[8px] print:text-[8pt] tracking-tighter mb-1">
       Not valid without University Dry Seal
     </p>
@@ -169,22 +174,26 @@ export const CertFooter = ({ layout }) => (
   </div>
 );
 
-export const RegistrarSignature = ({ signee }) => {
+export const RegistrarSignature = ({ signee, className = "", salutation = "" }) => {
   const signer = getSigneeInfo(signee, "mhel");
   return (
   <SignatureBlock
     name={signer.name}
     position={signer.position}
+    className={className}
+    salutation={salutation}
   />
   );
 };
 
-export const DirectorSignature = ({ signee }) => {
+export const DirectorSignature = ({ signee, className = "", salutation = "" }) => {
   const signer = getSigneeInfo(signee, "ferrer");
   return (
   <SignatureBlock
     name={signer.name}
     position={signer.position}
+    className={className}
+    salutation={salutation}
   />
   );
 };
@@ -243,12 +252,12 @@ export const PupLetterhead = ({ date, layout }) => (
   </>
 );
 
-export const EndorsementNoteBlock = ({ items }) => (
-  <TextBlock className="text-[11px] sm:text-[12px]">
-    <p className="mb-2">Note: The following documents are attached:</p>
-    <ol className="list-decimal list-inside ml-6 space-y-1">
+export const EndorsementNoteBlock = ({ items, className = "", twoCol = false }) => (
+  <TextBlock className={`text-[11px] sm:text-[12px] mb-2 ${className}`}>
+    <p className="mb-1">Note: The following documents are attached:</p>
+    <ol className={`list-decimal list-inside ml-6 space-y-1 ${twoCol ? "grid grid-cols-2 gap-x-4 gap-y-0.5 space-y-0" : ""}`}>
       {items.map((item, i) => (
-        <li key={i}>{item}</li>
+        <li key={i} className="text-left">{item}</li>
       ))}
     </ol>
   </TextBlock>
