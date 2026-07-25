@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDownIcon, XCircleIcon } from '@heroicons/react/24/solid';
 import { getDocumentTypes } from "../services/api";
 import { PROGRESS_MAP } from '../utils/constants';
@@ -50,9 +51,14 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
 
   const displayStatus = request.status?.status_name || request.status || 'N/A';
 
-  return (
-    <div className="fixed inset-0 pt-30 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 modal-overlay-container">
-      <div className={`rounded-xl sm:rounded-2xl shadow-2xl w-[95vw] sm:w-full sm:max-w-2xl lg:max-w-4xl md:max-h-[calc(100vh-180px)] flex flex-col h-full sm:h-auto max-h-full sm:max-h-[calc(100vh-110px)] lg:max-h-[calc(100vh-180px)] overflow-hidden print:w-full print:max-w-none print:shadow-none print:rounded-none mx-auto my-0 sm:my-4 lg:my-4 ${isDark ? 'bg-[#242526]' : 'bg-white'}`}>
+  return createPortal(
+    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
+      <div
+        className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`}
+        onClick={onClose}
+      />
+      <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl lg:max-w-4xl max-h-[calc(100vh-32px)] overflow-hidden flex flex-col print:w-full print:max-w-none print:shadow-none print:rounded-none ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
+
 
         {/* Header */}
         <div className={`relative px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center shrink-0 ${isDark ? 'bg-[#3a3b3c]' : 'bg-pup-maroon'}`}>
@@ -188,7 +194,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
         </div>
       </div>
     </div>
-  );
+  , document.body);
 };
 
 const getProgressLabel = (progress) => {
