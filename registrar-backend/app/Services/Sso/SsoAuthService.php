@@ -4,6 +4,7 @@ namespace App\Services\Sso;
 
 use App\Exceptions\IdpException;
 use App\Exceptions\IdpUnavailableException;
+use App\Exceptions\UnregisteredAccountException;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
 use Illuminate\Http\Request;
@@ -33,22 +34,29 @@ class SsoAuthService
     /**
      * Authenticate via OAuth authorization code (SSO redirect flow).
      *
-     * Rejection is handled by UserProvisioningService, which throws a
-     * \RuntimeException if the user has no registered role in RIS.
-     * SsoCallbackController catches that and returns a 403.
+     * Rejection is handled by UserProvisioningService, which throws
+     * UnregisteredAccountException if the user has no registered role in
+     * RIS. SsoCallbackController catches that specific type and returns a
+     * 403 — any other exception (e.g. a QueryException from a provisioning
+     * bug) is deliberately NOT caught here, so it falls through to the
+     * generic 500 handler instead of being misread as "not registered."
      *
      * @return array{token: string, user: SystemUser}
-     * @throws IdpException|\RuntimeException
+     * @throws IdpException|UnregisteredAccountException
      */
     public function loginWithCode(string $code, Request $request): array
     {
         $accessToken = $this->idpClient->exchangeCode($code);
         $profile     = $this->idpClient->fetchUserProfile($accessToken);
 
-        // provision() throws \RuntimeException if user has no role in RIS
-        $result = $this->provisioner->provision(
-            array_merge($profile, ['access_token' => $accessToken])
-        );
+        try {
+            $result = $this->provisioner->provision(
+                array_merge($profile, ['access_token' => $accessToken])
+            );
+        } catch (UnregisteredAccountException $e) {
+            $this->revokeOnRejection($accessToken, $profile);
+            throw $e;
+        }
 
         /** @var SystemUser $user */
         $user = $result->user;
@@ -69,7 +77,7 @@ class SsoAuthService
      * Authenticate with email + password via the IdP.
      *
      * @return array{token: string, user: SystemUser}
-     * @throws IdpException|\RuntimeException
+     * @throws IdpException|UnregisteredAccountException
      */
     public function loginWithCredentials(
         string  $email,
@@ -95,8 +103,14 @@ class SsoAuthService
             'user_id'      => $profile['id'] ?? null,
         ]);
 
-        $result = $this->provisioner->provision($idpResponse);
-        $user   = $result->user;
+        try {
+            $result = $this->provisioner->provision($idpResponse);
+        } catch (UnregisteredAccountException $e) {
+            $this->revokeOnRejection($accessToken, $profile);
+            throw $e;
+        }
+
+        $user = $result->user;
 
         $user->update([
             'idp_access_token' => $accessToken,
@@ -107,6 +121,33 @@ class SsoAuthService
         $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGIN);
 
         return ['token' => $token, 'user' => $user];
+    }
+
+    /**
+     * Revoke the just-issued IdP token when RIS rejects the login (e.g. the
+     * user has no registered role — see UserProvisioningService::provision).
+     *
+     * Without this, the IdP session/token stays valid even though RIS
+     * refused the login. The frontend's "Back to Login" button only fires a
+     * passive browser redirect to the IdP's /logout page — if that alone
+     * doesn't fully clear the session, the next "Log in with IDP" click
+     * silently reuses it and immediately fails again, looping forever.
+     * Revoking server-side here closes that gap regardless of what the
+     * browser-side redirect does or doesn't clear.
+     *
+     * Best-effort: a failed revoke must never mask the original rejection
+     * (UnregisteredAccountException) or block the user from seeing why they
+     * were rejected, so failures are logged and swallowed.
+     */
+    private function revokeOnRejection(string $accessToken, array $profile): void
+    {
+        try {
+            $this->idpClient->logout($accessToken, $profile['id'] ?? null);
+        } catch (\Exception $e) {
+            Log::warning('SSO: token revoke failed during rejection', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

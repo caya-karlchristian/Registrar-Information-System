@@ -23,6 +23,17 @@ php artisan optimize
 find /var/www/html/storage/app/public -type f -exec chmod 644 {} \;
 find /var/www/html/storage/app/public -type d -exec chmod 755 {} \;
 
+# Re-assert ownership on storage/ and bootstrap/cache/ right before php-fpm
+# starts. Everything above this line (migrate, optimize, etc.) runs as root
+# — the container's default user, since no USER directive drops privileges
+# before this script runs. If any of those commands write a log line, they
+# recreate storage/logs/laravel.log owned by root, and every future write
+# from php-fpm (which runs as www-data per www.conf) then fails with
+# "Permission denied" — permanently, until someone manually chowns it again.
+# The Dockerfile's build-time chown only protects the first boot; this line
+# makes every container start self-healing instead.
+chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
 # Start PHP-FPM in background
 umask 0022
 php-fpm -D

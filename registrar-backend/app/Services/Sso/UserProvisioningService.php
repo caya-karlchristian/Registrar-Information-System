@@ -3,6 +3,7 @@
 namespace App\Services\Sso;
 
 use App\Exceptions\OgosException;
+use App\Exceptions\UnregisteredAccountException;
 use App\Models\Alumni;
 use App\Models\AlumniProfile;
 use App\Models\StudentProfile;
@@ -38,7 +39,7 @@ class UserProvisioningService
                     $this->ogosStudentService->getClient()->getStudentByEmail($email);
                     $roleId = SystemUser::ROLE_STUDENT;
                 } catch (OgosException) {
-                    throw new \RuntimeException('Your account is not yet registered in RIS. Please contact the registrar.');
+                    throw new UnregisteredAccountException('Your account is not yet registered in RIS. Please contact the registrar.');
                 }
             }
 

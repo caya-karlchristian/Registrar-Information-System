@@ -13,10 +13,19 @@ namespace App\DTOs\Ogos;
  *   lastName:      string,
  *   email:         string,
  *   mobileNumber:  string,
- *   course:        { id, code, name },
+ *   program:       { id, code, name },
  *   yearLevel:     integer,
  *   section:       string,   ← string, not integer ("1", "2A", etc.)
  * }
+ *
+ * UPDATE (2026-07-25): OGOS renamed this object from `course` to `program`
+ * in its response — confirmed live via Postman against
+ * GET /integrations/students/profiles. The old `course` key silently
+ * resolved to null for every student once this shipped (courseId ends up
+ * null → StudentAcademicRecord insert fails, since course_id is NOT NULL —
+ * see 2026_07_04_000000_fix_course_fk_and_history_index.php). fromArray()
+ * below reads `program` first and falls back to `course` in case any OGOS
+ * endpoint/environment hasn't rolled the rename out yet.
  *
  * Extended fields (dateOfBirth, gender, heightFt, weightKg, etc.)
  * come from the separate /personal-info endpoint → OgosPersonalInfoDTO.
@@ -65,9 +74,12 @@ readonly class OgosStudentDTO
             lastName:      $data['lastName']      ?? '',
             mobileNumber:  self::nullableString($data['mobileNumber'] ?? null),
 
-            courseId:   $data['course']['id']   ?? null,
-            courseCode: $data['course']['code'] ?? null,
-            courseName: $data['course']['name'] ?? null,
+            // OGOS renamed course -> program (2026-07-25). Read the new key
+            // first; fall back to the old one so this doesn't silently break
+            // again if some environment/endpoint still sends the old shape.
+            courseId:   $data['program']['id']   ?? $data['course']['id']   ?? null,
+            courseCode: $data['program']['code'] ?? $data['course']['code'] ?? null,
+            courseName: $data['program']['name'] ?? $data['course']['name'] ?? null,
 
             yearLevel: isset($data['yearLevel']) ? (int) $data['yearLevel'] : null,
             section:   self::nullableString($data['section'] ?? null),
