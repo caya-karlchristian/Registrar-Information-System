@@ -237,6 +237,19 @@ const DocumentManagement = ({
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    if (!form.document_process_period || !form.document_process_period.trim()) {
+      setErrorMsg("Process Period is required.");
+      return;
+    }
+
+    if (!form.access_id) {
+      setErrorMsg("Exclusive For is required.");
+      return;
+    }
+
     try {
       if (selectedType === "document") {
         const payload = {
