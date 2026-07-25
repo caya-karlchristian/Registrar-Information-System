@@ -483,6 +483,7 @@ class IdpClient
 
     private function execRaw($ch): array
     {
+        $url    = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
         $body   = curl_exec($ch);
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error  = curl_error($ch);
@@ -498,6 +499,22 @@ class IdpClient
             CURLE_SSL_CONNECT_ERROR,     // TLS handshake failed
         ];
         $this->lastConnectivityError = in_array($errno, $connectivityErrors, true);
+
+        // Previously $error/$errno were captured but every caller only
+        // destructured [$body, $status], silently discarding the real
+        // cURL failure reason. That left transport-level failures (DNS,
+        // connection refused, timeout, TLS handshake) producing an empty
+        // $body and a callsite exception message like "...: " with
+        // nothing after the colon — no way to diagnose from logs alone.
+        // Log it here, once, centrally, for every caller.
+        if ($errno !== 0 || $status === 0) {
+            Log::error('IdpClient: transport-level request failure', [
+                'url'    => $url,
+                'errno'  => $errno,
+                'error'  => $error,
+                'status' => $status,
+            ]);
+        }
 
         return [$body, $status, $error];
     }
