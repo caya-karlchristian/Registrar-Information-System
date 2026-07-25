@@ -80,15 +80,15 @@ const buildFieldConfig = (courseOptions) => [
   ["educationLevel",    "dropdown", "Education Level",         { options: eduLevels }],
   ["semesters",         "dropdown", "Semester",                { options: semesters }],
   ["yearNum",           "dropdown", "Year",                    { options: yearNum }],
-  ["syAdmitted",        "input",    "S.Y. Admitted",           { type: "date", placeholder: "XXXX" }],
+  ["syAdmitted",        "input",    "S.Y. Admitted",           { type: "date", placeholder: "XXXX", max: getTodayDate() }],
   ["eventTitle",        "input",    "Event/Seminar Title",     { placeholder: "e.g. 1st ICT Congress" }],
-  ["dateGraduated",     "input",    "Date of Graduation",      { type: "date" }],
+  ["dateGraduated",     "input",    "Date of Graduation",      { type: "date", max: getTodayDate() }],
   ["diplomaNum",        "input",    "Diploma Number",          { placeholder: "e.g. 2026-XXXX" }],
   ["officialReceiptNum","input",    "Official Receipt Number", { placeholder: "e.g. XXXXXXX" }],
   ["gwa",               "input",    "General Weighted Average",{ placeholder: "e.g. 1.25" }],
   ["eligibilityType",   "input",    "Eligibility Type",        { placeholder: "e.g. Professional License" }],
   ["lastSemesters",     "dropdown", "Last Semester",           { options: semesters }],
-  ["lastSy",            "input",    "Last S.Y. Admitted",      { type: "date", placeholder: "XXXX" }],
+  ["lastSy",            "input",    "Last S.Y. Admitted",      { type: "date", placeholder: "XXXX", max: getTodayDate() }],
   ["units",             "input",    "Number of Units",         { placeholder: "e.g. 120" }],
   ["semestersNum",      "input",    "Number of Semesters",     { placeholder: "e.g. 8" }],
   ["ladderizedDegree",  "dropdown", "Ladderized Degree",       { options: courseOptions }],
@@ -497,7 +497,7 @@ useEffect(() => {
                 labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
               />
             </div>
-            <div className="w-[120px] md:w-[140px] shrink-0">
+            <div className="w-30 md:w-35 shrink-0">
               <DropDown
                 label="Size"
                 name="paperSize"
@@ -507,7 +507,7 @@ useEffect(() => {
                 labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
               />
             </div>
-            <div className="w-[150px] md:w-[180px] shrink-0">
+            <div className="w-37.5 md:w-45 shrink-0">
               <DropDown
                 label="Margins"
                 name="margins"
@@ -597,7 +597,7 @@ useEffect(() => {
                   onChange={handleChange}
                   voiceEnabled={false}
                   labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
-                  min={getTodayDate()}
+                  max={getTodayDate()}
                 />
 
                 <DropDown
@@ -650,7 +650,7 @@ useEffect(() => {
                 overflow: "hidden",
                 position: "relative",
               }}
-              className="shadow-xl rounded border border-stone-200 dark:border-stone-800 print:shadow-none print:border-0 print:w-full print:h-full shrink-0"
+              className="print:shadow-none print:border-0 print:w-full print:h-full shrink-0"
             >
               <div
                 style={{
