@@ -22,6 +22,7 @@ services:
       SSO_BASE_URL: ${SSO_BASE_URL}
       SSO_SUPERADMIN_EMAIL: ${SSO_SUPERADMIN_EMAIL}
       SSO_SUPERADMIN_PASSWORD: ${SSO_SUPERADMIN_PASSWORD}
+      SSO_API_KEY: ${SSO_API_KEY}
       REVERB_APP_ID: ${REVERB_APP_ID}
       REVERB_APP_KEY: ${REVERB_APP_KEY}
       REVERB_APP_SECRET: ${REVERB_APP_SECRET}
@@ -118,6 +119,7 @@ services:
       OCMS_BASE_URL: ${OCMS_BASE_URL}
       OCMS_CLIENT_ID: ${OCMS_CLIENT_ID}
       OCMS_CLIENT_SECRET: ${OCMS_CLIENT_SECRET}
+      SSO_API_KEY: ${SSO_API_KEY}
     ports:
       - "8080:8080"
     depends_on:
@@ -183,6 +185,7 @@ services:
       OCMS_BASE_URL: ${OCMS_BASE_URL}
       OCMS_CLIENT_ID: ${OCMS_CLIENT_ID}
       OCMS_CLIENT_SECRET: ${OCMS_CLIENT_SECRET}
+      SSO_API_KEY: ${SSO_API_KEY}
     depends_on:
       backend:
         condition: service_started
@@ -260,6 +263,7 @@ services:
       OCMS_BASE_URL: ${OCMS_BASE_URL}
       OCMS_CLIENT_ID: ${OCMS_CLIENT_ID}
       OCMS_CLIENT_SECRET: ${OCMS_CLIENT_SECRET}
+      SSO_API_KEY: ${SSO_API_KEY}
     depends_on:
       backend:
         condition: service_started
@@ -321,6 +325,7 @@ services:
       OCMS_BASE_URL: ${OCMS_BASE_URL}
       OCMS_CLIENT_ID: ${OCMS_CLIENT_ID}
       OCMS_CLIENT_SECRET: ${OCMS_CLIENT_SECRET}
+      SSO_API_KEY: ${SSO_API_KEY}
     depends_on:
       backend:
         condition: service_started
