@@ -6,6 +6,9 @@ use App\Models\DocumentRequest;
 use App\Models\SystemUser;
 use App\Models\AuditLog;
 use App\Contracts\DocumentRequestServiceInterface;
+use App\Http\Requests\DocumentRequest\BulkRequestIdsRequest;
+use App\Http\Requests\DocumentRequest\StoreDocumentRequestRequest;
+use App\Http\Requests\DocumentRequest\UpdateDocumentRequestRequest;
 use App\Services\DocumentRequestService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
@@ -18,6 +21,13 @@ use Illuminate\Support\Facades\Auth;
  *
  * Responsibilities: validate input, authorize, delegate to DocumentRequestService, return JSON.
  * Business logic lives entirely in DocumentRequestService.
+ *
+ * Validation for store()/update()/archiveBulk()/restoreBulk() now lives in
+ * App\Http\Requests\DocumentRequest\* — see each class's rules(). Their
+ * authorize() methods also replace the explicit $this->authorize() calls
+ * store()/update() used to make (archive()/restore()/view()/delete() below
+ * still call $this->authorize() directly since those don't take a
+ * FormRequest — there's nothing to validate on those routes).
  */
 class DocumentRequestController extends Controller
 {
@@ -189,21 +199,9 @@ class DocumentRequestController extends Controller
     // -------------------------------------------------------------------------
     // POST /document-requests
     // -------------------------------------------------------------------------
-    public function store(Request $request)
+    public function store(StoreDocumentRequestRequest $request)
     {
-        $this->authorize('create', DocumentRequest::class);
-
-        $validated = $request->validate([
-            'request_purpose_id'                 => 'required|integer|exists:request_purpose,request_purpose_id',
-            'or_number'                          => 'nullable|string|max:50',
-            'receipt_date'                       => 'nullable|date',
-            'documents'                          => 'nullable|array',
-            'documents.*.document_type_id'       => 'required|integer|exists:document_type,document_type_id',
-            'documents.*.number_of_copies'       => 'required|integer|min:1|max:10',
-            'certificates'                       => 'nullable|array',
-            'certificates.*.certificate_type_id' => 'required|integer|exists:certificate_type,certificate_type_id',
-            'certificates.*.number_of_copies'    => 'nullable|integer|min:1|max:10',
-        ]);
+        $validated = $request->validated();
 
         if (empty($validated['documents']) && empty($validated['certificates'])) {
             return response()->json([
@@ -293,15 +291,9 @@ class DocumentRequestController extends Controller
     // -------------------------------------------------------------------------
     // PUT /document-requests/{documentRequest}
     // -------------------------------------------------------------------------
-    public function update(Request $request, DocumentRequest $documentRequest)
+    public function update(UpdateDocumentRequestRequest $request, DocumentRequest $documentRequest)
     {
-        $this->authorize('update', $documentRequest);
-
-        $validated = $request->validate([
-            'status_id'    => 'sometimes|integer|exists:request_status,status_id',
-            'or_number'    => 'sometimes|nullable|string|max:50',
-            'receipt_date' => 'sometimes|nullable|date',
-        ]);
+        $validated = $request->validated();
 
         $documentRequest = $this->requestService->updateRequest($documentRequest, $validated);
 
@@ -381,18 +373,11 @@ class DocumentRequestController extends Controller
     }
 
     // POST /document-requests/archive-bulk  { request_ids: [...] }
-    public function archiveBulk(Request $request)
+    public function archiveBulk(BulkRequestIdsRequest $request)
     {
         /** @var SystemUser $actor */
         $actor = Auth::user();
-        if (!$actor instanceof SystemUser || !$actor->isStaff()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $validated = $request->validate([
-            'request_ids'   => 'required|array|min:1|max:200',
-            'request_ids.*' => 'integer|distinct',
-        ]);
+        $validated = $request->validated();
 
         $result = $this->requestService->archiveRequests($validated['request_ids'], $actor);
 
@@ -407,18 +392,11 @@ class DocumentRequestController extends Controller
     }
 
     // POST /document-requests/restore-bulk  { request_ids: [...] }
-    public function restoreBulk(Request $request)
+    public function restoreBulk(BulkRequestIdsRequest $request)
     {
         /** @var SystemUser $actor */
         $actor = Auth::user();
-        if (!$actor instanceof SystemUser || !$actor->isStaff()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $validated = $request->validate([
-            'request_ids'   => 'required|array|min:1|max:200',
-            'request_ids.*' => 'integer|distinct',
-        ]);
+        $validated = $request->validated();
 
         $result = $this->requestService->restoreRequests($validated['request_ids'], $actor);
 
