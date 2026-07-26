@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\IdpException;
 use App\Exceptions\PolicyException;
+use App\Http\Requests\SystemUser\AttachSystemUserPolicyRequest;
+use App\Http\Requests\SystemUser\StoreSystemUserRequest;
+use App\Http\Requests\SystemUser\UpdateSystemUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\SystemUser;
 use App\Services\AdminUserService;
 use App\Services\PolicyService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rules\Password;
 
 /**
  * System user management controller (admin / superadmin accounts only).
@@ -18,6 +20,12 @@ use Illuminate\Validation\Rules\Password;
  * Policy attachment (User Management → "Manage Access") is delegated to
  * PolicyService, since it's a distinct concern from the account lifecycle
  * AdminUserService owns.
+ *
+ * Validation now lives in App\Http\Requests\SystemUser\* (see rules() in
+ * each). Authorization now lives in SystemUserPolicy — the inline
+ * `in_array($user->role_id, self::MANAGEABLE_ROLES)` checks that used to
+ * live in every method here have been replaced with $this->authorize(),
+ * matching the pattern DocumentRequestController already uses.
  */
 class SystemUserController extends Controller
 {
@@ -36,6 +44,8 @@ class SystemUserController extends Controller
     // -------------------------------------------------------------------------
     public function index()
     {
+        $this->authorize('viewAny', SystemUser::class);
+
         $users = SystemUser::whereIn('role_id', self::MANAGEABLE_ROLES)
             ->with(['adminProfile', 'policy'])
             ->paginate(20);
@@ -48,15 +58,13 @@ class SystemUserController extends Controller
     // -------------------------------------------------------------------------
     public function show($id)
     {
-        $user = SystemUser::with(['adminProfile', 'policy'])->find($id);
+        $user = SystemUser::find($id);
 
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        if (!in_array($user->role_id, self::MANAGEABLE_ROLES)) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
+        $this->authorize('view', $user);
 
         return new UserResource($user);
     }
@@ -64,21 +72,11 @@ class SystemUserController extends Controller
     // -------------------------------------------------------------------------
     // POST /system-users
     // -------------------------------------------------------------------------
-    public function store(Request $request)
+    public function store(StoreSystemUserRequest $request)
     {
-        $validated = $request->validate([
-            'email'       => 'required|email|unique:users,email',
-            'password'    => ['required', Password::min(8)->mixedCase()->numbers()],
-            'role_id'     => 'required|integer|in:3,4',
-            'first_name'  => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name'   => 'required|string|max:100',
-            'suffix'      => 'nullable|string|max:20',
-            // Optional — lets "Add Admin" attach a policy in the same step
-            // instead of requiring a separate "Manage Access" action.
-            // Only meaningful when role_id = 3 (admin); ignored otherwise.
-            'policy_id'   => 'nullable|integer|exists:policies,policy_id',
-        ]);
+        $this->authorize('create', SystemUser::class);
+
+        $validated = $request->validated();
 
         try {
             // AdminUserService::create() owns IdP + DB coordination.
@@ -112,7 +110,7 @@ class SystemUserController extends Controller
     // -------------------------------------------------------------------------
     // PUT /system-users/{id}
     // -------------------------------------------------------------------------
-    public function update(Request $request, $id)
+    public function update(UpdateSystemUserRequest $request, $id)
     {
         $user = SystemUser::find($id);
 
@@ -120,20 +118,9 @@ class SystemUserController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        if (!in_array($user->role_id, self::MANAGEABLE_ROLES)) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
+        $this->authorize('update', $user);
 
-        $validated = $request->validate([
-            'email'       => 'sometimes|email|unique:users,email,' . $user->user_id . ',user_id',
-            'password'    => ['sometimes', Password::min(8)->mixedCase()->numbers()],
-            'role_id'     => 'sometimes|integer|in:3,4',
-            'status'      => 'sometimes|in:Activated,Deactivated',
-            'first_name'  => 'sometimes|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name'   => 'sometimes|string|max:100',
-            'suffix'      => 'nullable|string|max:20',
-        ]);
+        $validated = $request->validated();
 
         try {
             // Audit logging is handled inside AdminUserService::update()
@@ -155,7 +142,7 @@ class SystemUserController extends Controller
     // UserManagement.jsx's "Manage Access" → PolicyModal "Attach policy"
     // flow, which previously only wrote to localStorage.
     // -------------------------------------------------------------------------
-    public function attachPolicy(Request $request, $id)
+    public function attachPolicy(AttachSystemUserPolicyRequest $request, $id)
     {
         $user = SystemUser::find($id);
 
@@ -163,13 +150,9 @@ class SystemUserController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        if (!in_array($user->role_id, self::MANAGEABLE_ROLES)) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
+        $this->authorize('attachPolicy', $user);
 
-        $validated = $request->validate([
-            'policy_id' => 'nullable|integer|exists:policies,policy_id',
-        ]);
+        $validated = $request->validated();
 
         try {
             $user = $this->policyService->attachToUser($user, $validated['policy_id'] ?? null, $request);
@@ -191,15 +174,14 @@ class SystemUserController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        if (!in_array($user->role_id, self::MANAGEABLE_ROLES)) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
+        // Kept explicit (not folded into the policy) so this specific
+        // message survives — see SystemUserPolicy::delete() docblock.
         if ($user->user_id === $request->user()->user_id) {
             return response()->json(['message' => 'You cannot delete your own account.'], 403);
         }
 
-        // Audit logging is handled inside AdminUserService::delete()
+        $this->authorize('delete', $user);
+
         try {
             $this->adminUserService->delete($user, $request);
         } catch (\Illuminate\Database\QueryException $e) {

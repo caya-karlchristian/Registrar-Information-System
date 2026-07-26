@@ -4,26 +4,30 @@ import { ClockIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../context/ThemeContext";
 
 const parsePeriod = (periodStr) => {
-  if (!periodStr) return { days: 0, hours: 0, minutes: 0 };
+  if (!periodStr) return { days: "", hours: "", minutes: "" };
   const normalized = periodStr.toLowerCase();
 
-  let days = 0;
-  let hours = 0;
-  let minutes = 0;
+  let days = "";
+  let hours = "";
+  let minutes = "";
 
-  const dayMatch = normalized.match(/(\d+)\s*working\s*day/) || normalized.match(/(\d+)\s*day/);
+  const dayMatch = normalized.match(/([^\s,]+)\s*working\s*day/) || normalized.match(/([^\s,]+)\s*day/);
   if (dayMatch) {
-    days = parseInt(dayMatch[1], 10);
+    days = dayMatch[1];
   }
 
-  const hourMatch = normalized.match(/(\d+)\s*hour/) || normalized.match(/(\d+)\s*hr/);
+  const hourMatch = normalized.match(/([^\s,]+)\s*hour/) || normalized.match(/([^\s,]+)\s*hr/);
   if (hourMatch) {
-    hours = parseInt(hourMatch[1], 10);
+    hours = hourMatch[1];
   }
 
-  const minMatch = normalized.match(/(\d+)\s*minute/) || normalized.match(/(\d+)\s*min/);
+  const minMatch = normalized.match(/([^\s,]+)\s*minute/) || normalized.match(/([^\s,]+)\s*min/);
   if (minMatch) {
-    minutes = parseInt(minMatch[1], 10);
+    minutes = minMatch[1];
+  }
+
+  if (!days && !hours && !minutes && periodStr.trim()) {
+    days = periodStr.trim();
   }
 
   return { days, hours, minutes };
@@ -31,13 +35,13 @@ const parsePeriod = (periodStr) => {
 
 const formatPeriod = ({ days, hours, minutes }) => {
   const parts = [];
-  if (days > 0) {
+  if (days !== "" && days !== undefined && days !== null) {
     parts.push(`${days} working day/s`);
   }
-  if (hours > 0) {
+  if (hours !== "" && hours !== undefined && hours !== null && parseFloat(hours) !== 0) {
     parts.push(`${hours} hour/s`);
   }
-  if (minutes > 0) {
+  if (minutes !== "" && minutes !== undefined && minutes !== null && parseFloat(minutes) !== 0) {
     parts.push(`${minutes} minute/s`);
   }
   return parts.join(", ") || "";
@@ -66,18 +70,15 @@ const ProcessPeriodInput = ({
   };
 
   const handleDaysChange = (val) => {
-    const parsedVal = Math.max(0, parseInt(val, 10) || 0);
-    triggerChange(parsedVal, hours, minutes);
+    triggerChange(val, hours, minutes);
   };
 
   const handleHoursChange = (val) => {
-    const parsedVal = Math.max(0, Math.min(23, parseInt(val, 10) || 0));
-    triggerChange(days, parsedVal, minutes);
+    triggerChange(days, val, minutes);
   };
 
   const handleMinutesChange = (val) => {
-    const parsedVal = Math.max(0, Math.min(59, parseInt(val, 10) || 0));
-    triggerChange(days, hours, parsedVal);
+    triggerChange(days, hours, val);
   };
 
   const currentFormatted = formatPeriod({ days, hours, minutes });
@@ -105,7 +106,8 @@ const ProcessPeriodInput = ({
             </span>
             <input
               type="number"
-              min="0"
+              min="1"
+              max="30"
               value={days || ""}
               onChange={(e) => handleDaysChange(e.target.value)}
               placeholder="0"

@@ -217,11 +217,6 @@ const InboxCenter = () => {
                           </span>
                         </div>
                         <p className={`text-xs mt-1 line-clamp-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{mail.preview}</p>
-                        {mail.unread && !isActive && (
-                          <span className={`inline-block mt-2 text-[10px] font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-700'}`}>
-                            Unread
-                          </span>
-                        )}
                       </button>
                     );
                   })

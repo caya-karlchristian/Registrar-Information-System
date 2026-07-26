@@ -49,6 +49,7 @@ const SystemSettings = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [deleteModal, setDeleteModal] = useState({ isOpen: false });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchAnnouncements = useCallback(async (page = 1) => {
     setLoading(true);
@@ -111,6 +112,8 @@ const SystemSettings = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setError(null);
     
     const missingFields = [];
@@ -119,6 +122,7 @@ const SystemSettings = () => {
 
     if (missingFields.length > 0) {
       setErrorMsg(`Please fill in all required fields: ${missingFields.join(", ")}.`);
+      setIsSubmitting(false);
       return;
     }
 
@@ -136,6 +140,8 @@ const SystemSettings = () => {
       fetchAnnouncements(currentPage);
     } catch {
       setErrorMsg("Failed to save announcement.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -467,12 +473,15 @@ const SystemSettings = () => {
               )}
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className={`px-8 py-2.5 rounded-full text-sm font-bold transition-all shadow ${
                   isDark
                     ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]'
                     : 'bg-green-600 text-white hover:bg-green-700'
-                }`}              >
-                {isAdding ? "Add Announcement" : "Save Changes"}
+                } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}              >
+                {isSubmitting 
+                  ? (isAdding ? "Adding..." : "Saving...") 
+                  : (isAdding ? "Add Announcement" : "Save Changes")}
               </button>
             </div>
           </form>
