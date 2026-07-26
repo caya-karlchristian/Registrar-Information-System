@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exceptions\IdpException;
 use App\Exceptions\IdpUnavailableException;
+use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Services\AuditLogger;
@@ -26,6 +27,9 @@ use Illuminate\Support\Facades\Log;
  *      password bypass).
  *
  * The explicit local-only endpoint lives in LocalAuthController.
+ *
+ * login()'s validation now lives in App\Http\Requests\Auth\LoginRequest,
+ * shared with LocalAuthController::login() since both had identical rules.
  */
 class AuthController extends Controller
 {
@@ -38,13 +42,8 @@ class AuthController extends Controller
     // -------------------------------------------------------------------------
     // POST /api/login
     // -------------------------------------------------------------------------
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required|string',
-        ]);
-
         $email    = $request->input('email');
         $password = $request->input('password');
 
