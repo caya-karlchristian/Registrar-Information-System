@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\SetLocalPasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
@@ -27,6 +29,10 @@ use Illuminate\Support\Facades\Log;
  *   GET  /api/auth/local-auth-status   (superadmin only)
  *       Returns which users have local_auth_enabled = 1.
  *       Useful for the admin panel to show coverage at a glance.
+ *
+ * login()'s validation lives in App\Http\Requests\Auth\LoginRequest
+ * (shared with AuthController::login()). setPassword()'s validation +
+ * authorization live in App\Http\Requests\Auth\SetLocalPasswordRequest.
  */
 class LocalAuthController extends Controller
 {
@@ -38,13 +44,8 @@ class LocalAuthController extends Controller
     // -----------------------------------------------------------------------
     // POST /api/auth/local-login
     // -----------------------------------------------------------------------
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required|string',
-        ]);
-
         try {
             $user = $this->localAuth->attempt(
                 $request->input('email'),
@@ -84,13 +85,9 @@ class LocalAuthController extends Controller
     // -----------------------------------------------------------------------
     // POST /api/auth/local-password  (superadmin only)
     // -----------------------------------------------------------------------
-    public function setPassword(Request $request)
+    public function setPassword(SetLocalPasswordRequest $request)
     {
-        $validated = $request->validate([
-            'user_id'               => 'required|integer|exists:users,user_id',
-            'password'              => 'required|string|min:8|confirmed',
-            'password_confirmation' => 'required|string',
-        ]);
+        $validated = $request->validated();
 
         /** @var SystemUser $target */
         $target = SystemUser::findOrFail($validated['user_id']);

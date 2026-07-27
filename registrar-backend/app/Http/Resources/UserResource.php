@@ -31,6 +31,15 @@ class UserResource extends JsonResource
             // Will return data once admin profile module is built
             'admin_profile'   => $this->whenLoaded('adminProfile'),
 
+            // Flattened copies of the same admin_profile fields, so callers
+            // (e.g. the account-settings form after a save) can read
+            // data.first_name directly instead of reaching into
+            // data.admin_profile — only present when adminProfile is loaded.
+            'first_name'  => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->first_name),
+            'middle_name' => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->middle_name),
+            'last_name'   => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->last_name),
+            'suffix'      => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->suffix),
+
             // Policy attachment — admin-only. Super admins always have
             // full access and never carry a policy_id (see RoleMiddleware).
             'policy_id' => $this->policy_id,

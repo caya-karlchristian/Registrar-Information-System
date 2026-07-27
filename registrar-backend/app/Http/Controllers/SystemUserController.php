@@ -131,6 +131,11 @@ class SystemUserController extends Controller
             return response()->json(['message' => 'Failed to update user.'], 500);
         }
 
+        // AdminUserService::update() returns $user->fresh() from inside its
+        // transaction, which drops any previously loaded relations — same
+        // reason store() reloads them before building its resource.
+        $user->load(['adminProfile', 'policy']);
+
         return new UserResource($user);
     }
 

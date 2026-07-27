@@ -18,9 +18,15 @@ class UpdateSystemUserRequest extends FormRequest
 
     public function rules(): array
     {
-        // {id} is the raw route parameter — no model binding assumed,
-        // matching the controller's existing SystemUser::find($id) lookup.
-        $userId = $this->route('id');
+        // apiResource('system-users', ...) names its implicit route
+        // parameter 'system_user' (singular of the URI segment), not
+        // 'id' — the controller's $id argument still binds fine since
+        // Laravel matches scalar controller args positionally, but
+        // $this->route() here looks up by name, so 'id' always misses
+        // and returns null. That made the unique rule's "except" id
+        // silently empty, so the self-update-with-same-email case never
+        // got excluded and failed validation.
+        $userId = $this->route('system_user');
 
         return [
             'email'       => 'sometimes|email|unique:users,email,' . $userId . ',user_id',
