@@ -308,7 +308,11 @@ class DocumentRequestController extends Controller
         $this->authorize('delete', $documentRequest);
 
         try {
-            $documentRequest->delete();
+            // forceDelete(), not delete(): the model uses SoftDeletes, so a
+            // plain delete() would only stamp deleted_at and leave the row
+            // in place — this endpoint is a permanent delete, distinct from
+            // the separate is_archived/archive() mechanism above.
+            $documentRequest->forceDelete();
         } catch (\Illuminate\Database\QueryException $e) {
             // MySQL error 1451 — FK constraint violation
             if ($e->getCode() === '23000') {

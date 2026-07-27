@@ -205,9 +205,28 @@ class AdminUserService
             }
 
             if (!empty($profileFields)) {
-                DB::table('admin_profile')
+                $hasProfile = DB::table('admin_profile')
                     ->where('user_id', $user->user_id)
-                    ->update($profileFields);
+                    ->exists();
+
+                if ($hasProfile) {
+                    DB::table('admin_profile')
+                        ->where('user_id', $user->user_id)
+                        ->update($profileFields);
+                } else {
+                    // No admin_profile row yet for this account (e.g. one
+                    // created outside AdminUserService::create(), which is
+                    // the only other place that inserts one) — a plain
+                    // ->update() above would silently match zero rows and
+                    // this edit would be lost. first_name/last_name are
+                    // NOT NULL, so default them when the caller didn't
+                    // supply one, rather than letting the insert fail.
+                    DB::table('admin_profile')->insert(array_merge([
+                        'user_id'    => $user->user_id,
+                        'first_name' => '',
+                        'last_name'  => '',
+                    ], $profileFields));
+                }
             }
 
             return $user->fresh();
