@@ -28,3 +28,8 @@ registrar-frontend/certs/
 *.key
 *.env.*
 .env.production
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
