@@ -12,3 +12,8 @@ registrar-frontend/certs/
 *.bak_*
 .env.staging
 !registrar-frontend/.env.staging
+frontend/node_modules/
+frontend/dist/
+backend/bootstrap/cache/*
+test-results/
+playwright-report/
