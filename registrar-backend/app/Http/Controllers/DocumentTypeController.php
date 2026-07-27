@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DocumentType\ArchiveDocumentTypeRequest;
+use App\Http\Requests\DocumentType\StoreDocumentTypeRequest;
+use App\Http\Requests\DocumentType\UpdateDocumentTypeRequest;
 use App\Models\AuditLog;
 use App\Models\DocumentType;
 use App\Models\SystemUser;
@@ -29,37 +32,21 @@ class DocumentTypeController extends Controller
         return response()->json($docType, 200);
     }
 
-    public function store(Request $request)
+    public function store(StoreDocumentTypeRequest $request)
     {
-        $validated = $request->validate([
-            'document_name'           => 'required|string|max:100',
-            'document_description'    => 'nullable|string',
-            'document_requirements'   => 'nullable|string',
-            'document_process_period' => 'nullable|string|max:100',
-            'access_id'               => 'nullable|integer',
-        ]);
-
-        $docType = DocumentType::create($validated);
+        $docType = DocumentType::create($request->validated());
 
         return response()->json($docType, 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateDocumentTypeRequest $request, $id)
     {
         $docType = DocumentType::find($id);
         if (!$docType) {
             return response()->json(['message' => 'Document type not found'], 404);
         }
 
-        $validated = $request->validate([
-            'document_name'           => 'sometimes|string|max:100',
-            'document_description'    => 'nullable|string',
-            'document_requirements'   => 'nullable|string',
-            'document_process_period' => 'nullable|string|max:100',
-            'access_id'               => 'nullable|integer',
-        ]);
-
-        $docType->update($validated);
+        $docType->update($request->validated());
 
         return response()->json($docType, 200);
     }
@@ -98,7 +85,7 @@ class DocumentTypeController extends Controller
     //     archives) why.
     // -------------------------------------------------------------------------
 
-    public function archive(Request $request, $id)
+    public function archive(ArchiveDocumentTypeRequest $request, $id)
     {
         $docType = DocumentType::find($id);
         if (!$docType) {
@@ -121,9 +108,7 @@ class DocumentTypeController extends Controller
             ], 422);
         }
 
-        $validated = $request->validate([
-            'reason' => 'nullable|string|max:500',
-        ]);
+        $validated = $request->validated();
 
         /** @var SystemUser $actor */
         $actor = Auth::user();
