@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect} from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getDocumentRequests } from "../services/api"; 
 import { EyeIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
 import RequestDetailsModal from '../components/RequestDetailModal';
@@ -15,14 +16,12 @@ import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 const StudentDashboard = () => {
   const { docTypeName, purposeName, certName } = useReferenceData();
   const [activeTab, setActiveTab] = useState("pending");
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const itemsPerPage = 5;
   const { user } = useAuth();
-  const { isDark } = useTheme();
+  const { isDark } = useTheme();``
 
   const navigate = useNavigate();
   const { notifications } = useNotificationsContext();
@@ -33,12 +32,13 @@ const StudentDashboard = () => {
     }
   }, [user, navigate]);
 
-  const fetchRequests = useCallback(async () => {
-  try {
-    setLoading(true);
-    const res = await getDocumentRequests();
-
-    const studentRequests = (res.data.data ?? res.data)
+  const { data: requests = [], isLoading: loading, refetch } = useQuery({
+    queryKey: ['studentRequests', user?.user_id],
+    queryFn: getDocumentRequests,
+    enabled: !!user,
+    select: (res) => {
+      const rawRequests = res.data.data ?? res.data ?? [];
+      return rawRequests
       .filter(r => r.user_id === user.user_id)
       .map(r => {
         const baseConfig = STATUS_CONFIG[r.status_id] || {
@@ -69,19 +69,8 @@ const StudentDashboard = () => {
         };
       })
       .sort((a, b) => new Date(b.requested_at) - new Date(a.requested_at));
-
-    setRequests(studentRequests);
-  } catch (err) {
-    console.error("Failed to fetch requests:", err);
-  } finally {
-    setLoading(false);
-  }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    fetchRequests();
-  }, [user]);
+    },
+  });
 
 // Refetch only when a notification type that actually affects the request
 // list arrives. Prevents unnecessary API calls on unrelated events
@@ -103,11 +92,11 @@ useEffect(() => {
   if (!user || latestNotificationId === null) return;
   const latest = notifications[0];
   if (latest && STUDENT_REFETCH_TRIGGERS.has(latest.type)) {
-    fetchRequests();
+    refetch();
   }
-// fetchRequests is wrapped in useCallback so its identity is stable;
+// refetch is provided by useQuery and is stable;
 // include it here to satisfy the exhaustive-deps rule and avoid stale closures.
-}, [latestNotificationId, fetchRequests]);
+}, [latestNotificationId, refetch]);
 
   useEffect(() => { 
     setCurrentPage(1);

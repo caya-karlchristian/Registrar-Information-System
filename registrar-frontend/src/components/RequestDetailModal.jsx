@@ -153,8 +153,8 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
             <ul className="list-disc ml-4 sm:ml-5 space-y-2">
               {request.documents
                 ?.filter((doc) => !getDocName(doc).toLowerCase().includes('certif'))
-                .map((doc) => (
-                  <li key={doc.request_document_id} className="wrap-break-word">
+                .map((doc, index) => (
+                  <li key={doc.request_document_id ?? index} className="wrap-break-word">
                     <strong className="block sm:inline">{getDocName(doc)}</strong>
                     <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
                       {doc.number_of_copies || 1} {doc.number_of_copies > 1 ? 'Copies' : 'Copy'}
