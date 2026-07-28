@@ -75,6 +75,13 @@ jobs:
             docker exec ris_staging_backend php artisan config:cache
             docker exec ris_staging_backend php artisan route:cache
 
+            echo "── Re-asserting storage/cache ownership ────────"
+            # See deploy.yml for why: docker exec runs as root and can
+            # re-break storage/logs/laravel.log ownership after start.sh's
+            # boot-time chown already ran.
+            docker exec -u root ris_staging_backend chown -R www-data:www-data \
+              /var/www/html/storage /var/www/html/bootstrap/cache
+
             echo "── Verifying containers are up ──────────────────"
             docker compose -f docker-compose.staging.yml ps
 

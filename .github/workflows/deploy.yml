@@ -165,6 +165,18 @@ jobs:
             docker exec ris_backend php artisan config:cache
             docker exec ris_backend php artisan route:cache
 
+            echo "── Re-asserting storage/cache ownership ─────────"
+            # The commands above run via `docker exec`, which defaults to
+            # root (no USER directive drops privileges in the image). If any
+            # of them touch storage/logs/laravel.log, they recreate it as
+            # root-owned, and every subsequent www-data (php-fpm) write to
+            # it then fails with "Permission denied" until someone chowns it
+            # again. start.sh already does this once at container boot, but
+            # that's *before* these exec'd commands run, so it doesn't cover
+            # them. Re-run it here, right after, so nothing is left behind.
+            docker exec -u root ris_backend chown -R www-data:www-data \
+              /var/www/html/storage /var/www/html/bootstrap/cache
+
             echo "── Verifying containers are up ──────────────────"
             docker compose ps
 
