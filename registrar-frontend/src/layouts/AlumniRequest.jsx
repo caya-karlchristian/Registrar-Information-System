@@ -1,64 +1,51 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import InputGroup from '../components/InputGroup.jsx';
 import CheckboxItem from '../components/Checkbox.jsx';
 import DropdownGroup from '../components/DropDown.jsx';
 import MultiSelectDropdown from '../components/MultiSelection.jsx';
 import ErrorToast from "../components/ErrorToast.jsx";
-import { getDocumentTypes, getCertifications, getRequestPurposes, createDocumentRequest } from "../services/api.js";
+import { createDocumentRequest } from "../services/api.js";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 import { getTodayDate } from "../utils/helpers";
 import { DOC_TYPE_MAP, CERTIFICATION_MAP } from '../utils/constants';
 import qrCode from "../assets/qrcode.png";
 import { useTheme } from '../context/ThemeContext';
+import { useMutation } from '@tanstack/react-query';
 
 import { useReferenceData } from '../context/ReferenceDataContext';
 const ALUMNI_ACCESS_IDS = [2, 3];
 
 const AlumniRequestForm = ({ showProfileStep = false }) => {
-  const { docTypeName, certName, purposes: referencePurposes } = useReferenceData();
+  const { 
+    documentTypes, 
+    certifications, 
+    purposes: referencePurposes, 
+    docTypeName, 
+    certName 
+  } = useReferenceData();
   const { isDark } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [availableDocs, setAvailableDocs] = useState([]);
-  const [availableCertifications, setAvailableCertifications] = useState([]);
-  const [availablePurposes, setAvailablePurposes] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const availableDocs = useMemo(() => {
+    return documentTypes.filter(doc => ALUMNI_ACCESS_IDS.includes(doc.access_id));
+  }, [documentTypes]);
+
+  const availableCertifications = useMemo(() => {
+    return certifications.filter(cert => ALUMNI_ACCESS_IDS.includes(cert.access_id));
+  }, [certifications]);
+
+  const availablePurposes = referencePurposes;
 
   const getDateDaysAgo = (days) => {
     const date = new Date();
     date.setDate(date.getDate() - days);
     return date.toISOString().split('T')[0];
   };
-  
-  useEffect(() => {
-    const loadOptions = async () => {
-      try {
-        const docsRes = await getDocumentTypes();
-        setAvailableDocs((docsRes.data ?? []).filter(doc => ALUMNI_ACCESS_IDS.includes(doc.access_id)));
-      } catch (err) {
-        console.warn("Failed to load document types.");
-      }
-
-      try {
-        const certRes = await getCertifications();
-        setAvailableCertifications((certRes.data ?? []).filter(cert => ALUMNI_ACCESS_IDS.includes(cert.access_id)));
-      } catch (err) {
-        console.warn("Certification types API unavailable, using constants.");
-      }
-
-      try {
-        const purposeRes = await getRequestPurposes();
-        setAvailablePurposes(purposeRes.data ?? []);
-      } catch (err) {
-        console.warn("Request purposes API unavailable, using reference data context.");
-      }
-    };
-    loadOptions();
-  }, []);
 
   const [formData, setFormData] = useState({
     termsAgreed: false,
@@ -240,46 +227,48 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const selectedPurpose = availablePurposes.find(
-        p => p.purpose_name === formData.purposeOfRequest
-      );
-      const purposeId = selectedPurpose?.request_purpose_id
-        ?? referencePurposes.find(p => p.purpose_name === formData.purposeOfRequest)?.request_purpose_id;
-
-      // Map all selected certification names to their IDs
-      const certificates = formData.certification
-        .map(name => ({
-          certificate_type_id: availableCertifications.find(
-            c => c.certificate_name === name
-          )?.certificate_type_id,
-          number_of_copies: parseInt(formData.certCopies[name]) || 1,
-        }))
-        .filter(c => c.certificate_type_id);
-
-      const payload = {
-        request_purpose_id: purposeId,
-        or_number: formData.receiptNumber,
-        receipt_date: formData.dateOfPayment,
-        documents: formData.documentsRequested.filter(name => !name.toLowerCase().includes("certif")).map(name => { const dbDoc = availableDocs.find(d => d.document_name === name); const id = dbDoc?.document_type_id ?? Object.keys(DOC_TYPE_MAP).find(key => docTypeName(key) === name); return { document_type_id: id, number_of_copies: parseInt(formData.documentCopies[name]) || 1 }; }).filter(doc => doc.document_type_id),
-        certificates: certificates,
-      };
-
-      const response = await createDocumentRequest(payload);
-
-      // console.log("Submission successful:", response.data);
+  const mutation = useMutation({
+    mutationFn: createDocumentRequest,
+    onSuccess: () => {
       setIsSubmitted(true);
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error("Submission error:", error.response?.data || error);
       setErrorMessage(error.response?.data?.message || "Submission failed. Please check your data.");
-    } finally {
-      setIsLoading(false);
     }
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    const selectedPurpose = availablePurposes.find(
+      p => p.purpose_name === formData.purposeOfRequest
+    );
+    const purposeId = selectedPurpose?.request_purpose_id
+      ?? referencePurposes.find(p => p.purpose_name === formData.purposeOfRequest)?.request_purpose_id;
+
+    // Map all selected certification names to their IDs
+    const certificates = formData.certification
+      .map(name => ({
+        certificate_type_id: availableCertifications.find(
+          c => c.certificate_name === name
+        )?.certificate_type_id,
+        number_of_copies: parseInt(formData.certCopies[name]) || 1,
+      }))
+      .filter(c => c.certificate_type_id);
+
+    const payload = {
+      request_purpose_id: purposeId,
+      or_number: formData.receiptNumber,
+      receipt_date: formData.dateOfPayment,
+      documents: formData.documentsRequested.filter(name => !name.toLowerCase().includes("certif")).map(name => { const dbDoc = availableDocs.find(d => d.document_name === name); const id = dbDoc?.document_type_id ?? Object.keys(DOC_TYPE_MAP).find(key => docTypeName(key) === name); return { document_type_id: id, number_of_copies: parseInt(formData.documentCopies[name]) || 1 }; }).filter(doc => doc.document_type_id),
+      certificates: certificates,
+    };
+
+    mutation.mutate(payload);
   };
+
+  const isLoading = mutation.isPending;
   
   const handleConfirm = () => {
     setIsSubmitted(false);
@@ -303,7 +292,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
       certCopies: {},
     });
     setErrorMessage("");
-    setIsLoading(false);
+    mutation.reset();
   };
 
   const hasTOR = formData.documentsRequested.some(doc =>
