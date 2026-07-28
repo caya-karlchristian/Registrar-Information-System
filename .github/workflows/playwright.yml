@@ -8,14 +8,15 @@ on:
     branches: [develop, main]
     paths:
       - 'registrar-frontend/**'
-      
+
 jobs:
   test:
-    timeout-minutes: 60
+    name: Playwright Tests
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: registrar-frontend
+
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
