@@ -12,7 +12,6 @@ import {
 import { CheckIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
 import {
   getDocumentRequests,
-  getRequestStatuses,
   updateDocumentRequest,
   deleteDocumentRequest,
   archiveDocumentRequest,
@@ -20,6 +19,7 @@ import {
   archiveDocumentRequests,
   restoreDocumentRequests,
 } from '../services/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
@@ -76,13 +76,12 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
 ]);
 
 const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
-  const { docTypeName, purposeName, certName } = useReferenceData();
+  const { docTypeName, purposeName, certName, statuses: referenceStatuses } = useReferenceData();
   const { isDark } = useTheme();
-  const [requests, setRequests] = useState([]);
+  const queryClient = useQueryClient();
+
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -90,7 +89,6 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [certRequest, setCertRequest] = useState(null);
-  const [requestStatuses, setRequestStatuses] = useState([]);
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [filterClassification, setFilterClassification] = useState('All');
@@ -139,60 +137,35 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
 
   const { notifications } = useNotificationsContext();
 
-  const statusIds = useCallback(() => {
+  // Use statuses from the global cached context; fall back to STATUS_FALLBACK constants.
+  const requestStatuses = referenceStatuses ?? [];
+
+  const resolvedStatusIds = (() => {
     const lowerNameToId = Object.fromEntries(
       requestStatuses
         .filter(s => s?.status_name && s?.status_id)
         .map(s => [s.status_name.toLowerCase(), Number(s.status_id)])
     );
-
     return {
       PENDING: lowerNameToId.pending ?? STATUS_FALLBACK.PENDING,
       READY: lowerNameToId['ready to claim'] ?? STATUS_FALLBACK.READY,
       COMPLETED: lowerNameToId.completed ?? STATUS_FALLBACK.COMPLETED,
       FORFEITED: lowerNameToId.forfeited ?? STATUS_FALLBACK.FORFEITED,
     };
-  }, [requestStatuses]);
+  })();
 
-  const resolvedStatusIds = statusIds();
+  /* ---------------- TANSTACK QUERY: FETCH REQUESTS ---------------- */
+  const { data: requests = [], isLoading: loading } = useQuery({
+    queryKey: ['documentRequests', viewMode],
+    queryFn: async () => {
+      const requestsRes = await getDocumentRequests({
+        per_page: 200,
+        ...(viewMode === 'archived' ? { view: 'archived' } : { all_statuses: true }),
+      });
 
-  /* ---------------- FETCH DATA ---------------- */
-  const fetchData = useCallback(async (showOverlay = true) => {
-    try {
-      if (showOverlay) setLoading(true);
-      const [requestsRes, statusesRes] = await Promise.all([
-        getDocumentRequests({
-          per_page: 200,
-          // Archived tab: ask the backend for archived-only records
-          // (bypasses the actionable-work window entirely).
-          // Active tab: ask for every status — this dashboard already
-          // applies its own isDefaultVisible() windowing below, so
-          // asking the backend to pre-filter as well would just hide
-          // Forfeited/old-Completed rows from the status filter dropdown.
-          ...(viewMode === 'archived' ? { view: 'archived' } : { all_statuses: true }),
-        }),
-        getRequestStatuses(),
-      ]);
+      const STATUS = resolvedStatusIds;
 
-      const statuses = statusesRes.data || [];
-      setRequestStatuses(statuses);
-
-      const STATUS = (() => {
-        const lowerNameToId = Object.fromEntries(
-          statuses
-            .filter(s => s?.status_name && s?.status_id)
-            .map(s => [s.status_name.toLowerCase(), Number(s.status_id)])
-        );
-
-        return {
-          PENDING: lowerNameToId.pending ?? STATUS_FALLBACK.PENDING,
-          READY: lowerNameToId['ready to claim'] ?? STATUS_FALLBACK.READY,
-          COMPLETED: lowerNameToId.completed ?? STATUS_FALLBACK.COMPLETED,
-          FORFEITED: lowerNameToId.forfeited ?? STATUS_FALLBACK.FORFEITED,
-        };
-      })();
-
-      const formatted = (requestsRes.data?.data ?? requestsRes.data ?? []).map(r => {
+      return (requestsRes.data?.data ?? requestsRes.data ?? []).map(r => {
         const requestDate = r.requested_at ? new Date(r.requested_at) : null;
         const now = new Date();
         const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
@@ -225,7 +198,6 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                 d.document_type?.document_name?.toLowerCase() ||
                 docTypeName(d.document_type_id)?.toLowerCase() ||
                 '';
-
               return name.includes('cert');
             })
         );
@@ -276,7 +248,6 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
           isCertificate,
           copies: totalCopies,
           documentDetailsArray,
-
           // Metadata for Certificate Modal
           course: r.student_profile?.course ?? '',
           major: r.student_profile?.major ?? '',
@@ -286,22 +257,15 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
           diplomaNum: r.academic_record?.diploma_number ?? '',
           eventTitle: r.event_title ?? '',
           or_number: r.or_number ?? '',
-
           date: requestDate
-            ? requestDate.toLocaleDateString('en-GB', {
-                day: '2-digit', month: 'long', year: 'numeric',
-              })
+            ? requestDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
             : 'N/A',
           time: requestDate
-            ? requestDate.toLocaleTimeString('en-GB', {
-                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-              })
+            ? requestDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
             : '',
-
           statusId: computedStatusId,
           statusName: computedStatusName,
           timestamp: requestDate ? requestDate.getTime() : 0,
-
           // Archive state — a flag independent of status_id, not a status
           // itself. Restoring a record leaves statusId/statusName exactly
           // as they were (Archive Rules policy).
@@ -310,37 +274,21 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
           archivedBy: r.archived_by_user?.email ?? null,
         };
       });
-
-      setRequests(formatted);
-    } catch (error) {
-      console.error('Error fetching document requests:', error);
-    } finally {
-      if (showOverlay) setLoading(false);
-    }
-  }, [viewMode]);
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    },
+    // 30s polling fallback — keeps dashboard eventually-consistent when WebSocket is down.
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+  });
 
   // Refetch when a relevant notification arrives via WebSocket.
-  // DASHBOARD_REFETCH_TRIGGERS is defined at module scope so it is
-  // stable across renders and can safely be omitted from deps.
   useEffect(() => {
     if (notifications.length === 0) return;
     const latest = notifications[0];
     if (latest && DASHBOARD_REFETCH_TRIGGERS.has(latest.type)) {
-      fetchData(false); // silent background refresh, no loading overlay
+      queryClient.invalidateQueries({ queryKey: ['documentRequests', viewMode] });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notifications[0]?.id, fetchData]);
-
-  // Polling fallback — keeps the dashboard eventually-consistent even when
-  // the WebSocket is down or the queue worker misses an event.
-  // 30 s is frequent enough to feel live without hammering the backend.
-  useEffect(() => {
-    const id = setInterval(() => fetchData(false), 30_000);
-    return () => clearInterval(id);
-  }, [fetchData]);
+  }, [notifications[0]?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -351,21 +299,66 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
     setCurrentPage(1);
   }, [filterStatus, filterClassification, searchTerm, sortOrder]);
 
+  /* ---------------- TANSTACK QUERY: MUTATIONS ---------------- */
+  const invalidateRequests = () =>
+    queryClient.invalidateQueries({ queryKey: ['documentRequests', viewMode] });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, statusId }) => updateDocumentRequest(id, { status_id: statusId }),
+    onSuccess: () => invalidateRequests(),
+    onError: (error) => {
+      console.error('Status update failed:', error);
+      alert('Error: ' + error.message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map(id => deleteDocumentRequest(id))),
+    onSuccess: () => {
+      setSelectedIds([]);
+      setShowDeleteConfirm(false);
+      invalidateRequests();
+    },
+    onError: (err) => console.error('Delete failed', err),
+  });
+
+  const archiveSelectedMutation = useMutation({
+    mutationFn: (ids) => archiveDocumentRequests(ids),
+    onSuccess: () => { setSelectedIds([]); invalidateRequests(); },
+    onError: (err) => alert('Error archiving requests: ' + (err?.response?.data?.message || err.message)),
+  });
+
+  const restoreSelectedMutation = useMutation({
+    mutationFn: (ids) => restoreDocumentRequests(ids),
+    onSuccess: () => { setSelectedIds([]); invalidateRequests(); },
+    onError: (err) => alert('Error restoring requests: ' + (err?.response?.data?.message || err.message)),
+  });
+
+  const archiveOneMutation = useMutation({
+    mutationFn: (id) => archiveDocumentRequest(id),
+    onSuccess: () => invalidateRequests(),
+    onError: (err) => alert('Error archiving request: ' + (err?.response?.data?.message || err.message)),
+  });
+
+  const restoreOneMutation = useMutation({
+    mutationFn: (id) => restoreDocumentRequest(id),
+    onSuccess: () => invalidateRequests(),
+    onError: (err) => alert('Error restoring request: ' + (err?.response?.data?.message || err.message)),
+  });
+
+  // Combined action loading state from all mutations
+  const actionLoading = statusMutation.isPending || deleteMutation.isPending ||
+    archiveSelectedMutation.isPending || restoreSelectedMutation.isPending ||
+    archiveOneMutation.isPending || restoreOneMutation.isPending;
+
   /* ---------------- STATUS UPDATE ---------------- */
-  const handleStatusUpdate = async (id, newStatusId) => {
-    try {
+  const handleStatusUpdate = (id, newStatusId) => {
     setUpdatingId(id);
-    setActionLoading(true);
-    await updateDocumentRequest(id, { status_id: newStatusId });
-    await fetchData(false);
-    } catch (error) {
-    console.error('Status update failed:', error);
-    alert('Error: ' + error.message);
-    } finally {
-    setActionLoading(false);
-    setUpdatingId(null);
-    }
+    statusMutation.mutate({ id, statusId: newStatusId }, {
+      onSettled: () => setUpdatingId(null),
+    });
   };
+
 
   /* ---------------- FILTERED + SORTED DATA ---------------- */
   const statusFilterOptions = [
@@ -481,78 +474,28 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDeleteSelected = async () => {
-    try {
-      setActionLoading(true);
-      await Promise.all(selectedIds.map(id => deleteDocumentRequest(id)));
-      setSelectedIds([]);
-      setShowDeleteConfirm(false);
-      await fetchData(false);
-    } catch (err) {
-      console.error('Delete failed', err);
-    } finally {
-      setActionLoading(false);
-    }
+  const confirmDeleteSelected = () => {
+    deleteMutation.mutate(selectedIds);
   };
 
-  const handleArchiveSelected = async () => {
+  const handleArchiveSelected = () => {
     if (selectedIds.length === 0) return;
-    try {
-      setActionLoading(true);
-      await archiveDocumentRequests(selectedIds);
-      setSelectedIds([]);
-      await fetchData(false);
-    } catch (err) {
-      console.error('Bulk archive failed', err);
-      alert('Error archiving requests: ' + (err?.response?.data?.message || err.message));
-    } finally {
-      setActionLoading(false);
-    }
+    archiveSelectedMutation.mutate(selectedIds);
   };
 
-  const handleRestoreSelected = async () => {
+  const handleRestoreSelected = () => {
     if (selectedIds.length === 0) return;
-    try {
-      setActionLoading(true);
-      await restoreDocumentRequests(selectedIds);
-      setSelectedIds([]);
-      await fetchData(false);
-    } catch (err) {
-      console.error('Bulk restore failed', err);
-      alert('Error restoring requests: ' + (err?.response?.data?.message || err.message));
-    } finally {
-      setActionLoading(false);
-    }
+    restoreSelectedMutation.mutate(selectedIds);
   };
 
-  const handleArchiveOne = async (id) => {
-    try {
-      setUpdatingId(id);
-      setActionLoading(true);
-      await archiveDocumentRequest(id);
-      await fetchData(false);
-    } catch (err) {
-      console.error('Archive failed', err);
-      alert('Error archiving request: ' + (err?.response?.data?.message || err.message));
-    } finally {
-      setActionLoading(false);
-      setUpdatingId(null);
-    }
+  const handleArchiveOne = (id) => {
+    setUpdatingId(id);
+    archiveOneMutation.mutate(id, { onSettled: () => setUpdatingId(null) });
   };
 
-  const handleRestoreOne = async (id) => {
-    try {
-      setUpdatingId(id);
-      setActionLoading(true);
-      await restoreDocumentRequest(id);
-      await fetchData(false);
-    } catch (err) {
-      console.error('Restore failed', err);
-      alert('Error restoring request: ' + (err?.response?.data?.message || err.message));
-    } finally {
-      setActionLoading(false);
-      setUpdatingId(null);
-    }
+  const handleRestoreOne = (id) => {
+    setUpdatingId(id);
+    restoreOneMutation.mutate(id, { onSettled: () => setUpdatingId(null) });
   };
 
   const markCertificateAsPrinted = (requestId) => {
