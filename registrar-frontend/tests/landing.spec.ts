@@ -3,7 +3,6 @@ import { test, expect } from '@playwright/test';
 test.describe('Landing Page Tests', () => {
   
   test.beforeEach(async ({ page }) => {
-    // Navigate to the base URL before each test
     await page.goto('/');
   });
 
