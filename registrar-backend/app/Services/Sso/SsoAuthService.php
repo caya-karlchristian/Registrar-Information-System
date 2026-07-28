@@ -144,9 +144,30 @@ class SsoAuthService
         try {
             $this->idpClient->logout($accessToken, $profile['id'] ?? null);
         } catch (\Exception $e) {
-            Log::warning('SSO: token revoke failed during rejection', [
+            $this->safeLog('warning', 'SSO: token revoke failed during rejection', [
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Log without ever letting a logging failure escape.
+     *
+     * Log::*() writes to storage/logs/laravel.log — if that file was
+     * recreated by a root-owned process while php-fpm runs as www-data
+     * (see start.sh), the log call itself throws. Calls here happen
+     * inside catch blocks (e.g. revokeOnRejection, logout), so an
+     * uncaught throw from Log:: replaces the intended
+     * UnregisteredAccountException/response with a generic 500 — which is
+     * exactly the bug this guards against. Mirrors
+     * SsoCallbackController::safeLog().
+     */
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::{$level}($message, $context);
+        } catch (\Throwable $loggingFailure) {
+            // Intentionally swallowed — see docblock above.
         }
     }
 
@@ -172,14 +193,14 @@ class SsoAuthService
             try {
                 $this->idpClient->logout($user->idp_access_token, $user->idp_user_id);
             } catch (\Exception $e) {
-                Log::warning('SSO: logout call failed', ['error' => $e->getMessage()]);
+                $this->safeLog('warning', 'SSO: logout call failed', ['error' => $e->getMessage()]);
             }
         }
 
         $user->tokens()->delete();
 
         if ($isLocal) {
-            Log::info('SSO: local-auth logout — skipping IdP redirect', [
+            $this->safeLog('info', 'SSO: local-auth logout — skipping IdP redirect', [
                 'user_id' => $user->user_id,
             ]);
             return null;

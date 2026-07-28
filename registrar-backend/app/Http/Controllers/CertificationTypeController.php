@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CertificationType\ArchiveCertificationTypeRequest;
+use App\Http\Requests\CertificationType\StoreCertificationTypeRequest;
+use App\Http\Requests\CertificationType\UpdateCertificationLayoutRequest;
+use App\Http\Requests\CertificationType\UpdateCertificationTypeRequest;
+use App\Http\Requests\CertificationType\UploadCertificationLayoutLogoRequest;
 use App\Models\AuditLog;
 use App\Models\CertificationType;
 use App\Models\SystemUser;
@@ -77,35 +82,21 @@ class CertificationTypeController extends Controller
         return response()->json($this->freshRecord($id), 200);
     }
 
-    public function store(Request $request)
+    public function store(StoreCertificationTypeRequest $request)
     {
-        $validated = $request->validate([
-            'certificate_name'           => 'required|string|max:255',
-            'certificate_requirements'   => 'nullable|string',
-            'certificate_process_period' => 'nullable|string|max:100',
-            'access_id'                  => 'nullable|integer',
-        ]);
-
-        $cert = CertificationType::create($validated);
+        $cert = CertificationType::create($request->validated());
 
         return response()->json($this->freshRecord($cert->certificate_type_id), 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateCertificationTypeRequest $request, $id)
     {
         $cert = CertificationType::find($id);
         if (!$cert) {
             return response()->json(['message' => 'Certification type not found'], 404);
         }
 
-        $validated = $request->validate([
-            'certificate_name'           => 'sometimes|string|max:255',
-            'certificate_requirements'   => 'nullable|string',
-            'certificate_process_period' => 'nullable|string|max:100',
-            'access_id'                  => 'nullable|integer',
-        ]);
-
-        $cert->update($validated);
+        $cert->update($request->validated());
 
         return response()->json($this->freshRecord($id), 200);
     }
@@ -146,7 +137,7 @@ class CertificationTypeController extends Controller
     //     archives) why.
     // -------------------------------------------------------------------------
 
-    public function archive(Request $request, $id)
+    public function archive(ArchiveCertificationTypeRequest $request, $id)
     {
         $cert = CertificationType::find($id);
         if (!$cert) {
@@ -169,9 +160,7 @@ class CertificationTypeController extends Controller
             ], 422);
         }
 
-        $validated = $request->validate([
-            'reason' => 'nullable|string|max:500',
-        ]);
+        $validated = $request->validated();
 
         /** @var SystemUser $actor */
         $actor = Auth::user();
@@ -223,7 +212,7 @@ class CertificationTypeController extends Controller
         return response()->json($this->freshRecord($id), 200);
     }
 
-    public function updateLayout(Request $request, $id)
+    public function updateLayout(UpdateCertificationLayoutRequest $request, $id)
     {
         $cert = CertificationType::find($id);
         if (!$cert) {
@@ -236,14 +225,7 @@ class CertificationTypeController extends Controller
             ], 423); // 423 Locked
         }
 
-        $validated = $request->validate([
-            'layout_header_left_url'  => 'nullable|string|max:2048',
-            'layout_header_right_url' => 'nullable|string|max:2048',
-            'layout_footer_urls'      => 'nullable|array',
-            'layout_footer_urls.*'    => 'string|max:2048',
-            'layout_header_logo_size' => 'nullable|integer|min:24|max:240',
-            'layout_footer_logo_size' => 'nullable|integer|min:16|max:240',
-        ]);
+        $validated = $request->validated();
 
         if (array_key_exists('layout_footer_urls', $validated) && $validated['layout_footer_urls'] === null) {
             $validated['layout_footer_urls'] = [];
@@ -257,7 +239,7 @@ class CertificationTypeController extends Controller
         ], 200);
     }
 
-    public function uploadLayoutLogo(Request $request, $id)
+    public function uploadLayoutLogo(UploadCertificationLayoutLogoRequest $request, $id)
     {
         $cert = CertificationType::find($id);
         if (!$cert) {
@@ -270,10 +252,7 @@ class CertificationTypeController extends Controller
             ], 423); // 423 Locked
         }
 
-        $validated = $request->validate([
-            'logo' => 'required|image|mimes:jpeg,png,jpg,svg|max:2048',
-            'slot' => 'nullable|in:header_left,header_right,footer',
-        ]);
+        $validated = $request->validated();
 
         $slot = $validated['slot'] ?? 'footer';
 

@@ -78,8 +78,9 @@ const MainPage = () => {
             <img
               src={tech4ward}
               alt="Tech4ward Logo"
-              className="w-40 md:w-56 h-auto object-contain drop-shadow-xl"
-            />
+              width="224"
+              height="224"
+              className="w-40 md:w-56 h-40 md:h-56 object-contain drop-shadow-xl"            />
           </div>
           <div className="w-full text-center md:text-right">
             <h2 className="text-3xl md:text-5xl font-black text-[#800000] uppercase leading-tight mb-4">
