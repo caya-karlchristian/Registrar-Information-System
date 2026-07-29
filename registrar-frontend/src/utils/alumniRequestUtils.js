@@ -1,0 +1,80 @@
+import { getTodayDate } from "./helpers";
+
+export const ALUMNI_ACCESS_IDS = [2, 3];
+
+export const getDateDaysAgo = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().split("T")[0];
+};
+
+export const validateProfileStep = (formData) => {
+  if (!(formData.firstName || "").trim()) {
+    return "Please enter your first name.";
+  }
+  if (!(formData.middleName || "").trim()) {
+    return "Please enter your middle name.";
+  }
+  if (!(formData.surname || "").trim()) {
+    return "Please enter your surname.";
+  }
+  if (!formData.dob) {
+    return "Please select the date of birth.";
+  }
+  if (!(formData.address || "").trim()) {
+    return "Please enter your present/permanent mailing address.";
+  }
+  if (!(formData.contactNumber || "").trim()) {
+    return "Please enter your contact number.";
+  }
+  return null;
+};
+
+export const validateRequestDetailsStep = (formData, showCertificationDropdown) => {
+  if (formData.documentsRequested.length === 0) {
+    return "Please select at least one document to proceed.";
+  }
+  if (formData.purposeOfRequest.length === 0) {
+    return "Please select a purpose for your request.";
+  }
+  if (showCertificationDropdown && formData.certification.length === 0) {
+    return "Please specify the certification type.";
+  }
+  return null;
+};
+
+export const validateTORStep = (formData, hasTOR) => {
+  if (hasTOR && !formData.noRequests && !formData.doneRequest) {
+    return "Please select at least one TOR option to proceed.";
+  }
+  return null;
+};
+
+export const validateReceiptStep = (formData) => {
+  if (!(formData.receiptNumber || "").trim()) {
+    return "Please enter the Official Receipt Number.";
+  }
+  if (!/^\d{7}$/.test((formData.receiptNumber || "").trim())) {
+    return "Official Receipt Number must be exactly 7 digits.";
+  }
+  if (!formData.dateOfPayment) {
+    return "Please select the date of payment.";
+  }
+  if (formData.dateOfPayment < getDateDaysAgo(7) || formData.dateOfPayment > getTodayDate()) {
+    return "Date of payment must be within the last 7 days up to today.";
+  }
+
+  // Validate document copies count limits
+  const hasInvalidDocCopy = formData.documentsRequested
+    .filter((doc) => !doc.toLowerCase().includes("certif"))
+    .some((doc) => {
+      const copies = Number(formData.documentCopies[doc] || 1);
+      return !Number.isInteger(copies) || copies < 1 || copies > 10;
+    });
+
+  if (hasInvalidDocCopy) {
+    return "Number of copies must be between 1 and 10.";
+  }
+
+  return null;
+};
