@@ -124,13 +124,17 @@ export const useStaffDashboard = (viewMode) => {
       setShowDeleteConfirm(false);
       invalidateRequests();
     },
-    onError: (err) => console.error('Delete failed', err),
+    onError: (err) => {
+      console.error('Delete failed', err);
+    },
   });
 
   const archiveSelectedMutation = useMutation({
     mutationFn: (ids) => archiveDocumentRequests(ids),
     onSuccess: () => { setSelectedIds([]); invalidateRequests(); },
-    onError: (err) => alert('Error archiving requests: ' + (err?.response?.data?.message || err.message)),
+    onError: (err) => {
+      console.error('Archive failed', err);
+    },
   });
 
   const restoreSelectedMutation = useMutation({
