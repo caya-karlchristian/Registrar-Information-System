@@ -173,6 +173,45 @@ test('policy_id is silently ignored when creating a super-admin account', functi
     expect($response->json('data.policy_id'))->toBeNull();
 });
 
+test('creating a new admin or super-admin never enables break-glass (local) auth', function () {
+    // Regression test: AdminUserService::create() previously set
+    // local_auth_enabled = 1 (and a real, guessable-by-anyone-who-saw-the-
+    // password local hash) for every new admin/super-admin, making
+    // break-glass access an option on every admin rather than a small,
+    // deliberately-chosen set of Super Admin accounts. It must now stay
+    // off regardless of what's submitted, for both roles.
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $this->mock(IdpClient::class, function ($mock) {
+        $mock->shouldReceive('createUser')->twice()->andReturn('idp-user-789', 'idp-user-790');
+    });
+
+    $this->postJson('/api/system-users', [
+        'email'      => 'newadmin2@example.com',
+        'password'   => 'Password123',
+        'role_id'    => 3,
+        'first_name' => 'New',
+        'last_name'  => 'Admin',
+    ])->assertCreated();
+
+    $this->postJson('/api/system-users', [
+        'email'      => 'newsuperadmin2@example.com',
+        'password'   => 'Password123',
+        'role_id'    => 4,
+        'first_name' => 'New',
+        'last_name'  => 'SuperAdmin',
+    ])->assertCreated();
+
+    $this->assertDatabaseHas('users', ['email' => 'newadmin2@example.com', 'local_auth_enabled' => 0]);
+    $this->assertDatabaseHas('users', ['email' => 'newsuperadmin2@example.com', 'local_auth_enabled' => 0]);
+
+    // The stored password hash must not authenticate with the account's
+    // real (IdP) password — it exists only to satisfy the NOT NULL schema
+    // constraint and must never be a usable local credential.
+    $created = SystemUser::where('email', 'newadmin2@example.com')->firstOrFail();
+    expect(\Illuminate\Support\Facades\Hash::check('Password123', $created->password))->toBeFalse();
+});
+
 test('store returns 500 and does not create a local user when the IdP call fails', function () {
     suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
 

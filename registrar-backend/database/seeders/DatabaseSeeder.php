@@ -404,6 +404,18 @@ class DatabaseSeeder extends Seeder
                 'audience'             => 'admin',
                 'is_active'            => 1,
             ],
+            [
+                'notification_type_id' => 20,
+                'trigger_event'        => 'local_auth_login_used',
+                'title'                => 'Break-Glass Login Used',
+                'message_template'     => 'Break-glass login used for :email from :ip — verify this was expected.',
+                // Sent via sendToAllExcept([STUDENT, ALUMNI], ...) — reaches
+                // Admin + Super Admin, but is only ever meaningful to Super
+                // Admins since local auth is now restricted to that role
+                // (see LocalAuthController::login()).
+                'audience'             => 'super_admin',
+                'is_active'            => 1,
+            ],
         ];
 
         foreach ($rows as $row) {

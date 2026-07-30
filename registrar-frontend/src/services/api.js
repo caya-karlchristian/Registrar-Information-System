@@ -49,6 +49,19 @@ export const attachUserPolicy = (userId, policyId) =>
   api.patch(`/system-users/${userId}/policy`, { policy_id: policyId });
 
 // -------------------------------------------------------
+// LOCAL (BREAK-GLASS) AUTH (Super Admin only)
+// -------------------------------------------------------
+// Enables/updates local bcrypt fallback login for a user so they can
+// still sign in if the IdP is down. Backend additionally rejects any
+// target whose role isn't Super Admin — see SetLocalPasswordRequest.
+export const setLocalPassword = (userId, password, passwordConfirmation) =>
+  api.post("/auth/local-password", {
+    user_id: userId,
+    password,
+    password_confirmation: passwordConfirmation,
+  });
+
+// -------------------------------------------------------
 // POLICIES (Super Admin only)
 // -------------------------------------------------------
 export const getPolicies   = ()          => api.get("/policies");

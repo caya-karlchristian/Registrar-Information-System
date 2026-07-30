@@ -60,3 +60,23 @@ Schedule::command('announcements:auto-disable-expired')
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+/*
+|--------------------------------------------------------------------------
+| Scheduled Commands — Break-Glass Access Health Check
+|--------------------------------------------------------------------------
+|
+| Weekly: verify every break-glass (local-auth) account is still
+| correctly configured (Activated, has a password hash, Super Admin
+| role) BEFORE an IdP outage is the first time anyone finds out one
+| has drifted (e.g. deactivated, or somehow enabled on a non-super-admin
+| account). Exits non-zero on failure so this can be wired into
+| external monitoring/alerting on top of the scheduler log below.
+|--------------------------------------------------------------------------
+*/
+
+Schedule::command('break-glass:test')
+    ->weekly()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));

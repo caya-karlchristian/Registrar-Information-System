@@ -6,19 +6,22 @@ import {
   ChevronRightIcon,
   MagnifyingGlassIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  KeyIcon
 } from "@heroicons/react/24/outline";
 import DropDown from '../components/DropDown';
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import UserModal from "../components/UserModal";
 import ConfirmationModal from "../components/ConfirmationModal";
+import LocalPasswordModal from "../components/LocalPasswordModal";
 import {
   getSystemUsers,
   createSystemUser,
   updateSystemUser,
   deleteSystemUser,
   getPolicies,
-  attachUserPolicy
+  attachUserPolicy,
+  setLocalPassword
 } from "../services/api";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
@@ -120,6 +123,12 @@ const UserManagement = () => {
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [selectedUserForAccess, setSelectedUserForAccess] = useState(null);
   const [accessSubmitting, setAccessSubmitting] = useState(false);
+
+  // Break-Glass (local auth) access states — Super Admin targets only,
+  // enforced again server-side by SetLocalPasswordRequest.
+  const [isLocalPasswordModalOpen, setIsLocalPasswordModalOpen] = useState(false);
+  const [selectedUserForLocalAuth, setSelectedUserForLocalAuth] = useState(null);
+  const [localAuthSubmitting, setLocalAuthSubmitting] = useState(false);
 
   // Policies come from the backend now (policies table via GET /policies).
   const [systemPolicies, setSystemPolicies] = useState([]);
@@ -271,6 +280,30 @@ const UserManagement = () => {
       setErrorMsg(err.response?.data?.message || "Failed to attach policy.");
     } finally {
       setAccessSubmitting(false);
+    }
+  };
+
+  // -------------------------------------------------------
+  // Break-Glass (local auth) action handlers
+  // -------------------------------------------------------
+  const handleOpenLocalAuth = (user) => {
+    setSelectedUserForLocalAuth(user);
+    setIsLocalPasswordModalOpen(true);
+  };
+
+  const handleSaveLocalPassword = async (password, passwordConfirmation) => {
+    if (!selectedUserForLocalAuth) return;
+    setLocalAuthSubmitting(true);
+    setErrorMsg("");
+    try {
+      await setLocalPassword(selectedUserForLocalAuth.user_id, password, passwordConfirmation);
+      setSuccessMsg(`Break-glass access enabled for ${selectedUserForLocalAuth.email}.`);
+      setIsLocalPasswordModalOpen(false);
+      setSelectedUserForLocalAuth(null);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Failed to enable break-glass access.");
+    } finally {
+      setLocalAuthSubmitting(false);
     }
   };
 
@@ -495,6 +528,14 @@ const UserManagement = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 justify-center">
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => handleOpenLocalAuth(user)}
+                            title="Enable break-glass access"
+                            className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
+                            <KeyIcon className="w-4 h-4" />
+                          </button>
+                        )}
                         <button onClick={() => { setEditUser(user); setIsModalOpen(true); }}
                           className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
                           <PencilSquareIcon className="w-4 h-4" />
@@ -557,6 +598,14 @@ const UserManagement = () => {
         systemPolicies={systemPolicies}
         currentPolicy={selectedUserForAccess ? getUserPolicy(selectedUserForAccess) : ""}
         submitting={accessSubmitting}
+      />
+
+      <LocalPasswordModal
+        isOpen={isLocalPasswordModalOpen}
+        onClose={() => { setIsLocalPasswordModalOpen(false); setSelectedUserForLocalAuth(null); }}
+        onSubmit={handleSaveLocalPassword}
+        user={selectedUserForLocalAuth}
+        submitting={localAuthSubmitting}
       />
 
       <SuccessToast 

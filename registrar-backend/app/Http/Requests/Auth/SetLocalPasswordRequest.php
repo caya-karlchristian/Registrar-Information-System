@@ -14,19 +14,30 @@ class SetLocalPasswordRequest extends FormRequest
         // pattern used elsewhere (e.g. SystemUserPolicy) — cheap to keep
         // and means this class stays correct even if the route
         // middleware is ever refactored.
-        //
-        // NOTE: unlike SystemUserPolicy's MANAGEABLE_ROLES, this endpoint
-        // can target ANY user (student/alumni/admin/super admin) — see
-        // the controller docblock ("Set or update the local password for
-        // any user") — so there's no target-role restriction to check,
-        // only that the actor is a super admin.
         return $this->user()?->role_id === SystemUser::ROLE_SUPER_ADMIN;
     }
 
     public function rules(): array
     {
         return [
-            'user_id'               => 'required|integer|exists:users,user_id',
+            // Break-glass access is deliberately restricted to a small,
+            // watched set of accounts (Super Admins only) rather than
+            // being an option on every admin — see LocalAuthService docblock.
+            // This rule enforces that at the point local auth is actually
+            // enabled/updated for a target, regardless of what the UI sends.
+            'user_id' => [
+                'required',
+                'integer',
+                'exists:users,user_id',
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    /** @var SystemUser|null $target */
+                    $target = SystemUser::find($value);
+
+                    if ($target && $target->role_id !== SystemUser::ROLE_SUPER_ADMIN) {
+                        $fail('Local fallback access is limited to Super Admin accounts.');
+                    }
+                },
+            ],
             'password'              => 'required|string|min:8|confirmed',
             'password_confirmation' => 'required|string',
         ];
