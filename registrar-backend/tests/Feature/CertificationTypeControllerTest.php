@@ -54,12 +54,17 @@ function certSeedStatuses(): void
 // ═════════════════════════════════════════════════════════════════════════════
 
 test('any authenticated role can list certification types', function () {
-    certMakeType();
+    // Not assertJsonCount(1): TestCase::$seed = true means DatabaseSeeder's
+    // ~17 reference certificate_type rows are already present before this
+    // test's own row is created. What this test verifies — that the
+    // endpoint is reachable by any authenticated role and returns the type
+    // we just created — doesn't require table isolation.
+    $type = certMakeType();
     certMakeUser(SystemUser::ROLE_STUDENT);
 
     $this->getJson('/api/certifications')
          ->assertOk()
-         ->assertJsonCount(1);
+         ->assertJsonFragment(['certificate_type_id' => $type->certificate_type_id]);
 });
 
 test('show returns 404 for a missing certification type', function () {

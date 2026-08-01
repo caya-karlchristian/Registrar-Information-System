@@ -19,7 +19,7 @@ const DeleteConfirmModal = ({
       style={{
         top: isMobile ? `${headerHeight}px` : "0px",
       }}
-      className={`fixed left-0 right-0 bottom-0 z-50 flex items-center justify-center px-4 backdrop-blur-[2px] modal-overlay-container transition-all duration-300 ${
+      className={`fixed left-0 right-0 bottom-0 z-50 flex items-center justify-center px-4 backdrop-blur-[2px] transition-all duration-300 ${
         isDark ? 'bg-black/70' : 'bg-black/40'
       }`}
     >

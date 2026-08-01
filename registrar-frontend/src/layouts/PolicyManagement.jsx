@@ -21,6 +21,7 @@ import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { PolicyTableSkeleton } from "../components/LoadingSkeleton";
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 
 const MODULE_OPTIONS = [
   "Dashboard",
@@ -301,22 +302,14 @@ const PolicyManagement = () => {
         }`}>
           <div className="flex flex-wrap items-center gap-3 flex-1">
             {/* Search */}
-            <div className="relative w-full sm:max-w-md">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </span>
-              <input
-                type="text"
+            <div className="w-full sm:max-w-md">
+              <VoiceSearchInput
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(value) => {
+                  setSearch(value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Search"
-                className={`w-full pl-9 pr-4 py-2 rounded-lg border text-sm transition-all focus:outline-none focus:ring-2 ${
-                  isDark 
-                    ? 'bg-[#1f1f1f] border-[#3e4042] text-white placeholder-gray-550 focus:ring-[#FFD700]' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-[#FFC72C]'
-                }`}
               />
             </div>
           </div>
@@ -471,7 +464,7 @@ const PolicyManagement = () => {
 
       {/* Create / Edit Policy Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-10000 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
             className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} 
             onClick={() => setIsModalOpen(false)} 
@@ -499,7 +492,7 @@ const PolicyManagement = () => {
 
             <div className="h-1 w-full shrink-0 bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
 
-            <form onSubmit={handleSavePolicy} className="flex flex-col overflow-visible">
+            <form onSubmit={handleSavePolicy} noValidate className="flex flex-col overflow-visible">
               <div className="p-6 space-y-5 overflow-visible">
                 {/* Policy Name */}
                 <div>

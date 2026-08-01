@@ -54,12 +54,18 @@ function docTypeSeedStatuses(): void
 // ═════════════════════════════════════════════════════════════════════════════
 
 test('any authenticated role can list document types', function () {
-    docTypeMakeType();
+    // Not assertJsonCount(1): TestCase::$seed = true means DatabaseSeeder's
+    // ~14 reference document_type rows are already present in the table
+    // before this test's own row is created, so the list is never empty.
+    // What this test actually verifies — that the endpoint is reachable by
+    // any authenticated role and returns the type we just created — doesn't
+    // require (or want) table isolation.
+    $type = docTypeMakeType();
     docTypeMakeUser(SystemUser::ROLE_STUDENT);
 
     $this->getJson('/api/document-types')
          ->assertOk()
-         ->assertJsonCount(1);
+         ->assertJsonFragment(['document_type_id' => $type->document_type_id]);
 });
 
 test('show returns 404 for a missing document type', function () {

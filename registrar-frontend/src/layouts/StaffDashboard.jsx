@@ -47,6 +47,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
     sortOrder,
     setSortOrder,
     selectedIds,
+    setSelectedIds,
     showDeleteConfirm,
     setShowDeleteConfirm,
     certRequest,
@@ -88,14 +89,14 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
   };
 
   const handleSelectAll = (e) => {
+    const pageIds = currentItems.map(item => item.id);
     if (e.target.checked) {
-      const allIds = currentItems.map(item => item.id);
-      setSelectedIds(allIds);
+      setSelectedIds(prev => [...new Set([...prev, ...pageIds])]);
     } else {
-      setSelectedIds([]);
+      setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
     }
   };
-
+  
   const statusFilterOptions = [
     'All',
     ...requestStatuses

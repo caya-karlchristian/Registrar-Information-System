@@ -75,7 +75,6 @@ class LocalDevSeeder extends Seeder
                 'password'            => Hash::make('SE^e!41xz6Od'),
                 'role_id'             => SystemUser::ROLE_ADMIN,
                 'status'              => 'Activated',
-                'local_auth_enabled'  => 1,
                 // policy_id=1 = "Registrar Staff", seeded in
                 // DatabaseSeeder::seedPolicies() with real permissions
                 // (inbox/logbook/profile/analytics/dashboard access).
@@ -101,7 +100,6 @@ class LocalDevSeeder extends Seeder
                 'password'            => Hash::make('Jo*B!7TRyQ3B'),
                 'role_id'             => SystemUser::ROLE_STUDENT,
                 'status'              => 'Activated',
-                'local_auth_enabled'  => 1,
             ]
         );
 
@@ -141,7 +139,6 @@ class LocalDevSeeder extends Seeder
                 'password'            => Hash::make('!&jn&EuM6hdi'),
                 'role_id'             => SystemUser::ROLE_ALUMNI,
                 'status'              => 'Activated',
-                'local_auth_enabled'  => 1,
             ]
         );
 

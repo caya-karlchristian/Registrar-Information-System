@@ -63,7 +63,6 @@ const ReportManagement = () => {
   const [totalPages, setTotalPages]     = useState(1);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState(null);
-  const [showConfirm, setShowConfirm]   = useState(false);
   const [errorMsg, setErrorMsg]         = useState("");
 
   // Filter options populated from API
@@ -135,21 +134,6 @@ const ReportManagement = () => {
   // Reset to page 1 when filters change
   const handleFilterChange = () => setCurrentPage(1);
 
-  // -------------------------------------------------------
-  // Clear logs — NOTE: This only clears the local view.
-  // Audit logs should never be deleted from the DB.
-  // If you want a real clear, add a backend endpoint for it
-  // and discuss with your adviser first.
-  // -------------------------------------------------------
-  const handleClearLogs = async () => {
-    setSearch("");
-    setRoleFilter("All");
-    setActionFilter("All");
-    setCurrentPage(1);
-    setShowConfirm(false);
-    await fetchLogs();  // ← force a fresh fetch
-  };
-
   const pageNumbers = () => {
     if (totalPages <= 6) return Array.from({ length: totalPages }, (_, i) => i + 1);
     const pages = [1, 2, 3];
@@ -196,13 +180,6 @@ const ReportManagement = () => {
             Clear Filters
           </button>
         )}
-
-        <button
-          onClick={() => setShowConfirm(true)}
-          className={`sm:ml-auto w-full sm:w-auto px-5 py-2 rounded-full text-sm font-semibold border shadow-sm transition-all ${isDark ? 'border-red-900/50 text-red-300 bg-[#2a2a2f] hover:bg-[#353539]' : 'border-red-200 text-red-600 bg-white hover:bg-red-50'}`}
-        >
-          Clear Logs
-        </button>
       </div>
 
       {/* Table */}
@@ -341,14 +318,6 @@ const ReportManagement = () => {
         </div>
       </div>
 
-      <ConfirmationModal
-        isOpen={showConfirm}
-        onClose={() => setShowConfirm(false)}
-        onConfirm={handleClearLogs}
-        title="Clear All Logs?"
-        message="This will permanently delete all audit logs. This action cannot be undone."
-        type="danger"
-      />
       <ErrorToast 
         message={errorMsg} 
         onClose={() => setErrorMsg("")} 

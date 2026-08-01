@@ -42,7 +42,7 @@ function seedCashierReferenceData(): array
     $purpose = RequestPurpose::firstOrCreate(['request_purpose_id' => 1], ['purpose_name' => 'DFA']);
     $docType = DocumentType::firstOrCreate(
         ['document_type_id' => 1],
-        ['document_name' => 'Transcript of Records', 'document_process_period' => 5, 'access_id' => 1]
+        ['document_name' => 'Transcript of Records', 'document_description' => '', 'document_process_period' => 5, 'access_id' => 1]
     );
     return compact('purpose', 'docType');
 }
@@ -198,10 +198,7 @@ test('isOrAlreadyUsed returns false when OR has not been used at all', function 
 test('matcher returns valid when receipt contains matching document with sufficient quantity', function () {
     $matcher = new CashierDocumentMatcher();
 
-    $docType = DocumentType::firstOrCreate(
-        ['document_type_id' => 10],
-        ['document_name' => 'Transcript of Records', 'cashier_document_patterns' => ['Transcript of Records'], 'document_process_period' => 5, 'access_id' => 1]
-    );
+    $docType = DocumentType::create(['document_name' => 'Transcript of Records', 'document_description' => '', 'cashier_document_patterns' => ['Transcript of Records'], 'document_process_period' => 5, 'access_id' => 1]);
 
     $result = $matcher->match(
         cashierItems: [['document' => 'Transcript of Records', 'quantity' => 2]],
@@ -215,10 +212,7 @@ test('matcher returns valid when receipt contains matching document with suffici
 test('matcher is case-insensitive when matching receipt labels', function () {
     $matcher = new CashierDocumentMatcher();
 
-    $docType = DocumentType::firstOrCreate(
-        ['document_type_id' => 11],
-        ['document_name' => 'Transcript of Records', 'cashier_document_patterns' => ['transcript of records'], 'document_process_period' => 5, 'access_id' => 1]
-    );
+    $docType = DocumentType::create(['document_name' => 'Transcript of Records', 'document_description' => '', 'cashier_document_patterns' => ['transcript of records'], 'document_process_period' => 5, 'access_id' => 1]);
 
     $result = $matcher->match(
         cashierItems: [['document' => 'TRANSCRIPT OF RECORDS', 'quantity' => 1]],
@@ -232,10 +226,7 @@ test('matcher is case-insensitive when matching receipt labels', function () {
 test('matcher returns invalid when receipt does not contain the requested document', function () {
     $matcher = new CashierDocumentMatcher();
 
-    $docType = DocumentType::firstOrCreate(
-        ['document_type_id' => 12],
-        ['document_name' => 'Transcript of Records', 'cashier_document_patterns' => ['Transcript of Records'], 'document_process_period' => 5, 'access_id' => 1]
-    );
+    $docType = DocumentType::create(['document_name' => 'Transcript of Records', 'document_description' => '', 'cashier_document_patterns' => ['Transcript of Records'], 'document_process_period' => 5, 'access_id' => 1]);
 
     $result = $matcher->match(
         cashierItems: [['document' => 'Diploma', 'quantity' => 1]],
@@ -250,10 +241,7 @@ test('matcher returns invalid when receipt does not contain the requested docume
 test('matcher returns invalid when receipt quantity is less than requested copies', function () {
     $matcher = new CashierDocumentMatcher();
 
-    $docType = DocumentType::firstOrCreate(
-        ['document_type_id' => 13],
-        ['document_name' => 'Transcript of Records', 'cashier_document_patterns' => ['Transcript of Records'], 'document_process_period' => 5, 'access_id' => 1]
-    );
+    $docType = DocumentType::create(['document_name' => 'Transcript of Records', 'document_description' => '', 'cashier_document_patterns' => ['Transcript of Records'], 'document_process_period' => 5, 'access_id' => 1]);
 
     $result = $matcher->match(
         cashierItems: [['document' => 'Transcript of Records', 'quantity' => 1]],
@@ -271,10 +259,7 @@ test('matcher returns invalid when receipt quantity is less than requested copie
 test('matcher skips document types with null patterns', function () {
     $matcher = new CashierDocumentMatcher();
 
-    $docType = DocumentType::firstOrCreate(
-        ['document_type_id' => 14],
-        ['document_name' => 'Good Moral Certificate', 'cashier_document_patterns' => null, 'document_process_period' => 5, 'access_id' => 1]
-    );
+    $docType = DocumentType::create(['document_name' => 'Good Moral Certificate', 'document_description' => '', 'cashier_document_patterns' => null, 'document_process_period' => 5, 'access_id' => 1]);
 
     $result = $matcher->match(
         cashierItems: [],
@@ -288,10 +273,7 @@ test('matcher skips document types with null patterns', function () {
 test('matcher sums quantities when same label appears multiple times on receipt', function () {
     $matcher = new CashierDocumentMatcher();
 
-    $docType = DocumentType::firstOrCreate(
-        ['document_type_id' => 15],
-        ['document_name' => 'Transcript of Records', 'cashier_document_patterns' => ['Transcript of Records'], 'document_process_period' => 5, 'access_id' => 1]
-    );
+    $docType = DocumentType::create(['document_name' => 'Transcript of Records', 'document_description' => '', 'cashier_document_patterns' => ['Transcript of Records'], 'document_process_period' => 5, 'access_id' => 1]);
 
     $result = $matcher->match(
         cashierItems: [
