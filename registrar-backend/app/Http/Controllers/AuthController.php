@@ -59,6 +59,13 @@ class AuthController extends Controller
 
             $user->loadIdentityRelations();
 
+            // Mirrors the audit call in the local-fallback branch below.
+            // Previously only local-auth logins were recorded, leaving the
+            // majority (IDP) login path with no audit trail — a compliance
+            // gap since AuditLog is the system of record for "who logged
+            // in, when, from where."
+            $this->auditLogger->log($request, $user, AuditLog::ACTION_LOGIN);
+
             return response()
                 ->json(['user' => new UserResource($user)])
                 ->header('X-Auth-Method', 'idp')

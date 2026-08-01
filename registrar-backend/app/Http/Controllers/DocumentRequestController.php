@@ -154,9 +154,18 @@ class DocumentRequestController extends Controller
     // -------------------------------------------------------------------------
     // BE-1 migration: added from/to/doc_type filters
     // Accepts optional query params:
-    //   ?from=YYYY-MM-DD   filter requests on or after this date
-    //   ?to=YYYY-MM-DD     filter requests on or before this date
-    //   ?doc_type=string   filter by document_name (partial, case-insensitive)
+    //   ?from=YYYY-MM-DD    filter requests on or after this date
+    //   ?to=YYYY-MM-DD      filter requests on or before this date
+    //   ?doc_type=string    filter by document_name (partial, case-insensitive)
+    //   ?per_page=int       page size, default 25, capped at 100
+    //   ?page=int           page number, default 1 (standard Laravel paginator)
+    //
+    // BE-2: was ->get() with no limit — every completed request, forever,
+    // in one response. Switched to paginate(); page size is capped server
+    // -side so a client can't force an unbounded query by passing a huge
+    // per_page. requested_at already has an index (dr_requested_at_idx
+    // from the base schema migration) so ordering + the from/to filters
+    // stay index-backed.
     public function logbook(Request $request)
     {
         $query = DocumentRequest::with(array_merge(self::RELATIONS, ['history']))
@@ -176,8 +185,11 @@ class DocumentRequestController extends Controller
             });
         }
 
+        $perPage = (int) $request->query('per_page', 25);
+        $perPage = max(1, min($perPage, 100));
+
         return response()->json(
-            $query->orderByDesc('requested_at')->get(),
+            $query->orderByDesc('requested_at')->paginate($perPage),
             200
         );
     }

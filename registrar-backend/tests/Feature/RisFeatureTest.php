@@ -39,7 +39,7 @@ function seedReferenceData(): array
     $purpose = RequestPurpose::firstOrCreate(['request_purpose_id' => 1], ['purpose_name' => 'DFA']);
     $docType = DocumentType::firstOrCreate(
         ['document_type_id' => 1],
-        ['document_name' => 'Transcript of Records', 'document_process_period' => 5, 'access_id' => 1]
+        ['document_name' => 'Transcript of Records', 'document_description' => '', 'document_process_period' => 5, 'access_id' => 1]
     );
     return compact('status', 'purpose', 'docType');
 }

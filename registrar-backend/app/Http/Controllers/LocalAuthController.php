@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\NotificationServiceInterface;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\SetLocalPasswordRequest;
 use App\Http\Resources\UserResource;
@@ -20,11 +21,18 @@ use Illuminate\Support\Facades\Log;
  *   POST /api/auth/local-login
  *       Always authenticates against the local bcrypt hash.
  *       Used by staff when they know the IDP is down and don't want
- *       the IDP-first round-trip delay.
+ *       the IDP-first round-trip delay. Since local auth is now
+ *       restricted to a small set of Super Admin break-glass accounts
+ *       (see LocalAuthService docblock), every successful use is rare
+ *       by design — so a success here also fires an immediate
+ *       admin-facing notification (see login() below), not just a log
+ *       line, so the rest of the team can verify it was expected.
  *
  *   POST /api/auth/local-password      (superadmin only)
  *       Set or update the local password for any user.
  *       Body: { user_id: int, password: string, password_confirmation: string }
+ *       SetLocalPasswordRequest additionally rejects any target whose
+ *       role_id isn't Super Admin — see that class for details.
  *
  *   GET  /api/auth/local-auth-status   (superadmin only)
  *       Returns which users have local_auth_enabled = 1.
@@ -37,8 +45,9 @@ use Illuminate\Support\Facades\Log;
 class LocalAuthController extends Controller
 {
     public function __construct(
-        private LocalAuthService $localAuth,
-        private AuditLogger      $auditLogger,
+        private LocalAuthService           $localAuth,
+        private AuditLogger                $auditLogger,
+        private NotificationServiceInterface $notificationService,
     ) {}
 
     // -----------------------------------------------------------------------
@@ -66,6 +75,37 @@ class LocalAuthController extends Controller
             'user_id' => $user->user_id,
             'email'   => $user->email,
         ]);
+
+        // Break-glass logins should be rare and always verified. This is
+        // meant to reach the people who can actually act on it — the
+        // Super Admins who own break-glass accounts (see
+        // SetLocalPasswordRequest, which now restricts local auth to
+        // that role). NotificationService::sendToAdmins() intentionally
+        // targets ONLY role_id = Admin (see its docblock) and would
+        // silently never reach a Super Admin, so we target Admin +
+        // Super Admin explicitly here via sendToAllExcept() instead —
+        // excluding only the roles (student/alumni) that can never be
+        // break-glass accounts and have no reason to see this alert.
+        $this->notificationService->sendToAllExcept(
+            excludedRoleIds: [SystemUser::ROLE_STUDENT, SystemUser::ROLE_ALUMNI],
+            triggerEvent:    'local_auth_login_used',
+            data: [
+                'user_id' => $user->user_id,
+                'email'   => $user->email,
+                'ip'      => $request->ip(),
+            ],
+        );
+
+        // NOTE: failed-attempt alerting (e.g. N failed local-login attempts
+        // in a short window) is a follow-up, not built here. Route-level
+        // throttling already exists on POST /api/auth/local-login
+        // (see routes/api.php) as a separate brute-force mitigation, and
+        // LocalAuthService::attempt() already Log::warning()s every failed
+        // attempt for after-the-fact auditing — but there's currently no
+        // place that turns a burst of those warnings into a live alert.
+        // Wiring that up would need its own rate/threshold tracking
+        // (e.g. cache-backed counters or a dedicated table) rather than
+        // reusing this success-path notification call.
 
         return response()
             ->json(['user' => new UserResource($user)])

@@ -177,7 +177,9 @@ test('non-superadmin cannot set a local password', function () {
 test('setPassword fails validation when confirmation does not match', function () {
     $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN, 'status' => 'Activated']);
     Sanctum::actingAs($superAdmin);
-    $target = SystemUser::factory()->create();
+    // Super-admin target, isolating this test to the confirmation-mismatch
+    // failure rather than also tripping the target-role rule.
+    $target = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
 
     $this->postJson('/api/auth/local-password', [
         'user_id'               => $target->user_id,
@@ -199,10 +201,16 @@ test('setPassword fails validation for a nonexistent user_id', function () {
       ->assertJsonValidationErrors(['user_id']);
 });
 
-test('superadmin can set a local password, enabling local auth for the target', function () {
+test('superadmin can set a local password, enabling local auth for a super-admin target', function () {
     $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN, 'status' => 'Activated']);
     Sanctum::actingAs($superAdmin);
-    $target = SystemUser::factory()->create(['local_auth_enabled' => 0]);
+    // Break-glass access is restricted to Super Admin accounts — the
+    // target must be one too, not just any user (see
+    // SetLocalPasswordRequest).
+    $target = SystemUser::factory()->create([
+        'role_id'             => SystemUser::ROLE_SUPER_ADMIN,
+        'local_auth_enabled'  => 0,
+    ]);
 
     $this->postJson('/api/auth/local-password', [
         'user_id'               => $target->user_id,
@@ -218,4 +226,26 @@ test('superadmin can set a local password, enabling local auth for the target', 
         'email'    => $target->email,
         'password' => 'NewPassword1',
     ])->assertOk();
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SetLocalPasswordRequest — target must be a Super Admin account
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('setPassword rejects a target user who is not a super admin', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN, 'status' => 'Activated']);
+    Sanctum::actingAs($superAdmin);
+
+    foreach ([SystemUser::ROLE_STUDENT, SystemUser::ROLE_ALUMNI, SystemUser::ROLE_ADMIN] as $roleId) {
+        $target = SystemUser::factory()->create(['role_id' => $roleId]);
+
+        $this->postJson('/api/auth/local-password', [
+            'user_id'               => $target->user_id,
+            'password'              => 'NewPassword1',
+            'password_confirmation' => 'NewPassword1',
+        ])->assertStatus(422)
+          ->assertJsonValidationErrors(['user_id']);
+
+        $this->assertDatabaseHas('users', ['user_id' => $target->user_id, 'local_auth_enabled' => 0]);
+    }
 });

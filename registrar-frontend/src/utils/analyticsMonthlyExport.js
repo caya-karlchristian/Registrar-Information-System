@@ -3,8 +3,10 @@ import { saveAs } from 'file-saver';
 import puplogoimage from '../assets/puplogoimage.png';
 import bagongPilipinasLogo from '../assets/Bagong_Pilipinas_logo.png';
 import certificateFooterImg from '../assets/certificate_footer.png';
-import { getDocumentTypes, getLogbookData, getCertifications } from '../services/api';
-// FE-4 migration: replaced getDocumentRequests+getRequestHistory with getLogbookData()
+import { getDocumentTypes, getAllLogbookData, getCertifications } from '../services/api';
+// FE-4 migration: replaced getDocumentRequests+getRequestHistory with getLogbookData();
+// now uses getAllLogbookData() since the backend endpoint is paginated and this
+// export groups records across the full completed-request history.
 
 const noBorder = {
   top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
@@ -476,7 +478,7 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
     throw new Error('No document types found to export for the selected options.');
   }
   const [logbookRes, allDocumentTypesRes, allCertificationsRes] = await Promise.all([
-    getLogbookData(), // FE-4: returns completed requests with embedded history
+    getAllLogbookData(), // FE-4: returns completed requests with embedded history, paged through in full
     (async () => { try { return await getDocumentTypes(); } catch (_) { return { data: [] }; } })(),
     (async () => { try { return await getCertifications(); } catch (_) { return { data: [] }; } })(),
   ]);

@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Handles admin/superadmin account lifecycle.
@@ -87,12 +88,22 @@ class AdminUserService
             $user = DB::transaction(function () use ($validated, $idpId) {
                 $user = SystemUser::create([
                     'email'               => $validated['email'],
-                    'password'            => Hash::make($validated['password']),
-                    // A bcrypt password is set above, so local auth must be
-                    // switched on here too — otherwise LocalAuthService::attempt()
-                    // rejects the account with "local auth not enabled" even
-                    // though a valid password exists, and only IDP login works.
-                    'local_auth_enabled'  => 1,
+                    // Break-glass (local bcrypt) auth is never enabled at
+                    // creation time — it stays a small, deliberately-chosen
+                    // set of Super Admin accounts, set up afterward and only
+                    // via the superadmin-only POST /api/auth/local-password
+                    // endpoint (LocalAuthController::setPassword ->
+                    // LocalAuthService::setPassword). No LocalAuthService
+                    // call happens here, and local_auth_enabled is left at
+                    // its schema default (0).
+                    //
+                    // `password` is NOT NULL on the users table, but this
+                    // value is never used to authenticate: it is not derived
+                    // from the account's real (IdP) password, and
+                    // local_auth_enabled stays 0, so LocalAuthService::attempt()
+                    // rejects this account before the hash is ever checked.
+                    // It exists purely to satisfy the schema constraint.
+                    'password'            => Hash::make(Str::random(40)),
                     'role_id'     => $validated['role_id'],
                     'status'      => 'Activated',
                     'idp_user_id' => $idpId,

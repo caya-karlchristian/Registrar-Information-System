@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\PolicyException;
+use App\Http\Requests\Policy\StorePolicyRequest;
+use App\Http\Requests\Policy\UpdatePolicyRequest;
 use App\Http\Resources\PolicyResource;
 use App\Models\Policy;
 use App\Services\PolicyService;
@@ -29,15 +31,9 @@ class PolicyController extends Controller
     // -------------------------------------------------------------------------
     // POST /policies
     // -------------------------------------------------------------------------
-    public function store(Request $request)
+    public function store(StorePolicyRequest $request)
     {
-        $validated = $request->validate([
-            'name'                 => 'required|string|max:100|unique:policies,name',
-            'permissions'          => 'required|array',
-            'permissions.*'        => 'array',
-        ]);
-
-        $policy = $this->policyService->create($validated, $request);
+        $policy = $this->policyService->create($request->validated(), $request);
 
         return (new PolicyResource($policy))->response()->setStatusCode(201);
     }
@@ -45,20 +41,14 @@ class PolicyController extends Controller
     // -------------------------------------------------------------------------
     // PUT /policies/{id}
     // -------------------------------------------------------------------------
-    public function update(Request $request, $id)
+    public function update(UpdatePolicyRequest $request, $id)
     {
         $policy = Policy::find($id);
         if (!$policy) {
             return response()->json(['message' => 'Policy not found'], 404);
         }
 
-        $validated = $request->validate([
-            'name'                 => 'sometimes|string|max:100|unique:policies,name,' . $policy->policy_id . ',policy_id',
-            'permissions'          => 'sometimes|array',
-            'permissions.*'        => 'array',
-        ]);
-
-        $policy = $this->policyService->update($policy, $validated, $request);
+        $policy = $this->policyService->update($policy, $request->validated(), $request);
 
         return new PolicyResource($policy);
     }

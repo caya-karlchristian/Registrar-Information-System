@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RequestPurpose\StoreRequestPurposeRequest;
+use App\Http\Requests\RequestPurpose\UpdateRequestPurposeRequest;
 use App\Models\RequestPurpose;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class RequestPurposeController extends Controller
 {
@@ -42,13 +43,9 @@ class RequestPurposeController extends Controller
      * POST /api/request-purposes
      * Admin / Superadmin only.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreRequestPurposeRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'purpose_name' => 'required|string|max:100|unique:request_purpose,purpose_name',
-        ]);
-
-        $purpose = RequestPurpose::create($validated);
+        $purpose = RequestPurpose::create($request->validated());
 
         cache()->forget('request_purposes.all');
 
@@ -59,7 +56,7 @@ class RequestPurposeController extends Controller
      * PUT /api/request-purposes/{id}
      * Admin / Superadmin only.
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateRequestPurposeRequest $request, int $id): JsonResponse
     {
         $purpose = RequestPurpose::find($id);
 
@@ -67,11 +64,7 @@ class RequestPurposeController extends Controller
             return response()->json(['message' => 'Request purpose not found.'], 404);
         }
 
-        $validated = $request->validate([
-            'purpose_name' => "required|string|max:100|unique:request_purpose,purpose_name,{$id},request_purpose_id",
-        ]);
-
-        $purpose->update($validated);
+        $purpose->update($request->validated());
 
         cache()->forget('request_purposes.all');
 

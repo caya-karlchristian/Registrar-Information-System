@@ -49,6 +49,19 @@ export const attachUserPolicy = (userId, policyId) =>
   api.patch(`/system-users/${userId}/policy`, { policy_id: policyId });
 
 // -------------------------------------------------------
+// LOCAL (BREAK-GLASS) AUTH (Super Admin only)
+// -------------------------------------------------------
+// Enables/updates local bcrypt fallback login for a user so they can
+// still sign in if the IdP is down. Backend additionally rejects any
+// target whose role isn't Super Admin — see SetLocalPasswordRequest.
+export const setLocalPassword = (userId, password, passwordConfirmation) =>
+  api.post("/auth/local-password", {
+    user_id: userId,
+    password,
+    password_confirmation: passwordConfirmation,
+  });
+
+// -------------------------------------------------------
 // POLICIES (Super Admin only)
 // -------------------------------------------------------
 export const getPolicies   = ()          => api.get("/policies");
@@ -113,7 +126,54 @@ export const uploadCertificationLayoutLogo = (id, formData) =>
 // Read records from response.data.data, not response.data.
 // -------------------------------------------------------
 export const getDocumentRequests  = (params = {}) => api.get("/document-requests", { params });
-export const getLogbookData       = ()          => api.get("/document-requests/logbook");
+export const getLogbookData       = (params = {}) => api.get("/document-requests/logbook", { params });
+
+// BE-2 backend fix paginated /document-requests/logbook (previously an
+// unbounded ->get() of every completed request ever). Logbook.jsx and
+// analyticsMonthlyExport.js both filter/group across the FULL completed-
+// request history client-side (by doc type, certification, date range),
+// so they can't just take page 1 — they need every row.
+//
+// This pages through the endpoint at 100 rows/request (capped server-side
+// at 100 too) and concatenates the results, so:
+//   - the backend never answers one unbounded query
+//   - existing consumers keep working against the full dataset unchanged
+//
+// This is a stopgap, not the end state — if the completed-request table
+// grows large enough that paging through everything on every load becomes
+// slow, the real fix is moving the doc-type/certification/date filters
+// server-side (they're already partially there — see `from`/`to`/`doc_type`
+// on this endpoint) and having the DOCX export hit a dedicated endpoint
+// that streams matching rows instead of relying on the client having
+// already loaded them all.
+export const getAllLogbookData = async (params = {}) => {
+  const perPage = 100;
+  const MAX_PAGES = 500; // safety cap — avoids an infinite loop if last_page ever misbehaves
+  let page = 1;
+  let all = [];
+
+  while (page <= MAX_PAGES) {
+    const res = await getLogbookData({ ...params, page, per_page: perPage });
+    const body = res.data;
+
+    // Back-compat: if an older/unpaginated backend build is deployed,
+    // the endpoint just returns a plain array — take it and stop.
+    if (Array.isArray(body)) {
+      all = body;
+      break;
+    }
+
+    const rows = Array.isArray(body?.data) ? body.data : [];
+    all = all.concat(rows);
+
+    const lastPage = body?.last_page ?? body?.meta?.last_page ?? page;
+    if (rows.length === 0 || page >= lastPage) break;
+    page += 1;
+  }
+
+  return all;
+};
+
 export const getDocumentRequest   = (id)          => api.get(`/document-requests/${id}`);
 export const createDocumentRequest = (data)       => api.post("/document-requests", data);
 export const updateDocumentRequest = (id, data)   => api.put(`/document-requests/${id}`, data);
