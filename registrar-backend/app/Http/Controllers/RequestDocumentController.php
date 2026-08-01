@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RequestDocument\StoreRequestDocumentRequest;
+use App\Http\Requests\RequestDocument\UpdateRequestDocumentRequest;
 use App\Models\DocumentRequest;
 use App\Models\RequestDocument;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -28,13 +29,9 @@ class RequestDocumentController extends Controller
         return response()->json($reqDoc, 200);
     }
 
-    public function store(Request $request)
+    public function store(StoreRequestDocumentRequest $request)
     {
-        $validated = $request->validate([
-            'request_id'       => 'required|integer|exists:document_request,request_id',
-            'document_type_id' => 'required|integer|exists:document_type,document_type_id',
-            'number_of_copies' => 'required|integer|min:1|max:10',
-        ]);
+        $validated = $request->validated();
 
         // Ensure the authenticated student/alumni owns the parent request.
         // Without this check any student could append line-items to another
@@ -47,16 +44,11 @@ class RequestDocumentController extends Controller
         return response()->json($reqDoc, 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateRequestDocumentRequest $request, $id)
     {
         $reqDoc = RequestDocument::findOrFail($id);
 
-        $validated = $request->validate([
-            'document_type_id' => 'sometimes|integer|exists:document_type,document_type_id',
-            'number_of_copies' => 'sometimes|integer|min:1|max:10',
-        ]);
-
-        $reqDoc->update($validated);
+        $reqDoc->update($request->validated());
         return response()->json($reqDoc, 200);
     }
 

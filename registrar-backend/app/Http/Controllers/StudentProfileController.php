@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StudentProfile\StoreStudentProfileRequest;
+use App\Http\Requests\StudentProfile\UpdateStudentProfileRequest;
 use App\Models\StudentProfile;
-use Illuminate\Http\Request;
 use App\Exceptions\OgosException;
 use App\Services\Ogos\OgosStudentService;
 
@@ -27,38 +28,17 @@ class StudentProfileController extends Controller
         return response()->json($profile, 200);
     }
 
-    public function store(Request $request)
+    public function store(StoreStudentProfileRequest $request)
     {
-        $validated = $request->validate([
-            'user_id'           => 'required|integer|exists:users,user_id',
-            'first_name'        => 'required|string|max:100',
-            'middle_name'       => 'nullable|string|max:100',
-            'last_name'         => 'required|string|max:100',
-            'date_of_birth'     => 'required|date',
-            // permanent_address / contact_number removed — no such columns
-            // exist on student_profile (confirmed via SHOW CREATE TABLE).
-            // Both were marked 'required', so this endpoint 500'd on every
-            // call before this fix — validation always passed (fields were
-            // present) and create() always failed with a fatal "Unknown
-            // column" SQL error.
-        ]);
-
-        $profile = StudentProfile::create($validated);
+        $profile = StudentProfile::create($request->validated());
         return response()->json($profile, 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateStudentProfileRequest $request, $id)
     {
         $profile = StudentProfile::findOrFail($id);
 
-        $validated = $request->validate([
-            'first_name'        => 'sometimes|string|max:100',
-            'middle_name'       => 'nullable|string|max:100',
-            'last_name'         => 'sometimes|string|max:100',
-            'date_of_birth'     => 'sometimes|date',
-        ]);
-
-        $profile->update($validated);
+        $profile->update($request->validated());
         return response()->json($profile, 200);
     }
 

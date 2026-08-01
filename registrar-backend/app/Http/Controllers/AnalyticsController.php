@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Analytics\AiReportRequest;
 use App\Services\AnalyticsService;
 use App\Services\AnthropicService;
 use Illuminate\Http\Request;
@@ -146,15 +147,8 @@ class AnalyticsController extends Controller
      * The frontend never talks to the Claude API directly — this controller
      * is the sole gateway, enforcing the security model from the blueprint.
      */
-    public function aiReport(Request $request)
+    public function aiReport(AiReportRequest $request)
     {
-        // phase3-audit: max_length guard (minor finding #2)
-        $request->validate([
-            'range' => ['sometimes', 'string', 'in:today,week,month,year,all,custom'],
-            'from'  => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'to'    => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-        ]);
-
         try {
             $key = $this->cacheKey($request, 'ai-report');
 

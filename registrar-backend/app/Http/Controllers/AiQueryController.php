@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Analytics\AiQueryRequest;
 use App\Services\AiConversationService;
 use App\Services\AnalyticsService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -46,30 +46,14 @@ use Illuminate\Support\Facades\Cache;
  */
 class AiQueryController extends Controller
 {
-    /** Maximum prior turns accepted from the client. */
-    private const MAX_HISTORY_TURNS = 20;
-
     public function __construct(
         private AiConversationService $conversation,
         private AnalyticsService      $analytics,
     ) {}
 
-    public function query(Request $request)
+    public function query(AiQueryRequest $request)
     {
-        // ── Validate ──────────────────────────────────────────────────────────
-        $validated = $request->validate([
-            'question'          => [
-                'required', 'string',
-                'min:1',
-                'max:' . AiConversationService::MAX_INPUT_LENGTH,
-            ],
-            'history'           => ['sometimes', 'array', 'max:' . self::MAX_HISTORY_TURNS],
-            'history.*.role'    => ['required_with:history', 'in:user,assistant'],
-            'history.*.content' => ['required_with:history', 'string', 'max:8000'],
-            'range'             => ['sometimes', 'string', 'in:today,week,month,year,all,custom'],
-            'from'              => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'to'                => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
-        ]);
+        $validated = $request->validated();
 
         // ── Build date range (reuse same logic as AnalyticsController) ────────
         $rangeKey = $validated['range'] ?? 'month';
