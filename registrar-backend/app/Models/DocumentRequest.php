@@ -31,6 +31,8 @@ class DocumentRequest extends Model
         'is_archived',
         'archived_on',
         'archived_by',
+        'restored_on',
+        'restored_by',
     ];
 
     protected $casts = [
@@ -39,6 +41,7 @@ class DocumentRequest extends Model
         'deleted_at'   => 'datetime',
         'is_archived'  => 'boolean',
         'archived_on'  => 'datetime',
+        'restored_on'  => 'datetime',
     ];
 
     /**
@@ -124,5 +127,12 @@ class DocumentRequest extends Model
     public function archivedByUser()
     {
         return $this->belongsTo(SystemUser::class, 'archived_by', 'user_id');
+    }
+
+    // Same "*ByUser" naming rationale as archivedByUser() above —
+    // "restored_by" is the raw FK column, "restoredByUser" is the relation.
+    public function restoredByUser()
+    {
+        return $this->belongsTo(SystemUser::class, 'restored_by', 'user_id');
     }
 }
