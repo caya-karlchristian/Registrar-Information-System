@@ -39,7 +39,14 @@ function arsActingSuperAdmin(): SystemUser
 
 function arsRequest(): Request
 {
-    return Request::create('/api/access-requests', 'POST');
+    // Request::create() builds a bare request with no user resolver bound —
+    // unlike the real request Laravel's HTTP kernel injects in production,
+    // which has one attached by the auth middleware. Sanctum::actingAs()
+    // authenticates the guard, but $request->user() on this object still
+    // needs to be told to ask it explicitly.
+    $request = Request::create('/api/access-requests', 'POST');
+    $request->setUserResolver(fn () => auth()->user());
+    return $request;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

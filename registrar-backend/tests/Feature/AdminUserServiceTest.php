@@ -17,6 +17,17 @@ function ausActor(): SystemUser
     return $actor;
 }
 
+function ausRequest(): Request
+{
+    // Same fix as AccessRequestServiceTest's arsRequest(): Request::create()
+    // has no user resolver bound, so AdminUserService::create()'s call to
+    // $request->user() would otherwise return null even after
+    // Sanctum::actingAs() authenticates the guard.
+    $request = Request::create('/api/system-users', 'POST');
+    $request->setUserResolver(fn () => auth()->user());
+    return $request;
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // AdminUserService::create() — pre-register-then-link, no IdP call
 // ═════════════════════════════════════════════════════════════════════════════
@@ -34,7 +45,7 @@ test('create() never calls IdpClient::createUser', function () {
         'role_id'    => SystemUser::ROLE_ADMIN,
         'first_name' => 'Pending',
         'last_name'  => 'Admin',
-    ], Request::create('/api/system-users', 'POST'));
+    ], ausRequest());
 
     $this->assertDatabaseHas('users', ['email' => 'pending@example.com']);
 });
@@ -48,7 +59,7 @@ test('create() sets Pending Activation, null idp_user_id, null password, local_a
         'role_id'    => SystemUser::ROLE_ADMIN,
         'first_name' => 'Pending',
         'last_name'  => 'Admin',
-    ], Request::create('/api/system-users', 'POST'));
+    ], ausRequest());
 
     expect($user->status)->toBe('Pending Activation');
     expect($user->idp_user_id)->toBeNull();
@@ -65,7 +76,7 @@ test('create() sets pending_expires_at 14 days out', function () {
         'role_id'    => SystemUser::ROLE_ADMIN,
         'first_name' => 'Pending',
         'last_name'  => 'Admin',
-    ], Request::create('/api/system-users', 'POST'));
+    ], ausRequest());
 
     expect($user->pending_expires_at)->not->toBeNull();
     expect($user->pending_expires_at->diffInDays(now()->addDays(14)))->toBeLessThan(1);
@@ -82,7 +93,7 @@ test('create() writes an admin_profile row and an ACTION_ADMIN_CREATED audit log
         'middle_name' => 'M',
         'last_name'   => 'Admin',
         'suffix'      => 'Jr.',
-    ], Request::create('/api/system-users', 'POST'));
+    ], ausRequest());
 
     $this->assertDatabaseHas('admin_profile', [
         'user_id'     => $user->user_id,
@@ -116,7 +127,7 @@ test('create() only attaches policy_id for admin role, never super admin', funct
         'first_name' => 'A',
         'last_name'  => 'B',
         'policy_id'  => $policy->policy_id,
-    ], Request::create('/api/system-users', 'POST'));
+    ], ausRequest());
     expect($admin->policy_id)->toBe($policy->policy_id);
 
     $superAdmin = $service->create([
@@ -125,6 +136,6 @@ test('create() only attaches policy_id for admin role, never super admin', funct
         'first_name' => 'A',
         'last_name'  => 'B',
         'policy_id'  => $policy->policy_id,
-    ], Request::create('/api/system-users', 'POST'));
+    ], ausRequest());
     expect($superAdmin->policy_id)->toBeNull();
 });
