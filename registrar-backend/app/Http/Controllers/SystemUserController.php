@@ -79,26 +79,21 @@ class SystemUserController extends Controller
         $validated = $request->validated();
 
         try {
-            // AdminUserService::create() owns IdP + DB coordination.
-            // Do not call IdpService here — it is a legacy duplicate.
+            // AdminUserService::create() only pre-registers the RIS record
+            // ('Pending Activation', no IdP call) — see its docblock. The
+            // actual IdP identity is created by hand, separately, in the
+            // IdP's User Pool, and the two are linked automatically on
+            // first SSO login (Sso\UserProvisioningService::provision()).
             $user = $this->adminUserService->create($validated, $request);
-        } catch (IdpException $e) {
-            // Previously uncaught here beyond the JSON response — this
-            // exception never reached Laravel's default exception handler
-            // (which would've logged it), since it's caught and converted
-            // to a response before that point. Log explicitly so admin
-            // creation failures are traceable, with the actor who
-            // attempted it, not just the eventual IdP-side transport
-            // error logged in IdpClient::execRaw().
-            \Illuminate\Support\Facades\Log::error('SystemUserController: admin creation failed', [
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('SystemUserController: admin pre-registration failed', [
                 'attempted_by' => $request->user()?->user_id,
                 'target_email' => $validated['email'],
                 'error'        => $e->getMessage(),
             ]);
 
             return response()->json([
-                'message' => 'Failed to create user in identity provider.',
-                'detail'  => $e->getMessage(),
+                'message' => 'Failed to create the pending RIS record.',
             ], 500);
         }
 

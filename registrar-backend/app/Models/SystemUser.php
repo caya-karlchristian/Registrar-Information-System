@@ -50,6 +50,11 @@ class SystemUser extends Authenticatable
         'idp_access_token',
         'local_auth_enabled', // 1 = local bcrypt password is active and usable as IDP fallback
         'policy_id', // admin-only — the module-permissions policy attached to this account
+        // Only meaningful while status === 'Pending Activation'. Set on
+        // creation (direct or via an approved access request) and cleared
+        // on activation. Past this timestamp, provisioning:expire-stale
+        // flips status to 'Expired' — see Console\Commands\ExpireStaleProvisioning.
+        'pending_expires_at',
     ];
 
     protected $hidden = [
@@ -58,10 +63,11 @@ class SystemUser extends Authenticatable
     ];
 
     protected $casts = [
-        'created_at'       => 'datetime',
+        'created_at'         => 'datetime',
+        'pending_expires_at' => 'datetime',
         // Encrypt the live IdP credential at rest.
         // Laravel uses APP_KEY (AES-256-CBC) — reads/writes are transparent.
-        'idp_access_token' => 'encrypted',
+        'idp_access_token'   => 'encrypted',
     ];
 
     // -------------------------------------------------------

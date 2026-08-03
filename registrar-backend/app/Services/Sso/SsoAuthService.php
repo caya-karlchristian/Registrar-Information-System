@@ -51,7 +51,8 @@ class SsoAuthService
 
         try {
             $result = $this->provisioner->provision(
-                array_merge($profile, ['access_token' => $accessToken])
+                array_merge($profile, ['access_token' => $accessToken]),
+                $request,
             );
         } catch (UnregisteredAccountException $e) {
             $this->revokeOnRejection($accessToken, $profile);
@@ -104,7 +105,7 @@ class SsoAuthService
         ]);
 
         try {
-            $result = $this->provisioner->provision($idpResponse);
+            $result = $this->provisioner->provision($idpResponse, $request);
         } catch (UnregisteredAccountException $e) {
             $this->revokeOnRejection($accessToken, $profile);
             throw $e;

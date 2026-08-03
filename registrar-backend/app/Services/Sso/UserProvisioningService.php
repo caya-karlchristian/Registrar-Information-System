@@ -6,10 +6,13 @@ use App\Exceptions\OgosException;
 use App\Exceptions\UnregisteredAccountException;
 use App\Models\Alumni;
 use App\Models\AlumniProfile;
+use App\Models\AuditLog;
 use App\Models\StudentProfile;
 use App\Models\SystemUser;
+use App\Services\AuditLogger;
 use App\Services\Ocms\OcmsAdminService;
 use App\Services\Ogos\OgosStudentService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -19,9 +22,18 @@ class UserProvisioningService
         private RoleResolver       $roleResolver,
         private OgosStudentService $ogosStudentService,
         private OcmsAdminService   $ocmsAdminService,
+        private AuditLogger        $auditLogger,
     ) {}
 
-    public function provision(array $profile): ProvisioningResult
+    /**
+     * @param Request $request  Needed only to attribute the
+     *                          ACTION_ADMIN_ACTIVATED audit entry (browser +
+     *                          IP of the activating login) when this call
+     *                          happens to activate a Pending Activation
+     *                          admin/super-admin record. Every other
+     *                          provisioning path ignores it.
+     */
+    public function provision(array $profile, Request $request): ProvisioningResult
     {
         $email      = $profile['email'];
         $firstName  = $profile['first_name']  ?? null;
@@ -33,8 +45,27 @@ class UserProvisioningService
             $roleId   = $this->roleResolver->resolve($existing);
 
             if (!$roleId) {
-                // Not pre-registered — check OGOS before rejecting.
-                // If they exist in OGOS they're a valid student; auto-register them.
+                // Not pre-registered in RIS at all.
+                //
+                // Deny-by-default: RIS never trusts the IdP's account type
+                // alone to grant admin access. If the IdP says this login
+                // is a "System Administrator" account, that ONLY means the
+                // person has an IdP identity of that type — it says nothing
+                // about whether RIS has agreed to let them in. Reject
+                // immediately, without falling through to the OGOS
+                // auto-registration branch below (which exists for
+                // students, not admins, and could otherwise let a
+                // System-Administrator-typed IdP account slip in as a
+                // student if they happen to also have an OGOS record).
+                if ($this->isSystemAdministratorAccountType($profile)) {
+                    throw new UnregisteredAccountException(
+                        'Your account is not yet registered in RIS. Please contact the registrar.'
+                    );
+                }
+
+                // Not a System Administrator IdP account type — check OGOS
+                // before rejecting. If they exist in OGOS they're a valid
+                // student; auto-register them.
                 try {
                     $this->ogosStudentService->getClient()->getStudentByEmail($email);
                     $roleId = SystemUser::ROLE_STUDENT;
@@ -51,12 +82,73 @@ class UserProvisioningService
                 'status'      => 'Activated',
             ]);
 
+            // Pre-registered admin/super-admin, first successful SSO login:
+            // link the RIS record to the real IdP identity and flip it live.
+            // DB is always the source of truth for *who* this is (role,
+            // policy) — this only ever transitions Pending -> Activated and
+            // backfills idp_user_id, it never re-derives role from the IdP.
+            if ($existing
+                && $existing->status === 'Pending Activation'
+                && in_array($roleId, [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN], true)
+            ) {
+                $user->idp_user_id        = $profile['id'] ?? $user->idp_user_id;
+                $user->status             = 'Activated';
+                $user->pending_expires_at = null;
+                $user->save();
+
+                // The actor is the person themselves — this is an automatic
+                // side effect of their own successful first login, not an
+                // action performed on them by someone else. Matches the
+                // ACTION_LOGIN entry SsoAuthService writes right after with
+                // the same actor.
+                $this->auditLogger->log($request, $user, AuditLog::ACTION_ADMIN_ACTIVATED, [
+                    'target_user_id' => $user->user_id,
+                    'target_email'   => $user->email,
+                    'role_id'        => $user->role_id,
+                ]);
+            }
+
             $needsOnboarding = $this->provisionProfile(
                 $user, $roleId, $firstName, $middleName, $lastName
             );
 
             return new ProvisioningResult($user, $needsOnboarding);
         });
+    }
+
+    /**
+     * Best-effort read of whether the IdP profile identifies this login as
+     * a "System Administrator" account type.
+     *
+     * ⚠️ UNCONFIRMED CONTRACT: fetchUserProfile()'s only guaranteed field is
+     * `email` (see IdpClient::fetchUserProfile) — the exact key/shape the
+     * IdP's /api/v1/me endpoint uses to expose account type has not been
+     * captured from a real response the way the /api/v1/user create-payload
+     * shape was (see IdpClient::createUser docblock). This checks every
+     * reasonably-named field the /me payload might use, matching either the
+     * numeric account_type_id (1 = "System Administrator" per the IdP's own
+     * "New User" wizard) or a human-readable type/role string. Verify
+     * against a real /me response and narrow this once confirmed.
+     */
+    private function isSystemAdministratorAccountType(array $profile): bool
+    {
+        $numericFields = ['account_type_id', 'accountTypeId'];
+        foreach ($numericFields as $field) {
+            if (isset($profile[$field]) && (int) $profile[$field] === 1) {
+                return true;
+            }
+        }
+
+        $stringFields = ['account_type', 'accountType', 'account_type_name', 'user_type', 'role', 'role_name'];
+        foreach ($stringFields as $field) {
+            if (isset($profile[$field]) && is_string($profile[$field])
+                && str_contains(strtolower($profile[$field]), 'system administrator')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function provisionProfile(
