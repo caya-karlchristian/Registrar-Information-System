@@ -2,6 +2,7 @@
 
 namespace App\Services\Sso;
 
+use App\Exceptions\AccountDeactivatedException;
 use App\Exceptions\OgosException;
 use App\Exceptions\UnregisteredAccountException;
 use App\Models\Alumni;
@@ -42,7 +43,22 @@ class UserProvisioningService
 
         return DB::transaction(function () use ($email, $firstName, $middleName, $lastName, $profile, $request) {
             $existing = SystemUser::where('email', $email)->first();
-            $roleId   = $this->roleResolver->resolve($existing);
+
+            // RIS is the source of truth for who can use RIS. A Deactivated
+            // record is rejected here regardless of what the IdP currently
+            // believes about the account (it may still show as "active"
+            // there — IdP sync is best-effort, see AdminUserService::update())
+            // and regardless of OCMS state. This runs before role
+            // resolution so a deactivated admin can't slip back in through
+            // any branch below, including a fresh SSO login that would
+            // otherwise just issue a brand-new token.
+            if ($existing && $existing->status === 'Deactivated') {
+                throw new AccountDeactivatedException(
+                    'This RIS account has been deactivated. Please contact the registrar.'
+                );
+            }
+
+            $roleId = $this->roleResolver->resolve($existing);
 
             if (!$roleId) {
                 // Not pre-registered in RIS at all.

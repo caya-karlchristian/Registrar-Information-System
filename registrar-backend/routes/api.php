@@ -45,7 +45,7 @@ Route::get('announcements/{announcement}', [AnnouncementController::class, 'show
 // General authenticated endpoints: 60 requests per minute.
 // Analytics endpoints get a tighter limit (10/min) because each call
 // can trigger heavy DB aggregation or a paid Anthropic API call.
-Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function () {
 
     // ── OGOS student data ────────────────────────────────────────────────────
     Route::prefix('students')->group(function () {
@@ -235,7 +235,7 @@ use App\Http\Controllers\LocalAuthController;
 Route::post('/auth/local-login', [LocalAuthController::class, 'login'])
     ->middleware('throttle:60,1');
 
-Route::middleware(['auth:sanctum', 'role:4'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'role:4'])->group(function () {
     Route::post('/auth/local-password',    [LocalAuthController::class, 'setPassword']);
     Route::get('/auth/local-auth-status',  [LocalAuthController::class, 'status']);
 });

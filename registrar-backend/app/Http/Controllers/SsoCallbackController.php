@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\AccountDeactivatedException;
 use App\Exceptions\IdpException;
 use App\Exceptions\UnregisteredAccountException;
 use App\Http\Resources\UserResource;
@@ -46,6 +47,18 @@ class SsoCallbackController extends Controller
             return response()->json(['message' => $e->getMessage()], 401);
         } catch (UnregisteredAccountException $e) {
             $this->safeLog('warning', 'SSO: role error', ['message' => $e->getMessage()]);
+
+            $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
+                'client_id'                => config('sso.client_id'),
+                'post_logout_redirect_uri' => config('app.url'),
+            ]);
+
+            return response()->json([
+                'message'    => $e->getMessage(),
+                'logout_url' => $logoutUrl,
+            ], 403);
+        } catch (AccountDeactivatedException $e) {
+            $this->safeLog('warning', 'SSO: deactivated account attempted login', ['message' => $e->getMessage()]);
 
             $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
                 'client_id'                => config('sso.client_id'),

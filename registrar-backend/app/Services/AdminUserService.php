@@ -198,6 +198,18 @@ class AdminUserService
             'target_email'   => $user->email,
         ]);
 
+        // Immediately kill every active session the moment RIS-side status
+        // stops being 'Activated' — do not wait for the IdP sync below (it
+        // may fail or be slow) and do not rely solely on
+        // EnsureAccountActive re-checking status on the person's NEXT
+        // request. This is what actually logs them out right now: their
+        // existing cookie token(s) stop being valid tokens at all, the
+        // instant this commits, regardless of what the IdP or OCMS still
+        // believe about the account.
+        if (isset($validated['status']) && $validated['status'] !== 'Activated') {
+            $user->tokens()->delete();
+        }
+
         // Best-effort IdP sync — runs OUTSIDE the DB transaction, after the
         // local change has already committed, and can never undo it. Only
         // attempted when there's something to sync (status/password) and
