@@ -63,6 +63,49 @@ Schedule::command('announcements:auto-disable-expired')
 
 /*
 |--------------------------------------------------------------------------
+| Scheduled Commands — Admin/Staff Provisioning Expiry
+|--------------------------------------------------------------------------
+|
+| 08:15  ExpireStaleProvisioning — flip any SystemUser still
+|        'Pending Activation' past pending_expires_at (14 days) to
+|        'Expired', and any access_requests row still 'Requested' past
+|        expires_at (7 days) to 'Expired'. Kept in the same 08:xx block as
+|        the jobs above; given 08:10 (not 08:05) so it never lands on the
+|        same minute as announcements:auto-disable-expired.
+|--------------------------------------------------------------------------
+*/
+
+Schedule::command('provisioning:expire-stale')
+    ->dailyAt('08:15')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+/*
+|--------------------------------------------------------------------------
+| Scheduled Commands — Audit Log Chain Integrity
+|--------------------------------------------------------------------------
+|
+| Nightly: recompute and verify the entire audit_logs hash chain (see
+| AuditLogger::log() / AuditLog::booted() / the audit:verify command
+| itself). Not called out explicitly as a scheduled job in the original
+| spec — it only asked for the command to exist "for CI/cron alerting" —
+| but a tamper-evidence mechanism nobody is checking is a mechanism that
+| catches tampering only when someone happens to remember to run it by
+| hand. Cheap (single ordered read of the table) and high-value to run
+| unattended; wire the non-zero exit code into your monitoring/alerting
+| the same way break-glass:test already implies below.
+|--------------------------------------------------------------------------
+*/
+
+Schedule::command('audit:verify')
+    ->dailyAt('03:00')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+/*
+|--------------------------------------------------------------------------
 | Scheduled Commands — Break-Glass Access Health Check
 |--------------------------------------------------------------------------
 |

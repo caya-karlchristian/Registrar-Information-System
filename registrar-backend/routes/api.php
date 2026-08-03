@@ -21,6 +21,7 @@ use App\Http\Controllers\RequestPurposeController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
+use App\Http\Controllers\AccessRequestController;
 
 /*
 |--------------------------------------------------------------------------
@@ -194,6 +195,21 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::delete('announcements/{announcement}',     [AnnouncementController::class, 'destroy']);
         Route::patch('announcements/{id}/archive',        [AnnouncementController::class, 'archive']);
         Route::patch('announcements/{id}/restore',        [AnnouncementController::class, 'restore']);
+    });
+
+    // Self-service access requests: delegated intake, centralized approval.
+    // store() is available to any admin with the 'access_requests' module
+    // (not just super admins) — everything else is super-admin-only, since
+    // approval is what actually creates a SystemUser row.
+    Route::prefix('access-requests')->group(function () {
+        Route::post('/', [AccessRequestController::class, 'store'])
+            ->middleware(['role:3,4', 'module:access_requests']);
+
+        Route::middleware('role:4')->group(function () {
+            Route::get('/',                     [AccessRequestController::class, 'index']);
+            Route::post('{accessRequest}/approve', [AccessRequestController::class, 'approve']);
+            Route::post('{accessRequest}/reject',  [AccessRequestController::class, 'reject']);
+        });
     });
 });
 /*
