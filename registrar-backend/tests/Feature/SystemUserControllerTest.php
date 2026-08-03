@@ -99,19 +99,23 @@ test('superadmin can view an admin account', function () {
 
 // ═════════════════════════════════════════════════════════════════════════════
 // store() — StoreSystemUserRequest validation + SystemUserPolicy::create
+//
+// AdminUserService::create() no longer talks to the IdP at all (see its
+// docblock) — it only ever writes a 'Pending Activation' record with no
+// password of any kind. So these tests no longer mock IdpClient::createUser
+// for the happy path, and instead assert the IdP is never touched.
 // ═════════════════════════════════════════════════════════════════════════════
 
-test('store fails validation on weak password and bad role_id', function () {
+test('store fails validation on bad role_id', function () {
     suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
 
     $this->postJson('/api/system-users', [
         'email'      => 'newadmin@example.com',
-        'password'   => 'weak',      // fails Password::min(8)->mixedCase()->numbers()
         'role_id'    => 1,           // not in:3,4
         'first_name' => 'New',
         'last_name'  => 'Admin',
     ])->assertStatus(422)
-      ->assertJsonValidationErrors(['password', 'role_id']);
+      ->assertJsonValidationErrors(['role_id']);
 });
 
 test('store fails validation when email is already taken', function () {
@@ -120,7 +124,6 @@ test('store fails validation when email is already taken', function () {
 
     $this->postJson('/api/system-users', [
         'email'      => $existing->email,
-        'password'   => 'Password123',
         'role_id'    => 3,
         'first_name' => 'New',
         'last_name'  => 'Admin',
@@ -128,41 +131,66 @@ test('store fails validation when email is already taken', function () {
       ->assertJsonValidationErrors(['email']);
 });
 
-test('superadmin can create a new admin account', function () {
+test('store rejects a password field on create — it is no longer accepted', function () {
     suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
 
-    $this->mock(IdpClient::class, function ($mock) {
-        $mock->shouldReceive('createUser')->once()->andReturn('idp-user-123');
-    });
-
+    // StoreSystemUserRequest no longer declares a 'password' rule, so an
+    // extraneous one is simply ignored by validated() rather than causing
+    // a 422 — this asserts the *effect* (no password ever lands in the DB)
+    // rather than asserting a specific validation error that no longer
+    // applies.
     $this->postJson('/api/system-users', [
         'email'      => 'newadmin@example.com',
         'password'   => 'Password123',
         'role_id'    => 3,
         'first_name' => 'New',
         'last_name'  => 'Admin',
+    ])->assertCreated();
+
+    $created = SystemUser::where('email', 'newadmin@example.com')->firstOrFail();
+    expect($created->password)->toBeNull();
+});
+
+test('superadmin can pre-register a new admin account — no IdP call, Pending Activation, no password', function () {
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    // The IdP must never be touched by this endpoint anymore — if it is,
+    // this mock has nothing configured for createUser() and the test
+    // fails loudly rather than silently succeeding against a stub.
+    $this->mock(IdpClient::class, function ($mock) {
+        $mock->shouldNotReceive('createUser');
+    });
+
+    $this->postJson('/api/system-users', [
+        'email'      => 'newadmin@example.com',
+        'role_id'    => 3,
+        'first_name' => 'New',
+        'last_name'  => 'Admin',
     ])->assertCreated()
       ->assertJsonPath('data.email', 'newadmin@example.com')
-      ->assertJsonPath('data.role_name', 'admin');
+      ->assertJsonPath('data.role_name', 'admin')
+      ->assertJsonPath('data.status', 'Pending Activation');
 
     $this->assertDatabaseHas('users', [
         'email'       => 'newadmin@example.com',
-        'idp_user_id' => 'idp-user-123',
+        'idp_user_id' => null,
+        'status'      => 'Pending Activation',
     ]);
     $this->assertDatabaseHas('audit_logs', ['action' => AuditLog::ACTION_ADMIN_CREATED]);
+
+    $created = SystemUser::where('email', 'newadmin@example.com')->firstOrFail();
+    expect($created->pending_expires_at)->not->toBeNull();
+    expect($created->pending_expires_at->isFuture())->toBeTrue();
+    // 14 days out, per spec — allow a small tolerance for test execution time.
+    expect($created->pending_expires_at->diffInDays(now()->addDays(14)))->toBeLessThan(1);
 });
 
 test('policy_id is silently ignored when creating a super-admin account', function () {
     suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
     $policy = suMakePolicy();
 
-    $this->mock(IdpClient::class, function ($mock) {
-        $mock->shouldReceive('createUser')->once()->andReturn('idp-user-456');
-    });
-
     $response = $this->postJson('/api/system-users', [
         'email'      => 'newsuperadmin@example.com',
-        'password'   => 'Password123',
         'role_id'    => 4,
         'first_name' => 'New',
         'last_name'  => 'SuperAdmin',
@@ -171,6 +199,20 @@ test('policy_id is silently ignored when creating a super-admin account', functi
 
     // AdminUserService::create() only honors policy_id when role_id === ROLE_ADMIN
     expect($response->json('data.policy_id'))->toBeNull();
+});
+
+test('a status field sent on create is ignored — it is always server-set to Pending Activation', function () {
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    // StoreSystemUserRequest no longer declares a 'status' rule either.
+    $this->postJson('/api/system-users', [
+        'email'      => 'triedtoactivate@example.com',
+        'status'     => 'Activated',
+        'role_id'    => 3,
+        'first_name' => 'New',
+        'last_name'  => 'Admin',
+    ])->assertCreated()
+      ->assertJsonPath('data.status', 'Pending Activation');
 });
 
 test('creating a new admin or super-admin never enables break-glass (local) auth', function () {
@@ -182,13 +224,8 @@ test('creating a new admin or super-admin never enables break-glass (local) auth
     // off regardless of what's submitted, for both roles.
     suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
 
-    $this->mock(IdpClient::class, function ($mock) {
-        $mock->shouldReceive('createUser')->twice()->andReturn('idp-user-789', 'idp-user-790');
-    });
-
     $this->postJson('/api/system-users', [
         'email'      => 'newadmin2@example.com',
-        'password'   => 'Password123',
         'role_id'    => 3,
         'first_name' => 'New',
         'last_name'  => 'Admin',
@@ -196,38 +233,13 @@ test('creating a new admin or super-admin never enables break-glass (local) auth
 
     $this->postJson('/api/system-users', [
         'email'      => 'newsuperadmin2@example.com',
-        'password'   => 'Password123',
         'role_id'    => 4,
         'first_name' => 'New',
         'last_name'  => 'SuperAdmin',
     ])->assertCreated();
 
-    $this->assertDatabaseHas('users', ['email' => 'newadmin2@example.com', 'local_auth_enabled' => 0]);
-    $this->assertDatabaseHas('users', ['email' => 'newsuperadmin2@example.com', 'local_auth_enabled' => 0]);
-
-    // The stored password hash must not authenticate with the account's
-    // real (IdP) password — it exists only to satisfy the NOT NULL schema
-    // constraint and must never be a usable local credential.
-    $created = SystemUser::where('email', 'newadmin2@example.com')->firstOrFail();
-    expect(\Illuminate\Support\Facades\Hash::check('Password123', $created->password))->toBeFalse();
-});
-
-test('store returns 500 and does not create a local user when the IdP call fails', function () {
-    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
-
-    $this->mock(IdpClient::class, function ($mock) {
-        $mock->shouldReceive('createUser')->once()->andThrow(new \App\Exceptions\IdpException('IdP is down', 502));
-    });
-
-    $this->postJson('/api/system-users', [
-        'email'      => 'failed@example.com',
-        'password'   => 'Password123',
-        'role_id'    => 3,
-        'first_name' => 'Will',
-        'last_name'  => 'Fail',
-    ])->assertStatus(500);
-
-    $this->assertDatabaseMissing('users', ['email' => 'failed@example.com']);
+    $this->assertDatabaseHas('users', ['email' => 'newadmin2@example.com', 'local_auth_enabled' => 0, 'password' => null]);
+    $this->assertDatabaseHas('users', ['email' => 'newsuperadmin2@example.com', 'local_auth_enabled' => 0, 'password' => null]);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Records user actions to the audit_log table.
@@ -14,6 +15,27 @@ use Illuminate\Http\Request;
  * (rather than static) means it can be swapped for a test double:
  *
  *   $this->instance(AuditLogger::class, Mockery::mock(AuditLogger::class));
+ *
+ * ── Tamper-evident hash chain ──────────────────────────────────────────
+ * Every row stores prev_hash (the previous row's hash, or '0' for the
+ * very first row ever written) and hash = sha256(prev_hash . '|' .
+ * json_encode([action, actor user_id, target_user_id, target_email,
+ * created_at])), computed from that row's own final field values.
+ *
+ * Any later edit to a row (bypassing the model's append-only guard — see
+ * AuditLog::booted()) or a gap/reorder in the chain becomes detectable by
+ * recomputing every hash from prev_hash forward, which is exactly what
+ * the `audit:verify` Artisan command does. This does not itself prevent
+ * tampering (a direct SQL UPDATE at the database level can still rewrite
+ * both a row and its stored hash) — it makes tampering *evident*, by
+ * requiring the tamperer to also correctly recompute every subsequent
+ * row's hash to stay consistent, and by giving `audit:verify` something
+ * concrete to check against.
+ *
+ * The insert + "read the previous hash" step below run inside a
+ * transaction with a row lock on the last row, so two concurrent log()
+ * calls can never both read the same prev_hash and silently fork the
+ * chain into two branches with the same parent.
  */
 class AuditLogger
 {
@@ -43,23 +65,69 @@ class AuditLogger
         SystemUser $user,
         string     $action,
         array      $metadata = []
-    ): void {
+    ): AuditLog {
         $targetUserId = $metadata['target_user_id'] ?? null;
         $targetEmail  = $metadata['target_email'] ?? null;
         unset($metadata['target_user_id'], $metadata['target_email']);
 
-        AuditLog::create([
-            'user_id'         => $user->user_id,
-            'email'           => $user->email,
-            'role_name'       => $this->resolveRoleName($user->role_id),
-            'target_user_id'  => $targetUserId,
-            'target_email'    => $targetEmail,
-            'action'          => $action,
-            'browser'         => $this->parseBrowser($request->userAgent()),
-            'ip_address'      => $request->ip(),
-            'metadata'        => !empty($metadata) ? $metadata : null,
-            'created_at'      => now(),
-        ]);
+        $createdAt = now();
+
+        return DB::transaction(function () use (
+            $user, $action, $metadata, $targetUserId, $targetEmail, $createdAt, $request
+        ) {
+            $prevHash = $this->lockAndFetchLastHash();
+
+            $hash = $this->computeHash($prevHash, [
+                'action'         => $action,
+                'user_id'        => $user->user_id,
+                'target_user_id' => $targetUserId,
+                'target_email'   => $targetEmail,
+                'created_at'     => (string) $createdAt,
+            ]);
+
+            return AuditLog::create([
+                'user_id'        => $user->user_id,
+                'email'          => $user->email,
+                'role_name'      => $this->resolveRoleName($user->role_id),
+                'target_user_id' => $targetUserId,
+                'target_email'   => $targetEmail,
+                'action'         => $action,
+                'browser'        => $this->parseBrowser($request->userAgent()),
+                'ip_address'     => $request->ip(),
+                'metadata'       => !empty($metadata) ? $metadata : null,
+                'prev_hash'      => $prevHash,
+                'hash'           => $hash,
+                'created_at'     => $createdAt,
+            ]);
+        });
+    }
+
+    /**
+     * Compute a chained hash the exact same way for every caller — the
+     * live insert path above and the one-time backfill in the
+     * add_hash_chain_to_audit_logs migration both must produce identical
+     * output for identical input, or `audit:verify` would flag every
+     * pre-migration row as broken. Keep this the single source of truth
+     * for the algorithm; if it ever changes, the migration's backfill
+     * copy must change with it.
+     */
+    public function computeHash(string $prevHash, array $payload): string
+    {
+        return hash('sha256', $prevHash . '|' . json_encode($payload));
+    }
+
+    /**
+     * Read the most recently written row's hash, taking a row lock on it
+     * so a concurrent log() call blocks until this transaction commits
+     * instead of both reading the same prev_hash and forking the chain.
+     *
+     * '0' — the documented genesis value — when the table is empty.
+     */
+    private function lockAndFetchLastHash(): string
+    {
+        $last = AuditLog::orderByDesc('id')->lockForUpdate()->first(['id', 'hash']);
+
+        return $last->hash ?? '0';
     }
 
     // -------------------------------------------------------
