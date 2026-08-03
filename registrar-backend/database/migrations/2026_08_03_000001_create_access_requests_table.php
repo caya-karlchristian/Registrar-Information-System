@@ -20,7 +20,7 @@ return new class extends Migration
         Schema::create('access_requests', function (Blueprint $table) {
             $table->id();
 
-            $table->unsignedBigInteger('requested_by');
+            $table->integer('requested_by');
             $table->foreign('requested_by')->references('user_id')->on('users')->restrictOnDelete();
 
             $table->string('target_email');
@@ -30,7 +30,7 @@ return new class extends Migration
             // Matches SystemUser::ROLE_ADMIN (3) / ROLE_SUPER_ADMIN (4).
             $table->tinyInteger('requested_role_id');
 
-            $table->unsignedBigInteger('requested_policy_id')->nullable();
+            $table->unsignedInteger('requested_policy_id')->nullable();
             $table->foreign('requested_policy_id')->references('policy_id')->on('policies')->nullOnDelete();
 
             $table->text('justification');
@@ -38,7 +38,7 @@ return new class extends Migration
             $table->string('status')->default('Requested');
             // 'Requested' | 'Approved' | 'Rejected' | 'Fulfilled' | 'Expired'
 
-            $table->unsignedBigInteger('reviewed_by')->nullable();
+            $table->integer('reviewed_by')->nullable();
             $table->foreign('reviewed_by')->references('user_id')->on('users')->nullOnDelete();
             $table->timestamp('reviewed_at')->nullable();
 
@@ -47,7 +47,7 @@ return new class extends Migration
             // queue view can display it directly without parsing JSON.
             $table->text('rejection_reason')->nullable();
 
-            $table->unsignedBigInteger('fulfilled_user_id')->nullable();
+            $table->integer('fulfilled_user_id')->nullable();
             $table->foreign('fulfilled_user_id')->references('user_id')->on('users')->nullOnDelete();
 
             // 7 days from creation; cleared on Approve/Reject. Anything
