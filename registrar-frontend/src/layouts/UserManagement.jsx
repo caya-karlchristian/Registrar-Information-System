@@ -42,7 +42,7 @@ import DashboardDropdown from "../components/DashboardDropdown.jsx";
 const ROLE_MAP     = { 3: "Admin", 4: "Super Admin" };
 const ROLE_FILTERS = ["All", "Admin", "Super Admin"];
 const DATE_OPTIONS = ["Newest", "Oldest"];
-const STATUS_FILTERS = ["All", "Activated", "Deactivated"];
+const STATUS_FILTERS = ["All", "Activated", "Deactivated", "Pending Activation", "Expired"];
 const PER_PAGE = 7;
 
 const formatDate = (dateStr) => {
@@ -71,14 +71,27 @@ const getRoleBadgeClasses = (roleName, isDark) => {
 const getStatusBadgeClasses = (status, isDark) => {
   const normalized = String(status ?? "").trim().toLowerCase();
 
-  if (isDark) {
-    return normalized === 'activated'
+  if (normalized === 'activated') {
+    return isDark
       ? 'bg-green-900/20 text-green-400 border-green-600'
-      : 'bg-gray-700/20 text-gray-300 border-gray-400';
+      : 'bg-green-100 text-green-700 border-green-200';
   }
 
-  return normalized === 'activated'
-    ? 'bg-green-100 text-green-700 border-green-200'
+  if (normalized === 'pending activation') {
+    return isDark
+      ? 'bg-amber-900/20 text-amber-400 border-amber-600'
+      : 'bg-amber-100 text-amber-700 border-amber-200';
+  }
+
+  if (normalized === 'expired') {
+    return isDark
+      ? 'bg-red-950/30 text-red-400 border-red-700'
+      : 'bg-red-100 text-red-700 border-red-200';
+  }
+
+  // 'deactivated' and any unrecognized status
+  return isDark
+    ? 'bg-gray-700/20 text-gray-300 border-gray-400'
     : 'bg-gray-100 text-gray-700 border-gray-200';
 };
 

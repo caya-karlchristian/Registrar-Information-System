@@ -96,6 +96,14 @@ class DatabaseSeeder extends Seeder
     // add more rows here if local testing needs additional policy
     // variations. Permissions JSON confirmed against a real database
     // export (policy_id=1, "Registrar Staff").
+    //
+    // Also seeds "No Access" — App\Models\Policy::DEFAULT_NAME. This is
+    // the policy an admin resolves to when they have no policy_id
+    // attached at all (see SystemUser::effectivePermissions()), so it
+    // must grant nothing. Kept in sync with the
+    // 2026_08_03_000005_seed_zero_access_default_policy migration so a
+    // fresh `migrate:fresh --seed` and a plain `db:seed` against an
+    // already-migrated database both end up in the same state.
     // ─────────────────────────────────────────────
     private function seedPolicies(): void
     {
@@ -109,6 +117,23 @@ class DatabaseSeeder extends Seeder
                     'profile'    => ['Access'],
                     'analytics'  => ['Access'],
                     'dashboard'  => ['Access'],
+                ]),
+                'is_system'   => 1,
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ]
+        );
+
+        DB::table('policies')->updateOrInsert(
+            ['name' => \App\Models\Policy::DEFAULT_NAME],
+            [
+                'permissions' => json_encode([
+                    'dashboard'       => [],
+                    'inbox'           => [],
+                    'analytics'       => [],
+                    'logbook'         => [],
+                    'profile'         => [],
+                    'access_requests' => [],
                 ]),
                 'is_system'   => 1,
                 'created_at'  => now(),

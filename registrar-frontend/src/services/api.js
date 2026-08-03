@@ -70,6 +70,20 @@ export const updatePolicy  = (id, data)  => api.put(`/policies/${id}`, data);
 export const deletePolicy  = (id)        => api.delete(`/policies/${id}`);
 
 // -------------------------------------------------------
+// ACCESS REQUESTS — self-service intake, centralized approval.
+// store() only requires the 'access_requests' module (any admin);
+// index/approve/reject are Super Admin only — enforced server-side by
+// AccessRequestPolicy regardless of what the UI shows. getMyAccessRequests
+// is available to any admin/super-admin and is hard-scoped server-side to
+// the caller's own submissions (AccessRequestPolicy::viewOwn).
+// -------------------------------------------------------
+export const getAccessRequests    = (params = {}) => api.get("/access-requests", { params });
+export const getMyAccessRequests  = (params = {}) => api.get("/access-requests/mine", { params });
+export const submitAccessRequest  = (data)         => api.post("/access-requests", data);
+export const approveAccessRequest = (id)           => api.post(`/access-requests/${id}/approve`);
+export const rejectAccessRequest  = (id, reason)   => api.post(`/access-requests/${id}/reject`, { reason });
+
+// -------------------------------------------------------
 // ACADEMIC RECORDS
 // -------------------------------------------------------
 export const getAcademicRecords = ()         => api.get("/academic-records");

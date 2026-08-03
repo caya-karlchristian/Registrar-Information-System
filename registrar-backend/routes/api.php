@@ -21,6 +21,7 @@ use App\Http\Controllers\RequestPurposeController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
+use App\Http\Controllers\AccessRequestController;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,7 +45,7 @@ Route::get('announcements/{announcement}', [AnnouncementController::class, 'show
 // General authenticated endpoints: 60 requests per minute.
 // Analytics endpoints get a tighter limit (10/min) because each call
 // can trigger heavy DB aggregation or a paid Anthropic API call.
-Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function () {
 
     // ── OGOS student data ────────────────────────────────────────────────────
     Route::prefix('students')->group(function () {
@@ -182,7 +183,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
         // User Management — Policy Attachment: reusable admin permission
         // policies, plus attaching one to a specific admin above.
-        Route::get('policies',           [PolicyController::class, 'index']);
+        // NOTE: GET (read) is intentionally NOT here — see below. Only
+        // create/edit/delete of a policy is Super-Admin-only.
         Route::post('policies',          [PolicyController::class, 'store']);
         Route::put('policies/{id}',      [PolicyController::class, 'update']);
         Route::delete('policies/{id}',   [PolicyController::class, 'destroy']);
@@ -194,6 +196,30 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::delete('announcements/{announcement}',     [AnnouncementController::class, 'destroy']);
         Route::patch('announcements/{id}/archive',        [AnnouncementController::class, 'archive']);
         Route::patch('announcements/{id}/restore',        [AnnouncementController::class, 'restore']);
+    });
+
+    // GET /policies (read-only): needed by any admin who can submit an
+    // access request — RequestAccessPage.jsx's "Requested Policy" dropdown
+    // — not just Super Admins managing policies. Deliberately gated the
+    // same way as POST /access-requests below, not left wide open to every
+    // authenticated role. Mutating a policy (create/edit/delete, above)
+    // stays Super-Admin-only.
+    Route::get('policies', [PolicyController::class, 'index'])
+        ->middleware(['role:3,4', 'module:access_requests']);
+
+    // Self-service access requests: delegated intake, centralized approval.
+    // store() is available to any admin with the 'access_requests' module
+    // (not just super admins) — everything else is super-admin-only, since
+    // approval is what actually creates a SystemUser row.
+    Route::prefix('access-requests')->group(function () {
+        Route::post('/', [AccessRequestController::class, 'store'])
+            ->middleware(['role:3,4', 'module:access_requests']);
+
+        Route::middleware('role:4')->group(function () {
+            Route::get('/',                     [AccessRequestController::class, 'index']);
+            Route::post('{accessRequest}/approve', [AccessRequestController::class, 'approve']);
+            Route::post('{accessRequest}/reject',  [AccessRequestController::class, 'reject']);
+        });
     });
 });
 /*
@@ -209,7 +235,7 @@ use App\Http\Controllers\LocalAuthController;
 Route::post('/auth/local-login', [LocalAuthController::class, 'login'])
     ->middleware('throttle:60,1');
 
-Route::middleware(['auth:sanctum', 'role:4'])->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'role:4'])->group(function () {
     Route::post('/auth/local-password',    [LocalAuthController::class, 'setPassword']);
     Route::get('/auth/local-auth-status',  [LocalAuthController::class, 'status']);
 });

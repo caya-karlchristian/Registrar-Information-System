@@ -21,6 +21,7 @@ import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx';
 import MainPage from './layouts/MainPage.jsx';
 import InboxCenter from './layouts/InboxCenter.jsx';
+import RequestAccessPage from './pages/RequestAccessPage.jsx';
 
 // Super Admin layouts
 import UserManagementPage from './pages/UserManagementPage.jsx';
@@ -150,6 +151,9 @@ const App = () => {
                 <Route path="contact" element={<RegistrarContact />} />
                 <Route path="inbox" element={
                   <ModuleRoute module={MODULE_KEYS.INBOX}><InboxCenter /></ModuleRoute>
+                } />
+                <Route path="access-requests" element={
+                  <ModuleRoute module={MODULE_KEYS.ACCESS_REQUESTS}><RequestAccessPage /></ModuleRoute>
                 } />
               </Route>
 

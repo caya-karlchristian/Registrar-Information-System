@@ -2,6 +2,7 @@
 
 namespace App\Services\Sso;
 
+use App\Exceptions\AccountDeactivatedException;
 use App\Exceptions\IdpException;
 use App\Exceptions\IdpUnavailableException;
 use App\Exceptions\UnregisteredAccountException;
@@ -51,9 +52,10 @@ class SsoAuthService
 
         try {
             $result = $this->provisioner->provision(
-                array_merge($profile, ['access_token' => $accessToken])
+                array_merge($profile, ['access_token' => $accessToken]),
+                $request,
             );
-        } catch (UnregisteredAccountException $e) {
+        } catch (UnregisteredAccountException|AccountDeactivatedException $e) {
             $this->revokeOnRejection($accessToken, $profile);
             throw $e;
         }
@@ -104,8 +106,8 @@ class SsoAuthService
         ]);
 
         try {
-            $result = $this->provisioner->provision($idpResponse);
-        } catch (UnregisteredAccountException $e) {
+            $result = $this->provisioner->provision($idpResponse, $request);
+        } catch (UnregisteredAccountException|AccountDeactivatedException $e) {
             $this->revokeOnRejection($accessToken, $profile);
             throw $e;
         }

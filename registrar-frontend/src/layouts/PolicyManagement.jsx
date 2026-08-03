@@ -28,7 +28,8 @@ const MODULE_OPTIONS = [
   "Inbox",
   "Admin Analytics",
   "Admin Logbook",
-  "Admin Profile"
+  "Admin Profile",
+  "Access Requests"
 ];
 
 const LABEL_TO_KEY = {
@@ -36,7 +37,8 @@ const LABEL_TO_KEY = {
   "Inbox": "inbox",
   "Admin Analytics": "analytics",
   "Admin Logbook": "logbook",
-  "Admin Profile": "profile"
+  "Admin Profile": "profile",
+  "Access Requests": "access_requests"
 };
 
 const KEY_TO_LABEL = {
@@ -44,7 +46,8 @@ const KEY_TO_LABEL = {
   "inbox": "Inbox",
   "analytics": "Admin Analytics",
   "logbook": "Admin Logbook",
-  "profile": "Admin Profile"
+  "profile": "Admin Profile",
+  "access_requests": "Access Requests"
 };
 
 const PolicyManagement = () => {

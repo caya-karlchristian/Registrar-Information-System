@@ -56,7 +56,11 @@ class UserResource extends JsonResource
                 fn () => $this->effectivePermissions()
             ),
 
-            'status'    => $this->status,   
+            'status'    => $this->status,
+            // Only meaningful while status === 'Pending Activation' — when
+            // this passes, provisioning:expire-stale flips status to
+            // 'Expired' (see Console\Commands\ExpireStaleProvisioning).
+            'pending_expires_at' => $this->pending_expires_at,
             'created_at' => $this->created_at,  
         ];
     }
