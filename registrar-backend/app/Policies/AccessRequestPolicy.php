@@ -22,6 +22,21 @@ class AccessRequestPolicy
         return $user->isSuperAdmin();
     }
 
+    /**
+     * GET /access-requests/mine — any admin who can submit a request can
+     * see their own submission history. Deliberately does not require
+     * the 'access_requests' module the way create() does: a policy
+     * change or expiry that revokes the module shouldn't also erase an
+     * admin's ability to see what they already submitted while they had
+     * it, and this endpoint is hard-scoped to requested_by = the caller
+     * regardless — it can never leak another admin's requests, so it
+     * doesn't need the same gate as create()/viewAny().
+     */
+    public function viewOwn(SystemUser $user): bool
+    {
+        return $user->isAdmin() || $user->isSuperAdmin();
+    }
+
     public function create(SystemUser $user): bool
     {
         return $user->isSuperAdmin() || $user->hasModuleAccess('access_requests');

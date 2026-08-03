@@ -3,7 +3,7 @@ import risImage from "../assets/RIS1.png";
 import risLogo from "../assets/ris_logo.png";
 import Tech4wardProfile from "../components/Tech4wardProfile.jsx";
 import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthProvider';
 import { useState } from 'react';
 import LineLoading from "../components/LineLoading.jsx";
@@ -20,15 +20,26 @@ const ROLE_HOME = {
 const MainPage = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
 
   // If the user already has a valid session, send them straight to their dashboard.
+  //
+  // Guard against the loop where ROLE_HOME has no module the user's policy
+  // allows: ForbiddenPage -> "Go to Home" -> here -> ROLE_HOME -> policy
+  // check fails -> ForbiddenPage again, forever. When we've arrived here
+  // *from* /forbidden with a "policy" reason, don't immediately re-navigate
+  // away — let the user actually land on the home page and use its
+  // logout/help options instead.
+  const cameFromPolicyForbidden = location.state?.fromForbidden === 'policy';
+
   useEffect(() => {
     if (!user) return;
+    if (cameFromPolicyForbidden) return;
     const destination = ROLE_HOME[user.role_name];
     if (destination) navigate(destination, { replace: true });
-  }, [user, navigate]);
+  }, [user, navigate, cameFromPolicyForbidden]);
 
   // Auto-SSO: when the portal links to us with ?sso=1 (or ?auto_login=1),
   // skip showing the login page entirely and bounce straight to the IDP.

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthProvider";
 import { useAlertToast } from "../context/AlertToastContext";
-import { getAccessRequests, submitAccessRequest, getPolicies } from "../services/api";
+import { getMyAccessRequests, submitAccessRequest, getPolicies } from "../services/api";
 import InputGroup from "../components/InputGroup";
 import DropDown from "../components/DropDown";
 
@@ -42,10 +42,11 @@ const STATUS_BADGE_DARK = {
  * create a SystemUser directly — only a Super Admin approving the
  * request does that (AccessRequestService::approve()).
  *
- * The backend GET /access-requests endpoint is Super Admin only, so this
- * page can't show a live "my submitted requests" list without a
- * dedicated non-privileged endpoint — flagged below rather than silently
- * calling an endpoint that will 403 for the very users this page is for.
+ * GET /access-requests (the full queue) is Super Admin only, but every
+ * admin/super-admin can see their own submission history via
+ * GET /access-requests/mine (AccessRequestPolicy::viewOwn) — hard-scoped
+ * server-side to the caller, so it's safe to call for any role that can
+ * reach this page.
  */
 const RequestAccessPage = () => {
   const { isDark } = useTheme();
@@ -62,14 +63,10 @@ const RequestAccessPage = () => {
       .then((res) => setPolicies(res.data?.data ?? res.data ?? []))
       .catch(() => setPolicies([]));
 
-    // Only attempt this for a Super Admin viewing their own submissions —
-    // for a regular admin, GET /access-requests is Super-Admin-only
-    // server-side (AccessRequestPolicy::viewAny) and will 403. See the
-    // note in the component docblock: a dedicated
-    // "GET /access-requests/mine" endpoint would be a natural follow-up
-    // if self-service tracking for regular admins becomes a requirement.
-    if (user?.role_name === "super_admin") {
-      getAccessRequests()
+    // Available to any admin/super-admin — server-side scoped to the
+    // caller's own requests regardless of role (AccessRequestPolicy::viewOwn).
+    if (user) {
+      getMyAccessRequests()
         .then((res) => setMyRequests(res.data?.data ?? []))
         .catch(() => setMyRequests(null));
     }

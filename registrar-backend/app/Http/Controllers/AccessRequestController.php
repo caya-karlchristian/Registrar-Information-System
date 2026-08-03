@@ -36,6 +36,30 @@ class AccessRequestController extends Controller
     }
 
     /**
+     * GET /access-requests/mine
+     * Any admin (or super admin) — AccessRequestPolicy::viewOwn. Unlike
+     * index(), this is hard-scoped to the caller's own submissions via
+     * requested_by, so it never exposes another admin's requests. Lets a
+     * regular admin who submitted a request see its status without
+     * needing the Super-Admin-only GET /access-requests.
+     */
+    public function mine(Request $request)
+    {
+        $this->authorize('viewOwn', AccessRequest::class);
+
+        $query = AccessRequest::query()
+            ->where('requested_by', $request->user()->user_id)
+            ->with(['requestedBy.adminProfile', 'reviewedBy', 'requestedPolicy'])
+            ->latest('created_at');
+
+        if ($status = $request->query('status')) {
+            $query->where('status', $status);
+        }
+
+        return AccessRequestResource::collection($query->paginate(20));
+    }
+
+    /**
      * POST /access-requests
      * Any admin with the 'access_requests' module (AccessRequestPolicy::create).
      * Creates a 'Requested' row only — never a SystemUser directly.
