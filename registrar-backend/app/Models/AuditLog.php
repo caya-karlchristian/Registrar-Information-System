@@ -42,6 +42,12 @@ class AuditLog extends Model
     public const ACTION_ADMIN_DELETED   = 'admin_deleted';
     public const ACTION_ADMIN_UPDATED   = 'admin_updated';
     public const ACTION_ADMIN_EXPIRED   = 'admin_expired';
+    // RIS-side activation/deactivation (or password change) succeeded but
+    // the best-effort push to the IdP failed — see AdminUserService::update().
+    // The RIS-side change is NOT rolled back; this exists purely so ops can
+    // see, from the audit trail, that the two systems may be out of sync
+    // and reconcile the IdP side by hand.
+    public const ACTION_ADMIN_IDP_SYNC_FAILED = 'admin_idp_sync_failed';
     public const ACTION_ROLE_ASSIGNED   = 'role_assigned';
     public const ACTION_REQUEST_STATUS_CHANGED = 'request_status_changed';
     public const ACTION_REQUEST_ARCHIVED       = 'request_archived';

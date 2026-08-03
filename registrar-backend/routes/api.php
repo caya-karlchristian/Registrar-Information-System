@@ -183,7 +183,8 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
 
         // User Management — Policy Attachment: reusable admin permission
         // policies, plus attaching one to a specific admin above.
-        Route::get('policies',           [PolicyController::class, 'index']);
+        // NOTE: GET (read) is intentionally NOT here — see below. Only
+        // create/edit/delete of a policy is Super-Admin-only.
         Route::post('policies',          [PolicyController::class, 'store']);
         Route::put('policies/{id}',      [PolicyController::class, 'update']);
         Route::delete('policies/{id}',   [PolicyController::class, 'destroy']);
@@ -196,6 +197,15 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::patch('announcements/{id}/archive',        [AnnouncementController::class, 'archive']);
         Route::patch('announcements/{id}/restore',        [AnnouncementController::class, 'restore']);
     });
+
+    // GET /policies (read-only): needed by any admin who can submit an
+    // access request — RequestAccessPage.jsx's "Requested Policy" dropdown
+    // — not just Super Admins managing policies. Deliberately gated the
+    // same way as POST /access-requests below, not left wide open to every
+    // authenticated role. Mutating a policy (create/edit/delete, above)
+    // stays Super-Admin-only.
+    Route::get('policies', [PolicyController::class, 'index'])
+        ->middleware(['role:3,4', 'module:access_requests']);
 
     // Self-service access requests: delegated intake, centralized approval.
     // store() is available to any admin with the 'access_requests' module

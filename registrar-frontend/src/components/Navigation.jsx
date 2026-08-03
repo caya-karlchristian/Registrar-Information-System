@@ -56,6 +56,7 @@ const ROLE_CONFIG = {
       // { name: 'Walk-In Request', to: 'request', icon: AcademicCapIcon },
       { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon, module: MODULE_KEYS.ANALYTICS },
       { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon, module: MODULE_KEYS.LOGBOOK },
+      { name: 'Access Requests', to: 'access-requests', icon: ClipboardDocumentCheckIcon, module: MODULE_KEYS.ACCESS_REQUESTS },
       { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon, module: MODULE_KEYS.PROFILE },
     ],
   },

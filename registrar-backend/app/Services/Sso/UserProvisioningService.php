@@ -40,7 +40,7 @@ class UserProvisioningService
         $middleName = $profile['middle_name']  ?? null;
         $lastName   = $profile['last_name']    ?? null;
 
-        return DB::transaction(function () use ($email, $firstName, $middleName, $lastName, $profile) {
+        return DB::transaction(function () use ($email, $firstName, $middleName, $lastName, $profile, $request) {
             $existing = SystemUser::where('email', $email)->first();
             $roleId   = $this->roleResolver->resolve($existing);
 
@@ -117,38 +117,43 @@ class UserProvisioningService
     }
 
     /**
-     * Best-effort read of whether the IdP profile identifies this login as
-     * a "System Administrator" account type.
+     * Whether the IdP profile identifies this login as an admin-tier
+     * account type.
      *
-     * ⚠️ UNCONFIRMED CONTRACT: fetchUserProfile()'s only guaranteed field is
-     * `email` (see IdpClient::fetchUserProfile) — the exact key/shape the
-     * IdP's /api/v1/me endpoint uses to expose account type has not been
-     * captured from a real response the way the /api/v1/user create-payload
-     * shape was (see IdpClient::createUser docblock). This checks every
-     * reasonably-named field the /me payload might use, matching either the
-     * numeric account_type_id (1 = "System Administrator" per the IdP's own
-     * "New User" wizard) or a human-readable type/role string. Verify
-     * against a real /me response and narrow this once confirmed.
+     * CONFIRMED against real GET /api/v1/me responses (captured via
+     * DevTools against the actual IdP, not inferred — see
+     * IdpClient::fetchUserProfile):
+     *   - Admin-tier accounts return a `roles` key as a plain string,
+     *     e.g. "roles": "Admin". (Despite the plural key name, it is a
+     *     single string, not an array, in every response seen so far.)
+     *   - Non-admin accounts (students, etc.) omit the `roles` key
+     *     entirely rather than sending an empty/null value.
+     *
+     * Not yet confirmed: whether the IdP ever distinguishes RIS admin
+     * from RIS super-admin at this layer, or only ever sends "Admin"
+     * for both tiers (the one super-admin sample captured so far only
+     * returned "Admin", not "Super Admin" or similar). That distinction
+     * doesn't matter for this method — it only needs to catch
+     * "admin-tier, so don't auto-register as a student" — but matters
+     * if this profile data is ever used to assign RIS role tiers
+     * directly instead of just gating auto-registration.
+     *
+     * `roles` is normalized defensively (array → joined string) in case
+     * a future account type returns multiple roles.
      */
     private function isSystemAdministratorAccountType(array $profile): bool
     {
-        $numericFields = ['account_type_id', 'accountTypeId'];
-        foreach ($numericFields as $field) {
-            if (isset($profile[$field]) && (int) $profile[$field] === 1) {
-                return true;
-            }
+        $roles = $profile['roles'] ?? null;
+
+        if (is_array($roles)) {
+            $roles = implode(',', $roles);
         }
 
-        $stringFields = ['account_type', 'accountType', 'account_type_name', 'user_type', 'role', 'role_name'];
-        foreach ($stringFields as $field) {
-            if (isset($profile[$field]) && is_string($profile[$field])
-                && str_contains(strtolower($profile[$field]), 'system administrator')
-            ) {
-                return true;
-            }
+        if (!is_string($roles) || $roles === '') {
+            return false;
         }
 
-        return false;
+        return str_contains(strtolower($roles), 'admin');
     }
 
     private function provisionProfile(

@@ -81,25 +81,29 @@ test('an already-Activated admin logging in again does not re-trigger activation
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Deny-by-default: no RIS record + System Administrator IdP account type
+// Deny-by-default: no RIS record + admin-tier IdP account type
+//
+// Fixture shape (`roles: "Admin"`) is captured from a real GET /api/v1/me
+// response, not guessed — see UserProvisioningService::isSystemAdministratorAccountType()
+// docblock.
 // ═════════════════════════════════════════════════════════════════════════════
 
-test('a System Administrator IdP login with no matching RIS record is denied', function () {
+test('an admin-tier IdP login with no matching RIS record is denied', function () {
     $service = app(UserProvisioningService::class);
 
     expect(fn () => $service->provision([
-        'id'               => 'unregistered-idp-id',
-        'email'            => 'unregistered@example.com',
-        'account_type_id'  => 1, // "System Administrator" per IdpClient::createUser docblock
+        'id'    => 'unregistered-idp-id',
+        'email' => 'unregistered@example.com',
+        'roles' => 'Admin',
     ], upsRequest()))->toThrow(UnregisteredAccountException::class);
 
     $this->assertDatabaseMissing('users', ['email' => 'unregistered@example.com']);
 });
 
-test('a System Administrator IdP login is denied even if the email happens to match an OGOS student', function () {
+test('an admin-tier IdP login is denied even if the email happens to match an OGOS student', function () {
     // Regression guard: deny-by-default must be checked BEFORE the OGOS
-    // auto-registration fallback, or a System-Administrator-typed IdP
-    // account could slip in as an auto-registered student.
+    // auto-registration fallback, or an admin-typed IdP account could
+    // slip in as an auto-registered student.
     $this->mock(\App\Services\Ogos\OgosStudentService::class, function ($mock) {
         $mock->shouldNotReceive('getClient');
     });
@@ -107,8 +111,45 @@ test('a System Administrator IdP login is denied even if the email happens to ma
     $service = app(UserProvisioningService::class);
 
     expect(fn () => $service->provision([
-        'id'              => 'sysadmin-with-ogos-email',
-        'email'           => 'coincidental@example.com',
-        'account_type_id' => 1,
+        'id'    => 'sysadmin-with-ogos-email',
+        'email' => 'coincidental@example.com',
+        'roles' => 'Admin',
+    ], upsRequest()))->toThrow(UnregisteredAccountException::class);
+});
+
+test('the admin-tier check is case-insensitive', function () {
+    $service = app(UserProvisioningService::class);
+
+    expect(fn () => $service->provision([
+        'id'    => 'lowercase-role-idp-id',
+        'email' => 'lowercase-role@example.com',
+        'roles' => 'admin', // IdP casing isn't guaranteed to stay "Admin"
+    ], upsRequest()))->toThrow(UnregisteredAccountException::class);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Non-admin IdP profiles: `roles` is confirmed absent entirely (not null,
+// not empty string) for students and other non-admin account types. This
+// must NOT be misread as admin-tier, and must fall through to the OGOS
+// auto-registration branch instead of being denied outright.
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('an IdP profile with no roles field is not treated as admin-tier and falls through to the OGOS check', function () {
+    $ogosClient = \Mockery::mock(\App\Services\Ogos\OgosClient::class);
+    $ogosClient->shouldReceive('getStudentByEmail')
+        ->once()
+        ->with('student@example.com')
+        ->andThrow(new \App\Exceptions\OgosException('not found in OGOS'));
+
+    $this->mock(\App\Services\Ogos\OgosStudentService::class, function ($mock) use ($ogosClient) {
+        $mock->shouldReceive('getClient')->once()->andReturn($ogosClient);
+    });
+
+    $service = app(UserProvisioningService::class);
+
+    expect(fn () => $service->provision([
+        'id'    => 'student-idp-id',
+        'email' => 'student@example.com',
+        // No `roles` key at all — matches the real non-admin /me shape.
     ], upsRequest()))->toThrow(UnregisteredAccountException::class);
 });

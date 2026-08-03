@@ -136,19 +136,14 @@ class AdminUserService
             }
         }
 
-        if ($user->idp_user_id) {
-            $adminToken = $this->idpClient->getSuperAdminToken();
-
-            if (isset($validated['status'])) {
-                $idpStatus = $validated['status'] === 'Activated' ? 'active' : 'disabled';
-                $this->idpClient->updateUserStatus($user->idp_user_id, $idpStatus, $adminToken);
-            }
-
-            if (isset($validated['password'])) {
-                $this->idpClient->updateUserPassword($user->idp_user_id, $validated['password'], $adminToken);
-            }
-        }
-
+        // RIS is the source of truth for whether an admin can use RIS.
+        // The local status/role/profile change below always happens first
+        // and always succeeds on its own — an unreachable or misbehaving
+        // IdP must never prevent someone from being deactivated (or
+        // reactivated) in RIS. IdP sync is attempted AFTER, best-effort,
+        // and its failure is logged/audited but never rolled back or
+        // thrown — mirrors the existing OcmsAdminService::pushProfileToOcms()
+        // pattern used just below for profile pushes.
         $user = DB::transaction(function () use ($user, $validated) {
             $userFields = array_filter([
                 'email'    => $validated['email']    ?? null,
@@ -202,6 +197,48 @@ class AdminUserService
             'target_user_id' => $user->user_id,
             'target_email'   => $user->email,
         ]);
+
+        // Best-effort IdP sync — runs OUTSIDE the DB transaction, after the
+        // local change has already committed, and can never undo it. Only
+        // attempted when there's something to sync (status/password) and
+        // the account actually has a linked IdP identity. A failure here
+        // (IdP down, endpoint rejected, network error) is logged and
+        // audited so it can be reconciled manually, but the RIS-side
+        // activation/deactivation has already taken effect either way.
+        if ($user->idp_user_id && (isset($validated['status']) || isset($validated['password']))) {
+            try {
+                $adminToken = $this->idpClient->getSuperAdminToken();
+
+                if (isset($validated['status'])) {
+                    $idpStatus = $validated['status'] === 'Activated' ? 'active' : 'disabled';
+                    $this->idpClient->updateUserStatus($user->idp_user_id, $idpStatus, $adminToken);
+                }
+
+                if (isset($validated['password'])) {
+                    $this->idpClient->updateUserPassword($user->idp_user_id, $validated['password'], $adminToken);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('AdminUserService: IdP sync failed after local update — RIS-side change was NOT rolled back', [
+                    'user_id'        => $user->user_id,
+                    'email'          => $user->email,
+                    'attempted'      => array_values(array_filter([
+                        isset($validated['status'])   ? 'status'   : null,
+                        isset($validated['password']) ? 'password' : null,
+                    ])),
+                    'error'          => $e->getMessage(),
+                ]);
+
+                $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_IDP_SYNC_FAILED, [
+                    'target_user_id' => $user->user_id,
+                    'target_email'   => $user->email,
+                    'attempted'      => array_values(array_filter([
+                        isset($validated['status'])   ? 'status'   : null,
+                        isset($validated['password']) ? 'password' : null,
+                    ])),
+                    'error'          => $e->getMessage(),
+                ]);
+            }
+        }
 
         // Push profile changes back to OCMS hub — runs OUTSIDE the DB transaction
         // so an OCMS failure cannot rollback a successful local update.
