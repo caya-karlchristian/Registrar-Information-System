@@ -33,16 +33,62 @@ export const ROLE_HOME = {
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
-  const [user, setUser]             = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState(null);
+  const [user, setUser] = useState(null);
+  const [activeRoleOverride, setActiveRoleOverride] = useState(
+    () => localStorage.getItem("activeRoleOverride")
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   // idpOffline: true when the last login used the local fallback.
   // Post-login pages read this to show a non-blocking advisory banner.
   const [idpOffline, setIdpOffline] = useState(false);
-  const [hasAgreed, setHasAgreed]   = useState(
+  const [hasAgreed, setHasAgreed] = useState(
     () => localStorage.getItem("hasAgreed") === "true"
   );
+
+  // effectiveUser overlays the activeRoleOverride on top of the raw
+  // user object so every consumer sees the switched role transparently.
+  const effectiveUser = React.useMemo(() => {
+    if (!user) return null;
+    if (!activeRoleOverride) return user;
+
+    let permissions = user.effective_permissions;
+    if (user.role_name === 'super_admin' && activeRoleOverride === 'admin') {
+      permissions = {
+        dashboard: ['Access'],
+        inbox: ['Access'],
+        analytics: ['Access'],
+        logbook: ['Access'],
+        profile: ['Access'],
+        access_requests: ['Access'],
+        student_staff_switch: ['Access'],
+      };
+    }
+
+    return {
+      ...user,
+      role_name: activeRoleOverride,
+      effective_permissions: permissions
+    };
+  }, [user, activeRoleOverride]);
+
+  const switchRoleOverride = (roleName) => {
+    if (roleName) {
+      localStorage.setItem("activeRoleOverride", roleName);
+    } else {
+      localStorage.removeItem("activeRoleOverride");
+    }
+
+    // Navigate FIRST so the old page's ProtectedRoute never sees
+    // the role mismatch (which would flash /forbidden).
+    const destRole = roleName || user?.role_name;
+    const destination = ROLE_HOME[destRole] ?? "/";
+    navigate(destination, { replace: true });
+
+    // Update state on the next tick — by then the new route is mounted.
+    setTimeout(() => setActiveRoleOverride(roleName), 0);
+  };
 
   const agreeToTerms = () => {
     localStorage.setItem("hasAgreed", "true");
@@ -80,11 +126,20 @@ export const AuthProvider = ({ children }) => {
   // can show a non-blocking advisory banner via the idpOffline context value.
   // -------------------------------------------------------
   const login = async (email, password) => {
+    localStorage.removeItem("activeRoleOverride");
+    setActiveRoleOverride(null);
     const { data } = await api.post("/login", { email, password });
     const userData = data.data ?? data.user;
 
     setUser(userData);
     setIdpOffline(!!data.idp_offline);
+
+    // If this admin has the "Student Staff" policy,
+    // redirect to the access-control page so they can pick a role.
+    if (userData.role_name === 'admin' && userData.policy?.name === 'Student Staff') {
+      navigate("/access-control", { replace: true });
+      return;
+    }
 
     const destination = ROLE_HOME[userData.role_name] ?? "/";
     navigate(destination, { replace: true });
@@ -95,11 +150,20 @@ export const AuthProvider = ({ children }) => {
   // Shown on the LandingPage when the user explicitly chooses it.
   // -------------------------------------------------------
   const localLogin = async (email, password) => {
+    localStorage.removeItem("activeRoleOverride");
+    setActiveRoleOverride(null);
     const { data } = await localLoginRequest(email, password);
     const userData = data.data ?? data.user;
 
     setUser(userData);
     setIdpOffline(true); // they explicitly chose local login
+
+    // If this admin has the "Student Staff" policy,
+    // redirect to the access-control page so they can pick a role.
+    if (userData.role_name === 'admin' && userData.policy?.name === 'Student Staff') {
+      navigate("/access-control", { replace: true });
+      return;
+    }
 
     const destination = ROLE_HOME[userData.role_name] ?? "/";
     navigate(destination, { replace: true });
@@ -113,6 +177,8 @@ export const AuthProvider = ({ children }) => {
     setHasAgreed(false);
     setIdpOffline(false);
     localStorage.removeItem("hasAgreed");
+    localStorage.removeItem("activeRoleOverride");
+    setActiveRoleOverride(null);
     resetEcho();
     setUser(null);
     try {
@@ -132,12 +198,21 @@ export const AuthProvider = ({ children }) => {
   // SSO callback — called by SsoCallbackPage after IdP redirect.
   // -------------------------------------------------------
   const ssoCallback = async (code) => {
+    localStorage.removeItem("activeRoleOverride");
+    setActiveRoleOverride(null);
     try {
       const { data } = await ssoCallbackRequest(code);
       const userData = data.data ?? data.user;
 
       setUser(userData);
       setIdpOffline(false);
+
+      // If this admin has the "Student Staff" policy,
+      // redirect to the access-control page so they can pick a role.
+      if (userData.role_name === 'admin' && userData.policy?.name === 'Student Staff') {
+        navigate("/access-control", { replace: true });
+        return;
+      }
 
       const destination = ROLE_HOME[userData.role_name] ?? "/";
       navigate(destination, { replace: true });
@@ -159,13 +234,13 @@ export const AuthProvider = ({ children }) => {
   // -------------------------------------------------------
   // Role helpers
   // -------------------------------------------------------
-  const hasRole = (roleName) => user?.role_name === roleName;
+  const hasRole = (roleName) => effectiveUser?.role_name === roleName;
   const isStaff = () => hasRole(ROLES.ADMIN) || hasRole(ROLES.SUPER_ADMIN);
 
   return (
     <AuthContext.Provider
       value={{
-        user,
+        user: effectiveUser,
         loading,
         error,
         login,
@@ -179,6 +254,8 @@ export const AuthProvider = ({ children }) => {
         hasAgreed,
         setHasAgreed,
         agreeToTerms,
+        switchRoleOverride,
+        activeRoleOverride,
       }}
     >
       <ErrorToast message={error} onClose={() => setError(null)} />

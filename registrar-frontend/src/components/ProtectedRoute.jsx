@@ -15,7 +15,7 @@ import AgreementPage from './AgreementPage';
 // e.g. ["admin", "super_admin"]
 // -------------------------------------------------------
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-const { user, loading, isLoggingOut, hasAgreed, setHasAgreed } = useAuth();
+const { user, loading, isLoggingOut, hasAgreed, setHasAgreed, activeRoleOverride } = useAuth();
   // Still restoring session — don't redirect yet
   if (loading) {
     return (
@@ -32,8 +32,10 @@ const { user, loading, isLoggingOut, hasAgreed, setHasAgreed } = useAuth();
     : <Navigate to="/forbidden" state={{ reason: "unauthenticated" }} replace />;
 }
 
-  // Logged in but wrong role
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role_name)) {
+  // Logged in but wrong role — skip this check if the user has an
+  // active role override (Student Staff policy switcher mid-transition).
+  const isRoleSwitcher = !!activeRoleOverride || user.policy?.name === 'Student Staff';
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role_name) && !isRoleSwitcher) {
     return <Navigate to="/forbidden" replace />;
   }
 
