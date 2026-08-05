@@ -37,6 +37,7 @@ import ModuleRoute from './components/ModuleRoute';
 import { MODULE_KEYS, hasModuleAccess } from './utils/policy';
 import ForbiddenPage from './components/ForbiddenPage';
 import SsoCallbackPage from './pages/SsoCallbackPage.jsx';
+import AccessControlPage from './pages/AccessControlPage.jsx';
 
 // Notifications
 import { NotificationToastProvider } from './context/NotificationToastContext.jsx';
@@ -84,6 +85,7 @@ const App = () => {
               <Route path="/" element={<MainPage />} />
               <Route path="/forbidden" element={<ForbiddenPage />} />
               <Route path="/auth/callback" element={<SsoCallbackPage />} />
+              <Route path="/access-control" element={<AccessControlPage />} />
 
               {/* STUDENT (role: student) */}
               <Route

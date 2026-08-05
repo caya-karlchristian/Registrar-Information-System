@@ -78,6 +78,7 @@ const PolicyManagement = () => {
   // Form fields
   const [policyName, setPolicyName] = useState("");
   const [selectedModuleValues, setSelectedModuleValues] = useState([]);
+  const [allowStudentStaffSwitch, setAllowStudentStaffSwitch] = useState(false);
 
   // Admin list modal
   const [isAdminListOpen, setIsAdminListOpen] = useState(false);
@@ -131,6 +132,7 @@ const PolicyManagement = () => {
     Object.entries(LABEL_TO_KEY).forEach(([label, key]) => {
       raw[key] = selectedLabels.includes(label) ? ["Access"] : [];
     });
+    raw['student_staff_switch'] = allowStudentStaffSwitch ? ["Access"] : [];
     return raw;
   };
 
@@ -138,6 +140,7 @@ const PolicyManagement = () => {
     setIsEditMode(false);
     setPolicyName("");
     setSelectedModuleValues([]);
+    setAllowStudentStaffSwitch(false);
     setIsModalOpen(true);
   };
 
@@ -146,11 +149,12 @@ const PolicyManagement = () => {
     setEditingPolicyIndex(index);
     const p = policies[index];
     setPolicyName(p.name);
+    setAllowStudentStaffSwitch(Array.isArray(p.permissions?.student_staff_switch) && p.permissions.student_staff_switch.length > 0);
 
     // Map permissions object back to selectedModuleValues
     const labels = [];
     Object.entries(p.permissions || {}).forEach(([key, val]) => {
-      if (val && val.length > 0) {
+      if (key !== 'student_staff_switch' && val && val.length > 0) {
         const label = KEY_TO_LABEL[key];
         if (label) labels.push(label);
       }
@@ -423,12 +427,19 @@ const PolicyManagement = () => {
 
                       {/* Policy name hyperlink */}
                       <td className="px-4 py-3 font-semibold">
-                        <button
-                          onClick={() => handleOpenEdit(globalIdx)}
-                          className="text-blue-400 hover:text-blue-300 font-semibold hover:underline text-left text-sm cursor-pointer"
-                        >
-                          {policy.name}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleOpenEdit(globalIdx)}
+                            className="text-blue-400 hover:text-blue-300 font-semibold hover:underline text-left text-sm cursor-pointer"
+                          >
+                            {policy.name}
+                          </button>
+                          {Array.isArray(policy.permissions?.student_staff_switch) && policy.permissions.student_staff_switch.length > 0 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800/25">
+                              Switcher
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Type */}
@@ -532,6 +543,36 @@ const PolicyManagement = () => {
                       selectedValues={selectedModuleValues}
                       onChange={(e) => setSelectedModuleValues(e.target.value)}
                     />
+                  </div>
+                </div>
+
+                {/* Multiple Role Options */}
+                <div className={`p-4 rounded-xl border flex flex-col gap-3 ${
+                  isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200 shadow-xs'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        Role Switcher (Admin and Student)
+                      </span>
+                      <span className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                        Allow users under this policy to toggle between Admin and Student views.
+                      </span>
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setAllowStudentStaffSwitch(!allowStudentStaffSwitch)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        allowStudentStaffSwitch ? 'bg-green-500' : (isDark ? 'bg-gray-700' : 'bg-gray-200')
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          allowStudentStaffSwitch ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
                   </div>
                 </div>
               </div>
