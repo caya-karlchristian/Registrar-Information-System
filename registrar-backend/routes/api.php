@@ -22,6 +22,7 @@ use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
 use App\Http\Controllers\AccessRequestController;
+use App\Http\Controllers\RoleAssignmentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -219,6 +220,21 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             Route::get('/',                     [AccessRequestController::class, 'index']);
             Route::post('{accessRequest}/approve', [AccessRequestController::class, 'approve']);
             Route::post('{accessRequest}/reject',  [AccessRequestController::class, 'reject']);
+        });
+    });
+
+    // Role assignments — onboarding/offboarding a secondary role onto an
+    // existing account (e.g. the Admin side of a "student staff" who
+    // already holds Student). Grant/revoke/full-history are Super-Admin
+    // only; 'mine' is any authenticated user reading their own currently
+    // held roles (used by the frontend role switcher).
+    Route::prefix('role-assignments')->group(function () {
+        Route::get('mine', [RoleAssignmentController::class, 'mine']);
+
+        Route::middleware('role:4')->group(function () {
+            Route::get('/',                          [RoleAssignmentController::class, 'index']);
+            Route::post('/',                          [RoleAssignmentController::class, 'store']);
+            Route::post('{roleAssignment}/revoke',    [RoleAssignmentController::class, 'revoke']);
         });
     });
 });

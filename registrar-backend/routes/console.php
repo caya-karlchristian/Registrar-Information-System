@@ -81,6 +81,19 @@ Schedule::command('provisioning:expire-stale')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
+// Sweeps role_assignments past expires_at -> Expired, and force-logs
+// out the affected account. Scheduled after provisioning:expire-stale
+// (08:15) for the same non-collision reasoning that placed 08:15
+// after ShredExpiredRequests/SendUnclaimedReminders (08:00/08:05) —
+// see ExpireRoleAssignments' docblock for why this exists (primarily:
+// it's the only offboarding mechanism for scenarios RIS has no live
+// signal for, e.g. graduation).
+Schedule::command('role-assignments:expire')
+    ->dailyAt('08:20')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));
+
 /*
 |--------------------------------------------------------------------------
 | Scheduled Commands — Audit Log Chain Integrity

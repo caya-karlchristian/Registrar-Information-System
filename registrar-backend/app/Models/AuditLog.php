@@ -48,7 +48,10 @@ class AuditLog extends Model
     // see, from the audit trail, that the two systems may be out of sync
     // and reconcile the IdP side by hand.
     public const ACTION_ADMIN_IDP_SYNC_FAILED = 'admin_idp_sync_failed';
-    public const ACTION_ROLE_ASSIGNED   = 'role_assigned';
+    public const ACTION_ROLE_ASSIGNED   = 'role_assigned';   // granted (RoleAssignmentService::grant)
+    public const ACTION_ROLE_REVOKED    = 'role_revoked';    // explicit revoke (RoleAssignmentService::revoke)
+    public const ACTION_ROLE_EXPIRED    = 'role_expired';    // automatic sweep (role-assignments:expire)
+    public const ACTION_ROLE_SWITCHED   = 'role_switched';   // session assumed a different held role (Step 3)
     public const ACTION_REQUEST_STATUS_CHANGED = 'request_status_changed';
     public const ACTION_REQUEST_ARCHIVED       = 'request_archived';
     public const ACTION_REQUEST_RESTORED       = 'request_restored';

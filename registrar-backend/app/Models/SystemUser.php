@@ -10,6 +10,7 @@ use App\Models\AlumniProfile;
 use App\Models\AlumniType;
 use App\Models\AlumniAcademicRecord;
 use App\Models\Policy;
+use App\Models\RoleAssignment;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class SystemUser extends Authenticatable
@@ -134,6 +135,33 @@ class SystemUser extends Authenticatable
     public function policy()
     {
         return $this->belongsTo(Policy::class, 'policy_id', 'policy_id');
+    }
+
+    /**
+     * Every role this user has ever been granted, across all statuses
+     * (Active/Expired/Revoked) — the full history. Use activeRoleAssignments()
+     * below for "what can they do right now."
+     */
+    public function roleAssignments()
+    {
+        return $this->hasMany(RoleAssignment::class, 'user_id', 'user_id');
+    }
+
+    /**
+     * Roles this user currently holds — i.e. Active status AND not past
+     * expires_at. A "student staff" account has two rows here at once:
+     * one role_id = ROLE_STUDENT, one role_id = ROLE_ADMIN (with its own
+     * policy_id). This is what the switch-role endpoint validates
+     * against before letting someone assume a role for their session —
+     * see Step 3.
+     */
+    public function activeRoleAssignments()
+    {
+        return $this->roleAssignments()
+            ->active()
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            });
     }
 
     // -------------------------------------------------------
