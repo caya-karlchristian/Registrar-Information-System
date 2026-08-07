@@ -97,6 +97,12 @@ export const getRoleAssignments   = (params = {}) => api.get("/role-assignments"
 export const grantRoleAssignment  = (data)         => api.post("/role-assignments", data);
 export const revokeRoleAssignment = (id, reason)   => api.post(`/role-assignments/${id}/revoke`, { reason });
 
+// GET /role-assignments/search-users?q= — typeahead lookup across ALL
+// roles (student/alumni/admin/super admin), used by GrantRoleUserPicker
+// to find a target account. Deliberately separate from getSystemUsers(),
+// which only ever returns admin/super-admin accounts.
+export const searchGrantableUsers = (q) => api.get("/role-assignments/search-users", { params: { q } });
+
 // -------------------------------------------------------
 // ACADEMIC RECORDS
 // -------------------------------------------------------

@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\RoleAssignment;
 use App\Models\SystemUser;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -88,6 +89,53 @@ class RoleAssignmentService
 
             return $assignment;
         });
+    }
+
+    /**
+     * Powers the "Grant a Role" picker (GET /role-assignments/search-users).
+     * Searches across ALL roles by design — a grant target can be a
+     * student, alumni, admin, or another super admin, unlike
+     * SystemUserController::index(), which is intentionally scoped to
+     * admin/super-admin accounts only.
+     *
+     * Uses PREFIX matching (LIKE 'term%') rather than substring
+     * matching — this is what lets MySQL use the B-tree indexes added
+     * in the 2026_08_12 migration instead of a full table scan, which
+     * is what keeps this fast as the student roster grows into the
+     * thousands. Results are capped at 10 (typeahead, not a directory
+     * listing) and exclude Deactivated / Pending Activation accounts —
+     * granting a role to an account that can't yet log in isn't
+     * meaningful.
+     */
+    public function searchGrantableUsers(string $term): Collection
+    {
+        // Escape LIKE metacharacters in the raw user input. The query
+        // builder already parameterizes this value (no SQL injection
+        // risk), but an unescaped '%' or '_' typed by the admin would
+        // change LIKE's matching semantics (e.g. a literal "%" alone
+        // would match every row) rather than being treated as a literal
+        // character to search for.
+        $escaped = addcslashes($term, '%_\\');
+        $prefix  = $escaped . '%';
+
+        return SystemUser::query()
+            ->where('status', 'Activated')
+            ->where(function ($q) use ($prefix) {
+                $q->where('email', 'like', $prefix)
+                    ->orWhereHas('studentProfile', fn ($p) => $p
+                        ->where('first_name', 'like', $prefix)
+                        ->orWhere('last_name', 'like', $prefix))
+                    ->orWhereHas('adminProfile', fn ($p) => $p
+                        ->where('first_name', 'like', $prefix)
+                        ->orWhere('last_name', 'like', $prefix))
+                    ->orWhereHas('alumniProfile', fn ($p) => $p
+                        ->where('first_name', 'like', $prefix)
+                        ->orWhere('last_name', 'like', $prefix));
+            })
+            ->with(['studentProfile', 'adminProfile', 'alumniProfile', 'activeRoleAssignments'])
+            ->orderBy('email')
+            ->limit(10)
+            ->get();
     }
 
     /**

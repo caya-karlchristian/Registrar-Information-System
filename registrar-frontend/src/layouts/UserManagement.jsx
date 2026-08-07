@@ -8,7 +8,8 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   KeyIcon,
-  IdentificationIcon
+  IdentificationIcon,
+  UserPlusIcon
 } from "@heroicons/react/24/outline";
 import DropDown from '../components/DropDown';
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
@@ -16,6 +17,7 @@ import UserModal from "../components/UserModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import LocalPasswordModal from "../components/LocalPasswordModal";
 import RoleAssignmentsModal from "../components/RoleAssignmentsModal";
+import GrantRoleUserPicker from "../components/GrantRoleUserPicker";
 import {
   getSystemUsers,
   createSystemUser,
@@ -150,6 +152,7 @@ const UserManagement = () => {
   // beyond "which user's modal is open" lives here, the modal owns its
   // own fetch/grant/revoke lifecycle.
   const [selectedUserForRoles, setSelectedUserForRoles] = useState(null);
+  const [isGrantPickerOpen, setIsGrantPickerOpen] = useState(false);
 
   // Policies come from the backend now (policies table via GET /policies).
   const [systemPolicies, setSystemPolicies] = useState([]);
@@ -362,6 +365,13 @@ const UserManagement = () => {
             Clear Filters
           </button>
         )}
+
+        <button
+          onClick={() => setIsGrantPickerOpen(true)}
+          className={`mt-4 sm:mt-6 w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-full text-sm font-semibold shadow transition-all border ${isDark ? 'border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+        >
+          Grant a Role <UserPlusIcon className="w-4 h-4" />
+        </button>
 
         <button
           onClick={() => { setEditUser(null); setIsModalOpen(true); }}
@@ -642,6 +652,15 @@ const UserManagement = () => {
         systemPolicies={systemPolicies}
         onSuccess={setSuccessMsg}
         onError={setErrorMsg}
+      />
+
+      <GrantRoleUserPicker
+        isOpen={isGrantPickerOpen}
+        onClose={() => setIsGrantPickerOpen(false)}
+        onSelect={(pickedUser) => {
+          setIsGrantPickerOpen(false);
+          setSelectedUserForRoles(pickedUser);
+        }}
       />
 
       <SuccessToast 

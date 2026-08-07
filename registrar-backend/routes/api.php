@@ -238,6 +238,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::get('mine', [RoleAssignmentController::class, 'mine']);
 
         Route::middleware('role:4')->group(function () {
+            // Dedicated throttle stacked on top of the group's
+            // throttle:60,1 — this endpoint returns a broader slice of
+            // the user directory than anything else Super Admin can
+            // query, so it gets its own tighter ceiling against
+            // scripted enumeration.
+            Route::get('search-users', [RoleAssignmentController::class, 'searchUsers'])
+                ->middleware('throttle:30,1');
+
             Route::get('/',                          [RoleAssignmentController::class, 'index']);
             Route::post('/',                          [RoleAssignmentController::class, 'store']);
             Route::post('{roleAssignment}/revoke',    [RoleAssignmentController::class, 'revoke']);

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\RoleAssignment\RevokeRoleAssignmentRequest;
+use App\Http\Requests\RoleAssignment\SearchGrantableUsersRequest;
 use App\Http\Requests\RoleAssignment\StoreRoleAssignmentRequest;
+use App\Http\Resources\GrantableUserResource;
 use App\Http\Resources\RoleAssignmentResource;
 use App\Models\RoleAssignment;
 use App\Services\RoleAssignmentService;
@@ -53,6 +55,23 @@ class RoleAssignmentController extends Controller
             ->get();
 
         return RoleAssignmentResource::collection($assignments);
+    }
+
+    /**
+     * GET /role-assignments/search-users
+     * Super Admin only — gated by the SAME permission as granting
+     * itself (RoleAssignmentPolicy::grant), since finding a target is
+     * only ever useful as a step toward granting them a role. This is
+     * deliberately not part of SystemUserController — see
+     * GrantableUserResource's docblock.
+     */
+    public function searchUsers(SearchGrantableUsersRequest $request)
+    {
+        $this->authorize('grant', RoleAssignment::class);
+
+        $users = $this->roleAssignmentService->searchGrantableUsers($request->validated('q'));
+
+        return GrantableUserResource::collection($users);
     }
 
     /**

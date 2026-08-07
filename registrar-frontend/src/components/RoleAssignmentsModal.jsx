@@ -80,8 +80,14 @@ const RoleAssignmentsModal = ({
   const [revokeReason, setRevokeReason] = useState("");
   const [revoking, setRevoking] = useState(false);
 
+  // user.full_name comes from GrantableUserResource when this modal is
+  // opened via GrantRoleUserPicker; the admin_profile shape is what
+  // UserManagement.jsx's own table rows already carry. Checking
+  // full_name first keeps both entry points working unchanged.
   const fullName = user
-    ? [user.admin_profile?.first_name, user.admin_profile?.last_name].filter(Boolean).join(" ") || user.email
+    ? user.full_name
+      || [user.admin_profile?.first_name, user.admin_profile?.last_name].filter(Boolean).join(" ")
+      || user.email
     : "";
 
   const fetchAssignments = useCallback(async () => {
