@@ -9,7 +9,7 @@ const UserManagementPage = () => {
   const [activeTab, setActiveTab] = useState("accounts"); // "accounts" | "policies" | "access-requests"
 
   const tabs = [
-    { key: "accounts", label: "Accounts" },
+    { key: "accounts", label: "Admin Accounts" },
     { key: "policies", label: "Policy Management" },
     { key: "access-requests", label: "Access Requests" },
   ];

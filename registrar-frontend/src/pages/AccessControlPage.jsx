@@ -26,7 +26,7 @@ const AccessControlPage = () => {
     {
       id: "admin",
       label: "Admin",
-      description: "Registrar Staff",
+      description: user?.policy?.name || "Registrar Staff",
       icon: BriefcaseIcon,
       grad: "from-[#0052d4] to-[#4364f7]"
     },
@@ -80,7 +80,8 @@ const AccessControlPage = () => {
         <div className="w-full space-y-4">
           {roles.map((role) => {
             const Icon = role.icon;
-            const isSelected = activeRoleOverride === role.id;
+            const currentActiveRole = activeRoleOverride || user?.role_name;
+            const isSelected = currentActiveRole === role.id;
             return (
               <button
                 key={role.id}
