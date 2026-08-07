@@ -3,16 +3,40 @@ import { useTheme } from "../context/ThemeContext";
 import { useAlertToast } from "../context/AlertToastContext";
 import { getAccessRequests, approveAccessRequest, rejectAccessRequest } from "../services/api";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
+import { AccessRequestsSkeleton } from "../components/LoadingSkeleton";
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 
-const STATUS_FILTERS = ["All", "Requested", "Approved", "Rejected", "Fulfilled", "Expired"];
+const STATUS_FILTERS = ["All", "Pending", "Approved", "Rejected", "Expired"];
+
+const UI_TO_DB_STATUS = {
+  Pending: "Requested",
+  Approved: "Fulfilled",
+  Rejected: "Rejected",
+  Expired: "Expired"
+};
+
+const DB_TO_UI_STATUS = {
+  Requested: "Pending",
+  Fulfilled: "Approved",
+  Rejected: "Rejected",
+  Expired: "Expired"
+};
 
 const getStatusBadgeClasses = (status, isDark) => {
-  const map = {
-    Requested: isDark ? 'bg-amber-900/20 text-amber-400 border-amber-600' : 'bg-amber-100 text-amber-700 border-amber-200',
-    Rejected:  isDark ? 'bg-red-950/30 text-red-400 border-red-700' : 'bg-red-100 text-red-700 border-red-200',
-    Fulfilled: isDark ? 'bg-green-900/20 text-green-400 border-green-600' : 'bg-green-100 text-green-700 border-green-200',
-    Expired:   isDark ? 'bg-gray-700/20 text-gray-300 border-gray-400' : 'bg-gray-100 text-gray-700 border-gray-200',
-  };
+  const map = isDark
+    ? {
+      Requested: 'bg-yellow-900/20 text-yellow-400 border-yellow-600',
+      Rejected: 'bg-red-950/30 text-red-400 border-red-700',
+      Fulfilled: 'bg-green-900/20 text-green-400 border-green-600',
+      Expired: 'bg-gray-700/20 text-gray-300 border-gray-400',
+    }
+    : {
+      Requested: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      Rejected: 'bg-red-100 text-red-700 border-red-200',
+      Fulfilled: 'bg-green-100 text-green-700 border-green-200',
+      Expired: 'bg-gray-100 text-gray-700 border-gray-200',
+    };
   return map[status] || (isDark ? 'bg-gray-700/20 text-gray-300 border-gray-400' : 'bg-gray-100 text-gray-700 border-gray-200');
 };
 
@@ -29,20 +53,51 @@ const AccessRequestsQueue = () => {
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("Requested");
+  const [statusFilter, setStatusFilter] = useState("Pending");
+  const [searchQuery, setSearchQuery] = useState("");
   const [actioningId, setActioningId] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
-    getAccessRequests(statusFilter !== "All" ? { status: statusFilter } : {})
+    const dbStatus = UI_TO_DB_STATUS[statusFilter];
+    getAccessRequests(statusFilter !== "All" ? { status: dbStatus } : {})
       .then((res) => setRequests(res.data?.data ?? []))
       .catch(() => showError("Failed to load access requests."))
       .finally(() => setLoading(false));
   }, [statusFilter, showError]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    setSearchQuery("");
+  }, [statusFilter]);
+
+  const filteredRequests = requests.filter((r) => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+
+    const fullName = [r.target_first_name, r.target_last_name].filter(Boolean).join(" ").toLowerCase();
+    const email = (r.target_email || "").toLowerCase();
+    const role = (r.requested_role || "Admin").toLowerCase();
+    const policyName = (r.requested_policy?.name || "").toLowerCase();
+    const justification = (r.justification || "").toLowerCase();
+    const requesterName = (r.requested_by?.name || r.requested_by?.email || "Unknown").toLowerCase();
+    const requesterEmail = (r.requested_by?.email || "").toLowerCase();
+
+    return (
+      fullName.includes(query) ||
+      email.includes(query) ||
+      role.includes(query) ||
+      policyName.includes(query) ||
+      justification.includes(query) ||
+      requesterName.includes(query) ||
+      requesterEmail.includes(query)
+    );
+  });
 
   const handleApprove = async (id) => {
     setActioningId(id);
@@ -58,13 +113,19 @@ const AccessRequestsQueue = () => {
   };
 
   const confirmReject = async () => {
-    if (!rejectReason.trim()) {
-      showError("Please provide a reason for rejecting this request.");
+    const reason = rejectReason.trim();
+    if (!reason) {
+      showError("Rejection reason is required.");
       return;
     }
+    if (reason.length < 5) {
+      showError("Rejection reason must be at least 5 characters.");
+      return;
+    }
+
     setActioningId(rejectTarget.id);
     try {
-      await rejectAccessRequest(rejectTarget.id, rejectReason);
+      await rejectAccessRequest(rejectTarget.id, reason);
       showSuccess("Access request rejected.");
       setRejectTarget(null);
       setRejectReason("");
@@ -78,117 +139,242 @@ const AccessRequestsQueue = () => {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        {STATUS_FILTERS.map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${statusFilter === s
-              ? (isDark ? 'bg-yellow-500/20 text-yellow-400 border-yellow-600' : 'bg-pup-dark-maroon text-white border-pup-dark-maroon')
-              : (isDark ? 'text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f]' : 'text-gray-600 border-gray-200 hover:bg-gray-50')}`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <p className={`text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>Loading...</p>
-      ) : requests.length === 0 ? (
-        <p className={`text-sm ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>No access requests found for this filter.</p>
-      ) : (
-        <div className="space-y-3">
-          {requests.map((r) => (
-            <div key={r.id} className={`rounded-xl p-4 border ${isDark ? 'border-[#3e4042] bg-[#1c1c1e]' : 'border-gray-200 bg-gray-50'}`}>
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="font-semibold text-sm">{r.target_first_name} {r.target_last_name} · {r.requested_role}</p>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>{r.target_email}</p>
-                  {r.requested_policy && (
-                    <p className={`text-xs mt-0.5 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>Policy: {r.requested_policy.name}</p>
-                  )}
-                  <p className={`text-xs mt-2 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>{r.justification}</p>
-                  <p className={`text-xs mt-2 ${isDark ? 'text-[#6b6b6b]' : 'text-gray-400'}`}>
-                    Requested by {r.requested_by?.name || r.requested_by?.email || 'Unknown'}
-                    {r.expires_at && r.status === 'Requested' && ` · expires ${new Date(r.expires_at).toLocaleDateString()}`}
-                  </p>
-                  {r.status === 'Rejected' && r.rejection_reason && (
-                    <p className={`text-xs mt-2 italic ${isDark ? 'text-red-400' : 'text-red-600'}`}>Rejected: {r.rejection_reason}</p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(r.status, isDark)}`}>
-                    {r.status}
-                  </span>
-                  {r.status === 'Requested' && (
-                    <>
-                      <button
-                        onClick={() => handleApprove(r.id)}
-                        disabled={actioningId === r.id}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-60 ${isDark ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => setRejectTarget(r)}
-                        disabled={actioningId === r.id}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-60 ${isDark ? 'bg-red-950/30 text-red-400 hover:bg-red-950/50' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          {STATUS_FILTERS.map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${statusFilter === s
+                ? (isDark ? 'bg-yellow-500/20 text-yellow-400 border-yellow-600' : 'bg-pup-dark-maroon text-white border-pup-dark-maroon')
+                : (isDark ? 'text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f]' : 'text-gray-600 border-gray-200 hover:bg-gray-50')}`}
+            >
+              {s}
+            </button>
           ))}
         </div>
-      )}
+        <div className="w-full sm:max-w-xs">
+          <VoiceSearchInput
+            value={searchQuery}
+            onChange={(value) => setSearchQuery(value)}
+            placeholder="Search"
+          />
+        </div>
+      </div>
 
-      {rejectTarget && (
-        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className={`w-full max-w-md rounded-2xl shadow-2xl p-6 ${isDark ? 'bg-[#242526] border border-[#3e4042] text-[#e4e6eb]' : 'bg-white'}`}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">Reject Access Request</h3>
+      <div className={`rounded-xl overflow-hidden border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-200 shadow-sm'
+        }`}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[700px] text-sm">
+            <thead>
+              <tr className={`border-b text-xs font-bold uppercase tracking-wider ${isDark ? 'border-[#3e4042] text-[#a09e9a] bg-[#1a1a1c]/20' : 'border-gray-200 text-gray-500 bg-gray-50/50'
+                }`}>
+                <th className="px-5 py-4 text-center font-bold w-12">#</th>
+                <th className="px-5 py-4 text-left font-bold">Target User</th>
+                <th className="px-5 py-4 text-left font-bold">Requested Access</th>
+                <th className="px-5 py-4 text-left font-bold">Justification & Requester</th>
+                <th className="px-5 py-4 text-center font-bold">Expiration Date</th>
+                <th className="px-5 py-4 text-center font-bold">Status</th>
+                <th className="px-5 py-4 text-center font-bold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <AccessRequestsSkeleton isDark={isDark} />
+              ) : filteredRequests.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <svg className={`w-12 h-12 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                      </svg>
+                      <p className={`text-base font-semibold ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`}>
+                        {searchQuery ? "No Matching Results" : "No Access Requests"}
+                      </p>
+                      <p className={`text-xs ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
+                        {searchQuery
+                          ? `No requests match "${searchQuery}".`
+                          : "No access requests found for this filter status."}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredRequests.map((r, idx) => {
+                  const fullName = [r.target_first_name, r.target_last_name].filter(Boolean).join(" ");
+                  const requesterName = r.requested_by?.name || r.requested_by?.email || 'Unknown';
+
+                  return (
+                    <tr
+                      key={r.id}
+                      className={`border-b last:border-0 transition-colors ${isDark
+                          ? 'border-[#3e4042] hover:bg-[#2a2a2f]'
+                          : 'border-gray-100 hover:bg-gray-50'
+                        }`}
+                    >
+                      {/* Number Column */}
+                      <td className="px-5 py-4 align-middle text-center">
+                        <span className="font-semibold text-xs text-gray-500 dark:text-gray-400">
+                          {idx + 1}
+                        </span>
+                      </td>
+
+                      {/* Target User */}
+                      <td className="px-5 py-4 align-top">
+                        <div className="font-semibold text-sm">{fullName}</div>
+                        <div className={`text-xs mt-0.5 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>{r.target_email}</div>
+                      </td>
+
+                      {/* Requested Access */}
+                      <td className="px-5 py-4 align-top">
+                        <div className="font-semibold text-sm">{r.requested_role || 'Admin'}</div>
+                        {r.requested_policy && (
+                          <div className={`text-xs mt-0.5 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-500'}`}>
+                            Policy: <span className="font-semibold">{r.requested_policy.name}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Justification & Requester */}
+                      <td className="px-5 py-4 align-top max-w-xs md:max-w-md">
+                        <div className={`text-xs leading-relaxed ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                          {r.justification}
+                        </div>
+                        <div className={`text-[10px] mt-2 flex flex-col gap-0.5 ${isDark ? 'text-[#6b6b6b]' : 'text-gray-400'}`}>
+                          <div>Requested by: <span className="font-semibold">{requesterName}</span></div>
+                          {r.status === 'Rejected' && r.rejection_reason && (
+                            <div className={`italic font-semibold ${isDark ? 'text-red-400' : 'text-red-500'}`}>
+                              Reason: {r.rejection_reason}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Expiration Date */}
+                      <td className="px-5 py-4 align-middle text-center font-semibold text-xs whitespace-nowrap">
+                        {r.expires_at ? new Date(r.expires_at).toLocaleDateString() : '—'}
+                      </td>
+
+                      {/* Status Badge */}
+                      <td className="px-5 py-4 align-middle text-center">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap inline-block ${getStatusBadgeClasses(r.status, isDark)}`}>
+                          {DB_TO_UI_STATUS[r.status] || r.status}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-4 align-middle text-center">
+                        {r.status === 'Requested' ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleApprove(r.id)}
+                              disabled={actioningId === r.id}
+                              className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${isDark
+                                  ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600'
+                                  : 'bg-green-600 hover:bg-green-700'
+                                }`}
+                            >
+                              <CheckCircleIcon className="w-4 h-4" /> Approve
+                            </button>
+                            <button
+                              onClick={() => setRejectTarget(r)}
+                              disabled={actioningId === r.id}
+                              className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${isDark
+                                  ? 'bg-red-950/20 hover:bg-red-950/30 text-red-400 border border-red-700'
+                                  : 'bg-red-600 hover:bg-red-700'
+                                }`}
+                            >
+                              <XCircleIcon className="w-4 h-4" /> Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <span className={`text-xs font-semibold ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Reviewed</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>      {rejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`}
+            onClick={() => { setRejectTarget(null); setRejectReason(""); setValidationError(""); }}
+          />
+          <div className={`relative rounded-2xl shadow-2xl w-full max-w-lg mx-auto flex flex-col overflow-visible ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
+            
+            {/* Header */}
+            <div className={`px-6 py-5 flex items-center justify-between rounded-t-2xl shrink-0 ${isDark ? 'bg-[#2a2a2f] border-b border-[#3e4042]' : 'bg-pup-dark-maroon text-white'}`}>
+              <div>
+                <h2 className="text-white font-bold text-lg uppercase tracking-wide">
+                  Reject Access Request
+                </h2>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-[#b0b3b8]' : 'text-white/60'}`}>
+                  Please provide a valid reason for rejecting this request
+                </p>
+              </div>
               <button
+                type="button"
                 onClick={() => { setRejectTarget(null); setRejectReason(""); }}
-                className={`p-1 rounded-full transition-colors ${isDark ? 'hover:bg-[#3a3b3c]' : 'hover:bg-gray-100'}`}
+                className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white cursor-pointer"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
 
-            <p className={`text-sm mb-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
-              Rejecting the request for <span className="font-semibold">{rejectTarget.target_first_name} {rejectTarget.target_last_name}</span> ({rejectTarget.target_email}). Please provide a reason — this is shown to the requester.
-            </p>
+            <div className="h-1 w-full shrink-0 bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
 
-            <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={4}
-              placeholder="Reason for rejection..."
-              autoFocus
-              className={`w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-2 ${isDark
-                ? 'bg-[#1c1c1e] border-[#3e4042] text-[#e4e6eb] focus:ring-yellow-500/40'
-                : 'bg-white border-gray-300 text-gray-900 focus:ring-pup-dark-maroon/30'}`}
-            />
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div className={`p-4 rounded-xl border ${isDark ? 'bg-[#1f1f1f]/60 border-[#3e4042]' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="text-xs uppercase font-bold tracking-wider mb-2 text-gray-500">Target User</div>
+                <div className="font-semibold text-sm">{rejectTarget.target_first_name} {rejectTarget.target_last_name}</div>
+                <div className={`text-xs mt-0.5 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-550'}`}>{rejectTarget.target_email}</div>
+              </div>
 
-            <div className="flex gap-3 mt-5">
+              <div>
+                <label className={`block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-[#b0b3b8]' : 'text-gray-655'} mb-1.5`}>
+                  Reason for Rejection
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  rows={4}
+                  placeholder="Provide a specific justification for rejecting this access request..."
+                  autoFocus
+                  className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 ${isDark
+                      ? 'bg-[#1f1f1f] text-[#e4e6eb] placeholder-[#9a9a9a] focus:ring-[#FFD700] border border-[#3e4042]'
+                      : 'bg-white text-gray-700 placeholder-gray-400 focus:ring-[#FFC72C] border border-gray-300'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className={`px-6 pb-6 pt-4 flex items-center justify-end gap-3 border-t shrink-0 rounded-b-2xl ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
               <button
+                type="button"
                 onClick={() => { setRejectTarget(null); setRejectReason(""); }}
-                className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${isDark ? 'text-[#e4e6eb] bg-[#3a3b3c] hover:bg-[#4e4f50] border border-[#4e4f50]' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'}`}
+                className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-600 hover:bg-gray-100'}`}
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={confirmReject}
-                disabled={actioningId === rejectTarget.id || !rejectReason.trim()}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-md transition-colors bg-red-600 hover:bg-red-700 disabled:opacity-60"
+                disabled={actioningId === rejectTarget.id}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${isDark
+                  ? 'bg-[#2a2a2f] text-red-400 hover:bg-[#353539] border border-[#3e4042]'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
               >
-                {actioningId === rejectTarget.id ? "Rejecting..." : "Reject"}
+                {actioningId === rejectTarget.id ? "Rejecting..." : "Reject Request"}
               </button>
             </div>
+
           </div>
         </div>
       )}
