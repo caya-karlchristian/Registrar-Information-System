@@ -140,4 +140,74 @@ class RoleAssignmentService
             return $assignment;
         });
     }
+
+    /**
+     * Step 3 — session-scoped role switching. Validates the caller
+     * actually holds an Active (and not-yet-expired) assignment for
+     * $roleId, then reissues the session's Sanctum token stamped with
+     * that assignment's id in active_role_assignment_id.
+     *
+     * Reissues rather than mutating the existing token in place for the
+     * same reason a fresh token is issued on login: the plaintext value
+     * the browser is holding never changes meaning silently under it —
+     * a new plaintext token means a new cookie write, which is the
+     * honest signal to the client that its session's authority just
+     * changed. RIS is already single-session-per-account (see
+     * AuthController::login()'s `$user->tokens()->delete()`), so this
+     * mirrors that: delete the current token, issue exactly one new
+     * one carrying the same auth-method name (so logout()'s
+     * sanctum-local/sanctum-idp check keeps working) plus the assumed
+     * role.
+     *
+     * Does NOT touch other role_assignments rows or force-logout other
+     * sessions — unlike revoke(), switching is a normal, expected,
+     * reversible action by the account holder themselves, not an
+     * offboarding event.
+     *
+     * @return array{assignment: RoleAssignment, token: string, token_model: \Laravel\Sanctum\PersonalAccessToken}
+     * @throws ValidationException
+     */
+    public function switchTo(SystemUser $user, int $roleId, Request $request): array
+    {
+        return DB::transaction(function () use ($user, $roleId, $request) {
+            $assignment = RoleAssignment::where('user_id', $user->user_id)
+                ->where('role_id', $roleId)
+                ->active()
+                ->lockForUpdate()
+                ->first();
+
+            if (!$assignment || !$assignment->isCurrentlyActive()) {
+                throw ValidationException::withMessages([
+                    'role_id' => 'You do not currently hold an active assignment for that role.',
+                ]);
+            }
+
+            // Preserve the auth-method marker ('sanctum-idp' /
+            // 'sanctum-local') so AuthController::logout() can still
+            // tell which flow to run after the switch.
+            $currentToken = $user->currentAccessToken();
+            $tokenName    = $currentToken?->name ?? 'sanctum-idp';
+
+            $user->tokens()->delete();
+
+            $newToken = $user->createToken($tokenName);
+            $newToken->accessToken->forceFill([
+                'active_role_assignment_id' => $assignment->id,
+            ])->save();
+
+            $this->auditLogger->log($request, $user, AuditLog::ACTION_ROLE_SWITCHED, [
+                'target_user_id'      => $user->user_id,
+                'target_email'        => $user->email,
+                'role_assignment_id'  => $assignment->id,
+                'role_id'             => $assignment->role_id,
+                'policy_id'           => $assignment->policy_id,
+            ]);
+
+            return [
+                'assignment'  => $assignment,
+                'token'       => $newToken->plainTextToken,
+                'token_model' => $newToken->accessToken,
+            ];
+        });
+    }
 }

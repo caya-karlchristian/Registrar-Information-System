@@ -84,6 +84,20 @@ export const approveAccessRequest = (id)           => api.post(`/access-requests
 export const rejectAccessRequest  = (id, reason)   => api.post(`/access-requests/${id}/reject`, { reason });
 
 // -------------------------------------------------------
+// ROLE ASSIGNMENTS (Super Admin only) — Multi-Role Assignments.
+// Onboards/offboards a *secondary*, concurrent role onto an existing
+// account (e.g. granting a restricted Admin role to someone who already
+// holds Student — the "student staff" case). Powers UserManagement.jsx's
+// "Roles" action/modal. `getMyRoleAssignments` in authService.js is the
+// separate, any-authenticated-user version of this used by the role
+// switcher — this one is the full, Super-Admin-only history/management
+// view (RoleAssignmentController::index/store/revoke).
+// -------------------------------------------------------
+export const getRoleAssignments   = (params = {}) => api.get("/role-assignments", { params });
+export const grantRoleAssignment  = (data)         => api.post("/role-assignments", data);
+export const revokeRoleAssignment = (id, reason)   => api.post(`/role-assignments/${id}/revoke`, { reason });
+
+// -------------------------------------------------------
 // ACADEMIC RECORDS
 // -------------------------------------------------------
 export const getAcademicRecords = ()         => api.get("/academic-records");

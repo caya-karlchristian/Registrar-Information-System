@@ -66,6 +66,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     Route::get('/me',      [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // Step 3 of Multi-Role Assignments: assume a different role this
+    // session currently holds an Active grant for (e.g. a student-staff
+    // account switching from Student to their restricted Admin role).
+    // Caller-only — see SwitchRoleRequest / RoleAssignmentService::switchTo().
+    Route::post('/auth/switch-role', [AuthController::class, 'switchRole']);
+
     // Broadcasting auth
     // Resolve the sanctum user once before passing to Broadcast::auth().
     // Using setUserResolver(fn() => $request->user('sanctum')) causes infinite

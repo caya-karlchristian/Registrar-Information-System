@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Exceptions\IdpException;
 use App\Exceptions\IdpUnavailableException;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\SwitchRoleRequest;
 use App\Http\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Services\AuditLogger;
 use App\Services\LocalAuthService;
+use App\Services\RoleAssignmentService;
 use App\Services\Sso\SsoAuthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -37,6 +39,7 @@ class AuthController extends Controller
         private SsoAuthService  $ssoAuthService,
         private LocalAuthService $localAuth,
         private AuditLogger     $auditLogger,
+        private RoleAssignmentService $roleAssignmentService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -144,6 +147,52 @@ class AuthController extends Controller
         $user = $request->user();
         $user->loadIdentityRelations();
         return new UserResource($user);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/auth/switch-role
+    //
+    // Step 3 of Multi-Role Assignments: lets the caller assume any role
+    // they currently hold an Active role_assignments row for (e.g. a
+    // student-staff account flipping from Student to their restricted
+    // Admin grant). All the validation/reissue logic lives in
+    // RoleAssignmentService::switchTo() — this method's only job is the
+    // HTTP plumbing: pull role_id off the request, reissue the cookie
+    // the same way login() does, and return the user as they now appear
+    // under the assumed role.
+    // -------------------------------------------------------------------------
+    public function switchRole(SwitchRoleRequest $request)
+    {
+        $user = $request->user();
+
+        $result = $this->roleAssignmentService->switchTo(
+            $user,
+            (int) $request->validated('role_id'),
+            $request
+        );
+
+        // switchTo() deleted the token this request authenticated with
+        // and issued a brand new one carrying the assumed role. Rebind
+        // this request's user instance to that new token so every
+        // assumed-role helper (isAdmin(), effectivePermissions(), ...)
+        // reflects the switch immediately in this response, rather than
+        // the now-deleted token the request originally came in on.
+        $user->withAccessToken($result['token_model']);
+        $user->loadIdentityRelations();
+
+        return response()
+            ->json(['user' => new UserResource($user)])
+            ->cookie(
+                'token',
+                $result['token'],
+                60 * 24 * 7,
+                '/',
+                config('session.domain'),
+                config('session.secure_cookie'),
+                true,
+                false,
+                config('session.same_site'),
+            );
     }
 
     // -------------------------------------------------------------------------

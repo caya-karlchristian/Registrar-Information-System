@@ -2,6 +2,7 @@
 
 use App\Exceptions\IdpException;
 use App\Exceptions\IdpUnavailableException;
+use App\Models\RoleAssignment;
 use App\Models\SystemUser;
 use App\Services\Sso\SsoAuthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -248,4 +249,129 @@ test('setPassword rejects a target user who is not a super admin', function () {
 
         $this->assertDatabaseHas('users', ['user_id' => $target->user_id, 'local_auth_enabled' => 0]);
     }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// POST /api/auth/switch-role — Step 3 of Multi-Role Assignments
+// (AuthController::switchRole / RoleAssignmentService::switchTo)
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('switch-role requires authentication', function () {
+    $this->postJson('/api/auth/switch-role', ['role_id' => SystemUser::ROLE_ADMIN])
+         ->assertStatus(401);
+});
+
+test('switch-role fails validation for a role_id outside the four known roles', function () {
+    $person = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'status' => 'Activated']);
+    Sanctum::actingAs($person);
+
+    $this->postJson('/api/auth/switch-role', ['role_id' => 999])
+         ->assertStatus(422)
+         ->assertJsonValidationErrors(['role_id']);
+});
+
+test('switch-role rejects a role the caller does not actively hold', function () {
+    $person = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'status' => 'Activated']);
+    Sanctum::actingAs($person);
+
+    // Holds Student only — never granted Admin.
+    RoleAssignment::create([
+        'user_id' => $person->user_id,
+        'role_id' => SystemUser::ROLE_STUDENT,
+        'status'  => RoleAssignment::STATUS_ACTIVE,
+    ]);
+
+    $this->postJson('/api/auth/switch-role', ['role_id' => SystemUser::ROLE_ADMIN])
+         ->assertStatus(422)
+         ->assertJsonValidationErrors(['role_id']);
+});
+
+test('switch-role succeeds for a role the caller actively holds, returns the assumed role, and sets a fresh token cookie', function () {
+    // Base account is Student; Admin is a second, concurrent grant with
+    // a restricted policy — the "student staff" scenario end to end.
+    $person = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'status' => 'Activated']);
+
+    RoleAssignment::create([
+        'user_id' => $person->user_id,
+        'role_id' => SystemUser::ROLE_STUDENT,
+        'status'  => RoleAssignment::STATUS_ACTIVE,
+    ]);
+
+    RoleAssignment::create([
+        'user_id' => $person->user_id,
+        'role_id' => SystemUser::ROLE_ADMIN,
+        'status'  => RoleAssignment::STATUS_ACTIVE,
+    ]);
+
+    // Sanctum::actingAs() bypasses real token issuance, which this test
+    // needs (switchTo() deletes/reissues the token the request came in
+    // on) — authenticate with a real created token instead, same as a
+    // real browser session would present via the 'token' cookie/bearer
+    // header.
+    $plainTextToken = $person->createToken('sanctum-idp')->plainTextToken;
+
+    $response = $this->withHeader('Authorization', "Bearer {$plainTextToken}")
+        ->postJson('/api/auth/switch-role', ['role_id' => SystemUser::ROLE_ADMIN]);
+
+    $response->assertOk()
+        ->assertJsonPath('user.role_id', SystemUser::ROLE_ADMIN)
+        ->assertCookie('token');
+
+    // Old token gone, exactly one new one in its place.
+    $person->refresh();
+    expect($person->tokens()->count())->toBe(1);
+    expect($person->tokens()->first()->name)->toBe('sanctum-idp');
+
+    // The old plaintext token no longer authenticates anything.
+    $this->withHeader('Authorization', "Bearer {$plainTextToken}")
+        ->getJson('/api/me')
+        ->assertStatus(401);
+});
+
+test('the tokens cookie issued by switch-role immediately unlocks the newly assumed roles routes', function () {
+    $person = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'status' => 'Activated']);
+
+    RoleAssignment::create([
+        'user_id' => $person->user_id,
+        'role_id' => SystemUser::ROLE_STUDENT,
+        'status'  => RoleAssignment::STATUS_ACTIVE,
+    ]);
+
+    RoleAssignment::create([
+        'user_id' => $person->user_id,
+        'role_id' => SystemUser::ROLE_SUPER_ADMIN,
+        'status'  => RoleAssignment::STATUS_ACTIVE,
+    ]);
+
+    $plainTextToken = $person->createToken('sanctum-idp')->plainTextToken;
+
+    // A Student session cannot reach a Super-Admin-only route yet.
+    $this->withHeader('Authorization', "Bearer {$plainTextToken}")
+        ->getJson('/api/audit-logs')
+        ->assertStatus(403);
+
+    $switchResponse = $this->withHeader('Authorization', "Bearer {$plainTextToken}")
+        ->postJson('/api/auth/switch-role', ['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $switchResponse->assertOk()->assertJsonPath('user.role_id', SystemUser::ROLE_SUPER_ADMIN);
+
+    // 'token' is deliberately unencrypted (see EncryptCookies::$except) —
+    // the same plaintext value a real browser would resend automatically
+    // as a cookie on its next request.
+    $newTokenCookie = collect($switchResponse->headers->getCookies())
+        ->first(fn ($cookie) => $cookie->getName() === 'token');
+
+    expect($newTokenCookie)->not->toBeNull();
+    expect($newTokenCookie->getValue())->not->toBe($plainTextToken);
+
+    // The freshly-issued cookie authenticates the Super-Admin route the
+    // Student-only token above was rejected from.
+    $this->withUnencryptedCookie('token', $newTokenCookie->getValue())
+        ->getJson('/api/audit-logs')
+        ->assertOk();
+
+    // And the pre-switch token is dead — switchTo() deleted it.
+    $this->withHeader('Authorization', "Bearer {$plainTextToken}")
+        ->getJson('/api/me')
+        ->assertStatus(401);
 });

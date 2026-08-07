@@ -80,7 +80,8 @@ const ROLE_CONFIG = {
 
 const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
   const navigate = useNavigate();
-  const { user, logout, idpOffline, switchRoleOverride, activeRoleOverride } = useAuth();
+  const { user, logout, idpOffline, roleAssignments, switchRole, ROLE_ID_TO_NAME } = useAuth();
+  const [isSwitching, setIsSwitching] = useState(false);
   const { isDark } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
@@ -94,13 +95,48 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
   });
   const [headerHeight, setHeaderHeight] = useState(101); // Fallback default
 
-  // canUseSwitcher: enabled for admins whose policy is named "Student Staff".
-  // Explicitly exclude `super_admin` so they don't see the switcher on mobile.
-  const canUseSwitcher = (() => {
-    if (!user) return false;
-    if (user.role_name === 'super_admin') return false;
-    return user.policy?.name === 'Student Staff';
-  })();
+  // canUseSwitcher: enabled whenever this account currently holds more
+  // than one Active role_assignments row (e.g. Student + a
+  // policy-restricted Admin — the "student staff" case). Server-driven
+  // now, via GET /role-assignments/mine, rather than a hardcoded
+  // "Student Staff" policy name — any account granted a second role
+  // gets the switcher automatically, with no extra flag to maintain.
+  const canUseSwitcher = Array.isArray(roleAssignments) && roleAssignments.length > 1;
+
+  const switchableRoles = useMemo(() => {
+    const ICONS = { admin: BriefcaseIcon, super_admin: BriefcaseIcon, student: UserIcon, alumni: AcademicCapIcon };
+    const GRADS = {
+      admin: 'from-[#0052d4] to-[#4364f7]',
+      super_admin: 'from-[#0052d4] to-[#4364f7]',
+      student: 'from-[#11998e] to-[#38ef7d]',
+      alumni: 'from-[#11998e] to-[#38ef7d]',
+    };
+    const LABELS = { admin: 'Admin', super_admin: 'Super Admin', student: 'Student', alumni: 'Alumni' };
+
+    return (roleAssignments || []).map((assignment) => {
+      const roleName = ROLE_ID_TO_NAME?.[assignment.role_id];
+      return {
+        role_id: assignment.role_id,
+        label: LABELS[roleName] || roleName || 'Unknown',
+        description: assignment.policy?.name || (roleName === 'student' ? 'Student Member' : 'Account role'),
+        icon: ICONS[roleName] || UserIcon,
+        grad: GRADS[roleName] || 'from-gray-500 to-gray-700',
+      };
+    });
+  }, [roleAssignments, ROLE_ID_TO_NAME]);
+
+  const handleSwitchRole = async (roleId) => {
+    if (isSwitching) return;
+    setIsSwitching(true);
+    try {
+      await switchRole(roleId);
+      setIsSwitchModalOpen(false);
+    } catch (err) {
+      console.error('Role switch failed:', err);
+    } finally {
+      setIsSwitching(false);
+    }
+  };
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
       return localStorage.getItem('sidebar-collapsed') === 'true';
@@ -413,23 +449,21 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                 Your account has multiple roles assigned. Please select the role context for your current session.
               </p>
 
-              {/* List */}
+              {/* List — one entry per Active role_assignments row this
+                  account currently holds (see GET /role-assignments/mine).
+                  Selecting a role calls the server-enforced
+                  POST /auth/switch-role, not a client-only override. */}
               <div className="w-full space-y-3">
-                {[
-                  { id: "admin", label: "Admin", description: "Registrar Staff", icon: BriefcaseIcon, grad: "from-[#0052d4] to-[#4364f7]" },
-                  { id: "student", label: "Student", description: "Student Member", icon: UserIcon, grad: "from-[#11998e] to-[#38ef7d]" },
-                ].map((roleOption) => {
-                  const isSelected = activeRoleOverride === roleOption.id;
+                {switchableRoles.map((roleOption) => {
+                  const isSelected = user?.role_id === roleOption.role_id;
                   const RoleIcon = roleOption.icon;
                   return (
                     <button
-                      key={roleOption.label}
+                      key={roleOption.role_id}
                       type="button"
-                      onClick={() => {
-                        switchRoleOverride(roleOption.id);
-                        setIsSwitchModalOpen(false);
-                      }}
-                      className={`w-full text-left flex items-center justify-between p-3.5 border rounded-xl transition-all duration-200 group cursor-pointer active:scale-98 shadow-xs ${isSelected
+                      disabled={isSwitching}
+                      onClick={() => handleSwitchRole(roleOption.role_id)}
+                      className={`w-full text-left flex items-center justify-between p-3.5 border rounded-xl transition-all duration-200 group cursor-pointer active:scale-98 shadow-xs disabled:opacity-60 disabled:cursor-wait ${isSelected
                           ? (isDark
                             ? "bg-red-955/20 border-red-500/40 text-white font-bold"
                             : "bg-red-50 border-red-200 text-pup-maroon font-bold")
