@@ -21,13 +21,32 @@ use Illuminate\Support\Facades\Hash;
  *
  * Usage: wired into DatabaseSeeder::run() behind an
  * app()->environment('local') guard — never runs outside local.
+ *
+ * SECOND SAFETY CHECK
+ * --------------------
+ * app()->environment('local') alone is not sufficient: config caching
+ * (bootstrap/cache/config.php baked from a machine where APP_ENV=local),
+ * .env loading-order edge cases, or a CI runner that never explicitly
+ * sets APP_ENV can all cause environment('local') to return true during
+ * `php artisan test` / `migrate:fresh --seed`. When that happens this
+ * seeder's fixed accounts — including a student named "Juan Dela Cruz"
+ * — become permanent rows for the entire test run (TestCase::$seed only
+ * runs DatabaseSeeder once; RefreshDatabase rolls back each test's own
+ * data, not the initial seed). Any test that creates its own "Juan" and
+ * asserts an exact result count then silently inflates by one seeded
+ * row it never created — exactly what happened in
+ * RoleAssignmentSearchTest::"finds a student by first name prefix".
+ *
+ * runningUnitTests() checks the dedicated 'testing' console/PHPUnit
+ * signal Laravel sets independently of APP_ENV, so this still refuses
+ * to run even if the environment() check above is ever fooled.
  */
 class LocalDevSeeder extends Seeder
 {
     public function run(): void
     {
-        if (!app()->environment('local')) {
-            $this->command->error('LocalDevSeeder refused to run outside APP_ENV=local.');
+        if (!app()->environment('local') || app()->runningUnitTests()) {
+            $this->command?->error('LocalDevSeeder refused to run outside APP_ENV=local (or inside a test run).');
             return;
         }
 
