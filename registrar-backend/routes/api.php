@@ -23,6 +23,7 @@ use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
 use App\Http\Controllers\AccessRequestController;
 use App\Http\Controllers\RoleAssignmentController;
+use App\Http\Controllers\SignatoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -173,6 +174,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
         Route::put('request-purposes/{id}',    [RequestPurposeController::class, 'update']);
         Route::delete('request-purposes/{id}', [RequestPurposeController::class, 'destroy']);
+
+        // Signatories (certificate signees) — admin-only end to end,
+        // unlike document-types/certifications above whose GET is open to
+        // all authenticated roles. See create_signatories_table migration.
+        Route::get('signatories',           [SignatoryController::class, 'index']);
+        Route::post('signatories',          [SignatoryController::class, 'store']);
+        Route::put('signatories/{id}',      [SignatoryController::class, 'update']);
+        Route::delete('signatories/{id}',   [SignatoryController::class, 'destroy']);
     });
 
     // Superadmin only (role 4)
