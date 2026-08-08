@@ -155,6 +155,16 @@ export const uploadCertificationLayoutLogo = (id, formData) =>
   });
 
 // -------------------------------------------------------
+// SIGNATORIES (certificate signees) — read/write: Admin only
+// (unlike document-types/certifications, GET is admin-only here too —
+// see routes/api.php)
+// -------------------------------------------------------
+export const getSignatories    = ()          => api.get("/signatories");
+export const createSignatory   = (data)      => api.post("/signatories", data);
+export const updateSignatory   = (id, data)  => api.put(`/signatories/${id}`, data);
+export const deleteSignatory   = (id)        => api.delete(`/signatories/${id}`);
+
+// -------------------------------------------------------
 // DOCUMENT REQUESTS (read: all | write: Student/Alumni | manage: Admin+)
 // Response shape from index: { current_page, data, last_page, per_page, total }
 // Read records from response.data.data, not response.data.
