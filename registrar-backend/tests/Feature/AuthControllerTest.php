@@ -387,8 +387,18 @@ test('the tokens cookie issued by switch-role immediately unlocks the newly assu
 
     // The freshly-issued cookie authenticates the Super-Admin route the
     // Student-only token above was rejected from.
+    //
+    // withHeader() sets a DEFAULT header that Laravel's test client keeps
+    // attaching to every subsequent request in this method, so the old
+    // (now-deleted) bearer token from the calls above is still present
+    // here unless explicitly cleared. AuthenticateFromCookie only
+    // promotes the 'token' cookie into the Authorization header when no
+    // bearer token is already present, so without this the request would
+    // keep trying — and failing — to authenticate with the dead old
+    // token instead of the fresh cookie.
     $this->app['auth']->forgetGuards();
-    $this->withUnencryptedCookie('token', $newTokenCookie->getValue())
+    $this->withoutHeader('Authorization')
+        ->withUnencryptedCookie('token', $newTokenCookie->getValue())
         ->getJson('/api/audit-logs')
         ->assertOk();
 

@@ -82,7 +82,13 @@ function searchTestAlumni(string $firstName, string $lastName, array $userAttrs 
 
 test('finds a student by first name prefix', function () {
     $juan = searchTestStudent('Juan', 'Dela Cruz');
-    searchTestStudent('Maria', 'Santos'); // noise — must not match
+    // Email pinned (not left to Faker) so it can never coincidentally
+    // start with the 'Jua' search prefix below — searchGrantableUsers()
+    // matches on email too, and an unseeded Faker safeEmail() collides
+    // with 'jua...' just often enough to flake this exact-count
+    // assertion. Same fix already applied to the admin/alumni search
+    // tests further down this file.
+    searchTestStudent('Maria', 'Santos', ['email' => 'msantos-noise@registrar.edu']); // noise — must not match
 
     $results = app(RoleAssignmentService::class)->searchGrantableUsers('Jua');
 
