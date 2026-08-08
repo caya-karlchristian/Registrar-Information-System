@@ -5,6 +5,7 @@ import {
   getRequestStatuses,
   getRequestPurposes,
   getPrograms,
+  getSignatories,
 } from "../services/api";
 import { useAuth } from "./AuthProvider";
 
@@ -26,13 +27,20 @@ import { useAuth } from "./AuthProvider";
  *   at login time. Now we wait until `authLoading` is false AND `user` is set.
  *
  * Usage:
- *   const { documentTypes, certifications, statuses, purposes, loading } = useReferenceData();
+ *   const { documentTypes, certifications, signatories, statuses, purposes, loading } = useReferenceData();
  *
  * Convenience helpers are also exported:
  *   docTypeName(id)   → string | undefined
  *   certName(id)      → string | undefined
  *   purposeName(id)   → string | undefined
  *   statusConfig(id)  → { label, classes } | undefined
+ *
+ * Note: GET /signatories is admin-only server-side (unlike document
+ * types/certifications, which any authenticated role can read) — see
+ * routes/api.php. For non-admin sessions that request will 403 and
+ * Promise.allSettled below simply leaves `signatories` as []; that's
+ * expected, since only certificate generation (an admin-only flow)
+ * needs it.
  */
 
 // Status display config is purely presentational — it does NOT need to come
@@ -57,6 +65,7 @@ export const ReferenceDataProvider = ({ children }) => {
   const [statuses,        setStatuses]        = useState([]);
   const [purposes,        setPurposes]        = useState([]);
   const [programs,        setPrograms]        = useState([]);
+  const [signatories,     setSignatories]     = useState([]);
   const [loading,         setLoading]         = useState(true);
 
   useEffect(() => {
@@ -75,6 +84,7 @@ export const ReferenceDataProvider = ({ children }) => {
       setStatuses([]);
       setPurposes([]);
       setPrograms([]);
+      setSignatories([]);
       setLoading(false);
       return;
     }
@@ -89,12 +99,17 @@ export const ReferenceDataProvider = ({ children }) => {
         getRequestStatuses(),
         getRequestPurposes(),
         getPrograms(),
+        getSignatories(),
       ]);
       if (results[0].status === "fulfilled") setDocumentTypes(results[0].value.data ?? []);
       if (results[1].status === "fulfilled") setCertifications(results[1].value.data ?? []);
       if (results[2].status === "fulfilled") setStatuses(results[2].value.data ?? []);
       if (results[3].status === "fulfilled") setPurposes(results[3].value.data ?? []);
       if (results[4].status === "fulfilled") setPrograms(results[4].value.data?.data ?? []);
+      // Already ordered by sort_order server-side (see SignatoryController::index).
+      // Rejects here (e.g. 403 for a non-admin session) simply leave signatories
+      // as [] — see the doc comment above.
+      if (results[5].status === "fulfilled") setSignatories(results[5].value.data ?? []);
       setLoading(false);
     };
 
@@ -136,6 +151,26 @@ export const ReferenceDataProvider = ({ children }) => {
   const programName = (id) =>
     programs.find((p) => Number(p.ogos_course_id) === Number(id))?.name;
 
+  /** Return the signatory record for a given signatory_id, or undefined. */
+  const signatoryById = (id) =>
+    signatories.find((s) => Number(s.signatory_id) === Number(id));
+
+  /**
+   * Re-fetch just the signatories list. Call this after create/update/delete
+   * from an admin management screen so the rest of the app (e.g. the
+   * certificate signee dropdown) sees the change without a full reload of
+   * every other reference dataset.
+   */
+  const refreshSignatories = async () => {
+    try {
+      const res = await getSignatories();
+      setSignatories(res.data ?? []);
+    } catch {
+      // Leave the existing list as-is on failure (e.g. transient network
+      // error) rather than clearing it out from under the UI.
+    }
+  };
+
   return (
     <ReferenceDataContext.Provider
       value={{
@@ -144,12 +179,15 @@ export const ReferenceDataProvider = ({ children }) => {
         statuses,
         purposes,
         programs,
+        signatories,
         loading,
         docTypeName,
         certName,
         statusConfig,
         purposeName,
         programName,
+        signatoryById,
+        refreshSignatories,
       }}
     >
       {children}

@@ -2,6 +2,26 @@ import api from "../services/api";
 
 export const fetchCurrentUser = () => api.get("/me");
 
+/**
+ * switchRoleRequest — Step 3 of Multi-Role Assignments. Calls the
+ * server-enforced POST /auth/switch-role endpoint, which validates the
+ * caller actually holds an Active role_assignments row for role_id and
+ * reissues the session's token stamped with it. Replaces the old
+ * localStorage-only `activeRoleOverride` hack: the switch now really
+ * changes what the backend will authorize for this session, not just
+ * what the UI displays.
+ */
+export const switchRoleRequest = (roleId) =>
+  api.post("/auth/switch-role", { role_id: roleId });
+
+/**
+ * fetchMyRoleAssignments — the roles this account currently holds an
+ * Active (not expired/revoked) grant for. Drives the role-switcher
+ * modal (Navigation.jsx) so it lists exactly what the server would
+ * actually accept, instead of a hardcoded admin/student pair.
+ */
+export const fetchMyRoleAssignments = () => api.get("/role-assignments/mine");
+
 export const ssoCallbackRequest = (code) => api.post("/auth/callback", { code });
 
 /**

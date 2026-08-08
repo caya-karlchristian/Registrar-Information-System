@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthProvider";
 import { useTheme } from "../context/ThemeContext";
@@ -7,13 +7,25 @@ import {
   ShieldCheckIcon,
   ChevronRightIcon,
   BriefcaseIcon,
-  UserIcon
+  UserIcon,
+  AcademicCapIcon
 } from "@heroicons/react/24/outline";
+
+const ICONS = { admin: BriefcaseIcon, super_admin: BriefcaseIcon, student: UserIcon, alumni: AcademicCapIcon };
+const GRADS = {
+  admin: "from-[#0052d4] to-[#4364f7]",
+  super_admin: "from-[#0052d4] to-[#4364f7]",
+  student: "from-[#11998e] to-[#38ef7d]",
+  alumni: "from-[#11998e] to-[#38ef7d]",
+};
+const LABELS = { admin: "Admin", super_admin: "Super Admin", student: "Student", alumni: "Alumni" };
 
 const AccessControlPage = () => {
   const navigate = useNavigate();
-  const { user, switchRoleOverride, activeRoleOverride } = useAuth();
+  const { user, roleAssignments, switchRole, ROLE_ID_TO_NAME } = useAuth();
   const { isDark } = useTheme();
+  const [isSwitching, setIsSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState(null);
 
   // If there's no logged-in user, redirect to landing
   React.useEffect(() => {
@@ -22,25 +34,40 @@ const AccessControlPage = () => {
     }
   }, [user, navigate]);
 
-  const roles = [
-    {
-      id: "admin",
-      label: "Admin",
-      description: user?.policy?.name || "Registrar Staff",
-      icon: BriefcaseIcon,
-      grad: "from-[#0052d4] to-[#4364f7]"
-    },
-    {
-      id: "student",
-      label: "Student",
-      description: "Student Member",
-      icon: UserIcon,
-      grad: "from-[#11998e] to-[#38ef7d]"
-    },
-  ];
+  // Roles this account currently holds an Active role_assignments grant
+  // for — see GET /role-assignments/mine, exposed via AuthProvider.
+  // Server-driven, not a hardcoded admin/student pair, so this page
+  // works for any multi-role account shape going forward.
+  const roles = useMemo(() => {
+    return (roleAssignments || []).map((assignment) => {
+      const roleName = ROLE_ID_TO_NAME?.[assignment.role_id];
+      return {
+        role_id: assignment.role_id,
+        label: LABELS[roleName] || roleName || "Unknown",
+        description: assignment.policy?.name || (roleName === "student" ? "Student Member" : "Account role"),
+        icon: ICONS[roleName] || UserIcon,
+        grad: GRADS[roleName] || "from-gray-500 to-gray-700",
+      };
+    });
+  }, [roleAssignments, ROLE_ID_TO_NAME]);
 
-  const handleSelectRole = (roleId) => {
-    switchRoleOverride(roleId);
+  const handleSelectRole = async (roleId) => {
+    if (isSwitching) return;
+    setIsSwitching(true);
+    setSwitchError(null);
+    try {
+      // Server-enforced (POST /auth/switch-role) — see
+      // RoleAssignmentService::switchTo(). switchRole() itself navigates
+      // to the assumed role's home once the backend confirms it.
+      await switchRole(roleId);
+    } catch (err) {
+      setSwitchError(
+        err.response?.data?.message ||
+        "Couldn't switch roles — that assignment may have expired or been revoked. Please refresh and try again."
+      );
+    } finally {
+      setIsSwitching(false);
+    }
   };
 
   return (
@@ -71,23 +98,29 @@ const AccessControlPage = () => {
           }`}>
           Switch Role
         </h1>
-        <p className={`text-sm text-center max-w-sm leading-relaxed mb-8 transition-colors ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'
+        <p className={`text-sm text-center max-w-sm leading-relaxed mb-4 transition-colors ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'
           }`}>
           Your account has multiple roles assigned. Please select the role context for your current session.
         </p>
+
+        {switchError && (
+          <p className="w-full text-center text-xs font-semibold text-red-500 mb-4">
+            {switchError}
+          </p>
+        )}
 
         {/* Roles List */}
         <div className="w-full space-y-4">
           {roles.map((role) => {
             const Icon = role.icon;
-            const currentActiveRole = activeRoleOverride || user?.role_name;
-            const isSelected = currentActiveRole === role.id;
+            const isSelected = user?.role_id === role.role_id;
             return (
               <button
-                key={role.id}
+                key={role.role_id}
                 type="button"
-                onClick={() => handleSelectRole(role.id)}
-                className={`w-full text-left flex items-center justify-between p-4 border rounded-2xl transition-all duration-200 group cursor-pointer active:scale-98 shadow-xs ${isSelected
+                disabled={isSwitching}
+                onClick={() => handleSelectRole(role.role_id)}
+                className={`w-full text-left flex items-center justify-between p-4 border rounded-2xl transition-all duration-200 group cursor-pointer active:scale-98 shadow-xs disabled:opacity-60 disabled:cursor-wait ${isSelected
                     ? (isDark
                       ? "bg-red-950/20 border-red-500/40 text-white font-bold"
                       : "bg-red-50 border-red-200 text-pup-maroon font-bold")

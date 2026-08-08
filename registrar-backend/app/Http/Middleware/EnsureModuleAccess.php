@@ -24,6 +24,13 @@ use Illuminate\Http\Request;
  * All the actual resolution logic (own policy -> default policy ->
  * deny) lives on SystemUser::hasModuleAccess() so there is exactly one
  * implementation shared with UserResource's `effective_permissions`.
+ *
+ * Step 3 (Multi-Role Assignments): hasModuleAccess() resolves through
+ * isAdmin()/isSuperAdmin()/effectivePermissions(), which now all read
+ * the session's ASSUMED role first (see SystemUser::assumedRoleId() /
+ * assumedPolicyId()) — so a student-staff session that has switched to
+ * its Admin grant is gated by that grant's policy here automatically,
+ * with no change needed in this file.
  */
 class EnsureModuleAccess
 {

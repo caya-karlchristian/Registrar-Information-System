@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import {
@@ -6,6 +6,8 @@ import {
   logoutRequest,
   ssoCallbackRequest,
   localLoginRequest,
+  switchRoleRequest,
+  fetchMyRoleAssignments,
 } from "../services/authService";
 import { resetEcho } from "../services/echo";
 import ErrorToast from "../components/ErrorToast";
@@ -31,12 +33,28 @@ export const ROLE_HOME = {
   [ROLES.SUPER_ADMIN]: "/super-admin",
 };
 
+// Mirrors SystemUser::ROLE_STUDENT / ROLE_ALUMNI / ROLE_ADMIN /
+// ROLE_SUPER_ADMIN — role_assignments rows carry role_id (an int), not
+// the role_name string UserResource returns, so the switcher needs both
+// directions of this mapping.
+// eslint-disable-next-line react-refresh/only-export-components
+export const ROLE_ID = {
+  STUDENT:     1,
+  ALUMNI:      2,
+  ADMIN:       3,
+  SUPER_ADMIN: 4,
+};
+
+const ROLE_ID_TO_NAME = {
+  [ROLE_ID.STUDENT]:     ROLES.STUDENT,
+  [ROLE_ID.ALUMNI]:      ROLES.ALUMNI,
+  [ROLE_ID.ADMIN]:       ROLES.ADMIN,
+  [ROLE_ID.SUPER_ADMIN]: ROLES.SUPER_ADMIN,
+};
+
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [activeRoleOverride, setActiveRoleOverride] = useState(
-    () => localStorage.getItem("activeRoleOverride")
-  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -47,48 +65,33 @@ export const AuthProvider = ({ children }) => {
     () => localStorage.getItem("hasAgreed") === "true"
   );
 
-  // effectiveUser overlays the activeRoleOverride on top of the raw
-  // user object so every consumer sees the switched role transparently.
-  const effectiveUser = React.useMemo(() => {
-    if (!user) return null;
-    if (!activeRoleOverride) return user;
+  // The roles this account currently holds an Active (not
+  // expired/revoked) role_assignments grant for — e.g. a student-staff
+  // account has two entries here: Student and a policy-restricted
+  // Admin. Drives the Navigation.jsx switcher modal. Only meaningful
+  // once `user` is loaded; empty for a signed-out session.
+  const [roleAssignments, setRoleAssignments] = useState([]);
+  const [roleAssignmentsLoading, setRoleAssignmentsLoading] = useState(false);
 
-    let permissions = user.effective_permissions;
-    if (user.role_name === 'super_admin' && activeRoleOverride === 'admin') {
-      permissions = {
-        dashboard: ['Access'],
-        inbox: ['Access'],
-        analytics: ['Access'],
-        logbook: ['Access'],
-        profile: ['Access'],
-        access_requests: ['Access'],
-        student_staff_switch: ['Access'],
-      };
+  const refreshRoleAssignments = useCallback(async () => {
+    setRoleAssignmentsLoading(true);
+    try {
+      const res = await fetchMyRoleAssignments();
+      const assignments = res.data?.data ?? [];
+      setRoleAssignments(assignments);
+      // Returned (not just set into state) so callers that need the
+      // freshly-fetched list *synchronously after the await* — namely
+      // routeAfterAuth() below — don't have to read back a state value
+      // that may not have re-rendered yet.
+      return assignments;
+    } catch {
+      // Non-fatal — the switcher just won't show extra roles this time.
+      setRoleAssignments([]);
+      return [];
+    } finally {
+      setRoleAssignmentsLoading(false);
     }
-
-    return {
-      ...user,
-      role_name: activeRoleOverride,
-      effective_permissions: permissions
-    };
-  }, [user, activeRoleOverride]);
-
-  const switchRoleOverride = (roleName) => {
-    if (roleName) {
-      localStorage.setItem("activeRoleOverride", roleName);
-    } else {
-      localStorage.removeItem("activeRoleOverride");
-    }
-
-    // Navigate FIRST so the old page's ProtectedRoute never sees
-    // the role mismatch (which would flash /forbidden).
-    const destRole = roleName || user?.role_name;
-    const destination = ROLE_HOME[destRole] ?? "/";
-    navigate(destination, { replace: true });
-
-    // Update state on the next tick — by then the new route is mounted.
-    setTimeout(() => setActiveRoleOverride(roleName), 0);
-  };
+  }, []);
 
   const agreeToTerms = () => {
     localStorage.setItem("hasAgreed", "true");
@@ -108,6 +111,7 @@ export const AuthProvider = ({ children }) => {
         const res      = await fetchCurrentUser();
         const userData = res.data.data;
         setUser(userData);
+        refreshRoleAssignments();
       } catch {
         setUser(null);
       } finally {
@@ -115,7 +119,39 @@ export const AuthProvider = ({ children }) => {
       }
     };
     initializeAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // -------------------------------------------------------
+  // Shared post-login routing: anyone holding more than one Active
+  // role_assignments row goes to /access-control to pick a role context
+  // first; everyone else goes straight to their role's home.
+  //
+  // This used to key off `policy?.name === 'Student Staff'` — a
+  // hardcoded check against a pre-existing system *policy* (seeded in
+  // 2026_07_11_000001_create_policies_table.php, for restricted-permission
+  // single-role Admins) that predates role_assignments and has nothing to
+  // do with holding two roles. Navigation.jsx's switcher already migrated
+  // off that same heuristic to `roleAssignments.length > 1` — see the
+  // comment there ("any account granted a second role gets the switcher
+  // automatically, with no extra flag to maintain"). This brings
+  // routeAfterAuth() in line with it, so a genuine multi-role account
+  // (granted via the new flow, under any policy name) actually sees the
+  // picker instead of landing straight on one role's dashboard.
+  //
+  // Takes `assignments` explicitly rather than reading the roleAssignments
+  // state value, since callers await refreshRoleAssignments() and call
+  // this immediately after — state set inside that call may not have
+  // committed to a re-render yet, but the returned array is always current.
+  // -------------------------------------------------------
+  const routeAfterAuth = (userData, assignments) => {
+    if (Array.isArray(assignments) && assignments.length > 1) {
+      navigate("/access-control", { replace: true });
+      return;
+    }
+    const destination = ROLE_HOME[userData.role_name] ?? "/";
+    navigate(destination, { replace: true });
+  };
 
   // -------------------------------------------------------
   // login() — IDP-first with automatic local fallback.
@@ -126,23 +162,13 @@ export const AuthProvider = ({ children }) => {
   // can show a non-blocking advisory banner via the idpOffline context value.
   // -------------------------------------------------------
   const login = async (email, password) => {
-    localStorage.removeItem("activeRoleOverride");
-    setActiveRoleOverride(null);
     const { data } = await api.post("/login", { email, password });
     const userData = data.data ?? data.user;
 
     setUser(userData);
     setIdpOffline(!!data.idp_offline);
-
-    // If this admin has the "Student Staff" policy,
-    // redirect to the access-control page so they can pick a role.
-    if (userData.role_name === 'admin' && userData.policy?.name === 'Student Staff') {
-      navigate("/access-control", { replace: true });
-      return;
-    }
-
-    const destination = ROLE_HOME[userData.role_name] ?? "/";
-    navigate(destination, { replace: true });
+    const assignments = await refreshRoleAssignments();
+    routeAfterAuth(userData, assignments);
   };
 
   // -------------------------------------------------------
@@ -150,23 +176,13 @@ export const AuthProvider = ({ children }) => {
   // Shown on the LandingPage when the user explicitly chooses it.
   // -------------------------------------------------------
   const localLogin = async (email, password) => {
-    localStorage.removeItem("activeRoleOverride");
-    setActiveRoleOverride(null);
     const { data } = await localLoginRequest(email, password);
     const userData = data.data ?? data.user;
 
     setUser(userData);
     setIdpOffline(true); // they explicitly chose local login
-
-    // If this admin has the "Student Staff" policy,
-    // redirect to the access-control page so they can pick a role.
-    if (userData.role_name === 'admin' && userData.policy?.name === 'Student Staff') {
-      navigate("/access-control", { replace: true });
-      return;
-    }
-
-    const destination = ROLE_HOME[userData.role_name] ?? "/";
-    navigate(destination, { replace: true });
+    const assignments = await refreshRoleAssignments();
+    routeAfterAuth(userData, assignments);
   };
 
   // -------------------------------------------------------
@@ -177,10 +193,9 @@ export const AuthProvider = ({ children }) => {
     setHasAgreed(false);
     setIdpOffline(false);
     localStorage.removeItem("hasAgreed");
-    localStorage.removeItem("activeRoleOverride");
-    setActiveRoleOverride(null);
     resetEcho();
     setUser(null);
+    setRoleAssignments([]);
     try {
       // logoutRequest() handles the redirect internally:
       //   · IDP session  → window.location.href = idp_logout_url
@@ -198,24 +213,14 @@ export const AuthProvider = ({ children }) => {
   // SSO callback — called by SsoCallbackPage after IdP redirect.
   // -------------------------------------------------------
   const ssoCallback = async (code) => {
-    localStorage.removeItem("activeRoleOverride");
-    setActiveRoleOverride(null);
     try {
       const { data } = await ssoCallbackRequest(code);
       const userData = data.data ?? data.user;
 
       setUser(userData);
       setIdpOffline(false);
-
-      // If this admin has the "Student Staff" policy,
-      // redirect to the access-control page so they can pick a role.
-      if (userData.role_name === 'admin' && userData.policy?.name === 'Student Staff') {
-        navigate("/access-control", { replace: true });
-        return;
-      }
-
-      const destination = ROLE_HOME[userData.role_name] ?? "/";
-      navigate(destination, { replace: true });
+      const assignments = await refreshRoleAssignments();
+      routeAfterAuth(userData, assignments);
     } catch (err) {
       const status    = err.response?.status;
       const logoutUrl = err.response?.data?.logout_url;
@@ -232,15 +237,44 @@ export const AuthProvider = ({ children }) => {
   };
 
   // -------------------------------------------------------
+  // switchRole() — Step 3/4 of Multi-Role Assignments.
+  //
+  // Server-enforced: POST /auth/switch-role validates the caller holds
+  // an Active role_assignments row for roleId and reissues the session's
+  // token stamped with it (see RoleAssignmentService::switchTo()). This
+  // replaces the old client-only `activeRoleOverride` localStorage hack
+  // — a session can no longer "switch" to a role it doesn't actually
+  // hold, and the backend's own gates (RoleMiddleware, EnsureModuleAccess)
+  // now honor the switch too, not just the UI.
+  //
+  // Accepts a numeric role_id (matching role_assignments.role_id /
+  // SystemUser::ROLE_* — see ROLE_ID above), since that's what the
+  // /role-assignments/mine list and the API both key off.
+  // -------------------------------------------------------
+  const switchRole = async (roleId) => {
+    const { data } = await switchRoleRequest(roleId);
+    const userData = data.data ?? data.user;
+
+    setUser(userData);
+    // The set of roles held doesn't change when switching (only which
+    // one is currently assumed does) — no need to refetch, but doing so
+    // keeps this resilient if a grant/revoke happened concurrently.
+    refreshRoleAssignments();
+
+    const destination = ROLE_HOME[userData.role_name] ?? "/";
+    navigate(destination, { replace: true });
+  };
+
+  // -------------------------------------------------------
   // Role helpers
   // -------------------------------------------------------
-  const hasRole = (roleName) => effectiveUser?.role_name === roleName;
+  const hasRole = (roleName) => user?.role_name === roleName;
   const isStaff = () => hasRole(ROLES.ADMIN) || hasRole(ROLES.SUPER_ADMIN);
 
   return (
     <AuthContext.Provider
       value={{
-        user: effectiveUser,
+        user,
         loading,
         error,
         login,
@@ -254,8 +288,12 @@ export const AuthProvider = ({ children }) => {
         hasAgreed,
         setHasAgreed,
         agreeToTerms,
-        switchRoleOverride,
-        activeRoleOverride,
+        // Multi-role switching (Step 3/4)
+        roleAssignments,
+        roleAssignmentsLoading,
+        refreshRoleAssignments,
+        switchRole,
+        ROLE_ID_TO_NAME,
       }}
     >
       <ErrorToast message={error} onClose={() => setError(null)} />

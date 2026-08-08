@@ -7,13 +7,17 @@ import {
   MagnifyingGlassIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  KeyIcon
+  KeyIcon,
+  IdentificationIcon,
+  UserPlusIcon
 } from "@heroicons/react/24/outline";
 import DropDown from '../components/DropDown';
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import UserModal from "../components/UserModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import LocalPasswordModal from "../components/LocalPasswordModal";
+import RoleAssignmentsModal from "../components/RoleAssignmentsModal";
+import GrantRoleUserPicker from "../components/GrantRoleUserPicker";
 import {
   getSystemUsers,
   createSystemUser,
@@ -142,6 +146,13 @@ const UserManagement = () => {
   const [isLocalPasswordModalOpen, setIsLocalPasswordModalOpen] = useState(false);
   const [selectedUserForLocalAuth, setSelectedUserForLocalAuth] = useState(null);
   const [localAuthSubmitting, setLocalAuthSubmitting] = useState(false);
+
+  // Roles tab (Multi-Role Assignments) — per-user grant/revoke history,
+  // rendered via RoleAssignmentsModal. Server-driven; no local state
+  // beyond "which user's modal is open" lives here, the modal owns its
+  // own fetch/grant/revoke lifecycle.
+  const [selectedUserForRoles, setSelectedUserForRoles] = useState(null);
+  const [isGrantPickerOpen, setIsGrantPickerOpen] = useState(false);
 
   // Policies come from the backend now (policies table via GET /policies).
   const [systemPolicies, setSystemPolicies] = useState([]);
@@ -356,6 +367,13 @@ const UserManagement = () => {
         )}
 
         <button
+          onClick={() => setIsGrantPickerOpen(true)}
+          className={`mt-4 sm:mt-6 w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-full text-sm font-semibold shadow transition-all border ${isDark ? 'border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+        >
+          Grant a Role <UserPlusIcon className="w-4 h-4" />
+        </button>
+
+        <button
           onClick={() => { setEditUser(null); setIsModalOpen(true); }}
           className={`sm:ml-auto mt-4 sm:mt-6 w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-full text-sm font-semibold shadow transition-all ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
         >
@@ -549,6 +567,12 @@ const UserManagement = () => {
                             <KeyIcon className="w-4 h-4" />
                           </button>
                         )}
+                        <button
+                          onClick={() => setSelectedUserForRoles(user)}
+                          title="Manage roles"
+                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
+                          <IdentificationIcon className="w-4 h-4" />
+                        </button>
                         <button onClick={() => { setEditUser(user); setIsModalOpen(true); }}
                           className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
                           <PencilSquareIcon className="w-4 h-4" />
@@ -619,6 +643,24 @@ const UserManagement = () => {
         onSubmit={handleSaveLocalPassword}
         user={selectedUserForLocalAuth}
         submitting={localAuthSubmitting}
+      />
+
+      <RoleAssignmentsModal
+        isOpen={!!selectedUserForRoles}
+        onClose={() => setSelectedUserForRoles(null)}
+        user={selectedUserForRoles}
+        systemPolicies={systemPolicies}
+        onSuccess={setSuccessMsg}
+        onError={setErrorMsg}
+      />
+
+      <GrantRoleUserPicker
+        isOpen={isGrantPickerOpen}
+        onClose={() => setIsGrantPickerOpen(false)}
+        onSelect={(pickedUser) => {
+          setIsGrantPickerOpen(false);
+          setSelectedUserForRoles(pickedUser);
+        }}
       />
 
       <SuccessToast 

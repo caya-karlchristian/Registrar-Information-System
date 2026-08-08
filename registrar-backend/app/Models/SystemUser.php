@@ -10,6 +10,7 @@ use App\Models\AlumniProfile;
 use App\Models\AlumniType;
 use App\Models\AlumniAcademicRecord;
 use App\Models\Policy;
+use App\Models\RoleAssignment;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class SystemUser extends Authenticatable
@@ -136,35 +137,137 @@ class SystemUser extends Authenticatable
         return $this->belongsTo(Policy::class, 'policy_id', 'policy_id');
     }
 
+    /**
+     * Every role this user has ever been granted, across all statuses
+     * (Active/Expired/Revoked) — the full history. Use activeRoleAssignments()
+     * below for "what can they do right now."
+     */
+    public function roleAssignments()
+    {
+        return $this->hasMany(RoleAssignment::class, 'user_id', 'user_id');
+    }
+
+    /**
+     * Roles this user currently holds — i.e. Active status AND not past
+     * expires_at. A "student staff" account has two rows here at once:
+     * one role_id = ROLE_STUDENT, one role_id = ROLE_ADMIN (with its own
+     * policy_id). This is what the switch-role endpoint validates
+     * against before letting someone assume a role for their session —
+     * see Step 3.
+     */
+    public function activeRoleAssignments()
+    {
+        return $this->roleAssignments()
+            ->active()
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            });
+    }
+
+    // -------------------------------------------------------
+    // ASSUMED ROLE (Step 3 — session-scoped role switching)
+    //
+    // A "student staff" account can hold two Active role_assignments at
+    // once (Student + Admin). users.role_id/policy_id stay the
+    // account's PRIMARY/default role; which one a given session is
+    // currently ACTING AS lives on that session's Sanctum token (see
+    // migration 2026_08_11_000000 and RoleAssignmentService::switchTo()).
+    //
+    // Every role_id-based helper below reads through here rather than
+    // the raw column directly, so the moment a session switches role
+    // (via POST /auth/switch-role), isAdmin()/hasModuleAccess()/etc. all
+    // reflect it consistently — there is exactly one place ("assumed")
+    // that resolves "what is this session allowed to act as right now."
+    //
+    // Fully backward compatible: currentAccessToken() is null for any
+    // model instance not resolved through the sanctum guard (console
+    // commands, manually loaded records, tests using the model
+    // directly), and active_role_assignment_id is null for every token
+    // that predates this feature or was issued by a plain login — both
+    // cases fall straight through to the raw column, unchanged.
+    // -------------------------------------------------------
+
+    private ?RoleAssignment $cachedAssumedAssignment = null;
+    private bool $resolvedAssumedAssignment = false;
+
+    /**
+     * The role_assignments row this session is currently assumed as, if
+     * any override is set on the current token and that assignment is
+     * still currently active (an assumed role can lapse mid-session if
+     * it was revoked or expired since the token was issued — treated
+     * the same as "no override" rather than trusting a stale value).
+     */
+    public function assumedRoleAssignment(): ?RoleAssignment
+    {
+        if ($this->resolvedAssumedAssignment) {
+            return $this->cachedAssumedAssignment;
+        }
+
+        $this->resolvedAssumedAssignment = true;
+
+        $token = $this->currentAccessToken();
+        $assignmentId = $token->active_role_assignment_id ?? null;
+
+        if (!$assignmentId) {
+            return $this->cachedAssumedAssignment = null;
+        }
+
+        $assignment = RoleAssignment::find($assignmentId);
+
+        return $this->cachedAssumedAssignment = ($assignment && $assignment->isCurrentlyActive())
+            ? $assignment
+            : null;
+    }
+
+    public function assumedRoleId(): int
+    {
+        return $this->assumedRoleAssignment()->role_id ?? $this->role_id;
+    }
+
+    /**
+     * Only meaningful when the assumed role (or, absent an override,
+     * the raw role) is Admin — mirrors the users.policy_id convention.
+     */
+    public function assumedPolicyId(): ?int
+    {
+        $assignment = $this->assumedRoleAssignment();
+
+        if ($assignment) {
+            return $assignment->role_id === self::ROLE_ADMIN ? $assignment->policy_id : null;
+        }
+
+        return $this->policy_id;
+    }
+
     // -------------------------------------------------------
     // ROLE HELPERS
     // -------------------------------------------------------
 
     public function isStudent(): bool
     {
-        return $this->role_id === self::ROLE_STUDENT;
+        return $this->assumedRoleId() === self::ROLE_STUDENT;
     }
 
     public function isAlumni(): bool
     {
-        return $this->role_id === self::ROLE_ALUMNI;
+        return $this->assumedRoleId() === self::ROLE_ALUMNI;
     }
 
     public function isAdmin(): bool
     {
-        return $this->role_id === self::ROLE_ADMIN;
+        return $this->assumedRoleId() === self::ROLE_ADMIN;
     }
 
     public function isSuperAdmin(): bool
     {
-        return $this->role_id === self::ROLE_SUPER_ADMIN;
+        return $this->assumedRoleId() === self::ROLE_SUPER_ADMIN;
     }
 
     // True for any staff-level access (admin OR super admin)
     // Useful for "can this user manage requests?" type checks
     public function isStaff(): bool
     {
-        return in_array($this->role_id, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN]);
+        return in_array($this->assumedRoleId(), [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN]);
     }
 
     // -------------------------------------------------------
@@ -194,9 +297,19 @@ class SystemUser extends Authenticatable
             return [];
         }
 
-        // `policy` may already be eager-loaded (see loadIdentityRelations());
-        // this only issues a query the first time it's touched otherwise.
-        $policy = $this->policy;
+        $policyId = $this->assumedPolicyId();
+
+        // Fast path: no role override in play (the common case) and the
+        // `policy` relation is already eager-loaded (see
+        // loadIdentityRelations()) and points at the same policy_id —
+        // reuse it instead of issuing a second query.
+        if ($policyId && $this->relationLoaded('policy') && $this->policy?->policy_id === $policyId) {
+            $policy = $this->policy;
+        } elseif ($policyId) {
+            $policy = Policy::where('policy_id', $policyId)->first();
+        } else {
+            $policy = null;
+        }
 
         if (!$policy) {
             $policy = Policy::where('name', Policy::DEFAULT_NAME)->first();

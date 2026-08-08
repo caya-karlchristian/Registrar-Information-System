@@ -15,7 +15,7 @@ import AgreementPage from './AgreementPage';
 // e.g. ["admin", "super_admin"]
 // -------------------------------------------------------
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-const { user, loading, isLoggingOut, hasAgreed, setHasAgreed, activeRoleOverride } = useAuth();
+const { user, loading, isLoggingOut, hasAgreed, setHasAgreed } = useAuth();
   // Still restoring session — don't redirect yet
   if (loading) {
     return (
@@ -32,10 +32,12 @@ const { user, loading, isLoggingOut, hasAgreed, setHasAgreed, activeRoleOverride
     : <Navigate to="/forbidden" state={{ reason: "unauthenticated" }} replace />;
 }
 
-  // Logged in but wrong role — skip this check if the user has an
-  // active role override (Student Staff policy switcher mid-transition).
-  const isRoleSwitcher = !!activeRoleOverride || user.policy?.name === 'Student Staff';
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role_name) && !isRoleSwitcher) {
+  // Logged in but wrong role. `user.role_name` now reflects the
+  // session's server-enforced ASSUMED role (see AuthController::me() /
+  // switchRole() and SystemUser::assumedRoleId()) — a student-staff
+  // account that has switched to Admin already shows role_name: "admin"
+  // here, so no separate "mid-transition" bypass is needed anymore.
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role_name)) {
     return <Navigate to="/forbidden" replace />;
   }
 

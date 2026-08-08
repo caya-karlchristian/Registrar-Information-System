@@ -84,6 +84,26 @@ export const approveAccessRequest = (id)           => api.post(`/access-requests
 export const rejectAccessRequest  = (id, reason)   => api.post(`/access-requests/${id}/reject`, { reason });
 
 // -------------------------------------------------------
+// ROLE ASSIGNMENTS (Super Admin only) — Multi-Role Assignments.
+// Onboards/offboards a *secondary*, concurrent role onto an existing
+// account (e.g. granting a restricted Admin role to someone who already
+// holds Student — the "student staff" case). Powers UserManagement.jsx's
+// "Roles" action/modal. `getMyRoleAssignments` in authService.js is the
+// separate, any-authenticated-user version of this used by the role
+// switcher — this one is the full, Super-Admin-only history/management
+// view (RoleAssignmentController::index/store/revoke).
+// -------------------------------------------------------
+export const getRoleAssignments   = (params = {}) => api.get("/role-assignments", { params });
+export const grantRoleAssignment  = (data)         => api.post("/role-assignments", data);
+export const revokeRoleAssignment = (id, reason)   => api.post(`/role-assignments/${id}/revoke`, { reason });
+
+// GET /role-assignments/search-users?q= — typeahead lookup across ALL
+// roles (student/alumni/admin/super admin), used by GrantRoleUserPicker
+// to find a target account. Deliberately separate from getSystemUsers(),
+// which only ever returns admin/super-admin accounts.
+export const searchGrantableUsers = (q) => api.get("/role-assignments/search-users", { params: { q } });
+
+// -------------------------------------------------------
 // ACADEMIC RECORDS
 // -------------------------------------------------------
 export const getAcademicRecords = ()         => api.get("/academic-records");
@@ -133,6 +153,16 @@ export const uploadCertificationLayoutLogo = (id, formData) =>
   api.post(`/certifications/${id}/layout/logo`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
+
+// -------------------------------------------------------
+// SIGNATORIES (certificate signees) — read/write: Admin only
+// (unlike document-types/certifications, GET is admin-only here too —
+// see routes/api.php)
+// -------------------------------------------------------
+export const getSignatories    = ()          => api.get("/signatories");
+export const createSignatory   = (data)      => api.post("/signatories", data);
+export const updateSignatory   = (id, data)  => api.put(`/signatories/${id}`, data);
+export const deleteSignatory   = (id)        => api.delete(`/signatories/${id}`);
 
 // -------------------------------------------------------
 // DOCUMENT REQUESTS (read: all | write: Student/Alumni | manage: Admin+)

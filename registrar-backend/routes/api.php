@@ -22,6 +22,8 @@ use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
 use App\Http\Controllers\AccessRequestController;
+use App\Http\Controllers\RoleAssignmentController;
+use App\Http\Controllers\SignatoryController;
 
 /*
 |--------------------------------------------------------------------------
@@ -64,6 +66,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     // Auth
     Route::get('/me',      [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Step 3 of Multi-Role Assignments: assume a different role this
+    // session currently holds an Active grant for (e.g. a student-staff
+    // account switching from Student to their restricted Admin role).
+    // Caller-only — see SwitchRoleRequest / RoleAssignmentService::switchTo().
+    Route::post('/auth/switch-role', [AuthController::class, 'switchRole']);
 
     // Broadcasting auth
     // Resolve the sanctum user once before passing to Broadcast::auth().
@@ -166,6 +174,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
         Route::put('request-purposes/{id}',    [RequestPurposeController::class, 'update']);
         Route::delete('request-purposes/{id}', [RequestPurposeController::class, 'destroy']);
+
+        // Signatories (certificate signees) — admin-only end to end,
+        // unlike document-types/certifications above whose GET is open to
+        // all authenticated roles. See create_signatories_table migration.
+        Route::get('signatories',           [SignatoryController::class, 'index']);
+        Route::post('signatories',          [SignatoryController::class, 'store']);
+        Route::put('signatories/{id}',      [SignatoryController::class, 'update']);
+        Route::delete('signatories/{id}',   [SignatoryController::class, 'destroy']);
     });
 
     // Superadmin only (role 4)
@@ -219,6 +235,29 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             Route::get('/',                     [AccessRequestController::class, 'index']);
             Route::post('{accessRequest}/approve', [AccessRequestController::class, 'approve']);
             Route::post('{accessRequest}/reject',  [AccessRequestController::class, 'reject']);
+        });
+    });
+
+    // Role assignments — onboarding/offboarding a secondary role onto an
+    // existing account (e.g. the Admin side of a "student staff" who
+    // already holds Student). Grant/revoke/full-history are Super-Admin
+    // only; 'mine' is any authenticated user reading their own currently
+    // held roles (used by the frontend role switcher).
+    Route::prefix('role-assignments')->group(function () {
+        Route::get('mine', [RoleAssignmentController::class, 'mine']);
+
+        Route::middleware('role:4')->group(function () {
+            // Dedicated throttle stacked on top of the group's
+            // throttle:60,1 — this endpoint returns a broader slice of
+            // the user directory than anything else Super Admin can
+            // query, so it gets its own tighter ceiling against
+            // scripted enumeration.
+            Route::get('search-users', [RoleAssignmentController::class, 'searchUsers'])
+                ->middleware('throttle:30,1');
+
+            Route::get('/',                          [RoleAssignmentController::class, 'index']);
+            Route::post('/',                          [RoleAssignmentController::class, 'store']);
+            Route::post('{roleAssignment}/revoke',    [RoleAssignmentController::class, 'revoke']);
         });
     });
 });

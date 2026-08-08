@@ -35,7 +35,6 @@ const semesters   = ["1st Semester", "2nd Semester", "3rd Semester", "Summer"];
 const latinHonors = ["(Cum Laude)", "(Magna Cum Laude)", "(Summa Cum Laude)"];
 const eduLevels   = ["Undergraduate", "Graduate"];
 const yearNum     = ["2", "3", "4", "5"];
-const signeeOptions = ["Mhel P. Garcia", "Marissa B. Ferrer, DEM, RPsy"];
 
 const DEFAULT_FORM = {
   docType: null, // Will be set after fetching certifications
@@ -65,7 +64,7 @@ const DEFAULT_FORM = {
   semestersNum: "", 
   officialReceiptNum: "",
   yearNum: "",
-  signee: "Mhel P. Garcia",
+  signee: "", // Set once signatories load — see the effect below.
 };
 
 // ─── Field Config ─────
@@ -471,12 +470,29 @@ useEffect(() => {
   }, [updateScale]);
 
   const { isDark } = useTheme();
-  const { programs } = useReferenceData();
+  const { programs, signatories } = useReferenceData();
 
   // Build course options from the live programs table.
   // Falls back to an empty array while programs are loading —
   // the DropDown will show "Please Select" with no options until ready.
   const courseOptions = programs.map((p) => p.name);
+
+  // Signee options now come from the signatories table (see
+  // SignatoryController) instead of the old hardcoded signeeOptions
+  // array — an admin can add/rename/reorder signatories without a
+  // frontend deploy. Falls back to an empty array while loading, same
+  // as courseOptions above.
+  const signeeOptions = signatories.map((s) => s.name);
+
+  // Once signatories load, default the signee to the first one
+  // (sort_order 0) if nothing has been explicitly selected yet — mirrors
+  // the docType-defaulting effect above, and replaces the old hardcoded
+  // `signee: "Mhel P. Garcia"` in DEFAULT_FORM.
+  useEffect(() => {
+    if (signatories.length === 0) return;
+    setFormData((prev) => (prev.signee ? prev : { ...prev, signee: signatories[0].name }));
+    setSavedData((prev) => (prev.signee ? prev : { ...prev, signee: signatories[0].name }));
+  }, [signatories]);
 
   const FIELD_CONFIG = buildFieldConfig(courseOptions);
 
