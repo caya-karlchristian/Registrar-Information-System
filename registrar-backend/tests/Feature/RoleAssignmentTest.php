@@ -49,6 +49,39 @@ test('grants a second, concurrent role to a user who already holds one', functio
     ]);
 });
 
+test('grant() backfills a missing baseline row for the users current role before adding the new one', function () {
+    // Gap 1 regression: $student here (like every SystemUser::factory()
+    // fixture) has ZERO role_assignments rows going in — this is the
+    // "only the new row exists" shape that used to slip through
+    // grant() untouched. After this fix, grant() must leave the user
+    // holding BOTH their original role and the newly granted one.
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $student    = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT]);
+
+    expect(RoleAssignment::where('user_id', $student->user_id)->exists())->toBeFalse();
+
+    app(RoleAssignmentService::class)->grant([
+        'user_id'    => $student->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'expires_at' => now()->addMonths(4),
+    ], roleAssignmentTestRequest($superAdmin));
+
+    $rows = RoleAssignment::where('user_id', $student->user_id)
+        ->where('status', RoleAssignment::STATUS_ACTIVE)
+        ->pluck('role_id');
+
+    expect($rows)->toHaveCount(2);
+    expect($rows)->toContain(SystemUser::ROLE_STUDENT, SystemUser::ROLE_ADMIN);
+
+    // The backfilled baseline row is system-derived, not a human grant —
+    // it must not show up as if a Super Admin explicitly granted the
+    // user their own pre-existing role.
+    $baseline = RoleAssignment::where('user_id', $student->user_id)
+        ->where('role_id', SystemUser::ROLE_STUDENT)
+        ->first();
+    expect($baseline->granted_by)->toBeNull();
+});
+
 test('rejects granting a role the user already actively holds', function () {
     $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
     $admin      = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
@@ -106,6 +139,15 @@ test('revoking a role assignment invalidates the users existing sessions', funct
     $person->createToken('sanctum-idp');
     expect($person->tokens()->count())->toBe(1);
 
+    // Two Active rows so this revoke isn't blocked by the "can't revoke
+    // someone's only active role" guard below — that guard is exactly
+    // what this test would otherwise trip.
+    RoleAssignment::create([
+        'user_id' => $person->user_id,
+        'role_id' => SystemUser::ROLE_STUDENT,
+        'status'  => RoleAssignment::STATUS_ACTIVE,
+    ]);
+
     $adminAssignment = RoleAssignment::create([
         'user_id' => $person->user_id,
         'role_id' => SystemUser::ROLE_ADMIN,
@@ -132,6 +174,53 @@ test('rejects revoking an assignment that is already revoked', function () {
 
     expect(fn () => $service->revoke($assignment, 'again', roleAssignmentTestRequest($superAdmin)))
         ->toThrow(ValidationException::class);
+});
+
+test('rejects revoking a users only active role assignment, pointing at deactivation instead', function () {
+    // Gap #2 regression: revoking someone's last remaining role_assignments
+    // row used to succeed and looked like it worked (status flips to
+    // Revoked, tokens get deleted) but had zero real effect — the person's
+    // NEXT login resolves their role straight from the untouched
+    // users.role_id column and they're back in with identical access.
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $person     = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
+
+    $onlyAssignment = RoleAssignment::create([
+        'user_id' => $person->user_id,
+        'role_id' => SystemUser::ROLE_ADMIN,
+        'status'  => RoleAssignment::STATUS_ACTIVE,
+    ]);
+
+    $service = app(RoleAssignmentService::class);
+
+    expect(fn () => $service->revoke($onlyAssignment, 'trying to offboard', roleAssignmentTestRequest($superAdmin)))
+        ->toThrow(ValidationException::class);
+
+    // Nothing should have changed — the guard fires before any mutation.
+    expect($onlyAssignment->fresh()->status)->toBe(RoleAssignment::STATUS_ACTIVE);
+});
+
+test('allows revoking a role once a second active role no longer makes it the last one', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $person     = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT]);
+
+    $studentAssignment = RoleAssignment::create([
+        'user_id' => $person->user_id,
+        'role_id' => SystemUser::ROLE_STUDENT,
+        'status'  => RoleAssignment::STATUS_ACTIVE,
+    ]);
+
+    $adminAssignment = RoleAssignment::create([
+        'user_id' => $person->user_id,
+        'role_id' => SystemUser::ROLE_ADMIN,
+        'status'  => RoleAssignment::STATUS_ACTIVE,
+    ]);
+
+    $service = app(RoleAssignmentService::class);
+    $service->revoke($adminAssignment, 'No longer working the front desk.', roleAssignmentTestRequest($superAdmin));
+
+    expect($adminAssignment->fresh()->status)->toBe(RoleAssignment::STATUS_REVOKED);
+    expect($studentAssignment->fresh()->status)->toBe(RoleAssignment::STATUS_ACTIVE);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

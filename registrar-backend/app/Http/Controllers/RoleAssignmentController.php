@@ -98,6 +98,16 @@ class RoleAssignmentController extends Controller
      */
     public function revoke(RoleAssignment $roleAssignment, RevokeRoleAssignmentRequest $request)
     {
+        // Kept explicit (not folded into the policy) so this specific
+        // message survives — mirrors SystemUserController::destroy()'s
+        // same-shaped self-target guard. Without this, a Super Admin
+        // revoking their own assignment force-deletes every one of their
+        // own active Sanctum tokens mid-request, logging themselves out
+        // with no confirmation.
+        if ($roleAssignment->user_id === $request->user()->user_id) {
+            return response()->json(['message' => 'You cannot revoke your own role assignment.'], 403);
+        }
+
         $this->authorize('revoke', $roleAssignment);
 
         $roleAssignment = $this->roleAssignmentService->revoke(

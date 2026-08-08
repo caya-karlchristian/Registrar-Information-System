@@ -59,6 +59,46 @@ class RoleAssignmentService
                 ]);
             }
 
+            // Defense-in-depth against the "one-row" bug: grant() used to
+            // assume a baseline row for the user's current primary role
+            // already existed (from the backfill, or from
+            // UserProvisioningService::provision()). For any account that
+            // reached grant() before ensureBaselineRoleAssignment() shipped
+            // there — e.g. one provisioned in the window between the
+            // backfill running and this fix deploying — that assumption
+            // was false, and this user would end up with exactly one
+            // role_assignments row (the one being granted right now)
+            // instead of two. That hides the role switcher entirely
+            // (Navigation.jsx gates on roleAssignments.length > 1) and
+            // leaves switchTo() unable to return them to their original
+            // role. Backfilling it here, under the same row lock as the
+            // duplicate check above, closes that gap regardless of which
+            // path created the account.
+            //
+            // Skipped when the role being granted IS the user's current
+            // primary role_id — in that case the assignment created below
+            // already serves as the baseline row for that role, and
+            // inserting both would put two Active rows on the same role,
+            // which is exactly the invariant the duplicate check above
+            // exists to prevent.
+            $hasAnyAssignment = RoleAssignment::where('user_id', $targetUser->user_id)
+                ->lockForUpdate()
+                ->exists();
+
+            if (!$hasAnyAssignment && $targetUser->role_id !== $validated['role_id']) {
+                RoleAssignment::create([
+                    'user_id'    => $targetUser->user_id,
+                    'role_id'    => $targetUser->role_id,
+                    'policy_id'  => $targetUser->role_id === SystemUser::ROLE_ADMIN
+                        ? $targetUser->policy_id
+                        : null,
+                    'status'     => RoleAssignment::STATUS_ACTIVE,
+                    'granted_by' => null,
+                    'granted_at' => now(),
+                    'expires_at' => null,
+                ]);
+            }
+
             $assignment = RoleAssignment::create([
                 'user_id'    => $targetUser->user_id,
                 'role_id'    => $validated['role_id'],
@@ -139,6 +179,62 @@ class RoleAssignmentService
     }
 
     /**
+     * Cascade-revoke every Active role assignment a user holds — the
+     * Layer-1-to-Layer-2 cascade your account/entitlement model calls
+     * for: deactivating an account (Layer 1: "can they log in at all")
+     * should automatically end every entitlement they hold (Layer 2:
+     * "what can they currently do"), not leave role_assignments rows
+     * sitting there marked Active forever.
+     *
+     * Called from AdminUserService::update() when status moves away
+     * from 'Activated'. Deliberately does NOT delete tokens itself —
+     * the caller already does that as part of the same deactivation
+     * transaction (see EnsureAccountActive's docblock on why that has
+     * to happen regardless of this method), so doing it again here
+     * would just be a second, redundant DELETE.
+     *
+     * Reason is auto-generated rather than asked of the caller — this
+     * always fires as a side effect of a status change already being
+     * audited in its own right (ACTION_ADMIN_UPDATED), so each
+     * individual ACTION_ROLE_REVOKED entry just needs to point back at
+     * that cause, not collect a second human-authored reason for the
+     * same action.
+     *
+     * @return Collection<int, RoleAssignment>
+     */
+    public function revokeAllForUser(SystemUser $user, Request $request): Collection
+    {
+        return DB::transaction(function () use ($user, $request) {
+            $assignments = RoleAssignment::where('user_id', $user->user_id)
+                ->active()
+                ->lockForUpdate()
+                ->get();
+
+            $reason = 'Account deactivated — all role assignments automatically revoked.';
+            $actor  = $request->user();
+
+            foreach ($assignments as $assignment) {
+                $assignment->update([
+                    'status'            => RoleAssignment::STATUS_REVOKED,
+                    'revoked_by'        => $actor?->user_id,
+                    'revoked_at'        => now(),
+                    'revocation_reason' => $reason,
+                ]);
+
+                $this->auditLogger->log($request, $actor ?? $user, AuditLog::ACTION_ROLE_REVOKED, [
+                    'target_user_id'     => $user->user_id,
+                    'target_email'       => $user->email,
+                    'role_assignment_id' => $assignment->id,
+                    'role_id'            => $assignment->role_id,
+                    'reason'             => $reason,
+                ]);
+            }
+
+            return $assignments;
+        });
+    }
+
+    /**
      * Explicit offboarding: revoke a specific role assignment. Does NOT
      * touch the user's other role assignments — revoking the Admin side
      * of a student-staff account leaves their Student assignment (and
@@ -156,6 +252,22 @@ class RoleAssignmentService
      * outright on next login) — a revocation should take effect
      * immediately, not at the next natural token expiry.
      *
+     * DELIBERATE GUARD: refuses to revoke a user's ONLY currently
+     * Active assignment. RoleResolver::resolve() (and therefore every
+     * login) always derives the account's role from the raw
+     * users.role_id column, never from role_assignments — so revoking
+     * someone's last remaining row would force one re-login (their
+     * tokens get deleted) and then silently do nothing: they'd log
+     * back in with the exact same access, because role_assignments was
+     * never the thing gating it. That leaves a Revoked row on record
+     * for an account that was never actually denied anything — exactly
+     * the kind of state that misleads whoever reads the Roles tab
+     * later. Ending ALL of someone's access is Layer 1's job
+     * (deactivate the account — see AdminUserService::update() /
+     * RoleAssignmentService::revokeAllForUser()), not Layer 2's;
+     * revoke() here is specifically for offboarding ONE role off a
+     * multi-role account while the rest of their access continues.
+     *
      * @throws ValidationException
      */
     public function revoke(RoleAssignment $assignment, string $reason, Request $request): RoleAssignment
@@ -167,6 +279,19 @@ class RoleAssignmentService
         }
 
         return DB::transaction(function () use ($assignment, $reason, $request) {
+            $activeCount = RoleAssignment::where('user_id', $assignment->user_id)
+                ->active()
+                ->lockForUpdate()
+                ->count();
+
+            if ($activeCount <= 1) {
+                throw ValidationException::withMessages([
+                    'role_id' => 'This is the only active role this user holds. Revoking it here would '
+                        . 'appear to end their access without actually doing so — deactivate the account '
+                        . 'instead to end all access.',
+                ]);
+            }
+
             $assignment->update([
                 'status'            => RoleAssignment::STATUS_REVOKED,
                 'revoked_by'        => $request->user()->user_id,

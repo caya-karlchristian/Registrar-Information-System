@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\PolicyException;
 use App\Models\AuditLog;
 use App\Models\Policy;
+use App\Models\RoleAssignment;
 use App\Models\SystemUser;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
@@ -132,6 +133,24 @@ class PolicyService
 
         return DB::transaction(function () use ($user, $policyId, $request) {
             $user->update(['policy_id' => $policyId]);
+
+            // Keep this user's Active Admin role_assignments row (their
+            // baseline row — see UserProvisioningService::
+            // ensureBaselineRoleAssignment()) in sync with the raw
+            // column we just changed. assumedPolicyId() reads a
+            // role_assignments row's OWN policy_id whenever a session
+            // has switched into that role (Step 3), not the raw column
+            // — so for a student-staff account currently assumed as
+            // Admin, leaving this row stale would silently keep
+            // enforcing the OLD policy for that live session until they
+            // switch away and back. This UI/method only ever targets an
+            // account whose PRIMARY role is Admin (see the guard above),
+            // so `role_id = ROLE_ADMIN` here is unambiguous — it is that
+            // same account's own baseline row, not some other grant.
+            RoleAssignment::where('user_id', $user->user_id)
+                ->where('role_id', SystemUser::ROLE_ADMIN)
+                ->active()
+                ->update(['policy_id' => $policyId]);
 
             $this->auditLogger->log(
                 $request,

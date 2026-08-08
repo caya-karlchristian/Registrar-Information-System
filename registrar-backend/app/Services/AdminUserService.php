@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\SystemUser;
 use App\Services\AuditLogger;
 use App\Services\Ocms\OcmsAdminService;
+use App\Services\RoleAssignmentService;
 use App\Services\Sso\IdpClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,9 +44,10 @@ use Illuminate\Support\Facades\Log;
 class AdminUserService
 {
     public function __construct(
-        private IdpClient        $idpClient,
-        private AuditLogger      $auditLogger,
-        private OcmsAdminService $ocmsAdminService,
+        private IdpClient            $idpClient,
+        private AuditLogger          $auditLogger,
+        private OcmsAdminService     $ocmsAdminService,
+        private RoleAssignmentService $roleAssignmentService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -206,8 +208,17 @@ class AdminUserService
         // existing cookie token(s) stop being valid tokens at all, the
         // instant this commits, regardless of what the IdP or OCMS still
         // believe about the account.
+        //
+        // Cascades to Layer 2 as well: every Active role_assignments row
+        // this account holds gets revoked in the same breath (see
+        // RoleAssignmentService::revokeAllForUser()). Without this, a
+        // deactivated student-staff account keeps showing "Active" on
+        // both its Student and Admin rows forever, and reactivating the
+        // account later would silently resurrect that Admin access with
+        // no new deliberate grant behind it.
         if (isset($validated['status']) && $validated['status'] !== 'Activated') {
             $user->tokens()->delete();
+            $this->roleAssignmentService->revokeAllForUser($user, $request);
         }
 
         // Best-effort IdP sync — runs OUTSIDE the DB transaction, after the

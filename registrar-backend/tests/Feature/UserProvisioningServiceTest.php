@@ -81,6 +81,102 @@ test('an already-Activated admin logging in again does not re-trigger activation
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Baseline role_assignments backfill (Gap 1 fix)
+//
+// The real-world shape this locks in: a SystemUser with ZERO
+// role_assignments rows — exactly what UserProvisioningService::provision()
+// and AdminUserService::create() produced before ensureBaselineRoleAssignment()
+// existed, and what the backfill migration only ever fixed retroactively
+// for accounts that existed at the time it ran. Every fixture below is
+// built with SystemUser::factory()->create() and deliberately does NOT
+// manually seed a role_assignments row first, unlike the rest of this
+// suite's fixtures elsewhere in the project — that's the point.
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('first SSO login backfills a baseline Active role_assignments row for a fresh account', function () {
+    $pending = SystemUser::factory()->create([
+        'role_id'     => SystemUser::ROLE_ADMIN,
+        'status'      => 'Pending Activation',
+        'idp_user_id' => null,
+        'password'    => null,
+        'pending_expires_at' => now()->addDays(14),
+    ]);
+
+    expect(RoleAssignment::where('user_id', $pending->user_id)->exists())->toBeFalse();
+
+    app(UserProvisioningService::class)->provision([
+        'id'    => 'idp-user-baseline',
+        'email' => $pending->email,
+    ], upsRequest());
+
+    $baseline = RoleAssignment::where('user_id', $pending->user_id)->first();
+
+    expect($baseline)->not->toBeNull();
+    expect($baseline->role_id)->toBe(SystemUser::ROLE_ADMIN);
+    expect($baseline->status)->toBe(RoleAssignment::STATUS_ACTIVE);
+    expect($baseline->granted_by)->toBeNull();
+    expect($baseline->expires_at)->toBeNull();
+});
+
+test('re-provisioning an already-backfilled account does not create a duplicate baseline row', function () {
+    $admin = SystemUser::factory()->create([
+        'role_id'     => SystemUser::ROLE_ADMIN,
+        'status'      => 'Activated',
+        'idp_user_id' => 'already-linked',
+    ]);
+
+    RoleAssignment::create([
+        'user_id'    => $admin->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    app(UserProvisioningService::class)->provision([
+        'id'    => 'already-linked',
+        'email' => $admin->email,
+    ], upsRequest());
+
+    expect(RoleAssignment::where('user_id', $admin->user_id)->count())->toBe(1);
+});
+
+test('granting a second role onto a freshly-provisioned user (no manually-seeded baseline row) leaves the switcher usable', function () {
+    // Simulates the exact end-to-end sequence Gap 1 described: a student
+    // logs in for the first time (provision() runs and — with the fix —
+    // creates their baseline Student row), then a Super Admin grants them
+    // Admin. Both rows must exist afterward, or Navigation.jsx's
+    // roleAssignments.length > 1 switcher gate never fires and
+    // RoleAssignmentService::switchTo() can never return them to Student.
+    $student = SystemUser::factory()->create([
+        'role_id'     => SystemUser::ROLE_STUDENT,
+        'status'      => 'Activated',
+        'idp_user_id' => null,
+    ]);
+
+    expect(RoleAssignment::where('user_id', $student->user_id)->exists())->toBeFalse();
+
+    app(UserProvisioningService::class)->provision([
+        'id'    => 'idp-student-fresh',
+        'email' => $student->email,
+    ], upsRequest());
+
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    app(App\Services\RoleAssignmentService::class)->grant([
+        'user_id'    => $student->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'expires_at' => now()->addMonths(4),
+    ], roleAssignmentTestRequest($superAdmin));
+
+    $activeRoleIds = RoleAssignment::where('user_id', $student->user_id)
+        ->where('status', RoleAssignment::STATUS_ACTIVE)
+        ->pluck('role_id');
+
+    expect($activeRoleIds)->toHaveCount(2);
+    expect($activeRoleIds)->toContain(SystemUser::ROLE_STUDENT, SystemUser::ROLE_ADMIN);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Deny-by-default: no RIS record + admin-tier IdP account type
 //
 // Fixture shape (`roles: "Admin"`) is captured from a real GET /api/v1/me

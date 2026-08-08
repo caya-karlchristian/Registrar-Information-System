@@ -8,6 +8,7 @@ use App\Exceptions\UnregisteredAccountException;
 use App\Models\Alumni;
 use App\Models\AlumniProfile;
 use App\Models\AuditLog;
+use App\Models\RoleAssignment;
 use App\Models\StudentProfile;
 use App\Models\SystemUser;
 use App\Services\AuditLogger;
@@ -128,6 +129,8 @@ class UserProvisioningService
                 $user, $roleId, $firstName, $middleName, $lastName
             );
 
+            $this->ensureBaselineRoleAssignment($user, $roleId);
+
             return new ProvisioningResult($user, $needsOnboarding);
         });
     }
@@ -170,6 +173,62 @@ class UserProvisioningService
         }
 
         return str_contains(strtolower($roles), 'admin');
+    }
+
+    /**
+     * Guarantees every SystemUser has at least one role_assignments row
+     * for the role they actually hold, before they ever reach
+     * RoleAssignmentService::grant().
+     *
+     * Why this exists here specifically: 2026_08_10_000001_backfill_role_
+     * assignments_from_users.php gave every user that existed AT THAT
+     * TIME a baseline Active row, but this provision() path — which runs
+     * on every SSO login, including the very first one for a brand-new
+     * SystemUser::create() below and for a pre-registered Pending
+     * Activation admin's first login — never inserted one going forward.
+     * A Super Admin could then grant() a second role onto an account
+     * that only ever had zero rows, leaving exactly one row (the
+     * granted one) instead of two, which silently hides the role
+     * switcher (Navigation.jsx gates on roleAssignments.length > 1) and
+     * leaves switchTo() unable to switch back to the original role.
+     *
+     * This runs unconditionally (existing users included) rather than
+     * only in the `$existing === null` branch, so it also covers a
+     * pre-registered admin/super-admin activating for the first time
+     * (created via AdminUserService::create(), which — like this method
+     * used to — writes a SystemUser row with no matching role_assignments
+     * row). It's a cheap existence check and is idempotent: any account
+     * that already has at least one row (from the backfill, an earlier
+     * login, or a grant()) is left untouched.
+     *
+     * granted_by is deliberately null and expires_at is deliberately
+     * null (indefinite) — same reasoning as the backfill migration: this
+     * is a system-derived baseline, not a human decision to time-box,
+     * and there's no grantor to attribute it to.
+     *
+     * See also RoleAssignmentService::grant(), which independently
+     * backfills this same baseline row as defense-in-depth for accounts
+     * that reached grant() before this fix shipped.
+     */
+    private function ensureBaselineRoleAssignment(SystemUser $user, int $roleId): void
+    {
+        $hasAnyAssignment = RoleAssignment::where('user_id', $user->user_id)->exists();
+
+        if ($hasAnyAssignment) {
+            return;
+        }
+
+        RoleAssignment::create([
+            'user_id'    => $user->user_id,
+            'role_id'    => $roleId,
+            'policy_id'  => in_array($roleId, [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN], true)
+                ? $user->policy_id
+                : null,
+            'status'     => RoleAssignment::STATUS_ACTIVE,
+            'granted_by' => null,
+            'granted_at' => now(),
+            'expires_at' => null,
+        ]);
     }
 
     private function provisionProfile(

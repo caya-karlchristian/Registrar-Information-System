@@ -77,10 +77,17 @@ export const AuthProvider = ({ children }) => {
     setRoleAssignmentsLoading(true);
     try {
       const res = await fetchMyRoleAssignments();
-      setRoleAssignments(res.data?.data ?? []);
+      const assignments = res.data?.data ?? [];
+      setRoleAssignments(assignments);
+      // Returned (not just set into state) so callers that need the
+      // freshly-fetched list *synchronously after the await* — namely
+      // routeAfterAuth() below — don't have to read back a state value
+      // that may not have re-rendered yet.
+      return assignments;
     } catch {
       // Non-fatal — the switcher just won't show extra roles this time.
       setRoleAssignments([]);
+      return [];
     } finally {
       setRoleAssignmentsLoading(false);
     }
@@ -116,12 +123,29 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // -------------------------------------------------------
-  // Shared post-login routing: send a "Student Staff" policy admin to
-  // the access-control page to pick a role context first; everyone else
-  // goes straight to their role's home.
+  // Shared post-login routing: anyone holding more than one Active
+  // role_assignments row goes to /access-control to pick a role context
+  // first; everyone else goes straight to their role's home.
+  //
+  // This used to key off `policy?.name === 'Student Staff'` — a
+  // hardcoded check against a pre-existing system *policy* (seeded in
+  // 2026_07_11_000001_create_policies_table.php, for restricted-permission
+  // single-role Admins) that predates role_assignments and has nothing to
+  // do with holding two roles. Navigation.jsx's switcher already migrated
+  // off that same heuristic to `roleAssignments.length > 1` — see the
+  // comment there ("any account granted a second role gets the switcher
+  // automatically, with no extra flag to maintain"). This brings
+  // routeAfterAuth() in line with it, so a genuine multi-role account
+  // (granted via the new flow, under any policy name) actually sees the
+  // picker instead of landing straight on one role's dashboard.
+  //
+  // Takes `assignments` explicitly rather than reading the roleAssignments
+  // state value, since callers await refreshRoleAssignments() and call
+  // this immediately after — state set inside that call may not have
+  // committed to a re-render yet, but the returned array is always current.
   // -------------------------------------------------------
-  const routeAfterAuth = (userData) => {
-    if (userData.role_name === ROLES.ADMIN && userData.policy?.name === 'Student Staff') {
+  const routeAfterAuth = (userData, assignments) => {
+    if (Array.isArray(assignments) && assignments.length > 1) {
       navigate("/access-control", { replace: true });
       return;
     }
@@ -143,8 +167,8 @@ export const AuthProvider = ({ children }) => {
 
     setUser(userData);
     setIdpOffline(!!data.idp_offline);
-    refreshRoleAssignments();
-    routeAfterAuth(userData);
+    const assignments = await refreshRoleAssignments();
+    routeAfterAuth(userData, assignments);
   };
 
   // -------------------------------------------------------
@@ -157,8 +181,8 @@ export const AuthProvider = ({ children }) => {
 
     setUser(userData);
     setIdpOffline(true); // they explicitly chose local login
-    refreshRoleAssignments();
-    routeAfterAuth(userData);
+    const assignments = await refreshRoleAssignments();
+    routeAfterAuth(userData, assignments);
   };
 
   // -------------------------------------------------------
@@ -195,8 +219,8 @@ export const AuthProvider = ({ children }) => {
 
       setUser(userData);
       setIdpOffline(false);
-      refreshRoleAssignments();
-      routeAfterAuth(userData);
+      const assignments = await refreshRoleAssignments();
+      routeAfterAuth(userData, assignments);
     } catch (err) {
       const status    = err.response?.status;
       const logoutUrl = err.response?.data?.logout_url;

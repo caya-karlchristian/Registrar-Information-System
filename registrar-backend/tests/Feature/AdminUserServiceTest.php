@@ -139,3 +139,73 @@ test('create() only attaches policy_id for admin role, never super admin', funct
     ], ausRequest());
     expect($superAdmin->policy_id)->toBeNull();
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// AdminUserService::update() — deactivation cascades to role_assignments
+// (Layer 1 -> Layer 2 cascade; see RoleAssignmentService::revokeAllForUser())
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('deactivating a user revokes every Active role assignment they hold', function () {
+    ausActor();
+
+    $user = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'status' => 'Activated']);
+
+    \App\Models\RoleAssignment::create([
+        'user_id'    => $user->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => 'Active',
+        'granted_at' => now(),
+    ]);
+    \App\Models\RoleAssignment::create([
+        'user_id'    => $user->user_id,
+        'role_id'    => SystemUser::ROLE_STUDENT,
+        'status'     => 'Active',
+        'granted_at' => now(),
+    ]);
+
+    app(AdminUserService::class)->update($user, ['status' => 'Deactivated'], ausRequest());
+
+    $rows = \App\Models\RoleAssignment::where('user_id', $user->user_id)->get();
+
+    expect($rows)->toHaveCount(2);
+    $rows->each(fn ($row) => expect($row->status)->toBe('Revoked'));
+
+    $this->assertDatabaseHas('audit_logs', [
+        'action'         => AuditLog::ACTION_ROLE_REVOKED,
+        'target_user_id' => $user->user_id,
+    ]);
+});
+
+test('deactivating a user with no role assignments does not error', function () {
+    ausActor();
+
+    $user = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'status' => 'Activated']);
+
+    expect(fn () => app(AdminUserService::class)->update($user, ['status' => 'Deactivated'], ausRequest()))
+        ->not->toThrow(\Throwable::class);
+});
+
+test('reactivating a previously-deactivated user does not resurrect their revoked role assignments', function () {
+    ausActor();
+
+    $user = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'status' => 'Activated']);
+
+    \App\Models\RoleAssignment::create([
+        'user_id'    => $user->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => 'Active',
+        'granted_at' => now(),
+    ]);
+
+    $service = app(AdminUserService::class);
+    $service->update($user, ['status' => 'Deactivated'], ausRequest());
+    $service->update($user->fresh(), ['status' => 'Activated'], ausRequest());
+
+    $assignment = \App\Models\RoleAssignment::where('user_id', $user->user_id)->first();
+
+    // Reactivation only flips users.status back — it must not silently
+    // flip a Revoked role_assignments row back to Active. Regaining a
+    // role after deactivation should always go through a fresh, deliberate
+    // grant(), never happen as a side effect of reactivation.
+    expect($assignment->status)->toBe('Revoked');
+});
