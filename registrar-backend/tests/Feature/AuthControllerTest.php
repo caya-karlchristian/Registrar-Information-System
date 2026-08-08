@@ -397,7 +397,8 @@ test('the tokens cookie issued by switch-role immediately unlocks the newly assu
     // keep trying — and failing — to authenticate with the dead old
     // token instead of the fresh cookie.
     $this->app['auth']->forgetGuards();
-    $this->withoutHeader('Authorization')
+    $this->withCredentials()
+        ->withoutHeader('Authorization')
         ->withUnencryptedCookie('token', $newTokenCookie->getValue())
         ->getJson('/api/audit-logs')
         ->assertOk();
