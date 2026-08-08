@@ -38,7 +38,7 @@ class SsoCallbackController extends Controller
                     minutes:  60 * 24 * 7,
                     path:     '/',
                     domain:   config('session.domain'),
-                    secure:   config('session.secure_cookie'),
+                    secure:   config('session.secure'),
                     httpOnly: true,
                     sameSite: config('session.same_site'),
                 ));

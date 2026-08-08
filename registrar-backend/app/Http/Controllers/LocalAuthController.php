@@ -115,7 +115,7 @@ class LocalAuthController extends Controller
                     60 * 24 * 7,
                     '/',
                     config('session.domain'),
-                    config('session.secure_cookie'),
+                    config('session.secure'),
                     true,
                     false,
                     config('session.same_site'),
