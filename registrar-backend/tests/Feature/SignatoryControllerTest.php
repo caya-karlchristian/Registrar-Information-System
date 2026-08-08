@@ -36,6 +36,12 @@ test('student cannot list signatories', function () {
 });
 
 test('admin can list signatories ordered by sort_order', function () {
+    // The 2026_08_13_000000_create_signatories_table migration seeds its
+    // own two rows with these same names, so this test's rows would
+    // otherwise sit alongside duplicates. Start from a clean table so the
+    // ordering assertion below is deterministic.
+    Signatory::query()->delete();
+
     $second = signatoryMake(['name' => 'Marissa B. Ferrer, DEM, RPsy', 'position' => 'Director', 'sort_order' => 1]);
     $first  = signatoryMake(['name' => 'Mhel P. Garcia', 'sort_order' => 0]);
     signatoryMakeUser(SystemUser::ROLE_ADMIN);

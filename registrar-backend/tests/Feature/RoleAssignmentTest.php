@@ -413,6 +413,16 @@ test('a session that switched to a role loses that live token the instant the as
     // the account, so this isn't "lost Super Admin, kept Student", it's
     // "this session doesn't authenticate at all anymore" (see
     // RoleAssignmentService::revoke() docblock on why it's this blunt).
+    //
+    // Laravel's Sanctum guard (RequestGuard) caches the resolved user for
+    // the lifetime of the guard instance, and that instance persists
+    // across every HTTP call made within this single test method. Without
+    // forgetting it here, this call would return the user cached by the
+    // /api/audit-logs call above instead of re-validating the (now
+    // deleted) token against the database — a Laravel/Sanctum testing
+    // quirk that never occurs in production.
+    $this->app['auth']->forgetGuards();
+
     $this->withHeader('Authorization', "Bearer {$plainTextToken}")
         ->getJson('/api/audit-logs')
         ->assertStatus(401);
@@ -445,6 +455,12 @@ test('a role assignment that lapses via the daily sweep invalidates its live tok
 
     $this->travel(2)->seconds();
     $this->artisan('role-assignments:expire')->assertExitCode(0);
+
+    // See the identical comment in the test above: the Sanctum guard
+    // caches the resolved user across HTTP calls within one test method,
+    // so it must be forgotten before re-checking a token whose backing
+    // role_assignments row was just swept to Expired.
+    $this->app['auth']->forgetGuards();
 
     $this->withHeader('Authorization', "Bearer {$plainTextToken}")
         ->getJson('/api/audit-logs')

@@ -2,6 +2,7 @@
 
 use App\Exceptions\UnregisteredAccountException;
 use App\Models\AuditLog;
+use App\Models\RoleAssignment;
 use App\Models\SystemUser;
 use App\Services\Sso\UserProvisioningService;
 use Illuminate\Foundation\Testing\RefreshDatabase;

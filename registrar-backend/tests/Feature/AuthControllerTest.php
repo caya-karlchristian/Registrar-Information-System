@@ -323,6 +323,18 @@ test('switch-role succeeds for a role the caller actively holds, returns the ass
     expect($person->tokens()->first()->name)->toBe('sanctum-idp');
 
     // The old plaintext token no longer authenticates anything.
+    //
+    // Laravel's Sanctum guard (RequestGuard) caches the resolved user for
+    // the lifetime of the guard instance, and that instance persists
+    // across every HTTP call made within this single test method (the
+    // app container isn't rebuilt between them). Without forgetting the
+    // guard here, this next call would return the user resolved on the
+    // switch-role request above instead of re-validating the (now
+    // deleted) token against the database — a Laravel/Sanctum testing
+    // quirk that never occurs in production, where each request runs in
+    // its own process.
+    $this->app['auth']->forgetGuards();
+
     $this->withHeader('Authorization', "Bearer {$plainTextToken}")
         ->getJson('/api/me')
         ->assertStatus(401);
@@ -350,6 +362,15 @@ test('the tokens cookie issued by switch-role immediately unlocks the newly assu
         ->getJson('/api/audit-logs')
         ->assertStatus(403);
 
+    // Laravel's Sanctum guard (RequestGuard) caches the resolved user for
+    // the lifetime of the guard instance, and that instance persists
+    // across every HTTP call made within this single test method. Without
+    // forgetting it here, the switch-role request below would reuse the
+    // pre-switch (Student) user cached by the /api/audit-logs call above
+    // instead of re-resolving from the bearer token — a Laravel/Sanctum
+    // testing quirk that never occurs in production.
+    $this->app['auth']->forgetGuards();
+
     $switchResponse = $this->withHeader('Authorization', "Bearer {$plainTextToken}")
         ->postJson('/api/auth/switch-role', ['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
 
@@ -366,11 +387,13 @@ test('the tokens cookie issued by switch-role immediately unlocks the newly assu
 
     // The freshly-issued cookie authenticates the Super-Admin route the
     // Student-only token above was rejected from.
+    $this->app['auth']->forgetGuards();
     $this->withUnencryptedCookie('token', $newTokenCookie->getValue())
         ->getJson('/api/audit-logs')
         ->assertOk();
 
     // And the pre-switch token is dead — switchTo() deleted it.
+    $this->app['auth']->forgetGuards();
     $this->withHeader('Authorization', "Bearer {$plainTextToken}")
         ->getJson('/api/me')
         ->assertStatus(401);

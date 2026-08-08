@@ -37,7 +37,7 @@ test('attachToUser() updates the raw policy_id and the matching Active role_assi
     polActor();
 
     $oldPolicy = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
-    $newPolicy = Policy::create(['name' => 'Registrar Staff', 'permissions' => ['dashboard' => ['Access'], 'inbox' => ['Access']]]);
+    $newPolicy = Policy::create(['name' => 'Records Staff', 'permissions' => ['dashboard' => ['Access'], 'inbox' => ['Access']]]);
 
     $admin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'policy_id' => $oldPolicy->policy_id]);
 
@@ -82,7 +82,7 @@ test('attachToUser() does not touch a Revoked or Expired role_assignments row', 
     polActor();
 
     $oldPolicy = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
-    $newPolicy = Policy::create(['name' => 'Registrar Staff', 'permissions' => ['dashboard' => ['Access']]]);
+    $newPolicy = Policy::create(['name' => 'Records Staff', 'permissions' => ['dashboard' => ['Access']]]);
 
     $admin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'policy_id' => $oldPolicy->policy_id]);
 
@@ -106,7 +106,7 @@ test('attachToUser() does not touch another users role_assignments row', functio
     polActor();
 
     $oldPolicy = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
-    $newPolicy = Policy::create(['name' => 'Registrar Staff', 'permissions' => ['dashboard' => ['Access']]]);
+    $newPolicy = Policy::create(['name' => 'Records Staff', 'permissions' => ['dashboard' => ['Access']]]);
 
     $admin       = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'policy_id' => $oldPolicy->policy_id]);
     $otherAdmin  = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'policy_id' => $oldPolicy->policy_id]);
