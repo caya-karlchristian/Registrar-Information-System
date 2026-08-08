@@ -78,15 +78,7 @@ class AuthController extends Controller
                     60 * 24 * 7,
                     '/',
                     config('session.domain'),
-                    // config('session.secure') — NOT 'session.secure_cookie'.
-                    // Laravel's session config key is 'secure' (see
-                    // config/session.php: 'secure' => env('SESSION_SECURE_COOKIE')).
-                    // The old key name here silently resolved to null on
-                    // every call, so SESSION_SECURE_COOKIE in .env was never
-                    // actually honored — the Secure flag on this cookie was
-                    // always falling back to Symfony's auto-detect-from-request
-                    // behavior instead of the operator's explicit setting.
-                    config('session.secure'),
+                    config('session.secure_cookie'),
                     true,
                     false,
                     config('session.same_site'),
@@ -140,7 +132,7 @@ class AuthController extends Controller
                 60 * 24 * 7,
                 '/',
                 config('session.domain'),
-                config('session.secure'),
+                config('session.secure_cookie'),
                 true,
                 false,
                 config('session.same_site'),
@@ -196,7 +188,7 @@ class AuthController extends Controller
                 60 * 24 * 7,
                 '/',
                 config('session.domain'),
-                config('session.secure'),
+                config('session.secure_cookie'),
                 true,
                 false,
                 config('session.same_site'),
