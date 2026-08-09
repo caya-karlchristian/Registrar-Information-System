@@ -22,55 +22,6 @@ import { normalizeCertificateLayout, DEFAULT_CERTIFICATE_LAYOUT } from "../utils
 // real, persisted columns as of the 2026_07_11 migration) instead of being
 // hardcoded fake rows concatenated onto every load.
 
-const MOCK_ACTIVE_DOCS = [
-  {
-    document_type_id: "active-doc-1",
-    document_name: "Official Transcript of Records (OTR)",
-    document_description: "Official record of a student's academic history, courses taken, and grades received.",
-    document_requirements: "Clearance form, Official receipt, 2x2 Photo.",
-    document_process_period: "5 working day/s",
-    access_id: 3,
-    is_archived: false
-  },
-  {
-    document_type_id: "active-doc-2",
-    document_name: "Certificate of Graduation",
-    document_description: "Certifies that a student has completed all academic requirements for graduation.",
-    document_requirements: "Approved graduation clearance, Transcript copy.",
-    document_process_period: "3 working day/s",
-    access_id: 3,
-    is_archived: false
-  },
-  {
-    document_type_id: "active-doc-3",
-    document_name: "Honorable Dismissal / Transfer Credential",
-    document_description: "Issued to a student who desires to transfer to another school or university.",
-    document_requirements: "Registrar clearance, Request form, Return of Student ID.",
-    document_process_period: "3 working day/s",
-    access_id: 3,
-    is_archived: false
-  }
-];
-
-const MOCK_ACTIVE_CERTS = [
-  {
-    certificate_type_id: "active-cert-1",
-    certificate_name: "Certificate of Enrollment",
-    certificate_requirements: "Latest registration card copy, Current school ID.",
-    certificate_process_period: "1 working day/s",
-    access_id: 3,
-    is_archived: false
-  },
-  {
-    certificate_type_id: "active-cert-2",
-    certificate_name: "Certificate of Registration (COR)",
-    certificate_requirements: "Paid school fees receipt, Enrolled student profile.",
-    certificate_process_period: "1 working day/s",
-    access_id: 3,
-    is_archived: false
-  }
-];
-
 const DocumentAndCertificateManagement = () => {
   const { isDark } = useTheme();
   const [activeTab, setActiveTab] = useState("documents"); // "documents", "certificates", or "archived"

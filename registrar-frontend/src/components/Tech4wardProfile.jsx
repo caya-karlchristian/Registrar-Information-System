@@ -25,9 +25,8 @@ const TEAM_MEMBERS = [
 
 const Tech4wardProfile = ({ bgImage }) => {
   const bg = bgImage || risImage;
-  const [announcementPage, setAnnouncementPage] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [announcements, setAnnouncements] = useState([]);
-  const ITEMS_PER_PAGE = 3;
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -59,87 +58,86 @@ const Tech4wardProfile = ({ bgImage }) => {
       if (prev.some(a => a.id === latest.announcement.id)) return prev;
       return [{ id: latest.announcement.id, title: latest.announcement.title, content: latest.announcement.content, enabled: true }, ...prev];
     });
-    setAnnouncementPage(0);
+    setCurrentIndex(0);
   }, [notifications[0]?.id]);
 
-  const totalPages = Math.ceil(announcements.length / ITEMS_PER_PAGE);
-  const startIndex = announcementPage * ITEMS_PER_PAGE;
-  const visibleAnnouncements = announcements.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-  const handlePrevAnnouncements = () => {
-    setAnnouncementPage((prev) => Math.max(prev - 1, 0));
-  };
-
-  const handleNextAnnouncements = () => {
-    setAnnouncementPage((prev) => Math.min(prev + 1, totalPages - 1));
-  };
+  const maxIndex = Math.max(0, announcements.length - 3);
+  const safeIndex = Math.min(currentIndex, maxIndex);
+  const visibleAnnouncements = announcements.length <= 3 
+    ? announcements 
+    : announcements.slice(safeIndex, safeIndex + 3);
 
   return (
-    <div className="w-full overflow-hidden bg-gray-50 border-b-4 border-yellow-400">
-      <div className="relative w-full border-t-4 border-yellow-400 py-12 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
-          <h2 className="text-2xl md:text-4xl font-black text-[#800000] uppercase mb-4 -mt-8 text-center">
-            System Announcement
+    <div className="w-full overflow-hidden bg-gray-50 border-y-4 border-yellow-400">
+      <section id="announcements" className="lp-section lp-section--alt border-t-4 border-yellow-400 py-16">
+        <div className="lp-section-inner">
+          <div className="lp-section-label text-center">Latest Updates</div>
+          <h2 className="lp-section-title text-center">
+            System Announcements
           </h2>
-          <div className="flex items-center justify-between">
-            <button
-              onClick={handlePrevAnnouncements}
-              disabled={announcementPage === 0}
-              className="bg-[#800000] text-white p-3 rounded disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-              aria-label="Previous announcements"
-            >
-              <ChevronLeftIcon className="w-5 h-5" />
-            </button>
+          <p className="lp-section-label align- text-center mb-15">
+            Stay informed with the latest news and notices from the Registrar's Office.
+          </p>
 
-            <div className="flex-1 mx-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {visibleAnnouncements.length === 0 ? (
-                <div className="col-span-3 text-center text-white/60 py-8 italic text-sm">
-                  No announcements at this time.
-                </div>
-              ) : (
-                visibleAnnouncements.map((item, index) => {
-                  const Icon = ICON_CYCLE[(startIndex + index) % ICON_CYCLE.length];
-                  return (
-                    <div
-                      key={item.id}
-                      className="bg-[#800000] rounded-lg p-6 shadow-lg"
-                    >
-                      <div className="flex flex-col items-center text-center gap-3">
-                        <Icon className="w-10 h-10 text-yellow-300" />
-                        <div>
-                          <h3 className="text-lg font-black text-white uppercase">{item.title}</h3>
-                          <p className="text-xs text-gray-200 mt-1">{item.content}</p>
-                        </div>
-                      </div>
+          <div className="lp-cards-grid">
+            {announcements.length === 0 ? (
+              <div className="lp-announce-empty-card">
+                <svg className="w-12 h-12 text-[#F8BF1E]" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                </svg>
+                <h3 className="text-lg font-bold text-[#800000] mt-4 font-sans uppercase tracking-wide">All Caught Up!</h3>
+                <p className="text-sm text-gray-500 mt-2 max-w-sm leading-relaxed">
+                  There are no official system announcements active at this time. Please check back later.
+                </p>
+              </div>
+            ) : (
+              visibleAnnouncements.map((item, index) => {
+                const tag = ["Important", "Notice", "Reminder"][(safeIndex + index) % 3];
+                const dateStr = item.created_at 
+                  ? new Date(item.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                  : "Recent";
+                return (
+                  <div key={item.id} className="lp-announce-card lp-revealed">
+                    <div className="lp-announce-top">
+                      <span className="lp-announce-tag">{tag}</span>
+                      <span className="lp-announce-date">{dateStr}</span>
                     </div>
-                  );
-                })
-              )}
-            </div>
-
-            <button
-              onClick={handleNextAnnouncements}
-              disabled={announcementPage >= totalPages - 1}
-              className="bg-[#800000] text-white p-3 rounded disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-              aria-label="Next announcements"
-            >
-              <ChevronRightIcon className="w-5 h-5" />
-            </button>
+                    <h3 className="lp-announce-title">{item.title}</h3>
+                    <p className="lp-announce-desc">{item.content}</p>
+                  </div>
+                );
+              })
+            )}
           </div>
-        </div>
-      </div>
 
-      <div className="relative w-full py-16 px-6 overflow-hidden border-t-4 border-yellow-400">
+          {announcements.length > 3 && (
+            <div className="flex justify-center gap-2 mt-8">
+              {Array.from({ length: announcements.length - 2 }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentIndex(i)}
+                  className={`w-3.5 h-3.5 rounded-full transition-all border border-[#F8BF1E]/30 cursor-pointer ${
+                    safeIndex === i ? "bg-[#F8BF1E] scale-110 shadow-md" : "bg-gray-300 hover:bg-gray-400"
+                  }`}
+                  aria-label={`Go to slide ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <div id="about" className="relative w-full py-16 px-6 overflow-hidden border-t-4 border-yellow-400">
         <div className="absolute inset-0">
           <img src={bg} alt="Campus" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-linear-to-tr from-[#800000]/90 to-black/30 mix-blend-multiply" />
+          <div className="absolute inset-0 lp-hero-bg-overlay" />
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {TEAM_MEMBERS.map((member, index) => (
             <div
               key={index}
-              className="flex flex-col overflow-hidden rounded-[2.5rem] shadow-2xl border border-white/10 group transition-all hover:-translate-y-3 duration-300"
+              className="flex flex-col overflow-hidden rounded-[2.5rem] shadow-2xl border border-white/10 group transition-all hover:-translate-y-3 duration-300 hover:border-yellow-400/30"
             >
               <div className="bg-[#eebc48] py-5 text-center shrink-0">
                 <span className="text-[#800000] font-black text-xs md:text-sm uppercase">
@@ -147,19 +145,19 @@ const Tech4wardProfile = ({ bgImage }) => {
                 </span>
               </div>
 
-              <div className="relative h-96 overflow-hidden bg-[#800000]">
+              <div className="relative h-96 overflow-hidden bg-gradient-to-b from-[#800000] to-[#500000]">
                 <div className="absolute inset-0 flex items-center justify-center pb-20">
-                  <div className="w-40 h-40 rounded-full border-4 border-white/20 overflow-hidden shadow-2xl bg-white/5">
+                  <div className="w-40 h-40 rounded-full border-4 border-white/20 overflow-hidden shadow-2xl bg-white/5 transition-all duration-300 group-hover:border-yellow-400 group-hover:shadow-[0_0_20px_rgba(248,191,30,0.4)]">
                     <img
                       src={member.image}
                       alt={member.lastName}
                       className="w-full h-full object-cover scale-110 group-hover:scale-125 transition-transform duration-700"
-                    />
+                  />
                   </div>
                 </div>
 
                 <div className="absolute bottom-0 w-full p-6 text-center text-white">
-                  <h3 className="text-2xl font-black tracking-tighter uppercase leading-none">
+                  <h3 className="text-2xl font-black tracking-tighter uppercase leading-none group-hover:text-yellow-400 transition-colors duration-300">
                     {member.lastName}
                   </h3>
                   <p className="text-sm font-medium text-gray-200 mt-1">
