@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { PlusIcon, PencilSquareIcon, TrashIcon, UserGroupIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, PencilSquareIcon, TrashIcon, UserGroupIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../context/ThemeContext";
 import { useReferenceData } from "../context/ReferenceDataContext";
 import { createSignatory, updateSignatory, deleteSignatory } from "../services/api";
@@ -129,165 +129,189 @@ const SignatoryManagement = () => {
   }`;
 
   return (
-    <div className={`min-h-screen p-4 sm:p-6 rounded-2xl ${isDark ? "bg-[#18191a] text-[#e4e6eb]" : "bg-white"}`}>
-      <div className="mx-auto max-w-4xl space-y-4">
-        {/* Header */}
-        <header className={`flex flex-col gap-3 rounded-xl border p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between ${isDark ? "border-[#3e4042] bg-[#242526]" : "border-gray-200 bg-white"}`}>
-          <div>
-            <h1 className={`text-xl font-bold sm:text-2xl ${isDark ? "text-white" : "text-[#4f2018]"}`}>
-              Signatories
-            </h1>
-            <p className={`mt-1 text-xs ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
-              Manage the people selectable as "Signee" when generating certificates. Lower sort order appears first in the dropdown.
-            </p>
-          </div>
-          <button
-            onClick={openCreateForm}
-            className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-md transition-colors ${
-              isDark ? "bg-[#800000] hover:bg-[#a00000]" : "bg-pup-maroon hover:bg-pup-dark-maroon"
-            }`}
-          >
-            <PlusIcon className="h-4 w-4" />
-            Add Signatory
-          </button>
-        </header>
-
-        {/* List */}
-        <div className={`rounded-xl border shadow-sm ${isDark ? "border-[#3e4042] bg-[#242526]" : "border-gray-200 bg-white"}`}>
-          {signatories.length === 0 ? (
-            <div className={`flex flex-col items-center gap-2 py-16 text-center ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
-              <UserGroupIcon className="h-10 w-10 opacity-50" />
-              <p className="text-sm font-medium">No signatories yet.</p>
-              <p className="text-xs">Add one to make it selectable on certificates.</p>
+    <main className={`min-h-screen p-4 sm:p-6 ${isDark ? "bg-[#18191a] text-[#e4e6eb]" : "bg-[#f8f5f2] text-gray-900"}`}>
+      <div className="mx-auto max-w-4xl">
+        <section className={`overflow-hidden rounded-2xl border shadow-sm ${isDark ? "border-[#3e4042] bg-[#242526]" : "border-gray-200 bg-white"}`}>
+          <header className={`flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between ${isDark ? "border-[#3e4042] bg-[#2a2a2f]" : "border-gray-100 bg-white"}`}>
+            <div>
+              <h1 className={`text-xl font-bold sm:text-2xl ${isDark ? "text-white" : "text-[#4f2018]"}`}>
+                Signatories
+              </h1>
+              <p className={`mt-1 text-xs ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
+                Manage the people selectable as "Signee" when generating certificates. Lower sort order appears first in the dropdown.
+              </p>
             </div>
-          ) : (
-            <ul className={`divide-y ${isDark ? "divide-[#3e4042]" : "divide-gray-100"}`}>
-              {signatories.map((s) => (
-                <li key={s.signatory_id} className="flex items-center justify-between gap-4 p-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                        isDark ? "bg-[#18191a] text-[#b0b3b8]" : "bg-gray-100 text-gray-500"
-                      }`}
-                      title="Sort order"
-                    >
-                      {s.sort_order}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold">{s.name}</p>
-                      <p className={`truncate text-xs ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>{s.position}</p>
+            <button
+              onClick={openCreateForm}
+              className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-md transition-colors ${
+                isDark ? "bg-[#800000] hover:bg-[#a00000]" : "bg-pup-maroon hover:bg-pup-dark-maroon"
+              }`}
+            >
+              <PlusIcon className="h-4 w-4" />
+              Add Signatory
+            </button>
+          </header>
+
+          <div>
+            {signatories.length === 0 ? (
+              <div className={`flex flex-col items-center gap-2 py-16 text-center ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
+                <UserGroupIcon className="h-10 w-10 opacity-50" />
+                <p className="text-sm font-medium">No signatories yet.</p>
+                <p className="text-xs">Add one to make it selectable on certificates.</p>
+              </div>
+            ) : (
+              <ul className={`divide-y ${isDark ? "divide-[#3e4042]" : "divide-gray-100"}`}>
+                {signatories.map((s) => (
+                  <li key={s.signatory_id} className="flex items-center justify-between gap-4 p-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                          isDark ? "bg-[#18191a] text-[#b0b3b8]" : "bg-gray-100 text-gray-500"
+                        }`}
+                        title="Sort order"
+                      >
+                        {s.sort_order}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold">{s.name}</p>
+                        <p className={`truncate text-xs ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>{s.position}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      onClick={() => openEditForm(s)}
-                      className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-[#3a3b3c] text-[#b0b3b8] hover:text-white" : "hover:bg-gray-100 text-gray-500 hover:text-gray-800"}`}
-                      title="Edit"
-                    >
-                      <PencilSquareIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(s)}
-                      className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-red-950/40 text-[#b0b3b8] hover:text-red-400" : "hover:bg-red-50 text-gray-500 hover:text-red-600"}`}
-                      title="Delete"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => openEditForm(s)}
+                        className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-[#3a3b3c] text-[#b0b3b8] hover:text-white" : "hover:bg-gray-100 text-gray-500 hover:text-gray-800"}`}
+                        title="Edit"
+                      >
+                        <PencilSquareIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(s)}
+                        className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-red-950/40 text-[#b0b3b8] hover:text-red-400" : "hover:bg-red-50 text-gray-500 hover:text-red-600"}`}
+                        title="Delete"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
       </div>
 
       {/* Add / Edit Form Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <form
-            onSubmit={handleSubmit}
-            className={`w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in duration-200 ${
-              isDark ? "bg-[#242526] border border-[#3e4042] text-[#e4e6eb]" : "bg-white"
-            }`}
-          >
-            <h3 className="text-lg font-bold">{editingId ? "Edit Signatory" : "Add Signatory"}</h3>
-
-            <div>
-              <label className={`mb-1 block text-xs font-semibold ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
-                Full Name
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                placeholder="e.g. Juan D. Dela Cruz"
-                className={inputClass}
-                maxLength={255}
-                required
-              />
-              {fieldErrors.name && (
-                <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.name[0]}</p>
-              )}
-            </div>
-
-            <div>
-              <label className={`mb-1 block text-xs font-semibold ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
-                Position
-              </label>
-              <input
-                type="text"
-                name="position"
-                value={form.position}
-                onChange={handleChange}
-                placeholder="e.g. Assistant Registrar"
-                className={inputClass}
-                maxLength={255}
-                required
-              />
-              {fieldErrors.position && (
-                <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.position[0]}</p>
-              )}
-            </div>
-
-            <div>
-              <label className={`mb-1 block text-xs font-semibold ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
-                Sort Order
-              </label>
-              <input
-                type="number"
-                name="sort_order"
-                value={form.sort_order}
-                onChange={handleChange}
-                className={inputClass}
-              />
-              {fieldErrors.sort_order && (
-                <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.sort_order[0]}</p>
-              )}
-            </div>
-
-            <div className="flex gap-3 pt-2">
+        <div className="fixed inset-0 z-50  flex items-center justify-center p-4">
+          <div
+            className={`absolute inset-0 backdrop-blur-sm ${isDark ? "bg-black/70" : "bg-black/50"}`}
+            onClick={closeForm}
+          />
+          <div className={`relative w-full max-w-md mx-auto rounded-2xl shadow-2xl flex flex-col overflow-hidden ${isDark ? "bg-[#242526] border border-[#3e4042]" : "bg-white"}`}>
+            <div className={`px-6 py-5 flex items-center justify-between shrink-0 ${isDark ? "bg-[#2a2a2f] border-b border-[#3e4042]" : "bg-pup-dark-maroon text-white"}`}>
+              <div>
+                <h2 className="text-white font-bold text-lg uppercase tracking-wide">
+                  {editingId ? "Edit Signatory" : "Add Signatory"}
+                </h2>
+                <p className={`text-xs mt-0.5 ${isDark ? "text-[#b0b3b8]" : "text-white/60"}`}>
+                  Keep this list ordered for certificate selection.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={closeForm}
                 disabled={saving}
-                className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${
-                  isDark ? "text-[#e4e6eb] bg-[#3a3b3c] hover:bg-[#4e4f50] border border-[#4e4f50]" : "text-gray-700 bg-gray-100 hover:bg-gray-200"
-                }`}
+                className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white disabled:opacity-50"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-md transition-colors disabled:opacity-60 ${
-                  isDark ? "bg-[#800000] hover:bg-[#a00000]" : "bg-pup-maroon hover:bg-pup-dark-maroon"
-                }`}
-              >
-                {saving ? "Saving..." : editingId ? "Save Changes" : "Add Signatory"}
+                <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
-          </form>
+
+            <div className="h-1 w-full shrink-0 bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
+
+            <form onSubmit={handleSubmit} noValidate className="flex flex-col">
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className={`mb-1 block text-xs font-semibold uppercase tracking-wider ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
+                    placeholder="e.g. Juan D. Dela Cruz"
+                    className={inputClass}
+                    maxLength={255}
+                    required
+                  />
+                  {fieldErrors.name && (
+                    <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.name[0]}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={`mb-1 block text-xs font-semibold uppercase tracking-wider ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
+                    Position
+                  </label>
+                  <input
+                    type="text"
+                    name="position"
+                    value={form.position}
+                    onChange={handleChange}
+                    placeholder="e.g. Assistant Registrar"
+                    className={inputClass}
+                    maxLength={255}
+                    required
+                  />
+                  {fieldErrors.position && (
+                    <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.position[0]}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={`mb-1 block text-xs font-semibold uppercase tracking-wider ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
+                    Sort Order
+                  </label>
+                  <input
+                    type="number"
+                    name="sort_order"
+                    value={form.sort_order}
+                    onChange={handleChange}
+                    className={inputClass}
+                  />
+                  {fieldErrors.sort_order && (
+                    <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.sort_order[0]}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className={`px-6 pb-6 pt-4 flex items-center justify-end gap-3 border-t shrink-0 ${isDark ? "border-[#3e4042]" : "border-gray-100"}`}>
+                <button
+                  type="button"
+                  onClick={closeForm}
+                  disabled={saving}
+                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${
+                    isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isDark
+                      ? "bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]"
+                      : "bg-pup-dark-maroon text-white hover:bg-[#3a0303]"
+                  }`}
+                >
+                  {saving ? "Saving..." : editingId ? "Save Changes" : "Add Signatory"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -302,7 +326,7 @@ const SignatoryManagement = () => {
 
       <SuccessToast message={successMsg} onClose={() => setSuccessMsg("")} />
       <ErrorToast message={errorMsg} onClose={() => setErrorMsg("")} />
-    </div>
+    </main>
   );
 };
 
