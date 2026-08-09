@@ -9,6 +9,12 @@ import LineLoading from "../components/LineLoading.jsx";
 
 const SSO_LOGIN_URL = import.meta.env.VITE_SSO_LOGIN_URL;
 
+const NAV_ITEMS = [
+  { id: "hero", label: "Home" },
+  { id: "announcements", label: "Announcements" },
+  { id: "about", label: "About Us" },
+];
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const { user, login, localLogin } = useAuth();
@@ -154,13 +160,13 @@ const LandingPage = () => {
           {/* Right: nav links + sign in — hidden on mobile */}
           <div className="hidden md:relative md:flex items-center space-x-2 lg:space-x-3">
             <div className="hidden md:flex items-center gap-1">
-              {["hero", "announcements", "about us"].map((id) => (
+              {NAV_ITEMS.map(({ id, label }) => (
                 <button
                   key={id}
                   onClick={() => scrollTo(id)}
-                  className="px-3 py-2 text-white text-sm font-medium rounded-md hover:bg-white/10 transition-colors capitalize font-inter cursor-pointer"
+                  className="px-3 py-2 text-white text-sm font-medium rounded-md hover:bg-white/10 transition-colors font-inter cursor-pointer"
                 >
-                  {id === "hero" ? "Home" : id.charAt(0).toUpperCase() + id.slice(1)}
+                  {label}
                 </button>
               ))}
             </div>
