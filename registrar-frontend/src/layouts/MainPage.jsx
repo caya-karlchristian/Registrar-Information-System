@@ -93,7 +93,7 @@ const MainPage = () => {
           </div>
 
           {/* Text block */}
-          <div className="flex-grow text-left relative">
+          <div className="grow text-left relative">
             <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#F8BF1E] mb-3">
               Developer Team
             </div>
@@ -116,7 +116,7 @@ const MainPage = () => {
           </div>
         </div>
       </div>
-      <footer className="relative w-full bg-[#660000] border-t-[4px] border-yellow-400 text-white font-inter z-40">
+      <footer className="relative w-full bg-[#660000] border-t-4 border-yellow-400 text-white font-inter z-40">
         <div className="max-w-5xl mx-auto py-10 px-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
             {/* Column 1: Brand details */}
@@ -162,7 +162,7 @@ const MainPage = () => {
                 Quick Links
               </h4>
               <ul className="space-y-2 text-[11px] text-gray-300">
-                {["hero", "announcements", "services", "about", "features"].map((id) => (
+                {["hero", "announcements", "about us"].map((id) => (
                   <li key={id}>
                     {id === "features" ? (
                       <span className="capitalize text-gray-300 select-none">
@@ -244,10 +244,6 @@ const MainPage = () => {
               <span className="text-white/10">|</span>
               <a href="https://www.pup.edu.ph/privacy/" target="_blank" rel="noopener noreferrer" className="hover:text-yellow-400 text-gray-300 transition-colors">
                 Privacy Statement
-              </a>
-              <span className="text-white/10">|</span>
-              <a href="mailto:tech4ward.bsit2027@gmail.com" className="hover:text-yellow-400 text-gray-300 transition-colors">
-                Support
               </a>
             </div>
           </div>

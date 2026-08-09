@@ -145,7 +145,7 @@ const Tech4wardProfile = ({ bgImage }) => {
                 </span>
               </div>
 
-              <div className="relative h-96 overflow-hidden bg-gradient-to-b from-[#800000] to-[#500000]">
+              <div className="relative h-96 overflow-hidden bg-linear-to-b from-[#800000] to-[#500000]">
                 <div className="absolute inset-0 flex items-center justify-center pb-20">
                   <div className="w-40 h-40 rounded-full border-4 border-white/20 overflow-hidden shadow-2xl bg-white/5 transition-all duration-300 group-hover:border-yellow-400 group-hover:shadow-[0_0_20px_rgba(248,191,30,0.4)]">
                     <img
