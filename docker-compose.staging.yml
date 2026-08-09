@@ -7,7 +7,11 @@ services:
     mem_limit: 384m
     ports:
       - "8000:8000"
-    depends_on: [mysql, redis]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks: [ris_staging_network]
 
   reverb:
@@ -19,7 +23,9 @@ services:
     mem_limit: 128m
     ports:
       - "8080:8080"
-    depends_on: [backend]
+    depends_on:
+      backend:
+        condition: service_started
     networks: [ris_staging_network]
 
   worker:
@@ -34,7 +40,9 @@ services:
         --timeout=300
     env_file: .env.staging
     mem_limit: 128m
-    depends_on: [backend]
+    depends_on:
+      backend:
+        condition: service_started
     networks: [ris_staging_network]
 
   broadcast-worker:
@@ -49,7 +57,9 @@ services:
         --timeout=30
     env_file: .env.staging
     mem_limit: 96m
-    depends_on: [backend]
+    depends_on:
+      backend:
+        condition: service_started
     networks: [ris_staging_network]
 
   scheduler:
@@ -60,7 +70,9 @@ services:
       sh -c "while true; do php artisan schedule:run --no-interaction >> /var/log/scheduler.log 2>&1; sleep 60; done"
     env_file: .env.staging
     mem_limit: 96m
-    depends_on: [backend]
+    depends_on:
+      backend:
+        condition: service_started
     networks: [ris_staging_network]
 
   mysql:
@@ -75,6 +87,12 @@ services:
     volumes:
       - ris_staging_db_data:/var/lib/mysql
     networks: [ris_staging_network]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   redis:
     image: redis:7-alpine
