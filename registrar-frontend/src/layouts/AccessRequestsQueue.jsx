@@ -138,34 +138,46 @@ const AccessRequestsQueue = () => {
   };
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          {STATUS_FILTERS.map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${statusFilter === s
-                ? (isDark ? 'bg-yellow-500/20 text-yellow-400 border-yellow-600' : 'bg-pup-dark-maroon text-white border-pup-dark-maroon')
-                : (isDark ? 'text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f]' : 'text-gray-600 border-gray-200 hover:bg-gray-50')}`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        <div className="w-full sm:max-w-xs">
-          <VoiceSearchInput
-            value={searchQuery}
-            onChange={(value) => setSearchQuery(value)}
-            placeholder="Search"
-          />
+    <div className="w-full flex flex-col font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              Access Requests
+            </h1>
+          </div>
+          <p className={`text-xs mt-1 ${isDark ? 'text-gray-455' : 'text-gray-500'}`}>
+            Review self-service requests for new admin or super admin accounts.
+          </p>
         </div>
       </div>
 
-      <div className={`rounded-xl overflow-hidden border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-200 shadow-sm'
-        }`}>
+      <div className={`rounded-xl overflow-hidden border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-200 shadow-sm'}`}>
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b ${isDark ? 'border-[#3e4042] bg-[#1a1a1c]/20' : 'border-gray-200 bg-gray-50/50'}`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            {STATUS_FILTERS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${statusFilter === s
+                  ? (isDark ? 'bg-yellow-500/20 text-yellow-400 border-yellow-600' : 'bg-pup-dark-maroon text-white border-pup-dark-maroon')
+                  : (isDark ? 'text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f]' : 'text-gray-600 border-gray-200 hover:bg-gray-50')}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          <div className="w-full sm:max-w-xs">
+            <VoiceSearchInput
+              value={searchQuery}
+              onChange={(value) => setSearchQuery(value)}
+              placeholder="Search"
+            />
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
+          <table className="w-full min-w-175 text-sm">
             <thead>
               <tr className={`border-b text-xs font-bold uppercase tracking-wider ${isDark ? 'border-[#3e4042] text-[#a09e9a] bg-[#1a1a1c]/20' : 'border-gray-200 text-gray-500 bg-gray-50/50'
                 }`}>

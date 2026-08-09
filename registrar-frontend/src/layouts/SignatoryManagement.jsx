@@ -3,6 +3,7 @@ import { PlusIcon, PencilSquareIcon, TrashIcon, UserGroupIcon, XMarkIcon } from 
 import { useTheme } from "../context/ThemeContext";
 import { useReferenceData } from "../context/ReferenceDataContext";
 import { createSignatory, updateSignatory, deleteSignatory } from "../services/api";
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import ConfirmationModal from "../components/ConfirmationModal.jsx";
@@ -25,6 +26,7 @@ const SignatoryManagement = () => {
   const { isDark } = useTheme();
   const { signatories, refreshSignatories } = useReferenceData();
 
+  const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen]   = useState(false);
   const [editingId, setEditingId]     = useState(null); // null = creating
   const [form, setForm]               = useState(EMPTY_FORM);
@@ -68,8 +70,6 @@ const SignatoryManagement = () => {
     setSaving(true);
     setFieldErrors({});
 
-    // sort_order is optional server-side, but coerce a blank input to 0
-    // rather than sending an empty string (would fail the integer rule).
     const payload = {
       name: form.name.trim(),
       position: form.position.trim(),
@@ -89,7 +89,6 @@ const SignatoryManagement = () => {
     } catch (err) {
       const status = err?.response?.status;
       if (status === 422) {
-        // Laravel validation error shape: { message, errors: { field: [msg] } }
         setFieldErrors(err.response.data?.errors ?? {});
         setErrorMsg(err.response.data?.message || "Please fix the highlighted fields.");
       } else if (status === 403) {
@@ -128,82 +127,122 @@ const SignatoryManagement = () => {
       : "bg-white border-gray-300 text-gray-900 focus:ring-pup-maroon/30 focus:border-pup-maroon"
   }`;
 
+  const filteredSignatories = signatories.filter((signatory) => {
+    const query = search.toLowerCase().trim();
+    if (!query) return true;
+
+    const fullName = [signatory.name, signatory.position, String(signatory.sort_order ?? "")]
+      .join(" ")
+      .toLowerCase();
+
+    return fullName.includes(query);
+  });
+
   return (
-    <main className={`min-h-screen p-4 sm:p-6 ${isDark ? "bg-[#18191a] text-[#e4e6eb]" : "bg-[#f8f5f2] text-gray-900"}`}>
+    <main className={`min-h-screen p-4 sm:p-6 ${isDark ? "bg-[#18191a] text-[#e4e6eb]" : "text-gray-900"}`}>
       <div className="mx-auto max-w-4xl">
-        <section className={`overflow-hidden rounded-2xl border shadow-sm ${isDark ? "border-[#3e4042] bg-[#242526]" : "border-gray-200 bg-white"}`}>
-          <header className={`flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between ${isDark ? "border-[#3e4042] bg-[#2a2a2f]" : "border-gray-100 bg-white"}`}>
+        <div className={`rounded-3xl border shadow-sm p-4 sm:p-5 ${isDark ? "border-[#3e4042] bg-[#242526]" : "border-gray-200 bg-white"}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div>
-              <h1 className={`text-xl font-bold sm:text-2xl ${isDark ? "text-white" : "text-[#4f2018]"}`}>
-                Signatories
-              </h1>
-              <p className={`mt-1 text-xs ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
-                Manage the people selectable as "Signee" when generating certificates. Lower sort order appears first in the dropdown.
+              <div className="flex items-center gap-2">
+                <h1 className={`text-xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
+                  Signatories <span className={`text-sm font-semibold ml-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>({signatories.length})</span>
+                </h1>
+              </div>
+              <p className={`text-xs mt-1 ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
+                Manage the people selectable as "Signee" when generating certificates.
               </p>
             </div>
-            <button
-              onClick={openCreateForm}
-              className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-md transition-colors ${
-                isDark ? "bg-[#800000] hover:bg-[#a00000]" : "bg-pup-maroon hover:bg-pup-dark-maroon"
-              }`}
-            >
-              <PlusIcon className="h-4 w-4" />
-              Add Signatory
-            </button>
-          </header>
 
-          <div>
-            {signatories.length === 0 ? (
-              <div className={`flex flex-col items-center gap-2 py-16 text-center ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
-                <UserGroupIcon className="h-10 w-10 opacity-50" />
-                <p className="text-sm font-medium">No signatories yet.</p>
-                <p className="text-xs">Add one to make it selectable on certificates.</p>
-              </div>
-            ) : (
-              <ul className={`divide-y ${isDark ? "divide-[#3e4042]" : "divide-gray-100"}`}>
-                {signatories.map((s) => (
-                  <li key={s.signatory_id} className="flex items-center justify-between gap-4 p-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          isDark ? "bg-[#18191a] text-[#b0b3b8]" : "bg-gray-100 text-gray-500"
-                        }`}
-                        title="Sort order"
-                      >
-                        {s.sort_order}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold">{s.name}</p>
-                        <p className={`truncate text-xs ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>{s.position}</p>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        onClick={() => openEditForm(s)}
-                        className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-[#3a3b3c] text-[#b0b3b8] hover:text-white" : "hover:bg-gray-100 text-gray-500 hover:text-gray-800"}`}
-                        title="Edit"
-                      >
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(s)}
-                        className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-red-950/40 text-[#b0b3b8] hover:text-red-400" : "hover:bg-red-50 text-gray-500 hover:text-red-600"}`}
-                        title="Delete"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
+              <button
+                onClick={openCreateForm}
+                className={`px-5 py-2.5 rounded-lg text-sm font-bold shadow transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
+                  isDark ? "bg-yellow-400 text-black hover:bg-yellow-500" : "bg-pup-dark-maroon text-white hover:bg-[#3a0303]"
+                }`}
+              >
+                Add Signatory
+              </button>
+            </div>
           </div>
-        </section>
+
+          <section className={`rounded-2xl overflow-hidden border shadow-sm ${isDark ? "border-[#3e4042] bg-[#242526]" : "border-gray-100 bg-white"}`}>
+            <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b ${isDark ? "border-[#3e4042] bg-[#1a1a1c]/20" : "border-gray-200 bg-gray-50/50"}`}>
+              <div className="w-full sm:max-w-md">
+                <VoiceSearchInput
+                  value={search}
+                  onChange={(value) => setSearch(value)}
+                  placeholder="Search"
+                />
+              </div>
+              <div className={`text-sm font-semibold ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
+                {filteredSignatories.length} result{filteredSignatories.length === 1 ? "" : "s"}
+              </div>
+            </div>
+
+            <div>
+              {filteredSignatories.length === 0 ? (
+                <div className={`flex flex-col items-center gap-2 py-16 text-center ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
+                  <UserGroupIcon className="h-10 w-10 opacity-50" />
+                  <p className="text-sm font-medium">No signatories found.</p>
+                  <p className="text-xs">Try a different search or add a new signatory.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-175 text-sm">
+                    <thead>
+                      <tr className={isDark ? "border-b border-[#3e4042]" : "border-b border-gray-100"}>
+                        <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Name</th>
+                        <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Position</th>
+                        <th className={`px-5 py-4 text-center font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Sort Order</th>
+                        <th className={`px-5 py-4 text-center font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSignatories.map((signatory) => (
+                        <tr key={signatory.signatory_id} className={`border-b last:border-0 transition-colors ${isDark ? "border-[#3e4042] hover:bg-[#2a2a2f]" : "border-gray-100 hover:bg-gray-50"}`}>
+                          <td className={`px-5 py-4 ${isDark ? "text-[#e4e6eb]" : "text-gray-800"}`}>
+                            <div className="font-semibold">{signatory.name}</div>
+                          </td>
+                          <td className={`px-5 py-4 ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
+                            {signatory.position}
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isDark ? "bg-[#18191a] text-[#b0b3b8]" : "bg-gray-100 text-gray-500"}`} title="Sort order">
+                              {signatory.sort_order}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => openEditForm(signatory)}
+                                className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-[#3a3b3c] text-[#b0b3b8] hover:text-white" : "hover:bg-gray-100 text-gray-500 hover:text-gray-800"}`}
+                                title="Edit"
+                              >
+                                <PencilSquareIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => setDeleteTarget(signatory)}
+                                className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-red-950/40 text-[#b0b3b8] hover:text-red-400" : "hover:bg-red-50 text-gray-500 hover:text-red-600"}`}
+                                title="Delete"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
 
-      {/* Add / Edit Form Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 z-50  flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className={`absolute inset-0 backdrop-blur-sm ${isDark ? "bg-black/70" : "bg-black/50"}`}
             onClick={closeForm}
