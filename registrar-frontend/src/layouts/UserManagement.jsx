@@ -333,57 +333,68 @@ const UserManagement = () => {
 
   return (
     <div className="w-full flex flex-col font-sans">
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div className="flex-1 min-w-0 sm:max-w-xs">
-          <VoiceSearchInput
-            value={search}
-            onChange={(value) => {
-              setSearch(value);
-              handleFilterChange();
-            }}
-            placeholder="Search"
-          />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              Admin Accounts
+            </h1>
+          </div>
+          <p className={`text-xs mt-1 ${isDark ? 'text-gray-455' : 'text-gray-500'}`}>
+            Create, edit, and manage admin access, roles, and passwords.
+          </p>
         </div>
 
-        {/* Clear Filters button */}
-        {(roleFilter !== 'All' || statusFilter !== 'All' || dateOrder !== 'Newest' || search.trim() !== '') && (
+        <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
+          {(roleFilter !== 'All' || statusFilter !== 'All' || dateOrder !== 'Newest' || search.trim() !== '') && (
+            <button
+              type="button"
+              onClick={() => {
+                setRoleFilter('All');
+                setStatusFilter('All');
+                setDateOrder('Newest');
+                setSearch('');
+              }}
+              className={`px-4 py-2 border rounded-lg text-sm font-semibold transition-all cursor-pointer ${isDark ? 'border-gray-700 bg-[#2a2a2f] text-white hover:bg-white/10' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              Clear
+            </button>
+          )}
+
           <button
-            type="button"
-            onClick={() => {
-              setRoleFilter('All');
-              setStatusFilter('All');
-              setDateOrder('Newest');
-              setSearch('');
-            }}
-            className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold transition-colors border shadow-sm flex items-center justify-center shrink-0
-              ${isDark
-                ? 'bg-[#1f1f1f] text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
-              }`}
+            onClick={() => setIsGrantPickerOpen(true)}
+            className={`px-4 py-2 border rounded-lg text-sm font-semibold transition-all cursor-pointer ${isDark ? 'border-gray-700 bg-[#2a2a2f] text-white hover:bg-white/10' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
           >
-            Clear Filters
+            Grant a Role <UserPlusIcon className="w-4 h-4 inline-block ml-1" />
           </button>
-        )}
 
-        <button
-          onClick={() => setIsGrantPickerOpen(true)}
-          className={`mt-4 sm:mt-6 w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-full text-sm font-semibold shadow transition-all border ${isDark ? 'border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-        >
-          Grant a Role <UserPlusIcon className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={() => { setEditUser(null); setIsModalOpen(true); }}
-          className={`sm:ml-auto mt-4 sm:mt-6 w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-full text-sm font-semibold shadow transition-all ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
-        >
-          Add User <PlusIcon className="w-4 h-4" />
-        </button>
-
+          <button
+            onClick={() => { setEditUser(null); setIsModalOpen(true); }}
+            className={`px-5 py-2 rounded-lg text-sm font-bold shadow transition-all cursor-pointer ${isDark ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'}`}
+          >
+            Add User <PlusIcon className="w-4 h-4 inline-block ml-1" />
+          </button>
+        </div>
       </div>
 
       {/* Table */}
-      <div className={`rounded-2xl overflow-hidden ${isDark ? 'bg-[#242526] border border-[#3e4042] shadow-none' : 'bg-white shadow-sm border border-gray-100'}`}>
+      <div className={`rounded-xl overflow-hidden border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-200 shadow-sm'}`}>
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b ${isDark ? 'border-[#3e4042] bg-[#1a1a1c]/20' : 'border-gray-200 bg-gray-50/50'}`}>
+          <div className="w-full sm:max-w-md">
+            <VoiceSearchInput
+              value={search}
+              onChange={(value) => {
+                setSearch(value);
+                handleFilterChange();
+              }}
+              placeholder="Search"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-3 ml-auto">
+            <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{safePage} of {totalPages}</span>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full min-w-190 text-sm">
           <thead>

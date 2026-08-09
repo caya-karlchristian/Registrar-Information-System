@@ -222,8 +222,8 @@ const MainPage = () => {
                   <svg className="w-4 h-4 text-[#F8BF1E] shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.47-5.112-3.758-6.58-6.58l1.293-.97c.362-.271.527-.834.417-1.173L6.111 2.22a1.091 1.091 0 0 0-1.091-.852H3.75A2.25 2.25 0 0 0 1.5 3.75v2.25Z" />
                   </svg>
-                  <a href="tel:+63286452337" className="hover:text-yellow-400 transition-colors">
-                    +63 2 8645 2337
+                  <a href="tel:+639380192649" className="hover:text-yellow-400 transition-colors">
+                    +63 938 019 2649
                   </a>
                 </li>
               </ul>
