@@ -8,9 +8,10 @@ class AlumniAcademicRecord extends Model
 {
     public $timestamps = false;
     protected $primaryKey = 'alumni_academic_id';
-    // Not currently written to anywhere in the app — fillable set to the
-    // real schema columns (minus PK) as a safe default for whenever this
-    // gets wired up, rather than leaving mass assignment fully open.
+    // Written by App\Services\Alumni\AlumniProvisioningService on every
+    // alumni SSO login (updateOrCreate keyed on alumni_profile_id).
+    // Fillable is scoped to the real schema columns (minus PK) rather
+    // than left fully open.
     protected $fillable = ['alumni_profile_id', 'student_number', 'maiden_name', 'year_of_graduation', 'course'];
     protected $table = 'alumni_academic_record';
 

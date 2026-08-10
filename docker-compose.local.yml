@@ -32,7 +32,7 @@ services:
       # Third-party integrations default to mock/off locally —
       # override in your own .env only if you specifically need
       # to test against a real sandbox/staging endpoint.
-      ALUMNI_MOCK: "true"
+      ALUMNI_MOCK: "false"
       FILESYSTEM_DISK: local
     volumes:
       # Bind mount so code changes reflect immediately — this is the

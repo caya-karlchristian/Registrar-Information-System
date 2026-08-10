@@ -5,6 +5,7 @@ namespace App\Services\Alumni;
 use App\Contracts\AlumniSystemClientInterface;
 use App\DTOs\Alumni\AlumniDTO;
 use App\Models\Alumni;
+use App\Models\SystemUser;
 
 /**
  * Fake PUPTAPS client — reads from RIS's own alumni tables.
@@ -83,6 +84,36 @@ class FakeAlumniSystemClient implements AlumniSystemClientInterface
         }
 
         return $this->toDto($alumni);
+    }
+
+    /**
+     * Match by SystemUser.email, since RIS's local alumni tables don't
+     * store email at all (see class docblock — the real client's DTO
+     * fills email: null locally, PUPTAPS owns that field).
+     *
+     * IMPORTANT LIMITATION: this can only find an alumnus who ALREADY
+     * has a SystemUser + Alumni row in RIS (e.g. testing re-login /
+     * re-provisioning of an existing alumni account). It CANNOT simulate
+     * a brand-new alumnus logging into RIS for the first time — that
+     * scenario, by definition, involves someone RIS has never seen who
+     * only exists in PUPTAPS, and there is no local email index to check
+     * against. To test that specific flow (first-time alumni
+     * auto-registration at login), set ALUMNI_MOCK=false and run
+     * against a real or locally-running PUPTAPS instance instead.
+     */
+    public function tryLookupAlumniByEmail(string $email): ?AlumniDTO
+    {
+        $user = SystemUser::where('email', $email)->first();
+
+        if (!$user) {
+            return null;
+        }
+
+        $alumni = Alumni::with('profile.academicRecord')
+            ->where('user_id', $user->user_id)
+            ->first();
+
+        return $alumni ? $this->toDto($alumni) : null;
     }
 
     // ── Private mapper ────────────────────────────────────────────────────────

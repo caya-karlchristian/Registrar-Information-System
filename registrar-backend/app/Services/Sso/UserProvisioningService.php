@@ -2,6 +2,7 @@
 
 namespace App\Services\Sso;
 
+use App\DTOs\Alumni\AlumniDTO;
 use App\Exceptions\AccountDeactivatedException;
 use App\Exceptions\OgosException;
 use App\Exceptions\UnregisteredAccountException;
@@ -11,6 +12,7 @@ use App\Models\AuditLog;
 use App\Models\RoleAssignment;
 use App\Models\StudentProfile;
 use App\Models\SystemUser;
+use App\Services\Alumni\AlumniProvisioningService;
 use App\Services\AuditLogger;
 use App\Services\Ocms\OcmsAdminService;
 use App\Services\Ogos\OgosStudentService;
@@ -21,10 +23,11 @@ use Illuminate\Support\Str;
 class UserProvisioningService
 {
     public function __construct(
-        private RoleResolver       $roleResolver,
-        private OgosStudentService $ogosStudentService,
-        private OcmsAdminService   $ocmsAdminService,
-        private AuditLogger        $auditLogger,
+        private RoleResolver             $roleResolver,
+        private OgosStudentService       $ogosStudentService,
+        private AlumniProvisioningService $alumniProvisioningService,
+        private OcmsAdminService         $ocmsAdminService,
+        private AuditLogger              $auditLogger,
     ) {}
 
     /**
@@ -61,6 +64,12 @@ class UserProvisioningService
 
             $roleId = $this->roleResolver->resolve($existing);
 
+            // Captured only if the not-pre-registered branch below ends up
+            // confirming this person against PUPTAPS — reused by
+            // provisionAlumniProfile() further down so a single login
+            // never calls PUPTAPS twice for the same email.
+            $prefetchedAlumniDto = null;
+
             if (!$roleId) {
                 // Not pre-registered in RIS at all.
                 //
@@ -87,7 +96,18 @@ class UserProvisioningService
                     $this->ogosStudentService->getClient()->getStudentByEmail($email);
                     $roleId = SystemUser::ROLE_STUDENT;
                 } catch (OgosException) {
-                    throw new UnregisteredAccountException('Your account is not yet registered in RIS. Please contact the registrar.');
+                    // Not a current OGOS student either — check PUPTAPS
+                    // before rejecting. If they exist there they're a valid
+                    // alumnus; auto-register them the same way. Keep the
+                    // DTO so provisionAlumniProfile() doesn't have to fetch
+                    // it again a few lines down.
+                    $prefetchedAlumniDto = $this->alumniProvisioningService->getClient()->tryLookupAlumniByEmail($email);
+
+                    if ($prefetchedAlumniDto !== null) {
+                        $roleId = SystemUser::ROLE_ALUMNI;
+                    } else {
+                        throw new UnregisteredAccountException('Your account is not yet registered in RIS. Please contact the registrar.');
+                    }
                 }
             }
 
@@ -126,7 +146,7 @@ class UserProvisioningService
             }
 
             $needsOnboarding = $this->provisionProfile(
-                $user, $roleId, $firstName, $middleName, $lastName
+                $user, $roleId, $firstName, $middleName, $lastName, $prefetchedAlumniDto
             );
 
             $this->ensureBaselineRoleAssignment($user, $roleId);
@@ -232,18 +252,19 @@ class UserProvisioningService
     }
 
     private function provisionProfile(
-        SystemUser $user,
-        int        $roleId,
-        ?string    $firstName,
-        ?string    $middleName,
-        ?string    $lastName
+        SystemUser  $user,
+        int         $roleId,
+        ?string     $firstName,
+        ?string     $middleName,
+        ?string     $lastName,
+        ?AlumniDTO  $prefetchedAlumniDto = null,
     ): bool {
         if ($roleId === SystemUser::ROLE_STUDENT) {
             return $this->provisionStudentProfile($user, $firstName, $middleName, $lastName);
         }
 
         if ($roleId === SystemUser::ROLE_ALUMNI) {
-            return $this->provisionAlumniProfile($user, $firstName, $middleName, $lastName);
+            return $this->provisionAlumniProfile($user, $firstName, $middleName, $lastName, $prefetchedAlumniDto);
         }
 
         if (in_array($roleId, [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN])) {
@@ -278,24 +299,29 @@ class UserProvisioningService
         return $isNew;
     }
 
-    private function provisionAlumniProfile(SystemUser $user, ?string $firstName, ?string $middleName, ?string $lastName): bool
-    {
-        if (Alumni::where('user_id', $user->user_id)->exists()) {
-            return false;
-        }
+    private function provisionAlumniProfile(
+        SystemUser $user,
+        ?string    $firstName,
+        ?string    $middleName,
+        ?string    $lastName,
+        ?AlumniDTO $prefetchedAlumniDto = null,
+    ): bool {
+        $existingAlumni = Alumni::where('user_id', $user->user_id)->first();
+        $isNew = !$existingAlumni || !AlumniProfile::where('alumni_id', $existingAlumni->alumni_id)->exists();
 
-        $alumni = Alumni::create([
-            'user_id'        => $user->user_id,
-            'alumni_type_id' => Alumni::TYPE_NON_SIS,
-        ]);
+        // Always try PUPTAPS — it is the source of truth, same reasoning
+        // as provisionStudentProfile()'s "always try OGOS first". Reuses
+        // $prefetchedAlumniDto when the caller already fetched it during
+        // the not-pre-registered auto-registration check, so a brand-new
+        // alumnus's first login only ever costs one PUPTAPS call, not two.
+        // All actual read/write logic — including the NOT NULL
+        // date_of_birth/sex_at_birth placeholder handling — lives in
+        // AlumniProvisioningService; see its class docblock for why those
+        // two fields can't be populated with real data at login time.
+        $this->alumniProvisioningService->provisionAlumniData(
+            $user, $firstName, $middleName, $lastName, $prefetchedAlumniDto
+        );
 
-        AlumniProfile::create([
-            'alumni_id'   => $alumni->alumni_id,
-            'first_name'  => $firstName,
-            'middle_name' => $middleName,
-            'last_name'   => $lastName,
-        ]);
-
-        return true;
+        return $isNew;
     }
 }

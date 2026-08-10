@@ -29,4 +29,21 @@ interface AlumniSystemClientInterface
      * Returns null if not found or source is unavailable.
      */
     public function tryGetAlumni(string $id): ?AlumniDTO;
+
+    /**
+     * Return a single alumni by exact email match — used at SSO login
+     * time to check "does this person exist as a PUPTAPS alumnus" before
+     * auto-registering them in RIS, mirroring how OgosStudentService
+     * checks OGOS for students.
+     *
+     * Deliberately calls PUPTAPS's /alumni/lookup endpoint (not
+     * /alumni/{id}) — that endpoint is scoped to the 'alumni:lookup'
+     * ability and returns identity + academic fields only, no sensitive
+     * data (birthday, sex, addresses). RIS's login-time token is
+     * intentionally not granted the 'alumni:sensitive' ability, since a
+     * basic existence check has no legitimate need for it.
+     *
+     * Never throws — returns null if not found or source is unavailable.
+     */
+    public function tryLookupAlumniByEmail(string $email): ?AlumniDTO;
 }
