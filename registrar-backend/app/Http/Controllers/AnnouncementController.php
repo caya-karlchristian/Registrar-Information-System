@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Announcement\ArchiveAnnouncementRequest;
+use App\Http\Requests\Announcement\StoreAnnouncementRequest;
+use App\Http\Requests\Announcement\UpdateAnnouncementRequest;
 use App\Models\Announcement;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
@@ -45,15 +48,9 @@ class AnnouncementController extends Controller
         );
     }
 
-    public function store(Request $request)
+    public function store(StoreAnnouncementRequest $request)
     {
-        $validated = $request->validate([
-            'title'    => 'required|string|max:255',
-            'content'  => 'required|string',
-            'end_date' => 'nullable|date',
-        ]);
-
-        $announcement = $this->announcementService->create($validated, $request->user());
+        $announcement = $this->announcementService->create($request->validated(), $request->user());
 
         return response()->json($announcement, 201);
     }
@@ -63,16 +60,9 @@ class AnnouncementController extends Controller
         return response()->json($announcement);
     }
 
-    public function update(Request $request, Announcement $announcement)
+    public function update(UpdateAnnouncementRequest $request, Announcement $announcement)
     {
-        $validated = $request->validate([
-            'title'    => 'sometimes|string|max:255',
-            'content'  => 'sometimes|string',
-            'enabled'  => 'sometimes|boolean',
-            'end_date' => 'sometimes|nullable|date',
-        ]);
-
-        $announcement->update($validated);
+        $announcement->update($request->validated());
 
         return response()->json($announcement);
     }
@@ -105,16 +95,14 @@ class AnnouncementController extends Controller
     // -------------------------------------------------------------------------
 
     // PATCH /announcements/{id}/archive
-    public function archive(Request $request, $id)
+    public function archive(ArchiveAnnouncementRequest $request, $id)
     {
         $announcement = Announcement::withArchived()->findOrFail($id);
 
         /** @var SystemUser $actor */
         $actor = Auth::user();
 
-        $validated = $request->validate([
-            'reason' => 'nullable|string|max:500',
-        ]);
+        $validated = $request->validated();
 
         try {
             $announcement = $this->announcementService->archive($announcement, $actor);

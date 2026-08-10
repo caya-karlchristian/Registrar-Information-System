@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
-use App\Exceptions\IdpException;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
 use App\Services\AuditLogger;
 use App\Services\Ocms\OcmsAdminService;
+use App\Services\RoleAssignmentService;
 use App\Services\Sso\IdpClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,26 +16,38 @@ use Illuminate\Support\Facades\Log;
 /**
  * Handles admin/superadmin account lifecycle.
  *
- * Owns IdP + DB coordination AND audit logging so controllers
- * stay thin HTTP adapters with no cross-cutting concerns.
+ * ── Account creation model (post IdP-shortcut-deprecation) ────────────────
+ * RIS no longer creates identities in the IdP. create() only pre-registers
+ * who is allowed to have RIS access — email, role, policy — as a
+ * 'Pending Activation' record. The actual IdP identity is created
+ * separately, by hand, in the IdP's User Pool by the RIS system
+ * administrator. The two are linked automatically on the person's first
+ * SSO login (see Sso\UserProvisioningService::provision()), which backs
+ * fill idp_user_id and flips the record to 'Activated'.
  *
- * All mutations are wrapped in DB transactions so a failed IdP
- * call never leaves the local DB in a partial state.
+ * No password is ever set here — RIS accounts authenticate exclusively
+ * through the IdP. The only exception is the small, separately-managed
+ * break-glass (local bcrypt) fallback, which is opt-in per Super Admin
+ * account via the dedicated POST /api/auth/local-password endpoint
+ * (LocalAuthController::setPassword -> LocalAuthService::setPassword) —
+ * never through this method.
+ *
+ * update() and delete() are unaffected by this change: they operate on
+ * an admin who (by definition) already has a linked, Activated IdP
+ * identity, so they keep talking to the IdP directly via the
+ * authenticated getSuperAdminToken() path.
  *
  * OCMS sync: profile changes are pushed to the OCMS hub AFTER a
  * successful local update. An OCMS failure logs a warning but does
  * NOT rollback the local change.
- *
- * Bug fixed: array_filter() previously used the default callback
- * which drops all falsy values (0, '', false). Changed to an
- * explicit !== null check so legitimate falsy values are kept.
  */
 class AdminUserService
 {
     public function __construct(
-        private IdpClient        $idpClient,
-        private AuditLogger      $auditLogger,
-        private OcmsAdminService $ocmsAdminService,
+        private IdpClient            $idpClient,
+        private AuditLogger          $auditLogger,
+        private OcmsAdminService     $ocmsAdminService,
+        private RoleAssignmentService $roleAssignmentService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -43,109 +55,62 @@ class AdminUserService
     // -------------------------------------------------------------------------
 
     /**
-     * @throws IdpException|\Exception
+     * Pre-register a new admin/super-admin in RIS.
+     *
+     * This never talks to the IdP. It writes a 'Pending Activation' record
+     * that has no credential of its own:
+     *   - idp_user_id is null (backfilled on first SSO login)
+     *   - password is null (users.password was made nullable specifically
+     *     for this — see the add_pending_activation_status migration).
+     *     Safe even though LocalAuthService::attempt() is reachable for
+     *     any email: it checks local_auth_enabled (0 here) before ever
+     *     looking at password, and separately guards `!$user->password`
+     *     before calling Hash::check(), so a null password can never be
+     *     authenticated against.
+     *   - local_auth_enabled stays at its schema default (0)
+     *   - pending_expires_at is set 14 days out; a Pending Activation
+     *     record nobody activates by then is auto-expired by the
+     *     provisioning:expire-stale scheduled command (see
+     *     Console\Commands\ExpireStaleProvisioning)
+     *
+     * @throws \Throwable
      */
     public function create(array $validated, Request $request): SystemUser
     {
-        // IdP-side values captured from its own "New User" wizard request —
-        // NOT the same thing as SystemUser::ROLE_ADMIN / ROLE_SUPER_ADMIN.
-        // The wizard has no role picker (only account type + password), so
-        // both RIS roles use the same IdP account_type_id/role_id here;
-        // RIS's admin/superadmin distinction stays purely local (role_id
-        // column + policy system). account_type_id 1 = "System
-        // Administrator" per the wizard's radio options.
-        //
-        // ⚠️ role_id: 4 was captured from a single test account and is not
-        // yet confirmed as a fixed/correct value for every system-admin
-        // account — verify with the IdP owner before relying on this in
-        // production.
-        $idpAccountTypeId = 1;
-        $idpRoleId        = 4;
-
-        // ⚠️ TEMPORARY: no longer fetching a superadmin bearer token here.
-        // The IdP's /api/v1/user endpoint doesn't actually enforce the
-        // Authorization header it's documented to require — it accepts the
-        // request on x-api-key alone (confirmed via direct Postman test,
-        // no Authorization header sent, still got 201). Access control for
-        // admin creation currently rests entirely on that static key.
-        // Revert to $this->idpClient->getSuperAdminToken() once the IdP
-        // fixes bearer-token enforcement on this endpoint.
-        $adminToken = null;
-
-        $idpId = $this->idpClient->createUser([
-            'email'           => $validated['email'],
-            'first_name'      => $validated['first_name'],
-            'middle_name'     => $validated['middle_name'] ?? '',
-            'last_name'       => $validated['last_name'],
-            'name_suffix'     => $validated['suffix'] ?? '',
-            'password'        => $validated['password'],
-            'account_type_id' => $idpAccountTypeId,
-            'idp_role_id'     => $idpRoleId,
-        ], $adminToken);
-
-        try {
-            $user = DB::transaction(function () use ($validated, $idpId) {
-                $user = SystemUser::create([
-                    'email'               => $validated['email'],
-                    'password'            => Hash::make($validated['password']),
-                    // A bcrypt password is set above, so local auth must be
-                    // switched on here too — otherwise LocalAuthService::attempt()
-                    // rejects the account with "local auth not enabled" even
-                    // though a valid password exists, and only IDP login works.
-                    'local_auth_enabled'  => 1,
-                    'role_id'     => $validated['role_id'],
-                    'status'      => 'Activated',
-                    'idp_user_id' => $idpId,
-                    // Only admins (role_id = 3) carry a policy — super admins
-                    // always have unrestricted access, so silently ignore a
-                    // policy_id sent for a super-admin create.
-                    'policy_id'   => $validated['role_id'] === SystemUser::ROLE_ADMIN
-                        ? ($validated['policy_id'] ?? null)
-                        : null,
-                ]);
-
-                DB::table('admin_profile')->insert([
-                    'user_id'     => $user->user_id,
-                    'first_name'  => $validated['first_name'],
-                    'middle_name' => $validated['middle_name'] ?? null,
-                    'last_name'   => $validated['last_name'],
-                    'suffix'      => $validated['suffix'] ?? null,
-                ]);
-
-                return $user;
-            });
-        } catch (\Throwable $e) {
-            // The IdP user was already created above. If the local DB write
-            // fails (e.g. a race-condition unique constraint), we'd otherwise
-            // be left with an orphaned IdP account that has no local record
-            // and no way to be managed or deleted through this app. Roll it
-            // back before rethrowing so IdP and local DB stay in sync.
-            Log::error('AdminUserService: local DB insert failed after IdP user was created — rolling back orphaned IdP user', [
-                'idp_user_id' => $idpId,
-                'email'       => $validated['email'],
-                'error'       => $e->getMessage(),
+        $user = DB::transaction(function () use ($validated) {
+            $user = SystemUser::create([
+                'email'              => $validated['email'],
+                // No credential at all yet — see docblock above.
+                'password'           => null,
+                'role_id'            => $validated['role_id'],
+                'status'             => 'Pending Activation',
+                'idp_user_id'        => null,
+                'local_auth_enabled' => 0,
+                'pending_expires_at' => now()->addDays(14),
+                // Only admins (role_id = 3) carry a policy — super admins
+                // always have unrestricted access, so silently ignore a
+                // policy_id sent for a super-admin create.
+                'policy_id'          => $validated['role_id'] === SystemUser::ROLE_ADMIN
+                    ? ($validated['policy_id'] ?? null)
+                    : null,
             ]);
 
-            try {
-                $this->idpClient->deleteUser($idpId, $adminToken);
-            } catch (\Throwable $cleanupError) {
-                // Cleanup failed too — this now genuinely needs manual
-                // intervention in the IdP. Logged distinctly so it's easy
-                // to grep for and doesn't get silently swallowed.
-                Log::critical('AdminUserService: failed to roll back orphaned IdP user after local DB failure — manual cleanup required', [
-                    'idp_user_id' => $idpId,
-                    'email'       => $validated['email'],
-                    'error'       => $cleanupError->getMessage(),
-                ]);
-            }
+            DB::table('admin_profile')->insert([
+                'user_id'     => $user->user_id,
+                'first_name'  => $validated['first_name'],
+                'middle_name' => $validated['middle_name'] ?? null,
+                'last_name'   => $validated['last_name'],
+                'suffix'      => $validated['suffix'] ?? null,
+            ]);
 
-            throw $e;
-        }
+            return $user;
+        });
 
         $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_CREATED, [
             'target_user_id' => $user->user_id,
             'target_email'   => $user->email,
             'role_id'        => $user->role_id,
+            'status'         => $user->status,
         ]);
 
         return $user;
@@ -161,28 +126,26 @@ class AdminUserService
     public function update(SystemUser $user, array $validated, Request $request): SystemUser
     {
         if (!$user->idp_user_id) {
-            // ⚠️ This admin has no IdP record — password changes will
-            // desync and break login. This user needs to be re-created
-            // through AdminUserService::create() or have their idp_user_id patched.
-            Log::error('AdminUserService: update called on user with no idp_user_id', [
-                'user_id' => $user->user_id,
-                'email'   => $user->email,
-            ]);
-        }
-
-        if ($user->idp_user_id) {
-            $adminToken = $this->idpClient->getSuperAdminToken();
-
-            if (isset($validated['status'])) {
-                $idpStatus = $validated['status'] === 'Activated' ? 'active' : 'disabled';
-                $this->idpClient->updateUserStatus($user->idp_user_id, $idpStatus, $adminToken);
-            }
-
-            if (isset($validated['password'])) {
-                $this->idpClient->updateUserPassword($user->idp_user_id, $validated['password'], $adminToken);
+            // Expected for an admin who is still 'Pending Activation' (has
+            // never logged in via SSO yet) — nothing to sync to the IdP.
+            // Only worth a warning once the account is otherwise supposed
+            // to be usable.
+            if ($user->status !== 'Pending Activation') {
+                Log::warning('AdminUserService: update called on Activated user with no idp_user_id', [
+                    'user_id' => $user->user_id,
+                    'email'   => $user->email,
+                ]);
             }
         }
 
+        // RIS is the source of truth for whether an admin can use RIS.
+        // The local status/role/profile change below always happens first
+        // and always succeeds on its own — an unreachable or misbehaving
+        // IdP must never prevent someone from being deactivated (or
+        // reactivated) in RIS. IdP sync is attempted AFTER, best-effort,
+        // and its failure is logged/audited but never rolled back or
+        // thrown — mirrors the existing OcmsAdminService::pushProfileToOcms()
+        // pattern used just below for profile pushes.
         $user = DB::transaction(function () use ($user, $validated) {
             $userFields = array_filter([
                 'email'    => $validated['email']    ?? null,
@@ -236,6 +199,69 @@ class AdminUserService
             'target_user_id' => $user->user_id,
             'target_email'   => $user->email,
         ]);
+
+        // Immediately kill every active session the moment RIS-side status
+        // stops being 'Activated' — do not wait for the IdP sync below (it
+        // may fail or be slow) and do not rely solely on
+        // EnsureAccountActive re-checking status on the person's NEXT
+        // request. This is what actually logs them out right now: their
+        // existing cookie token(s) stop being valid tokens at all, the
+        // instant this commits, regardless of what the IdP or OCMS still
+        // believe about the account.
+        //
+        // Cascades to Layer 2 as well: every Active role_assignments row
+        // this account holds gets revoked in the same breath (see
+        // RoleAssignmentService::revokeAllForUser()). Without this, a
+        // deactivated student-staff account keeps showing "Active" on
+        // both its Student and Admin rows forever, and reactivating the
+        // account later would silently resurrect that Admin access with
+        // no new deliberate grant behind it.
+        if (isset($validated['status']) && $validated['status'] !== 'Activated') {
+            $user->tokens()->delete();
+            $this->roleAssignmentService->revokeAllForUser($user, $request);
+        }
+
+        // Best-effort IdP sync — runs OUTSIDE the DB transaction, after the
+        // local change has already committed, and can never undo it. Only
+        // attempted when there's something to sync (status/password) and
+        // the account actually has a linked IdP identity. A failure here
+        // (IdP down, endpoint rejected, network error) is logged and
+        // audited so it can be reconciled manually, but the RIS-side
+        // activation/deactivation has already taken effect either way.
+        if ($user->idp_user_id && (isset($validated['status']) || isset($validated['password']))) {
+            try {
+                $adminToken = $this->idpClient->getSuperAdminToken();
+
+                if (isset($validated['status'])) {
+                    $idpStatus = $validated['status'] === 'Activated' ? 'active' : 'disabled';
+                    $this->idpClient->updateUserStatus($user->idp_user_id, $idpStatus, $adminToken);
+                }
+
+                if (isset($validated['password'])) {
+                    $this->idpClient->updateUserPassword($user->idp_user_id, $validated['password'], $adminToken);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('AdminUserService: IdP sync failed after local update — RIS-side change was NOT rolled back', [
+                    'user_id'        => $user->user_id,
+                    'email'          => $user->email,
+                    'attempted'      => array_values(array_filter([
+                        isset($validated['status'])   ? 'status'   : null,
+                        isset($validated['password']) ? 'password' : null,
+                    ])),
+                    'error'          => $e->getMessage(),
+                ]);
+
+                $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ADMIN_IDP_SYNC_FAILED, [
+                    'target_user_id' => $user->user_id,
+                    'target_email'   => $user->email,
+                    'attempted'      => array_values(array_filter([
+                        isset($validated['status'])   ? 'status'   : null,
+                        isset($validated['password']) ? 'password' : null,
+                    ])),
+                    'error'          => $e->getMessage(),
+                ]);
+            }
+        }
 
         // Push profile changes back to OCMS hub — runs OUTSIDE the DB transaction
         // so an OCMS failure cannot rollback a successful local update.

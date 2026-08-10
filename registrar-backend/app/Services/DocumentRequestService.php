@@ -243,7 +243,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
     public function restoreRequest(DocumentRequest $documentRequest, SystemUser $actor): DocumentRequest
     {
-        return DB::transaction(function () use ($documentRequest) {
+        return DB::transaction(function () use ($documentRequest, $actor) {
             $documentRequest = DocumentRequest::withArchived()
                 ->lockForUpdate()
                 ->findOrFail($documentRequest->request_id);
@@ -255,6 +255,8 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                     'is_archived' => false,
                     'archived_on' => null,
                     'archived_by' => null,
+                    'restored_on' => now(),
+                    'restored_by' => $actor->user_id,
                 ]);
             }
 
@@ -291,7 +293,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
     public function restoreRequests(array $requestIds, SystemUser $actor): array
     {
-        return DB::transaction(function () use ($requestIds) {
+        return DB::transaction(function () use ($requestIds, $actor) {
             $eligible = DocumentRequest::withArchived()
                 ->whereIn('request_id', $requestIds)
                 ->where('is_archived', true)
@@ -306,6 +308,14 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                         'is_archived' => false,
                         'archived_on' => null,
                         'archived_by' => null,
+                        // Row-level attribution for the restore itself —
+                        // mirrors archived_on/archived_by above. The bulk
+                        // action is also written to audit_logs by the
+                        // controller, but that requires a join to answer
+                        // "who restored this request"; these columns let
+                        // that be queried directly off the row.
+                        'restored_on' => now(),
+                        'restored_by' => $actor->user_id,
                     ]);
             }
 

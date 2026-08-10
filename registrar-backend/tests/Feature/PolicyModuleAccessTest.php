@@ -61,6 +61,28 @@ function seedStudentStaffAndRegistrarPolicies(): array
     return compact('studentStaff', 'registrarStaff');
 }
 
+function seedZeroAccessDefaultPolicy(): Policy
+{
+    // Policy::DEFAULT_NAME ("No Access") is seeded by the
+    // 2026_08_03_000005_seed_zero_access_default_policy migration, which
+    // already runs as part of RefreshDatabase. updateOrCreate here just
+    // makes this fixture explicit and self-contained rather than relying
+    // on migration timing, matching the pattern above.
+    return Policy::updateOrCreate(
+        ['name' => Policy::DEFAULT_NAME],
+        [
+            'permissions' => [
+                'dashboard' => [],
+                'inbox'     => [],
+                'analytics' => [],
+                'logbook'   => [],
+                'profile'   => [],
+            ],
+            'is_system' => true,
+        ]
+    );
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // UNIT — SystemUser::hasModuleAccess() / effectivePermissions()
 // ═════════════════════════════════════════════════════════════════════════════
@@ -92,22 +114,44 @@ test('admin with Student Staff policy only has dashboard and inbox', function ()
         ->and($admin->hasModuleAccess('profile'))->toBeFalse();
 });
 
-test('admin with no policy_id falls back to the default policy, not full access', function () {
+test('admin with no policy_id falls back to the zero-access default, never an access-granting one', function () {
+    // Also seed Registrar Staff/Student Staff (both grant real access) to
+    // prove the fallback resolves by Policy::DEFAULT_NAME specifically,
+    // not "whatever is_system policy happens to exist first".
     seedStudentStaffAndRegistrarPolicies();
+    seedZeroAccessDefaultPolicy();
+
     $admin = makeAdmin(null);
 
-    // Registrar Staff (the seeded default) grants everything in this
-    // fixture — the important assertion is that it's resolved from the
-    // named default, not from "no policy => unrestricted".
-    expect($admin->hasModuleAccess('analytics'))->toBeTrue();
+    foreach (Policy::MODULE_KEYS as $module) {
+        expect($admin->hasModuleAccess($module))->toBeFalse();
+    }
+});
+
+test('an admin created without an explicit policy never inherits Registrar Staff access', function () {
+    // Regression test for the historical bug: DEFAULT_NAME used to be
+    // 'Registrar Staff', so any admin with no policy_id silently got
+    // Analytics + Logbook access instead of nothing. Guard against this
+    // ever regressing back, independent of whatever DEFAULT_NAME's exact
+    // string value is.
+    seedStudentStaffAndRegistrarPolicies();
+    seedZeroAccessDefaultPolicy();
+
+    expect(Policy::DEFAULT_NAME)->not->toBe('Registrar Staff');
+
+    $admin = makeAdmin(null);
+
+    expect($admin->hasModuleAccess('analytics'))->toBeFalse()
+        ->and($admin->hasModuleAccess('logbook'))->toBeFalse();
 });
 
 test('admin falls back to deny when even the default policy is missing', function () {
-    // The create_policies_table migration seeds "Registrar Staff" (the
-    // DEFAULT_NAME policy) as an is_system row, and RefreshDatabase only
-    // migrates once — so that row exists by default in every test in this
-    // run. To actually exercise "the default policy is missing", delete
-    // it explicitly rather than relying on a blank slate.
+    // The default-policy row (Policy::DEFAULT_NAME, "No Access") is
+    // normally seeded by the 2026_08_03_000005 migration, and
+    // RefreshDatabase only migrates once — so that row exists by default
+    // in every test in this run. To actually exercise "the default
+    // policy is missing", delete it explicitly rather than relying on a
+    // blank slate.
     Policy::where('name', Policy::DEFAULT_NAME)->delete();
 
     $admin = makeAdmin(null);

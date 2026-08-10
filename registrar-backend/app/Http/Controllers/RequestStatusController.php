@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RequestStatus\StoreRequestStatusRequest;
+use App\Http\Requests\RequestStatus\UpdateRequestStatusRequest;
 use App\Models\RequestStatus;
-use Illuminate\Http\Request;
 
 class RequestStatusController extends Controller
 {
@@ -20,26 +21,18 @@ class RequestStatusController extends Controller
         return response()->json($status, 200);
     }
 
-    public function store(Request $request)
+    public function store(StoreRequestStatusRequest $request)
     {
-        $validated = $request->validate([
-            'status_name' => 'required|string|max:50',
-        ]);
-
-        $status = RequestStatus::create($validated);
+        $status = RequestStatus::create($request->validated());
         return response()->json($status, 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(UpdateRequestStatusRequest $request, $id)
     {
         $status = RequestStatus::find($id);
         if (!$status) return response()->json(['message' => 'Status not found'], 404);
 
-        $validated = $request->validate([
-            'status_name' => 'required|string|max:50',
-        ]);
-
-        $status->update($validated);
+        $status->update($request->validated());
         return response()->json($status, 200);
     }
 

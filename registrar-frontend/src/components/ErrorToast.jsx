@@ -48,10 +48,10 @@ const ErrorToast = ({ message, onClose }) => {
       }}
       className={`fixed left-1/2 -translate-x-1/2 md:left-auto md:right-5 md:translate-x-0 z-9999 flex items-center w-[calc(100vw-24px)] md:w-[340px] px-4 py-3 rounded-lg shadow-xl animate-in slide-in-from-top-2 md:slide-in-from-right-4 fade-in duration-300 transition-all duration-300 ${isDark ? 'text-[#e4e6eb] bg-[#242526] border border-[#3e4042]' : 'text-white bg-pup-maroon border border-white/20'}`}
     >
-      <div className={`flex items-center justify-center w-9 h-9 rounded-md ${isDark ? 'text-[#FFC72C] bg-[#1a1b1e]' : 'text-pup-maroon bg-white'}`}>
+      <div className={`flex items-center justify-center w-9 h-9 rounded-md shrink-0 ${isDark ? 'text-[#FFC72C] bg-[#1a1b1e]' : 'text-pup-maroon bg-white'}`}>
         <ExclamationCircleIcon className="w-9 h-7" strokeWidth={2.5} />
       </div>
-      <div className="ml-3 text-sm font-semibold leading-snug">
+      <div className="ml-3 text-sm font-semibold leading-snug flex-1">
         {message}
       </div>
       <button 

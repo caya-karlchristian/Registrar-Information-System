@@ -13,7 +13,7 @@ test.describe('Landing Page Tests', () => {
     await expect(page.getByText('Academic Request. Redefined Simplicity.')).toBeVisible();
 
     // Verify presence of PUP Logo image
-    const logo = page.locator('img[alt="PUP Logo"]');
+    const logo = page.locator('header img[alt="PUP Logo"]');
     await expect(logo).toBeVisible();
 
     // Verify external branding footer links exist with correct attributes
@@ -27,6 +27,9 @@ test.describe('Landing Page Tests', () => {
   });
 
   test('2. Password visibility toggle works correctly', async ({ page }) => {
+    // Open the local login modal
+    await page.getByRole('button', { name: /Sign In/i }).first().click();
+
     const passwordInput = page.getByPlaceholder('Password');
     
     // Default mode should be password
@@ -50,17 +53,20 @@ test.describe('Landing Page Tests', () => {
   });
 
   test('3. Client-side form validation handling', async ({ page }) => {
+    // Open the local login modal
+    await page.getByRole('button', { name: /Sign In/i }).first().click();
+
     // Clear any autofill and click "Sign In Locally" with empty fields
     await page.getByPlaceholder('Email Address').fill('');
     await page.getByPlaceholder('Password').fill('');
-    await page.getByRole('button', { name: /Sign In Locally/i }).click();
+    await page.locator('form').getByRole('button', { name: /Sign In Locally/i }).click();
 
     // Should display email required warning
     await expect(page.getByText('Email is required.')).toBeVisible();
 
     // Fill email but leave password empty and submit
     await page.getByPlaceholder('Email Address').fill('test@example.com');
-    await page.getByRole('button', { name: /Sign In Locally/i }).click();
+    await page.locator('form').getByRole('button', { name: /Sign In Locally/i }).click();
 
     // Should display password required warning
     await expect(page.getByText('Password is required.')).toBeVisible();
@@ -76,9 +82,12 @@ test.describe('Landing Page Tests', () => {
       });
     });
 
+    // Open the local login modal
+    await page.getByRole('button', { name: /Sign In/i }).first().click();
+
     await page.getByPlaceholder('Email Address').fill('wrong@example.com');
     await page.getByPlaceholder('Password').fill('wrongpassword');
-    await page.getByRole('button', { name: /Sign In Locally/i }).click();
+    await page.locator('form').getByRole('button', { name: /Sign In Locally/i }).click();
 
     // Should display the returned error message
     await expect(page.getByText('Invalid credentials.')).toBeVisible();
@@ -110,11 +119,11 @@ test.describe('Landing Page Tests', () => {
     await expect(page.getByRole('heading', { name: 'HOLIDAY ANNOUNCEMENT' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'ENROLLMENT OPEN' })).toBeVisible();
 
-    // Verify next button is enabled since we have 4 announcements and page shows 3
-    const nextBtn = page.getByLabel('Next announcements');
-    await expect(nextBtn).toBeEnabled();
+    // Verify slide indicator dot for slide 2 is visible
+    const nextBtn = page.getByLabel('Go to slide 2');
+    await expect(nextBtn).toBeVisible();
 
-    // Click Next button
+    // Click slide 2 indicator dot
     await nextBtn.click();
 
     // Assert that the 4th announcement is now visible

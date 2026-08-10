@@ -32,7 +32,11 @@ const { user, loading, isLoggingOut, hasAgreed, setHasAgreed } = useAuth();
     : <Navigate to="/forbidden" state={{ reason: "unauthenticated" }} replace />;
 }
 
-  // Logged in but wrong role
+  // Logged in but wrong role. `user.role_name` now reflects the
+  // session's server-enforced ASSUMED role (see AuthController::me() /
+  // switchRole() and SystemUser::assumedRoleId()) — a student-staff
+  // account that has switched to Admin already shows role_name: "admin"
+  // here, so no separate "mid-transition" bypass is needed anymore.
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role_name)) {
     return <Navigate to="/forbidden" replace />;
   }

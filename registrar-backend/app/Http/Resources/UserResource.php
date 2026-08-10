@@ -4,20 +4,28 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Models\Policy;
 use App\Models\SystemUser;
 
 class UserResource extends JsonResource
 {
     public function toArray($request): array
     {
+        // role_id/policy_id below reflect the session's ASSUMED role
+        // (Step 3 — see SystemUser::assumedRoleId()/assumedPolicyId()),
+        // which is identical to the raw users.role_id/policy_id columns
+        // unless this session has switched via POST /auth/switch-role.
+        $assumedRoleId   = $this->assumedRoleId();
+        $assumedPolicyId = $this->assumedPolicyId();
+
         return [
             'user_id'  => $this->user_id,
             'email'    => $this->email,
-            'role_id'  => $this->role_id,
+            'role_id'  => $assumedRoleId,
 
             // Human-readable role name so the frontend never needs to
             // hardcode "if role_id === 3" checks — use role_name instead
-            'role_name' => $this->resolveRoleName(),
+            'role_name' => $this->resolveRoleName($assumedRoleId),
 
             // Student relations — only present if loaded
             'student_profile' => $this->whenLoaded('studentProfile'),
@@ -42,8 +50,19 @@ class UserResource extends JsonResource
 
             // Policy attachment — admin-only. Super admins always have
             // full access and never carry a policy_id (see RoleMiddleware).
-            'policy_id' => $this->policy_id,
-            'policy'    => $this->whenLoaded('policy', fn () => $this->policy ? new PolicyResource($this->policy) : null),
+            // Resolved independently of the `policy` eager-load below,
+            // because that relation is bound to the raw policy_id
+            // column and would show the wrong (or no) policy once a
+            // session has switched to an assumed role with a different
+            // one attached.
+            'policy_id' => $assumedPolicyId,
+            'policy'    => $this->when($assumedPolicyId !== null, function () use ($assumedPolicyId) {
+                $policy = $this->relationLoaded('policy') && $this->policy?->policy_id === $assumedPolicyId
+                    ? $this->policy
+                    : Policy::where('policy_id', $assumedPolicyId)->first();
+
+                return $policy ? new PolicyResource($policy) : null;
+            }),
 
             // The module => actions map that ACTUALLY applies right now
             // (own policy, else the default policy, else nothing) — see
@@ -56,7 +75,11 @@ class UserResource extends JsonResource
                 fn () => $this->effectivePermissions()
             ),
 
-            'status'    => $this->status,   
+            'status'    => $this->status,
+            // Only meaningful while status === 'Pending Activation' — when
+            // this passes, provisioning:expire-stale flips status to
+            // 'Expired' (see Console\Commands\ExpireStaleProvisioning).
+            'pending_expires_at' => $this->pending_expires_at,
             'created_at' => $this->created_at,  
         ];
     }
@@ -65,9 +88,9 @@ class UserResource extends JsonResource
     // Resolves role_id to a readable string.
     // Keeps frontend logic clean — check role_name, not numbers.
     // -------------------------------------------------------
-    private function resolveRoleName(): string
+    private function resolveRoleName(int $roleId): string
     {
-        return match ((int) $this->role_id) {
+        return match ($roleId) {
             SystemUser::ROLE_STUDENT     => 'student',
             SystemUser::ROLE_ALUMNI      => 'alumni',
             SystemUser::ROLE_ADMIN       => 'admin',

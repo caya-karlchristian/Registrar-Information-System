@@ -32,7 +32,12 @@ class UpdateSystemUserRequest extends FormRequest
             'email'       => 'sometimes|email|unique:users,email,' . $userId . ',user_id',
             'password'    => ['sometimes', Password::min(8)->mixedCase()->numbers()],
             'role_id'     => 'sometimes|integer|in:3,4',
-            'status'      => 'sometimes|in:Activated,Deactivated',
+            // Pending Activation / Expired are included so a Super Admin can
+            // manually correct a record — e.g. re-open an Expired invite
+            // back to Pending Activation, or hand-activate someone whose
+            // IdP login isn't matching for some reason — without having to
+            // delete and recreate the account.
+            'status'      => 'sometimes|in:Activated,Deactivated,Pending Activation,Expired',
             'first_name'  => 'sometimes|string|max:100',
             'middle_name' => 'nullable|string|max:100',
             'last_name'   => 'sometimes|string|max:100',

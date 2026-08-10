@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
-import { getLogbookData, getDocumentTypes, getCertifications } from '../services/api'; // FE-3 migration: uses getLogbookData() from API
+import { getAllLogbookData, getDocumentTypes, getCertifications } from '../services/api'; // FE-3 migration: uses getLogbookData() from API; now pages through via getAllLogbookData() since the backend endpoint is paginated
 import {
   formatMinutesDuration,
   getProcessedAt,
@@ -63,13 +63,13 @@ const LogbookRecords = () => {
     const fetchLogbookData = async () => {
       setLoading(true);
       try {
-        const [logbookRes, typesRes, certRes] = await Promise.all([
-          getLogbookData(),
+        const [logbookRows, typesRes, certRes] = await Promise.all([
+          getAllLogbookData(),
           getDocumentTypes(),
           getCertifications(),
         ]);
 
-        const requests = toRows(logbookRes.data);
+        const requests = toRows(logbookRows);
         const types = toRows(typesRes.data);
         const certifications = toRows(certRes.data);
 

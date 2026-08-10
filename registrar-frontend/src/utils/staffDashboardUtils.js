@@ -1,0 +1,210 @@
+export const STATUS_FALLBACK = {
+  PENDING: 1,
+  READY: 2,
+  COMPLETED: 3,
+  FORFEITED: 4,
+};
+
+export const COMPLETED_VISIBILITY_MS = 24 * 60 * 60 * 1000;
+export const PRINTED_CERTIFICATE_STORAGE_KEY = 'printed-certificate-request-ids';
+
+/**
+ * Resolves API status name to ID mappings based on database reference statuses.
+ */
+export const resolveStatusIds = (requestStatuses) => {
+  const lowerNameToId = Object.fromEntries(
+    (requestStatuses ?? [])
+      .filter(s => s?.status_name && s?.status_id)
+      .map(s => [s.status_name.toLowerCase(), Number(s.status_id)])
+  );
+  return {
+    PENDING: lowerNameToId.pending ?? STATUS_FALLBACK.PENDING,
+    READY: lowerNameToId['ready to claim'] ?? STATUS_FALLBACK.READY,
+    COMPLETED: lowerNameToId.completed ?? STATUS_FALLBACK.COMPLETED,
+    FORFEITED: lowerNameToId.forfeited ?? STATUS_FALLBACK.FORFEITED,
+  };
+};
+
+/**
+ * Default dashboard visibility rules:
+ *  - Pending / Processing / Ready to Claim → always shown
+ *  - Completed → shown only within 1 day of the request date
+ *  - Everything else (Forfeited, Cancelled, ...) → hidden unless filtered/searched
+ */
+export const isDefaultVisible = (req, resolvedStatusIds) => {
+  const { statusId, statusName, timestamp } = req;
+  const name = String(statusName ?? '').trim().toLowerCase();
+  if (statusId === resolvedStatusIds.PENDING || name === 'pending')         return true;
+  if (name === 'processing')                                           return true;
+  if (statusId === resolvedStatusIds.READY || name === 'ready to claim')    return true;
+  if (statusId === resolvedStatusIds.COMPLETED || name === 'completed') {
+    return timestamp > 0 && (Date.now() - timestamp) <= COMPLETED_VISIBILITY_MS;
+  }
+  return false;
+};
+
+/**
+ * Transforms raw API requests into flat dashboard data models.
+ */
+export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
+  const requestDate = r.requested_at ? new Date(r.requested_at) : null;
+  const now = new Date();
+  const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
+
+  let computedStatusId = r.status?.status_id;
+  let computedStatusName = r.status?.status_name;
+
+  const isArchived = Boolean(r.is_archived);
+  const STATUS = resolvedStatusIds;
+
+  const alreadyForfeited = computedStatusId === STATUS.FORFEITED || String(computedStatusName).toLowerCase() === 'forfeited';
+  const alreadyCompleted = computedStatusId === STATUS.COMPLETED || String(computedStatusName).toLowerCase() === 'completed';
+
+  const autoForfeit = !alreadyForfeited && !alreadyCompleted && !isArchived && diffDays >= 90;
+  // Archived records are read-only (Archive Rules policy) — never
+  // auto-transition their status client-side while archived.
+  if (autoForfeit) {
+    computedStatusId = STATUS.FORFEITED;
+    computedStatusName = 'Forfeited';
+  }
+
+  const finalCertName = r.certificates?.length > 0
+    ? r.certificates.map(c => c.certification_type?.certificate_name).filter(Boolean).join(', ')
+    : null;
+
+  const isCertificate = Boolean(
+    (r.certificates && r.certificates.length > 0) ||
+      r.documents?.some(d => {
+        const name =
+          d.document_type?.document_name?.toLowerCase() ||
+          docTypeName(d.document_type_id)?.toLowerCase() ||
+          '';
+        return name.includes('cert');
+      })
+  );
+
+  const getDocName = d =>
+    d.document_type?.document_name ||
+    docTypeName(d.document_type_id) ||
+    `Unknown Doc (ID: ${d.document_type_id})`;
+
+  const totalCopies = (r.documents?.reduce((sum, d) => sum + (Number(d.number_of_copies) || 1), 0) || 0) + 
+                      (r.certificates?.reduce((sum, c) => sum + (Number(c.number_of_copies) || 1), 0) || 0) || 1;
+
+  const documentDetailsArray = (() => {
+    const docs = [];
+    if (r.certificates?.length > 0) {
+      r.certificates.forEach(c => {
+        if (c.certification_type?.certificate_name) {
+          docs.push(`Certification: ${c.certification_type.certificate_name}`);
+        }
+      });
+    }
+    if (r.documents?.length > 0) {
+      r.documents.forEach(d => docs.push(getDocName(d)));
+    }
+    return docs;
+  })();
+
+  return {
+    id: r.request_id,
+    rawRequest: {
+      ...r,
+      status: {
+        ...(r.status || {}),
+        status_id: computedStatusId,
+        status_name: computedStatusName,
+      },
+    },
+    studentName: r.student_profile
+      ? `${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`
+      : r.alumni_profile
+      ? `${r.alumni_profile.first_name} ${r.alumni_profile.middle_name ?? ''} ${r.alumni_profile.last_name}`
+      : 'N/A',
+    studentNumber: r.academic_record?.student_number
+      ?? r.alumni_academic_record?.student_number
+      ?? 'N/A',
+    userType: r.student_profile ? 'Student' : 'Alumni',
+    certName: finalCertName,
+    certificateNames: r.certificates?.map(c => c.certification_type?.certificate_name).filter(Boolean) ?? [],
+    isCertificate,
+    copies: totalCopies,
+    documentDetailsArray,
+    course: r.student_profile?.course ?? '',
+    major: r.student_profile?.major ?? '',
+    educationLevel: r.student_profile?.education_level ?? '',
+    syAdmitted: r.academic_record?.sy_admitted ?? '',
+    dateGraduated: r.academic_record?.date_graduated ?? '',
+    diplomaNum: r.academic_record?.diploma_number ?? '',
+    eventTitle: r.event_title ?? '',
+    or_number: r.or_number ?? '',
+    date: requestDate
+      ? requestDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+      : 'N/A',
+    time: requestDate
+      ? requestDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+      : '',
+    statusId: computedStatusId,
+    statusName: computedStatusName,
+    timestamp: requestDate ? requestDate.getTime() : 0,
+    // Archive state — a flag independent of status_id, not a status
+    // itself. Restoring a record leaves statusId/statusName exactly
+    // as they were (Archive Rules policy).
+    isArchived,
+    archivedOn: r.archived_on ?? null,
+    archivedBy: r.archived_by_user?.email ?? null,
+    autoForfeit
+  };
+};
+
+/**
+ * Filter and sort data records.
+ */
+export const filterAndSortRequests = (requests, { filterStatus, filterClassification, searchTerm, sortOrder, viewMode, resolvedStatusIds }) => {
+  const isFiltering = filterStatus !== 'All' || filterClassification !== 'All' || searchTerm.trim() !== '';
+
+  return requests
+    .filter(r => {
+      // The Active/Archived split now happens server-side (fetchData asks
+      // for ?view=archived or the default non-archived scope) — no need
+      // to re-derive it from a synthetic status here.
+      if (viewMode !== 'archived' && !isFiltering && !isDefaultVisible(r, resolvedStatusIds)) {
+        return false;
+      }
+
+      const matchesStatus =
+        filterStatus === 'All' ||
+        (filterStatus === 'Completed' && r.statusId === resolvedStatusIds.COMPLETED) ||
+        r.statusName === filterStatus;
+      const matchesClassification =
+        filterClassification === 'All' ||
+        r.userType.toLowerCase() === filterClassification.toLowerCase();
+      const matchesSearch =
+        searchTerm.trim() === '' ||
+        r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.id.toString().includes(searchTerm);
+      return matchesStatus && matchesClassification && matchesSearch;
+    })
+    .sort((a, b) => {
+      if (sortOrder === 'Recent Requests') {
+        return b.timestamp - a.timestamp;
+      }
+      if (sortOrder === 'Old Requests') {
+        return a.timestamp - b.timestamp;
+      }
+      if (sortOrder === 'Classification Asc') {
+        return a.userType.localeCompare(b.userType);
+      }
+      if (sortOrder === 'Classification Desc') {
+        return b.userType.localeCompare(a.userType);
+      }
+      if (sortOrder === 'Status Asc') {
+        return (a.statusName || '').localeCompare(b.statusName || '');
+      }
+      if (sortOrder === 'Status Desc') {
+        return (b.statusName || '').localeCompare(a.statusName || '');
+      }
+      return 0;
+    });
+};

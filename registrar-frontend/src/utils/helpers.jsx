@@ -3,6 +3,7 @@ import certificate_footer from "../assets/certificate_footer.png";
 import { formatDateFormal, formatDateOrdinal } from "./formatters.js";
 import { CURRENT_YEAR } from "./formatters.js";
 import { useState, useEffect } from "react";
+import { useReferenceData } from "../context/ReferenceDataContext";
 
 export const TextBlock = ({ children, className = "" }) => (
   <div
@@ -49,22 +50,44 @@ export const SignatureBlock = ({ name, position, className = "", salutation = ""
   </div>
 );
 
-const SIGNATORY_MAP = {
-  mhel: {
-    name: "Mhel P. Garcia",
-    position: "Campus Registrar/Head of Registration Office",
-  },
-  ferrer: {
-    name: "Marissa B. Ferrer, DEM, RPsy",
-    position: "Director",
-  },
+// Fallback used only if the signatories API is completely unreachable
+// (e.g. network failure) AND the reference data hasn't loaded yet. A
+// certificate's signature block must never silently render blank, since
+// these are printed legal documents — this keeps the pre-DB-migration
+// default names as a last resort so generation never hard-fails.
+const SAFE_FALLBACK = {
+  registrar: { name: "Mhel P. Garcia", position: "Campus Registrar/Head of Registration Office" },
+  director:  { name: "Marissa B. Ferrer, DEM, RPsy", position: "Director" },
 };
 
-export const getSigneeInfo = (signee, fallbackKey = "mhel") => {
-  const normalized = String(signee || "").toLowerCase();
-  if (normalized.includes("ferrer")) return SIGNATORY_MAP.ferrer;
-  if (normalized.includes("mhel") || normalized.includes("garcia")) return SIGNATORY_MAP.mhel;
-  return SIGNATORY_MAP[fallbackKey] || SIGNATORY_MAP.mhel;
+/**
+ * Resolve { name, position } for a signature block.
+ *
+ * @param signee       The exact name string selected in the "Signee"
+ *                      dropdown (GenerateCertificate.jsx) — this is always
+ *                      one of the fetched `signatories[].name` values, so
+ *                      an exact match is sufficient (no more substring
+ *                      guessing against a hardcoded name list).
+ * @param signatories   The array from useReferenceData(), already ordered
+ *                      by sort_order server-side.
+ * @param fallbackIndex Which signatories[] entry to fall back to when
+ *                      `signee` doesn't match anything (empty selection,
+ *                      or the selected signatory was since deleted).
+ *                      RegistrarSignature passes 0, DirectorSignature
+ *                      passes 1 — preserving the seeded convention that
+ *                      sort_order 0 is the registrar-type signatory and
+ *                      sort_order 1 is the director-type one. If your
+ *                      org's data no longer matches that convention,
+ *                      pass whichever index makes sense for the block.
+ */
+export const getSigneeInfo = (signee, signatories = [], fallbackIndex = 0) => {
+  const match = signatories.find((s) => s.name === signee);
+  if (match) return { name: match.name, position: match.position };
+
+  const fallback = signatories[fallbackIndex];
+  if (fallback) return { name: fallback.name, position: fallback.position };
+
+  return fallbackIndex === 0 ? SAFE_FALLBACK.registrar : SAFE_FALLBACK.director;
 };
 
 export const FooterInfo = ({ diplomaNum, date }) => (
@@ -175,7 +198,8 @@ export const CertFooter = ({ layout }) => (
 );
 
 export const RegistrarSignature = ({ signee, className = "", salutation = "" }) => {
-  const signer = getSigneeInfo(signee, "mhel");
+  const { signatories } = useReferenceData();
+  const signer = getSigneeInfo(signee, signatories, 0);
   return (
   <SignatureBlock
     name={signer.name}
@@ -187,7 +211,8 @@ export const RegistrarSignature = ({ signee, className = "", salutation = "" }) 
 };
 
 export const DirectorSignature = ({ signee, className = "", salutation = "" }) => {
-  const signer = getSigneeInfo(signee, "ferrer");
+  const { signatories } = useReferenceData();
+  const signer = getSigneeInfo(signee, signatories, 1);
   return (
   <SignatureBlock
     name={signer.name}

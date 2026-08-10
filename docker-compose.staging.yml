@@ -1,30 +1,35 @@
 services:
   backend:
-    build:
-      context: ./registrar-backend
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_staging_backend
     restart: unless-stopped
     env_file: .env.staging
+    mem_limit: 384m
     ports:
       - "8000:8000"
-    depends_on: [mysql, redis]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks: [ris_staging_network]
 
   reverb:
-    build:
-      context: ./registrar-backend
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_staging_reverb
     restart: unless-stopped
     command: php artisan reverb:start --host=0.0.0.0 --port=8080
     env_file: .env.staging
+    mem_limit: 128m
     ports:
       - "8080:8080"
-    depends_on: [backend]
+    depends_on:
+      backend:
+        condition: service_started
     networks: [ris_staging_network]
 
   worker:
-    build:
-      context: ./registrar-backend
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_staging_worker
     restart: unless-stopped
     command: >
@@ -34,12 +39,14 @@ services:
         --tries=3
         --timeout=300
     env_file: .env.staging
-    depends_on: [backend]
+    mem_limit: 128m
+    depends_on:
+      backend:
+        condition: service_started
     networks: [ris_staging_network]
 
   broadcast-worker:
-    build:
-      context: ./registrar-backend
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_staging_broadcast_worker
     restart: unless-stopped
     command: >
@@ -49,36 +56,50 @@ services:
         --tries=3
         --timeout=30
     env_file: .env.staging
-    depends_on: [backend]
+    mem_limit: 96m
+    depends_on:
+      backend:
+        condition: service_started
     networks: [ris_staging_network]
 
   scheduler:
-    build:
-      context: ./registrar-backend
+    image: ${ECR_REPOSITORY}:${IMAGE_TAG:-latest}
     container_name: ris_staging_scheduler
     restart: unless-stopped
     command: >
       sh -c "while true; do php artisan schedule:run --no-interaction >> /var/log/scheduler.log 2>&1; sleep 60; done"
     env_file: .env.staging
-    depends_on: [backend]
+    mem_limit: 96m
+    depends_on:
+      backend:
+        condition: service_started
     networks: [ris_staging_network]
 
   mysql:
     image: mysql:8.0
     container_name: ris_staging_mysql
     restart: unless-stopped
+    command: --innodb-buffer-pool-size=96M --performance-schema=OFF --max-connections=50
     environment:
       MYSQL_DATABASE: registrar_information_system
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    mem_limit: 256m
     volumes:
       - ris_staging_db_data:/var/lib/mysql
     networks: [ris_staging_network]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   redis:
     image: redis:7-alpine
     container_name: ris_staging_redis
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD}
+    mem_limit: 48m
     networks: [ris_staging_network]
 
 volumes:

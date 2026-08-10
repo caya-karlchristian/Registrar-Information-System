@@ -105,6 +105,9 @@ class AuditLogController extends Controller
             AuditLog::ACTION_ADMIN_CREATED          => 'Admin Created',
             AuditLog::ACTION_ADMIN_DELETED          => 'Admin Deleted',
             AuditLog::ACTION_ROLE_ASSIGNED          => 'Role Assigned',
+            AuditLog::ACTION_ROLE_REVOKED           => 'Role Revoked',
+            AuditLog::ACTION_ROLE_EXPIRED           => 'Role Expired',
+            AuditLog::ACTION_ROLE_SWITCHED          => 'Role Switched',
             AuditLog::ACTION_REQUEST_STATUS_CHANGED => 'Request Status Changed',
             default                                 => ucwords(str_replace('_', ' ', $action)),
         };

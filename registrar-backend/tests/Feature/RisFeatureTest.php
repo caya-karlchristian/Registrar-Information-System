@@ -3,6 +3,7 @@
 use App\Enums\RequestStatusEnum;
 use App\Models\DocumentRequest;
 use App\Models\DocumentType;
+use App\Models\Policy;
 use App\Models\RequestPurpose;
 use App\Models\RequestStatus;
 use App\Models\StudentAcademicRecord;
@@ -39,7 +40,7 @@ function seedReferenceData(): array
     $purpose = RequestPurpose::firstOrCreate(['request_purpose_id' => 1], ['purpose_name' => 'DFA']);
     $docType = DocumentType::firstOrCreate(
         ['document_type_id' => 1],
-        ['document_name' => 'Transcript of Records', 'document_process_period' => 5, 'access_id' => 1]
+        ['document_name' => 'Transcript of Records', 'document_description' => '', 'document_process_period' => 5, 'access_id' => 1]
     );
     return compact('status', 'purpose', 'docType');
 }
@@ -191,7 +192,18 @@ test('admin can update document request status to ready-to-claim', function () {
 });
 
 test('admin can view analytics overview', function () {
-    makeUser(SystemUser::ROLE_ADMIN);
+    // Since the default-policy fallback fix (Policy::DEFAULT_NAME now
+    // resolves to the zero-access "No Access" policy instead of silently
+    // granting "Registrar Staff"), a plain admin with no policy_id no
+    // longer has analytics access by default. Explicitly attach a policy
+    // that grants it, matching how a real admin would be provisioned.
+    $policy = Policy::create([
+        'name'        => 'Test Analytics Access',
+        'permissions' => ['analytics' => ['Access']],
+        'is_system'   => false,
+    ]);
+    $admin = makeUser(SystemUser::ROLE_ADMIN);
+    $admin->update(['policy_id' => $policy->policy_id]);
     seedReferenceData();
 
     $this->getJson('/api/analytics/overview')->assertOk();

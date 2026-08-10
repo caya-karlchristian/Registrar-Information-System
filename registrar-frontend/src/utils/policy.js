@@ -22,6 +22,7 @@ export const MODULE_KEYS = {
   ANALYTICS: "analytics",
   LOGBOOK: "logbook",
   PROFILE: "profile",
+  ACCESS_REQUESTS: "access_requests",
 };
 
 /**

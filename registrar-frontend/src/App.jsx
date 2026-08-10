@@ -21,6 +21,7 @@ import ProfilePage from './layouts/ProfilePage.jsx';
 import RegistrarContact from './layouts/RegistrarContact.jsx';
 import MainPage from './layouts/MainPage.jsx';
 import InboxCenter from './layouts/InboxCenter.jsx';
+import RequestAccessPage from './pages/RequestAccessPage.jsx';
 
 // Super Admin layouts
 import UserManagementPage from './pages/UserManagementPage.jsx';
@@ -36,6 +37,7 @@ import ModuleRoute from './components/ModuleRoute';
 import { MODULE_KEYS, hasModuleAccess } from './utils/policy';
 import ForbiddenPage from './components/ForbiddenPage';
 import SsoCallbackPage from './pages/SsoCallbackPage.jsx';
+import AccessControlPage from './pages/AccessControlPage.jsx';
 
 // Notifications
 import { NotificationToastProvider } from './context/NotificationToastContext.jsx';
@@ -83,6 +85,7 @@ const App = () => {
               <Route path="/" element={<MainPage />} />
               <Route path="/forbidden" element={<ForbiddenPage />} />
               <Route path="/auth/callback" element={<SsoCallbackPage />} />
+              <Route path="/access-control" element={<AccessControlPage />} />
 
               {/* STUDENT (role: student) */}
               <Route
@@ -150,6 +153,9 @@ const App = () => {
                 <Route path="contact" element={<RegistrarContact />} />
                 <Route path="inbox" element={
                   <ModuleRoute module={MODULE_KEYS.INBOX}><InboxCenter /></ModuleRoute>
+                } />
+                <Route path="access-requests" element={
+                  <ModuleRoute module={MODULE_KEYS.ACCESS_REQUESTS}><RequestAccessPage /></ModuleRoute>
                 } />
               </Route>
 

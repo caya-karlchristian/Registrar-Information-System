@@ -3,7 +3,6 @@
 namespace App\Http\Requests\SystemUser;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Password;
 
 class StoreSystemUserRequest extends FormRequest
 {
@@ -23,7 +22,19 @@ class StoreSystemUserRequest extends FormRequest
     {
         return [
             'email'       => 'required|email|unique:users,email',
-            'password'    => ['required', Password::min(8)->mixedCase()->numbers()],
+            // No password on create — accounts are pre-registered as
+            // 'Pending Activation' with no credential of their own. RIS
+            // never sets or accepts a password at creation time (see
+            // AdminUserService::create()); the only way any admin ever
+            // gets a local password is the separate, superadmin-only
+            // POST /api/auth/local-password endpoint, restricted to Super
+            // Admin break-glass accounts.
+            //
+            // No status on create either — it is always server-set to
+            // 'Pending Activation' and can only be changed afterward via
+            // the update endpoint (UpdateSystemUserRequest) or
+            // automatically by first SSO login / the
+            // provisioning:expire-stale scheduled command.
             'role_id'     => 'required|integer|in:3,4',
             'first_name'  => 'required|string|max:100',
             'middle_name' => 'nullable|string|max:100',

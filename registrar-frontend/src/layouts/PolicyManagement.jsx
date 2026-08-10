@@ -11,8 +11,8 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "../context/ThemeContext";
-import { 
-  PlusIcon, 
+import {
+  PlusIcon,
   XMarkIcon
 } from "@heroicons/react/24/outline";
 import { getSystemUsers, getPolicies, createPolicy, updatePolicy, deletePolicy } from "../services/api";
@@ -21,13 +21,15 @@ import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { PolicyTableSkeleton } from "../components/LoadingSkeleton";
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 
 const MODULE_OPTIONS = [
   "Dashboard",
   "Inbox",
   "Admin Analytics",
   "Admin Logbook",
-  "Admin Profile"
+  "Admin Profile",
+  "Access Requests"
 ];
 
 const LABEL_TO_KEY = {
@@ -35,7 +37,8 @@ const LABEL_TO_KEY = {
   "Inbox": "inbox",
   "Admin Analytics": "analytics",
   "Admin Logbook": "logbook",
-  "Admin Profile": "profile"
+  "Admin Profile": "profile",
+  "Access Requests": "access_requests"
 };
 
 const KEY_TO_LABEL = {
@@ -43,7 +46,8 @@ const KEY_TO_LABEL = {
   "inbox": "Inbox",
   "analytics": "Admin Analytics",
   "logbook": "Admin Logbook",
-  "profile": "Admin Profile"
+  "profile": "Admin Profile",
+  "access_requests": "Access Requests"
 };
 
 const PolicyManagement = () => {
@@ -58,7 +62,7 @@ const PolicyManagement = () => {
 
   const [users, setUsers] = useState([]);
   const [successMsg, setSuccessMsg] = useState("");
-  const [errorMsg, setErrorMsg]       = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   // Table selection (multi-selection) & pagination state
   const [selectedPolicyIndices, setSelectedPolicyIndices] = useState([]);
@@ -74,11 +78,16 @@ const PolicyManagement = () => {
   // Form fields
   const [policyName, setPolicyName] = useState("");
   const [selectedModuleValues, setSelectedModuleValues] = useState([]);
+  const [allowStudentStaffSwitch, setAllowStudentStaffSwitch] = useState(false);
 
   // Admin list modal
   const [isAdminListOpen, setIsAdminListOpen] = useState(false);
   const [selectedPolicyForAdmins, setSelectedPolicyForAdmins] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Discard changes state
+  const [initialFormState, setInitialFormState] = useState(null);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   // Fetch policies from the backend
   const fetchPolicies = useCallback(async () => {
@@ -127,6 +136,7 @@ const PolicyManagement = () => {
     Object.entries(LABEL_TO_KEY).forEach(([label, key]) => {
       raw[key] = selectedLabels.includes(label) ? ["Access"] : [];
     });
+    raw['student_staff_switch'] = allowStudentStaffSwitch ? ["Access"] : [];
     return raw;
   };
 
@@ -134,6 +144,8 @@ const PolicyManagement = () => {
     setIsEditMode(false);
     setPolicyName("");
     setSelectedModuleValues([]);
+    setAllowStudentStaffSwitch(false);
+    setInitialFormState({ name: "", modules: [], switcher: false });
     setIsModalOpen(true);
   };
 
@@ -141,19 +153,46 @@ const PolicyManagement = () => {
     setIsEditMode(true);
     setEditingPolicyIndex(index);
     const p = policies[index];
-    setPolicyName(p.name);
+    const initialName = p.name;
+    const initialSwitcher = Array.isArray(p.permissions?.student_staff_switch) && p.permissions.student_staff_switch.length > 0;
 
     // Map permissions object back to selectedModuleValues
     const labels = [];
     Object.entries(p.permissions || {}).forEach(([key, val]) => {
-      if (val && val.length > 0) {
+      if (key !== 'student_staff_switch' && val && val.length > 0) {
         const label = KEY_TO_LABEL[key];
         if (label) labels.push(label);
       }
     });
 
+    setPolicyName(initialName);
+    setAllowStudentStaffSwitch(initialSwitcher);
     setSelectedModuleValues(labels);
+    setInitialFormState({ name: initialName, modules: labels, switcher: initialSwitcher });
     setIsModalOpen(true);
+  };
+
+  const hasUnsavedChanges = () => {
+    if (!initialFormState) return false;
+    const nameChanged = policyName.trim() !== initialFormState.name.trim();
+    const modulesChanged =
+      selectedModuleValues.length !== initialFormState.modules.length ||
+      !selectedModuleValues.every(val => initialFormState.modules.includes(val));
+    const switcherChanged = allowStudentStaffSwitch !== initialFormState.switcher;
+    return nameChanged || modulesChanged || switcherChanged;
+  };
+
+  const handleCloseModal = () => {
+    if (hasUnsavedChanges()) {
+      setShowDiscardConfirm(true);
+    } else {
+      setIsModalOpen(false);
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false);
+    setIsModalOpen(false);
   };
 
   const handleToggleSelectRow = (index) => {
@@ -216,6 +255,11 @@ const PolicyManagement = () => {
       return;
     }
 
+    if (isEditMode && !hasUnsavedChanges()) {
+      setErrorMsg("No changes have been made.");
+      return;
+    }
+
     const permissions = buildPermissions(selectedModuleValues);
     setSubmitting(true);
 
@@ -246,16 +290,16 @@ const PolicyManagement = () => {
   // Filter policies based on Search
   const filteredPolicies = policies.filter((p) => {
     return p.name.toLowerCase().includes(search.toLowerCase()) ||
-           (p.permissions_label || "").toLowerCase().includes(search.toLowerCase());
+      (p.permissions_label || "").toLowerCase().includes(search.toLowerCase());
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredPolicies.length / PER_PAGE));
-  const safePage   = Math.min(currentPage, totalPages);
-  const paginated  = filteredPolicies.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+  const safePage = Math.min(currentPage, totalPages);
+  const paginated = filteredPolicies.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
   return (
     <div className="w-full flex flex-col font-sans">
-      
+
       {/* Title & Top button toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
         <div>
@@ -274,9 +318,8 @@ const PolicyManagement = () => {
           <button
             disabled={selectedPolicyIndices.length === 0}
             onClick={handleDeleteSelected}
-            className={`px-4 py-2 border rounded-lg text-sm font-semibold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-              isDark ? 'border-gray-700 bg-[#2a2a2f] text-white hover:bg-white/10' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-            }`}
+            className={`px-4 py-2 border rounded-lg text-sm font-semibold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isDark ? 'border-gray-700 bg-[#2a2a2f] text-white hover:bg-white/10' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
           >
             Delete
           </button>
@@ -284,39 +327,28 @@ const PolicyManagement = () => {
           {/* Create policy Button */}
           <button
             onClick={handleOpenCreate}
-            className={`px-5 py-2.5 rounded-lg text-sm font-bold shadow transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${
-              isDark ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
-            }`}
+            className={`px-5 py-2.5 rounded-lg text-sm font-bold shadow transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${isDark ? 'bg-yellow-400 text-black hover:bg-yellow-500' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
+              }`}
           >
             Create policy
           </button>
         </div>
       </div>      {/* Main Container */}
-      <div className={`rounded-xl overflow-hidden border mt-4 ${
-        isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-200 shadow-sm'
-      }`}>
-        {/* Search & pagination bar inside container */}
-        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b ${
-          isDark ? 'border-[#3e4042] bg-[#1a1a1c]/20' : 'border-gray-200 bg-gray-50/50'
+      <div className={`rounded-xl overflow-hidden border mt-4 ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-200 shadow-sm'
         }`}>
+        {/* Search & pagination bar inside container */}
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b ${isDark ? 'border-[#3e4042] bg-[#1a1a1c]/20' : 'border-gray-200 bg-gray-50/50'
+          }`}>
           <div className="flex flex-wrap items-center gap-3 flex-1">
             {/* Search */}
-            <div className="relative w-full sm:max-w-md">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </span>
-              <input
-                type="text"
+            <div className="w-full sm:max-w-md">
+              <VoiceSearchInput
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(value) => {
+                  setSearch(value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Search"
-                className={`w-full pl-9 pr-4 py-2 rounded-lg border text-sm transition-all focus:outline-none focus:ring-2 ${
-                  isDark 
-                    ? 'bg-[#1f1f1f] border-[#3e4042] text-white placeholder-gray-550 focus:ring-[#FFD700]' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-[#FFC72C]'
-                }`}
               />
             </div>
           </div>
@@ -347,9 +379,8 @@ const PolicyManagement = () => {
         <div className="overflow-x-auto">
           <table className="w-full min-w-200 text-sm">
             <thead>
-              <tr className={`border-b text-xs font-bold uppercase tracking-wider ${
-                isDark ? 'border-[#3e4042] text-[#a09e9a]' : 'border-gray-200 text-gray-500'
-              }`}>
+              <tr className={`border-b text-xs font-bold uppercase tracking-wider ${isDark ? 'border-[#3e4042] text-[#a09e9a]' : 'border-gray-200 text-gray-500'
+                }`}>
                 {/* Checkbox column header */}
                 <th className="w-12 px-4 py-3 text-center">
                   <input
@@ -389,25 +420,24 @@ const PolicyManagement = () => {
               ) : (
                 paginated.map((policy, idx) => {
                   const admins = getAssignedAdmins(policy);
-                  const usedAsText = admins.length > 0 
-                    ? `Permissions policy (${admins.length})` 
+                  const usedAsText = admins.length > 0
+                    ? `Permissions policy (${admins.length})`
                     : "None";
 
                   const globalIdx = (safePage - 1) * PER_PAGE + idx;
 
                   return (
-                    <tr 
+                    <tr
                       key={policy.policy_id}
-                      className={`border-b last:border-0 transition-colors ${
-                        isDark 
-                          ? 'border-[#3e4042] hover:bg-[#2a2a2f]' 
+                      className={`border-b last:border-0 transition-colors ${isDark
+                          ? 'border-[#3e4042] hover:bg-[#2a2a2f]'
                           : 'border-gray-100 hover:bg-gray-50'
-                      } ${selectedPolicyIndices.includes(globalIdx) ? (isDark ? 'bg-yellow-400/5' : 'bg-[#800000]/5') : ''}`}
+                        } ${selectedPolicyIndices.includes(globalIdx) ? (isDark ? 'bg-yellow-400/5' : 'bg-[#800000]/5') : ''}`}
                     >
                       {/* Checkbox Select cell */}
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center">
-                          <input 
+                          <input
                             type="checkbox"
                             checked={selectedPolicyIndices.includes(globalIdx)}
                             onChange={() => handleToggleSelectRow(globalIdx)}
@@ -420,19 +450,26 @@ const PolicyManagement = () => {
                       <td className="px-2 py-3 text-center">
                         <div className="flex items-center justify-center">
                           <svg className="w-5 h-5 text-orange-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M11 17a1 1 0 001.447.894l5-2.5A1 1 0 0018 14.5V9.632a1 1 0 00-.553-.894l-5-2.5A1 1 0 0011 7.132V17zM9 17V7.132a1 1 0 00-1.447-.894l-5 2.5A1 1 0 002 9.632v4.868a1 1 0 00.553.894l5 2.5A1 1 0 009 17zM10 2a1 1 0 00-.553.168l-7 4.5a1 1 0 000 1.664l7 4.5a1 1 0 001.106 0l7-4.5a1 1 0 000-1.664l-7-4.5A1 1 0 0010 2z"/>
+                            <path d="M11 17a1 1 0 001.447.894l5-2.5A1 1 0 0018 14.5V9.632a1 1 0 00-.553-.894l-5-2.5A1 1 0 0011 7.132V17zM9 17V7.132a1 1 0 00-1.447-.894l-5 2.5A1 1 0 002 9.632v4.868a1 1 0 00.553.894l5 2.5A1 1 0 009 17zM10 2a1 1 0 00-.553.168l-7 4.5a1 1 0 000 1.664l7 4.5a1 1 0 001.106 0l7-4.5a1 1 0 000-1.664l-7-4.5A1 1 0 0010 2z" />
                           </svg>
                         </div>
                       </td>
 
                       {/* Policy name hyperlink */}
                       <td className="px-4 py-3 font-semibold">
-                        <button
-                          onClick={() => handleOpenEdit(globalIdx)}
-                          className="text-blue-400 hover:text-blue-300 font-semibold hover:underline text-left text-sm cursor-pointer"
-                        >
-                          {policy.name}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleOpenEdit(globalIdx)}
+                            className="text-blue-400 hover:text-blue-300 font-semibold hover:underline text-left text-sm cursor-pointer"
+                          >
+                            {policy.name}
+                          </button>
+                          {Array.isArray(policy.permissions?.student_staff_switch) && policy.permissions.student_staff_switch.length > 0 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800/25">
+                              Switcher
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Type */}
@@ -471,13 +508,13 @@ const PolicyManagement = () => {
 
       {/* Create / Edit Policy Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-10000 flex items-center justify-center p-4">
-          <div 
-            className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} 
-            onClick={() => setIsModalOpen(false)} 
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`}
+            onClick={handleCloseModal}
           />
           <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl mx-auto flex flex-col overflow-visible ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
-            
+
             {/* Header */}
             <div className={`px-6 py-5 flex items-center justify-between rounded-t-2xl shrink-0 ${isDark ? 'bg-[#2a2a2f] border-b border-[#3e4042]' : 'bg-pup-dark-maroon text-white'}`}>
               <div>
@@ -488,9 +525,9 @@ const PolicyManagement = () => {
                   Define a reusable set of module permissions, then attach it to any admin
                 </p>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setIsModalOpen(false)}
+              <button
+                type="button"
+                onClick={handleCloseModal}
                 className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white cursor-pointer"
               >
                 <XMarkIcon className="w-5 h-5" />
@@ -499,7 +536,7 @@ const PolicyManagement = () => {
 
             <div className="h-1 w-full shrink-0 bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
 
-            <form onSubmit={handleSavePolicy} className="flex flex-col overflow-visible">
+            <form onSubmit={handleSavePolicy} noValidate className="flex flex-col overflow-visible">
               <div className="p-6 space-y-5 overflow-visible">
                 {/* Policy Name */}
                 <div>
@@ -512,18 +549,16 @@ const PolicyManagement = () => {
                     value={policyName}
                     onChange={(e) => setPolicyName(e.target.value)}
                     placeholder="e.g. Registrar Frontliner"
-                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 ${
-                      isDark 
-                        ? 'bg-[#1f1f1f] text-[#e4e6eb] placeholder-[#9a9a9a] focus:ring-[#FFD700] border border-[#3e4042]' 
+                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 ${isDark
+                        ? 'bg-[#1f1f1f] text-[#e4e6eb] placeholder-[#9a9a9a] focus:ring-[#FFD700] border border-[#3e4042]'
                         : 'bg-white text-gray-700 placeholder-gray-400 focus:ring-[#FFC72C] border border-gray-300'
-                    }`}
+                      }`}
                   />
                 </div>
 
                 {/* Single module selection card with MultiSelectDropdown */}
-                <div className={`p-4 rounded-xl border flex flex-col relative overflow-visible ${
-                  isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200'
-                }`}>
+                <div className={`p-4 rounded-xl border flex flex-col relative overflow-visible ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200'
+                  }`}>
                   <div className="flex justify-between items-center mb-2">
                     <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Select a module</span>
                   </div>
@@ -538,27 +573,52 @@ const PolicyManagement = () => {
                     />
                   </div>
                 </div>
+
+                {/* Multiple Role Options */}
+                <div className={`p-4 rounded-xl border flex flex-col gap-3 ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200 shadow-xs'
+                  }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        Role Switcher (Admin and Student)
+                      </span>
+                      <span className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                        Allow users under this policy to toggle between Admin and Student views.
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setAllowStudentStaffSwitch(!allowStudentStaffSwitch)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${allowStudentStaffSwitch ? 'bg-green-500' : (isDark ? 'bg-gray-700' : 'bg-gray-200')
+                        }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${allowStudentStaffSwitch ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                      />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Footer */}
               <div className={`px-6 pb-6 pt-4 flex items-center justify-end gap-3 border-t shrink-0 rounded-b-2xl ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)}
-                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
-                    isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   disabled={submitting}
-                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
-                    isDark 
-                      ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' 
+                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${isDark
+                      ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]'
                       : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
-                  }`}
+                    }`}
                 >
                   {submitting ? "Saving..." : (isEditMode ? "Save Changes" : "Save Policy")}
                 </button>
@@ -571,12 +631,12 @@ const PolicyManagement = () => {
       {/* Admin Assignment Details Modal */}
       {isAdminListOpen && selectedPolicyForAdmins && (
         <div className="fixed inset-0 z-10000 modal-overlay-container flex items-center justify-center p-4">
-          <div 
-            className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`} 
-            onClick={() => setIsAdminListOpen(false)} 
+          <div
+            className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`}
+            onClick={() => setIsAdminListOpen(false)}
           />
           <div className={`relative rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
-            
+
             {/* Header */}
             <div className={`px-6 py-5 flex items-center justify-between ${isDark ? 'bg-[#2a2a2f] border-b border-[#3e4042]' : 'bg-pup-dark-maroon text-white'}`}>
               <div>
@@ -587,8 +647,8 @@ const PolicyManagement = () => {
                   Admins attached to {selectedPolicyForAdmins.name}
                 </p>
               </div>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setIsAdminListOpen(false)}
                 className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white"
               >
@@ -610,11 +670,10 @@ const PolicyManagement = () => {
                       ? [user.admin_profile.first_name, user.admin_profile.last_name].filter(Boolean).join(" ")
                       : "Unnamed Admin";
                     return (
-                      <div 
+                      <div
                         key={user.user_id}
-                        className={`p-3 rounded-lg border flex flex-col ${
-                          isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200'
-                        }`}
+                        className={`p-3 rounded-lg border flex flex-col ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200'
+                          }`}
                       >
                         <div className={`font-bold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
                           {fullName}
@@ -631,12 +690,11 @@ const PolicyManagement = () => {
 
             {/* Footer */}
             <div className={`px-6 pb-6 pt-4 flex items-center justify-end border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setIsAdminListOpen(false)}
-                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow ${
-                  isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
-                }`}
+                className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow ${isDark ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]' : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
+                  }`}
               >
                 Close
               </button>
@@ -645,14 +703,14 @@ const PolicyManagement = () => {
         </div>
       )}
 
-      <SuccessToast 
-        message={successMsg} 
-        onClose={() => setSuccessMsg("")} 
+      <SuccessToast
+        message={successMsg}
+        onClose={() => setSuccessMsg("")}
       />
 
-      <ErrorToast 
-        message={errorMsg} 
-        onClose={() => setErrorMsg("")} 
+      <ErrorToast
+        message={errorMsg}
+        onClose={() => setErrorMsg("")}
       />
 
       <ConfirmationModal
@@ -662,6 +720,15 @@ const PolicyManagement = () => {
         title="Delete Selected Policies?"
         message="Are you sure you want to delete the selected policy/policies? This action cannot be undone."
         type="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={showDiscardConfirm}
+        onClose={() => setShowDiscardConfirm(false)}
+        onConfirm={handleConfirmDiscard}
+        title="Discard Unsaved Changes?"
+        message="You have unsaved changes. Are you sure you want to discard them?"
+        type="confirm"
       />
     </div>
   );
