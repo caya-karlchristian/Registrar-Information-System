@@ -252,17 +252,30 @@ export const AuthProvider = ({ children }) => {
   // /role-assignments/mine list and the API both key off.
   // -------------------------------------------------------
   const switchRole = async (roleId) => {
-    const { data } = await switchRoleRequest(roleId);
-    const userData = data.data ?? data.user;
+    setLoading(true);
+    try {
+      const { data } = await switchRoleRequest(roleId);
+      const userData = data.data ?? data.user;
 
-    setUser(userData);
-    // The set of roles held doesn't change when switching (only which
-    // one is currently assumed does) — no need to refetch, but doing so
-    // keeps this resilient if a grant/revoke happened concurrently.
-    refreshRoleAssignments();
+      setUser(userData);
+      // The set of roles held doesn't change when switching (only which
+      // one is currently assumed does) — no need to refetch, but doing so
+      // keeps this resilient if a grant/revoke happened concurrently.
+      await refreshRoleAssignments();
 
-    const destination = ROLE_HOME[userData.role_name] ?? "/";
-    navigate(destination, { replace: true });
+      const destination = ROLE_HOME[userData.role_name] ?? "/";
+      navigate(destination, { replace: true });
+      
+      // Defer disabling the loading state to ensure React Router mounts 
+      // the new route before we check route permissions again.
+      setTimeout(() => {
+        setLoading(false);
+      }, 100);
+    } catch (err) {
+      console.error('Role switch failed:', err);
+      setLoading(false);
+      throw err;
+    }
   };
 
   // -------------------------------------------------------

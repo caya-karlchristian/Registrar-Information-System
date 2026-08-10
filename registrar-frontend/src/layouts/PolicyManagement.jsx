@@ -78,7 +78,6 @@ const PolicyManagement = () => {
   // Form fields
   const [policyName, setPolicyName] = useState("");
   const [selectedModuleValues, setSelectedModuleValues] = useState([]);
-  const [allowStudentStaffSwitch, setAllowStudentStaffSwitch] = useState(false);
 
   // Admin list modal
   const [isAdminListOpen, setIsAdminListOpen] = useState(false);
@@ -136,7 +135,6 @@ const PolicyManagement = () => {
     Object.entries(LABEL_TO_KEY).forEach(([label, key]) => {
       raw[key] = selectedLabels.includes(label) ? ["Access"] : [];
     });
-    raw['student_staff_switch'] = allowStudentStaffSwitch ? ["Access"] : [];
     return raw;
   };
 
@@ -144,8 +142,7 @@ const PolicyManagement = () => {
     setIsEditMode(false);
     setPolicyName("");
     setSelectedModuleValues([]);
-    setAllowStudentStaffSwitch(false);
-    setInitialFormState({ name: "", modules: [], switcher: false });
+    setInitialFormState({ name: "", modules: [] });
     setIsModalOpen(true);
   };
 
@@ -154,7 +151,6 @@ const PolicyManagement = () => {
     setEditingPolicyIndex(index);
     const p = policies[index];
     const initialName = p.name;
-    const initialSwitcher = Array.isArray(p.permissions?.student_staff_switch) && p.permissions.student_staff_switch.length > 0;
 
     // Map permissions object back to selectedModuleValues
     const labels = [];
@@ -166,9 +162,8 @@ const PolicyManagement = () => {
     });
 
     setPolicyName(initialName);
-    setAllowStudentStaffSwitch(initialSwitcher);
     setSelectedModuleValues(labels);
-    setInitialFormState({ name: initialName, modules: labels, switcher: initialSwitcher });
+    setInitialFormState({ name: initialName, modules: labels });
     setIsModalOpen(true);
   };
 
@@ -178,8 +173,7 @@ const PolicyManagement = () => {
     const modulesChanged =
       selectedModuleValues.length !== initialFormState.modules.length ||
       !selectedModuleValues.every(val => initialFormState.modules.includes(val));
-    const switcherChanged = allowStudentStaffSwitch !== initialFormState.switcher;
-    return nameChanged || modulesChanged || switcherChanged;
+    return nameChanged || modulesChanged;
   };
 
   const handleCloseModal = () => {
@@ -571,33 +565,6 @@ const PolicyManagement = () => {
                       selectedValues={selectedModuleValues}
                       onChange={(e) => setSelectedModuleValues(e.target.value)}
                     />
-                  </div>
-                </div>
-
-                {/* Multiple Role Options */}
-                <div className={`p-4 rounded-xl border flex flex-col gap-3 ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200 shadow-xs'
-                  }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        Role Switcher (Admin and Student)
-                      </span>
-                      <span className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                        Allow users under this policy to toggle between Admin and Student views.
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setAllowStudentStaffSwitch(!allowStudentStaffSwitch)}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${allowStudentStaffSwitch ? 'bg-green-500' : (isDark ? 'bg-gray-700' : 'bg-gray-200')
-                        }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${allowStudentStaffSwitch ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                      />
-                    </button>
                   </div>
                 </div>
               </div>
