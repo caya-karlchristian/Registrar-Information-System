@@ -80,6 +80,13 @@ class AuditLog extends Model
     public const ACTION_ACCESS_REQUEST_REJECTED  = 'access_request_rejected';
     public const ACTION_ACCESS_REQUEST_EXPIRED   = 'access_request_expired';
 
+    // Cashier OR verification attempts (see NameMatcher, DocumentRequestController::store)
+    // Logged for every attempt regardless of outcome — not just failures —
+    // via the existing tamper-evident audit_log table rather than a new
+    // one, so this survives container recreation the way storage/logs
+    // currently does not (see 2026-08-11 incident notes).
+    public const ACTION_CASHIER_VERIFICATION = 'cashier_verification';
+
     // -------------------------------------------------------
     // Relationship back to the acting user (nullable — may be deleted)
     // -------------------------------------------------------

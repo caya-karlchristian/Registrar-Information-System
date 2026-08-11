@@ -381,6 +381,82 @@ test('document request is rejected when OR number is already used', function () 
       ->assertJsonPath('errors.or_number.0', fn ($msg) => str_contains($msg, 'already been used'));
 });
 
+test('document request succeeds when cashier only accepts the full-middle-name format', function () {
+    // Regression coverage for the case NameMatcher exists to handle: the
+    // cashier's on-file name uses a format RIS's primary guess (initial)
+    // doesn't match, but a later candidate (full middle name) does.
+    config(['services.cashier.api_key' => 'test-key']);
+
+    ['user' => $user, 'profile' => $profile] = makeCashierStudent(); // Dela Cruz, Juan, Santos
+    ['purpose' => $purpose, 'docType' => $docType] = seedCashierReferenceData();
+
+    Http::fake(function ($request) {
+        $body = $request->data();
+
+        // Only the full-middle-name format succeeds — simulates a cashier
+        // admin who typed the middle name out in full instead of an initial.
+        if (($body['customer_name'] ?? null) === 'DELA CRUZ, JUAN SANTOS') {
+            return Http::response([
+                'valid'  => true,
+                'reason' => null,
+                'data'   => [
+                    'receipt_number'   => 1234567,
+                    'customer_name'    => 'DELA CRUZ, JUAN SANTOS',
+                    'transaction_date' => now()->toDateTimeString(),
+                    'items'            => [],
+                ],
+            ], 200);
+        }
+
+        return Http::response(['valid' => false, 'reason' => 'NOT_FOUND', 'data' => null], 200);
+    });
+
+    $this->postJson('/api/document-requests', [
+        'request_purpose_id' => $purpose->request_purpose_id,
+        'or_number'          => '1234567',
+        'receipt_date'       => now()->toDateString(),
+        'documents'          => [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
+    ])->assertCreated();
+
+    // Confirm RIS actually retried — not just that it got lucky on the
+    // first attempt — by checking the audit log recorded multiple attempts.
+    $log = \App\Models\AuditLog::where('action', \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION)
+        ->latest('created_at')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->metadata['final_approved'])->toBeTrue()
+        ->and(count($log->metadata['attempts']))->toBeGreaterThan(1)
+        ->and($log->metadata['matched_name'])->toBe('DELA CRUZ, JUAN SANTOS');
+});
+
+test('document request is rejected and every candidate attempt is logged when no format matches', function () {
+    config(['services.cashier.api_key' => 'test-key']);
+
+    ['user' => $user] = makeCashierStudent();
+    ['purpose' => $purpose, 'docType' => $docType] = seedCashierReferenceData();
+
+    Http::fake([
+        '*' => Http::response(['valid' => false, 'reason' => 'NOT_FOUND', 'data' => null], 200),
+    ]);
+
+    $this->postJson('/api/document-requests', [
+        'request_purpose_id' => $purpose->request_purpose_id,
+        'or_number'          => '0000000',
+        'receipt_date'       => now()->toDateString(),
+        'documents'          => [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
+    ])->assertStatus(422);
+
+    $log = \App\Models\AuditLog::where('action', \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION)
+        ->latest('created_at')
+        ->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->metadata['final_approved'])->toBeFalse()
+        ->and($log->metadata['matched_name'])->toBeNull()
+        ->and(count($log->metadata['attempts']))->toBeGreaterThan(1);
+});
+
 test('document request with no OR number is accepted when OR is optional', function () {
     config(['services.cashier.api_key' => '']);
 

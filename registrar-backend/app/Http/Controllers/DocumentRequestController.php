@@ -14,6 +14,7 @@ use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use App\Services\CashierService;
 use App\Services\CashierDocumentMatcher;
+use App\Services\NameMatcher;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -49,6 +50,7 @@ class DocumentRequestController extends Controller
         private CashierService                  $cashierService,
         private CashierDocumentMatcher          $documentMatcher,
         private AuditLogger                     $auditLogger,
+        private NameMatcher                     $nameMatcher,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -244,17 +246,67 @@ class DocumentRequestController extends Controller
             $profile = $user->studentProfile ?? $user->alumniProfile ?? null;
 
             if ($profile) {
-                $customerName = $this->cashierService->formatCustomerName(
-                    $profile->last_name  ?? '',
-                    $profile->first_name ?? '',
+                // The Cashier API does exact string matching against a
+                // free-text "Customer Name" field the Cashier System
+                // itself doesn't validate (confirmed via screenshot of
+                // its payment form). On failure it never tells us what
+                // name is actually on file — NOT_FOUND means either
+                // "wrong OR" or "wrong name", indistinguishably — so
+                // there's nothing to compare against after the fact.
+                // Instead: try a small set of plausible name formattings
+                // for this same person, stopping at the first one the API
+                // accepts. Every attempt is logged so the eventual
+                // decision is traceable.
+                $candidates = $this->nameMatcher->candidatesFor(
+                    $profile->last_name   ?? '',
+                    $profile->first_name  ?? '',
                     $profile->middle_name ?? '',
-                    $profile->suffix ?? '',
+                    $profile->suffix      ?? '',
                 );
 
-                $verification = $this->cashierService->verifyPayment(
-                    $validated['or_number'],
-                    $customerName,
-                );
+                $verification   = null;
+                $matchedName    = null;
+                $attemptsLog    = [];
+
+                foreach ($candidates as $candidate) {
+                    $attempt = $this->cashierService->verifyPayment(
+                        $validated['or_number'],
+                        $candidate,
+                    );
+
+                    $attemptsLog[] = [
+                        'name'   => $candidate,
+                        'valid'  => $attempt['valid'],
+                        'reason' => $attempt['reason'] ?? null,
+                    ];
+
+                    $verification = $attempt;
+                    $matchedName  = $candidate;
+
+                    if ($attempt['valid']) {
+                        break; // found a formatting the cashier accepts — stop here
+                    }
+
+                    // Only worth trying alternate formattings when the
+                    // failure is a real lookup miss. An API_ERROR (server
+                    // error / connection failure) won't be fixed by a
+                    // different name string, and retrying it 2-3x in a
+                    // row would just add latency to an already-failing
+                    // request for no benefit.
+                    if (($attempt['reason'] ?? null) === 'API_ERROR') {
+                        break;
+                    }
+                }
+
+                $isMockAttempt = $verification['data']['_mock'] ?? false;
+
+                $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
+                    'or_number'      => $validated['or_number'],
+                    'attempts'       => $attemptsLog,
+                    'matched_name'   => $verification['valid'] ? $matchedName : null,
+                    'is_mock'        => $isMockAttempt,
+                    'final_approved' => $verification['valid'],
+                ]);
 
                 if (!$verification['valid']) {
                     $reason = $verification['reason'] ?? 'NOT_FOUND';
