@@ -194,6 +194,18 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
     return 'Guest';
   }, [profile, role]);
 
+  const initials = useMemo(() => {
+    if (role === 'superAdmin') return 'SA';
+    if (profile?.first_name) {
+      const parts = profile.first_name.trim().split(/\s+/);
+      if (parts.length > 1) {
+        return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+      }
+      return parts[0].charAt(0).toUpperCase();
+    }
+    return 'G';
+  }, [profile, role]);
+
   const handleLogoutClick = () => {
     setModal({
       isOpen: true,
@@ -321,15 +333,21 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
               type="button"
               disabled={!canUseSwitcher}
               onClick={() => setIsSwitchModalOpen(true)}
-              className={`w-full text-left flex items-center justify-between focus:outline-none ${canUseSwitcher
+              className={`w-full text-left flex items-center justify-between focus:outline-none min-w-0 ${canUseSwitcher
                 ? 'cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 p-2 rounded-2xl transition-all duration-200'
                 : ''
                 } ${isCollapsed ? 'justify-center p-0' : 'gap-3'}`}
             >
-              <div className="flex items-center gap-3">
-                <UserCircleIcon className={`transition-all duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-12 h-12 lg:w-14 lg:h-14'} ${isDark ? 'text-[#b0b3b8]' : 'text-gray-700'}`} />
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={`flex items-center justify-center rounded-full shrink-0 font-black text-white bg-pup-dark-maroon transition-all duration-300 border border-white/10 shadow-sm
+                    ${isCollapsed ? 'w-10 h-10 text-xs' : 'w-12 h-12 text-sm lg:w-14 lg:h-14 lg:text-base'}
+                  `}
+                >
+                  {initials}
+                </div>
                 {!isCollapsed && (
-                  <div className="flex flex-col overflow-hidden transition-all duration-300">
+                  <div className="flex flex-col overflow-hidden transition-all duration-300 min-w-0">
                     <h2 className={`font-black text-sm leading-tight uppercase truncate ${isDark ? 'text-[#e4e6eb]' : 'text-pup-maroon'}`}>
                       {fullName}
                     </h2>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import DropdownGroup from '../components/DropDown';
 import { getCertifications } from '../services/api';
+import { useReferenceData } from '../context/ReferenceDataContext';
 import SuccessToast from './SuccessToast.jsx';
 import ErrorToast from './ErrorToast.jsx';
 
@@ -16,6 +17,42 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = null, isDark,
   const [toastError, setToastError] = useState('');
   const [toastSuccess, setToastSuccess] = useState('');
   const [activePreset, setActivePreset] = useState('');
+  const [preparedByName, setPreparedByName] = useState('MHEL P. GARCIA');
+  const [preparedByTitle, setPreparedByTitle] = useState('Head of Registration Office');
+  const [notedByName, setNotedByName] = useState('DR. MARISSA B. FERRER');
+  const [notedByTitle, setNotedByTitle] = useState('Campus Director');
+
+  const { signatories = [] } = useReferenceData();
+  const [preparedSignatoryId, setPreparedSignatoryId] = useState('');
+  const [notedSignatoryId, setNotedSignatoryId] = useState('');
+
+  const handlePreparedSignatoryChange = (e) => {
+    const val = e.target.value;
+    if (val === 'Custom / Manual Input') {
+      setPreparedSignatoryId('custom');
+    } else {
+      const selected = signatories.find(s => `${s.name} (${s.position})` === val);
+      if (selected) {
+        setPreparedSignatoryId(selected.signatory_id);
+        setPreparedByName(selected.name);
+        setPreparedByTitle(selected.position);
+      }
+    }
+  };
+
+  const handleNotedSignatoryChange = (e) => {
+    const val = e.target.value;
+    if (val === 'Custom / Manual Input') {
+      setNotedSignatoryId('custom');
+    } else {
+      const selected = signatories.find(s => `${s.name} (${s.position})` === val);
+      if (selected) {
+        setNotedSignatoryId(selected.signatory_id);
+        setNotedByName(selected.name);
+        setNotedByTitle(selected.position);
+      }
+    }
+  };
 
 
   const applyPreset = (preset) => {
@@ -81,9 +118,50 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = null, isDark,
       setToastError('');
       setCertifications([]);
       setSelectedCertification('');
+
+      let prepDefaultId = 'custom';
+      let prepDefaultName = 'MHEL P. GARCIA';
+      let prepDefaultTitle = 'Head of Registration Office';
+
+      let noteDefaultId = 'custom';
+      let noteDefaultName = 'DR. MARISSA B. FERRER';
+      let noteDefaultTitle = 'Campus Director';
+
+      if (signatories && signatories.length > 0) {
+        const matchPrep = signatories.find(s => s.name?.toLowerCase().includes('mhel') || s.name?.toLowerCase().includes('garcia'));
+        if (matchPrep) {
+          prepDefaultId = matchPrep.signatory_id;
+          prepDefaultName = matchPrep.name;
+          prepDefaultTitle = matchPrep.position;
+        } else {
+          prepDefaultId = signatories[0].signatory_id;
+          prepDefaultName = signatories[0].name;
+          prepDefaultTitle = signatories[0].position;
+        }
+
+        const matchNote = signatories.find(s => s.name?.toLowerCase().includes('marissa') || s.name?.toLowerCase().includes('ferrer'));
+        if (matchNote) {
+          noteDefaultId = matchNote.signatory_id;
+          noteDefaultName = matchNote.name;
+          noteDefaultTitle = matchNote.position;
+        } else if (signatories.length > 1) {
+          noteDefaultId = signatories[1].signatory_id;
+          noteDefaultName = signatories[1].name;
+          noteDefaultTitle = signatories[1].position;
+        }
+      }
+
+      setPreparedSignatoryId(prepDefaultId);
+      setPreparedByName(prepDefaultName);
+      setPreparedByTitle(prepDefaultTitle);
+
+      setNotedSignatoryId(noteDefaultId);
+      setNotedByName(noteDefaultName);
+      setNotedByTitle(noteDefaultTitle);
+
       if (documentTypes && documentTypes.length) setSelectedDocType(documentTypes[0]);
     }
-  }, [isOpen, documentTypes]);
+  }, [isOpen, documentTypes, signatories]);
 
   if (!isOpen) return null;
 
@@ -134,10 +212,11 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = null, isDark,
       if (maxMonths && count > maxMonths) { setToastError(`Range must not exceeds ${maxMonths} months.`); return; }
     }
 
+    const options = { preparedByName, preparedByTitle, notedByName, notedByTitle };
     // Pass the certification type only for certification exports.
     const params = selectedDocType === 'CERTIFICATION'
-      ? [start, end, selectedDocType, selectedCertification]
-      : [start, end, selectedDocType];
+      ? [start, end, selectedDocType, selectedCertification, options]
+      : [start, end, selectedDocType, null, options];
 
     try {
       // Support both sync and async onConfirm handlers
@@ -219,6 +298,88 @@ const MonthRangeModal = ({ isOpen, onClose, onConfirm, maxMonths = null, isDark,
                 max={todayMonthStr}
                 className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
               />
+            </div>
+          </div>
+
+          {/* Signatory Options */}
+          <div className="space-y-4 pt-4 border-t border-dashed border-gray-200 dark:border-[#3e4042]">
+            <h4 className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-[#800000]'}`}>
+              Report Signatories
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Prepared By */}
+              <div className="space-y-3">
+                {signatories.length > 0 ? (
+                  <DropdownGroup
+                    label="Prepared By"
+                    name="preparedSignatory"
+                    value={preparedSignatoryId === 'custom' ? 'Custom / Manual Input' : (signatories.find(s => String(s.signatory_id) === String(preparedSignatoryId)) ? `${signatories.find(s => String(s.signatory_id) === String(preparedSignatoryId)).name} (${signatories.find(s => String(s.signatory_id) === String(preparedSignatoryId)).position})` : 'Custom / Manual Input')}
+                    onChange={handlePreparedSignatoryChange}
+                    options={[...signatories.map(s => `${s.name} (${s.position})`), 'Custom / Manual Input']}
+                    labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+                  />
+                ) : (
+                  <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-600'}`}>Prepared By</label>
+                )}
+
+                {/* Conditional Custom Inputs for Prepared By */}
+                {preparedSignatoryId === 'custom' && (
+                  <div className="space-y-2 p-3 rounded-lg border border-gray-100 dark:border-[#3e4042] bg-gray-50/30 dark:bg-[#1a1b1c] animate-in slide-in-from-top-2 duration-200">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Custom Prepared Signatory</span>
+                    <input
+                      type="text"
+                      value={preparedByName}
+                      onChange={(e) => setPreparedByName(e.target.value)}
+                      placeholder="Signatory Name"
+                      className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors w-full ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
+                    />
+                    <input
+                      type="text"
+                      value={preparedByTitle}
+                      onChange={(e) => setPreparedByTitle(e.target.value)}
+                      placeholder="Title / Designation"
+                      className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors w-full ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Noted By */}
+              <div className="space-y-3">
+                {signatories.length > 0 ? (
+                  <DropdownGroup
+                    label="Noted By"
+                    name="notedSignatory"
+                    value={notedSignatoryId === 'custom' ? 'Custom / Manual Input' : (signatories.find(s => String(s.signatory_id) === String(notedSignatoryId)) ? `${signatories.find(s => String(s.signatory_id) === String(notedSignatoryId)).name} (${signatories.find(s => String(s.signatory_id) === String(notedSignatoryId)).position})` : 'Custom / Manual Input')}
+                    onChange={handleNotedSignatoryChange}
+                    options={[...signatories.map(s => `${s.name} (${s.position})`), 'Custom / Manual Input']}
+                    labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+                  />
+                ) : (
+                  <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-600'}`}>Noted By</label>
+                )}
+
+                {/* Conditional Custom Inputs for Noted By */}
+                {notedSignatoryId === 'custom' && (
+                  <div className="space-y-2 p-3 rounded-lg border border-gray-100 dark:border-[#3e4042] bg-gray-50/30 dark:bg-[#1a1b1c] animate-in slide-in-from-top-2 duration-200">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Custom Noted Signatory</span>
+                    <input
+                      type="text"
+                      value={notedByName}
+                      onChange={(e) => setNotedByName(e.target.value)}
+                      placeholder="Signatory Name"
+                      className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors w-full ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
+                    />
+                    <input
+                      type="text"
+                      value={notedByTitle}
+                      onChange={(e) => setNotedByTitle(e.target.value)}
+                      placeholder="Title / Designation"
+                      className={`text-xs px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 transition-colors w-full ${isDark ? 'bg-[#2d2e30] border-[#4e4f50] text-[#e4e6eb] focus:ring-[#800000]/50' : 'bg-white border-gray-300 text-gray-700 focus:ring-[#800000]/30'}`}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
