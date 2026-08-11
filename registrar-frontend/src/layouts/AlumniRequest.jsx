@@ -129,11 +129,13 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
 
                   <p>
                     <strong>D.</strong> REMINDERS: For TOR (first copy), please bring one documentary stamp,
-                    two colored 2x2 picture in academic grown, PUP ID, and dummy diploma (in case of loss,
+                    two colored 2x2 pictures in academic gown, PUP ID, and dummy diploma (in case of loss,
                     please bring an affidavit of loss). For TOR (second copy), please bring one documentary
-                    stamp (violet), two colored 2x2 picture in formal attire with white background. For
-                    Honorable Dismissal and other certifications, please bring one violet documentary stamp
-                    (or two brown documentary stamp) per requested document.
+                    stamp (violet) and two colored 2x2 pictures in formal attire with a white background.
+                    For Honorable Dismissal and other certifications, please bring one violet documentary
+                    stamp (or two brown documentary stamps) per requested document. <strong>Requests must
+                    be submitted within one (1) week after receiving the documentary receipt. Requests
+                    submitted beyond this period may no longer be considered valid.</strong>
                   </p>
 
                   <p>
@@ -409,8 +411,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                           ? Array.isArray(docData.document_requirements)
                             ? docData.document_requirements
                             : docData.document_requirements
-                                .split(",")
-                                .map((r) => r.trim())
+                                .split("\n")
+                                .map((r) => r.trim().replace(/,$/, ""))
                                 .filter(Boolean)
                           : [];
 
