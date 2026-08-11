@@ -144,8 +144,7 @@ const PolicyManagement = () => {
     setIsEditMode(false);
     setPolicyName("");
     setSelectedModuleValues([]);
-    setAllowStudentStaffSwitch(false);
-    setInitialFormState({ name: "", modules: [], switcher: false });
+    setInitialFormState({ name: "", modules: [] });
     setIsModalOpen(true);
   };
 
@@ -154,7 +153,6 @@ const PolicyManagement = () => {
     setEditingPolicyIndex(index);
     const p = policies[index];
     const initialName = p.name;
-    const initialSwitcher = Array.isArray(p.permissions?.student_staff_switch) && p.permissions.student_staff_switch.length > 0;
 
     // Map permissions object back to selectedModuleValues
     const labels = [];
@@ -166,9 +164,8 @@ const PolicyManagement = () => {
     });
 
     setPolicyName(initialName);
-    setAllowStudentStaffSwitch(initialSwitcher);
     setSelectedModuleValues(labels);
-    setInitialFormState({ name: initialName, modules: labels, switcher: initialSwitcher });
+    setInitialFormState({ name: initialName, modules: labels });
     setIsModalOpen(true);
   };
 
@@ -178,8 +175,7 @@ const PolicyManagement = () => {
     const modulesChanged =
       selectedModuleValues.length !== initialFormState.modules.length ||
       !selectedModuleValues.every(val => initialFormState.modules.includes(val));
-    const switcherChanged = allowStudentStaffSwitch !== initialFormState.switcher;
-    return nameChanged || modulesChanged || switcherChanged;
+    return nameChanged || modulesChanged;
   };
 
   const handleCloseModal = () => {

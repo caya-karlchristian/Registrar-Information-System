@@ -14,6 +14,21 @@ const DashboardDropdown = ({
 }) => {
   const { isDark } = useTheme();
 
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event) => {
+      if (dropdownRef && dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, setIsOpen, dropdownRef]);
+
   const alignClasses = {
     left: 'left-0 mt-2',
     right: 'right-0 mt-2',

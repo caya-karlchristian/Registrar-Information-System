@@ -84,6 +84,30 @@ class AlumniSystemClient implements AlumniSystemClientInterface
         }
     }
 
+    /** GET /alumni/lookup?email= → identity + academic fields only (no sensitive data) */
+    public function getAlumniByEmail(string $email): AlumniDTO
+    {
+        return AlumniDTO::fromArray($this->get('/alumni/lookup', ['email' => $email]));
+    }
+
+    /**
+     * Safe lookup — returns null if Alumni System is unreachable or this
+     * email doesn't match a PUPTAPS alumnus. Used at SSO login time.
+     */
+    public function tryLookupAlumniByEmail(string $email): ?AlumniDTO
+    {
+        try {
+            return $this->getAlumniByEmail($email);
+        } catch (AlumniSystemException $e) {
+            Log::warning('Alumni System unavailable — email lookup failed', [
+                'email' => $email,
+                'error' => $e->getMessage(),
+                'code'  => $e->getCode(),
+            ]);
+            return null;
+        }
+    }
+
     // ── HTTP helpers ──────────────────────────────────────────
 
     private function get(string $path, array $query = []): array

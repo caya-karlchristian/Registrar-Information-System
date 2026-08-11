@@ -32,7 +32,11 @@ class AlumniDTO
             middleName:    $data['middle_name'] ?? null,
             suffix:        $data['suffix'] ?? null,
             courseId:      $data['course_id'],
-            courseDesc:    $data['course']['course_desc'] ?? null,
+            // /alumni and /alumni/{id} (full detail) nest this under a
+            // 'course' relation object; /alumni/lookup (added for the
+            // RIS login-check flow) returns it as a flat key instead.
+            // Support both so this DTO works against either shape.
+            courseDesc:    $data['course']['course_desc'] ?? $data['course_desc'] ?? null,
             batch:         $data['batch'],
             yearGraduated: $data['year_graduated'],
             sex:           $data['sex'] ?? null,
