@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { XMarkIcon, MagnifyingGlassIcon, UserPlusIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, MagnifyingGlassIcon, UserPlusIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../context/ThemeContext";
-import { searchGrantableUsers } from "../services/api";
+import { searchGrantableUsers, getSystemUsers } from "../services/api";
 
 /**
  * GrantRoleUserPicker — search-as-you-type lookup across ALL roles
@@ -44,6 +44,17 @@ const GrantRoleUserPicker = ({ isOpen, onClose, onSelect }) => {
   const [error, setError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [results]);
+
+  const totalPages = Math.max(1, Math.ceil(results.length / ITEMS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedResults = results.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+
   useEffect(() => {
     if (!isOpen) {
       setQuery("");
@@ -54,12 +65,43 @@ const GrantRoleUserPicker = ({ isOpen, onClose, onSelect }) => {
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const term = debouncedQuery.trim();
 
-    if (term.length < MIN_QUERY_LENGTH) {
-      setResults([]);
+    // If search term is empty, fetch system users as a default placeholder list
+    if (term.length === 0) {
+      let cancelled = false;
+      setLoading(true);
       setError("");
-      setHasSearched(false);
+
+      getSystemUsers()
+        .then((res) => {
+          if (cancelled) return;
+          const mapped = (res.data?.data || []).map((u) => ({
+            user_id: u.user_id,
+            email: u.email,
+            full_name: [u.admin_profile?.first_name || u.first_name, u.admin_profile?.last_name || u.last_name].filter(Boolean).join(" ") || u.email,
+            role_id: u.role_id,
+            role_name: u.role_name === 'super_admin' ? 'Super Admin' : (u.role_name === 'admin' ? 'Admin' : (u.role_name === 'student' ? 'Student' : (u.role_name === 'alumni' ? 'Alumni' : 'Unknown'))),
+            active_role_ids: u.active_role_ids || [u.role_id]
+          }));
+          setResults(mapped);
+          setHasSearched(true);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setError(err.response?.data?.message || "Failed to load default users.");
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+
+      return () => { cancelled = true; };
+    }
+
+    // If query has exactly 1 character, don't query yet to prevent heavy DB search.
+    if (term.length === 1) {
       return;
     }
 
@@ -82,7 +124,7 @@ const GrantRoleUserPicker = ({ isOpen, onClose, onSelect }) => {
       });
 
     return () => { cancelled = true; };
-  }, [debouncedQuery]);
+  }, [debouncedQuery, isOpen]);
 
   if (!isOpen) return null;
 
@@ -164,7 +206,7 @@ const GrantRoleUserPicker = ({ isOpen, onClose, onSelect }) => {
             </p>
           )}
 
-          {!loading && results.map((u) => (
+          {!loading && paginatedResults.map((u) => (
             <button
               key={u.user_id}
               type="button"
@@ -199,6 +241,39 @@ const GrantRoleUserPicker = ({ isOpen, onClose, onSelect }) => {
               </div>
             </button>
           ))}
+
+          {/* Pagination Controls */}
+          {!loading && results.length > ITEMS_PER_PAGE && (
+            <div className={`flex items-center justify-between gap-1 px-2 py-3 mt-4 border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-150'}`}>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-bold border transition-colors disabled:opacity-40 cursor-pointer ${
+                  isDark
+                    ? 'border-[#3e4042] text-[#b0b3b8] hover:bg-[#2c2d30] hover:text-white'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                }`}
+              >
+                <ChevronLeftIcon className="w-3.5 h-3.5" /> Previous
+              </button>
+              <span className={`text-xs font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                Page {safePage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-bold border transition-colors disabled:opacity-40 cursor-pointer ${
+                  isDark
+                    ? 'border-[#3e4042] text-[#b0b3b8] hover:bg-[#2c2d30] hover:text-white'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                }`}
+              >
+                Next <ChevronRightIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
