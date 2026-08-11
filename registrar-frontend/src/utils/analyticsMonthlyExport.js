@@ -329,7 +329,12 @@ const buildHeader = async () => {
   });
 };
 
-export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certType = '') => {
+export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certType = '', options = {}) => {
+  const preparedByName = options.preparedByName || 'MHEL P. GARCIA';
+  const preparedByTitle = options.preparedByTitle || 'Head of Registration Office';
+  const notedByName = options.notedByName || 'DR. MARISSA B. FERRER';
+  const notedByTitle = options.notedByTitle || 'Campus Director';
+
   const header = await buildHeader();
   const footerLogo = await fetchImageData(certificateFooterImg);
   const getSectionTitle = (docName) => {
@@ -694,8 +699,8 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
               width: { size: 45, type: WidthType.PERCENTAGE },
               children: [
                 new Paragraph({ children: [ new TextRun({ text: 'Prepared by:', bold: true, size: 20 }) ] }),
-                new Paragraph({ spacing: { before: 720 }, children: [ new TextRun({ text: 'MHEL P. GARCIA', bold: true, size: 20 }) ] }),
-                new Paragraph({ children: [ new TextRun({ text: 'Head of Registration Office', size: 18 }) ] }),
+                new Paragraph({ spacing: { before: 720 }, children: [ new TextRun({ text: preparedByName, bold: true, size: 20 }) ] }),
+                new Paragraph({ children: [ new TextRun({ text: preparedByTitle, size: 18 }) ] }),
               ],
               borders: { top: { style: BorderStyle.NONE, size: 0 }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } },
             }),
@@ -708,8 +713,8 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
               width: { size: 45, type: WidthType.PERCENTAGE },
               children: [
                 new Paragraph({ children: [ new TextRun({ text: 'Noted by:', bold: true, size: 20 }) ] }),
-                new Paragraph({ spacing: { before: 720 }, children: [ new TextRun({ text: 'DR. MARISSA B. FERRER', bold: true, size: 20 }) ] }),
-                new Paragraph({ children: [ new TextRun({ text: 'Campus Director', size: 18 }) ] }),
+                new Paragraph({ spacing: { before: 720 }, children: [ new TextRun({ text: notedByName, bold: true, size: 20 }) ] }),
+                new Paragraph({ children: [ new TextRun({ text: notedByTitle, size: 18 }) ] }),
               ],
               borders: { top: { style: BorderStyle.NONE, size: 0 }, bottom: { style: BorderStyle.NONE, size: 0 }, left: { style: BorderStyle.NONE, size: 0 }, right: { style: BorderStyle.NONE, size: 0 } },
             }),

@@ -170,14 +170,14 @@ const AnalyticsDashboard = () => {
   };
 
   // ── Monthly export handler ─────────────────────────────────────────────
-  const handleExportConfirm = async (startYM, endYM, selectedDocType = 'ALL', certType = null) => {
+  const handleExportConfirm = async (startYM, endYM, selectedDocType = 'ALL', certType = null, options = {}) => {
     setExportLoading(true);
     setToastSuccess('');
     setToastError('');
     try {
       const { exportMonthlyDocx } = await import('../utils/analyticsMonthlyExport');
       const docTypeToSend = selectedDocType === 'All Documents' ? 'ALL' : selectedDocType;
-      await exportMonthlyDocx(startYM, endYM, docTypeToSend, certType);
+      await exportMonthlyDocx(startYM, endYM, docTypeToSend, certType, options);
       setToastSuccess('Exported successfully! Check your downloads.');
     } catch (err) {
       console.error('Export failed', err);
