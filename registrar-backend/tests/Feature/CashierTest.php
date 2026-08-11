@@ -51,10 +51,10 @@ function seedCashierReferenceData(): array
 // UNIT — CashierService::formatCustomerName
 // ═════════════════════════════════════════════════════════════════════════════
 
-test('formatCustomerName produces correct format for full name', function () {
+test('formatCustomerName reduces middle name to an initial', function () {
     $service = new CashierService();
     expect($service->formatCustomerName('Dela Cruz', 'Juan', 'Santos'))
-        ->toBe('DELA CRUZ, JUAN SANTOS');
+        ->toBe('DELA CRUZ, JUAN S.');
 });
 
 test('formatCustomerName handles empty middle name', function () {
@@ -73,6 +73,27 @@ test('formatCustomerName does not double-add period to suffix', function () {
     $service = new CashierService();
     expect($service->formatCustomerName('Santos', 'Jose', '', 'Sr.'))
         ->toBe('SANTOS, JOSE SR.');
+});
+
+test('formatCustomerName combines middle initial and suffix', function () {
+    $service = new CashierService();
+    expect($service->formatCustomerName('Mendoza', 'Sabeniano James Martin', 'Alonzo', ''))
+        ->toBe('MENDOZA, SABENIANO JAMES MARTIN A.');
+});
+
+// Regression test — incident 2026-08-11: RIS sent the full middle name
+// ("ROMANO, JEFFERSON CAMERO") instead of an initial to the live Cashier
+// API. The cashier system matches on or_no AND customer_name together, so
+// this caused a valid, already-paid OR number to be rejected as
+// "NOT_FOUND" — indistinguishable from an OR that genuinely doesn't exist.
+// This test locks in the middle-initial format so this can't silently
+// regress again.
+test('formatCustomerName never emits a full middle name (regression: incident 2026-08-11)', function () {
+    $service = new CashierService();
+    $formatted = $service->formatCustomerName('Romano', 'Jefferson', 'Camero', '');
+
+    expect($formatted)->toBe('ROMANO, JEFFERSON C.')
+        ->and($formatted)->not->toContain('CAMERO');
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

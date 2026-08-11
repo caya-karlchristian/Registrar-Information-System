@@ -42,9 +42,17 @@ function mockOgosMiss(Tests\TestCase $test, string $email): void
         ->with($email)
         ->andThrow(new OgosException('not found in OGOS'));
 
-    $test->mock(OgosStudentService::class, function ($mock) use ($ogosClient) {
-        $mock->shouldReceive('getClient')->once()->andReturn($ogosClient);
-    });
+    $ogosStudentService = Mockery::mock(OgosStudentService::class);
+    $ogosStudentService->shouldReceive('getClient')->once()->andReturn($ogosClient);
+
+    // TestCase::mock() is protected, so it can't be called from this
+    // global-scope helper function even with a $test instance in hand —
+    // PHP's protected visibility is enforced by the calling *scope*, not
+    // by whether the caller happens to hold a valid instance. $test->app
+    // is protected too, for the same reason. app() is a plain global
+    // helper function (not a TestCase member), so it sidesteps the
+    // visibility issue entirely while binding into the same container.
+    app()->instance(OgosStudentService::class, $ogosStudentService);
 }
 
 function sampleAlumniDto(string $email, array $overrides = []): AlumniDTO

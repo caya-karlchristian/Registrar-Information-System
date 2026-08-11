@@ -102,10 +102,18 @@ class CashierService
 
     /**
      * Format a user's name to match the cashier API convention.
-     * Pattern: "LASTNAME, FIRSTNAME MIDDLENAME SUFFIX" — all uppercase.
+     * Pattern: "LASTNAME, FIRSTNAME MIDDLEINITIAL. SUFFIX" — all uppercase.
+     *
+     * The cashier system stores names with an abbreviated middle initial,
+     * not the full middle name — confirmed against the Cashier System API
+     * doc's own examples (e.g. "MENDOZA, SABENIANO JAMES MARTIN A.") and by
+     * direct reproduction: the same OR number returns valid:true with a
+     * middle-initial name and valid:false/NOT_FOUND with the full middle
+     * name. Sending the full middle name causes real, valid OR numbers to
+     * be rejected as "not found" — see incident 2026-08-11.
      *
      * Examples:
-     *   Dela Cruz / Juan  / Santos / ""   → "DELA CRUZ, JUAN SANTOS"
+     *   Dela Cruz / Juan  / Santos / ""   → "DELA CRUZ, JUAN S."
      *   Guevarra  / Pedro / ""     / "Jr" → "GUEVARRA, PEDRO JR."
      */
     public function formatCustomerName(
@@ -114,9 +122,13 @@ class CashierService
         string $middleName = '',
         string $suffix     = '',
     ): string {
+        $middleInitial = trim($middleName) !== ''
+            ? strtoupper(mb_substr(trim($middleName), 0, 1)) . '.'
+            : '';
+
         $parts = array_filter([
             trim($firstName),
-            trim($middleName),
+            $middleInitial,
             trim($suffix) ? rtrim(strtoupper(trim($suffix)), '.') . '.' : '',
         ]);
 
