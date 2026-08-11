@@ -123,7 +123,10 @@ test('a new alumnus confirmed by PUPTAPS is auto-registered as ROLE_ALUMNI with 
     $record = AlumniAcademicRecord::where('alumni_profile_id', $profile->alumni_profile_id)->first();
     expect($record)->not->toBeNull();
     expect($record->student_number)->toBe('2018-00123-MN-0');
-    expect($record->year_of_graduation)->toBe('2022');
+    // year_of_graduation is written from $dto->batch (int), not
+    // $dto->yearGraduated (string) — see AlumniProvisioningService::
+    // resolveYearOfGraduation()'s doc comment for why. Assert the int.
+    expect($record->year_of_graduation)->toBe(2022);
     // courseDesc is preferred over the raw courseId when present.
     expect($record->course)->toBe('Bachelor of Science in Information Technology');
 });
