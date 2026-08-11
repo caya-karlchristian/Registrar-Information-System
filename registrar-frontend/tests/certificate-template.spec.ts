@@ -149,16 +149,16 @@ test.describe('Certificate Template Management E2E Tests', () => {
     await expect(heading).toBeVisible();
 
     // Verify Certificate Type dropdown is loaded with certificate templates
-    const dropdown = page.getByPlaceholder('Please Select');
+    const dropdown = page.locator('div:has(> label:has-text("Certificate Type")) button');
     await expect(dropdown).toBeVisible();
-    await expect(dropdown).toHaveValue('Certificate of Enrollment');
+    await expect(dropdown).toContainText('Certificate of Enrollment');
 
     // Toggling dropdown option
     await dropdown.click();
-    const option = page.locator('li button').filter({ hasText: 'Certificate of Registration' });
+    const option = page.locator('div:has(> label:has-text("Certificate Type")) li button').filter({ hasText: 'Certificate of Registration' });
     await expect(option).toBeVisible();
     await option.click();
-    await expect(dropdown).toHaveValue('Certificate of Registration');
+    await expect(dropdown).toContainText('Certificate of Registration');
 
     // Verify checkbox controls are rendering and unticked initially
     const mainLogoCheckbox = page.locator('#checkbox-apply-main-logo');
@@ -228,11 +228,11 @@ test.describe('Certificate Template Management E2E Tests', () => {
     await page.goto('/super-admin/documents');
     await page.locator('button:has-text("Certificate Logo Management")').click();
 
-    const dropdown = page.getByPlaceholder('Please Select');
+    const dropdown = page.locator('div:has(> label:has-text("Certificate Type")) button');
     await expect(dropdown).toBeVisible();
     await dropdown.click();
 
-    const option = page.locator('li button').filter({ hasText: 'Archived Certificate' });
+    const option = page.locator('div:has(> label:has-text("Certificate Type")) li button').filter({ hasText: 'Archived Certificate' });
     await expect(option).toBeVisible();
     await option.click();
 
