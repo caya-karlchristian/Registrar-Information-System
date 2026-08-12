@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createDocumentRequest } from "../services/api"
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
@@ -41,6 +41,14 @@ const RequestForm = ({ showProfileStep = false }) => {
   } = useReferenceData();
 
   const [currentStep, setCurrentStep] = useState(1);
+  const formRef = useRef(null);
+
+  useEffect(() => {
+    if (formRef.current) {
+      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [currentStep]);
+
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -352,7 +360,7 @@ const RequestForm = ({ showProfileStep = false }) => {
           </div>
         </div>
       ) : (
-        <div className="max-w-5xl mx-auto -mt-2">
+        <div ref={formRef} className="max-w-5xl mx-auto -mt-2">
           <form
             className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}
             onSubmit={handleSubmit}

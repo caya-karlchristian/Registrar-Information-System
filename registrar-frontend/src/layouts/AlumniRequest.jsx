@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
@@ -14,6 +14,7 @@ import { getTodayDate } from "../utils/helpers";
 
 const AlumniRequestForm = ({ showProfileStep = false }) => {
   const { isDark } = useTheme();
+  const formRef = useRef(null);
 
   const {
     currentStep,
@@ -44,6 +45,12 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
     finalStep,
   } = useAlumniRequest({ showProfileStep });
 
+  useEffect(() => {
+    if (formRef.current) {
+      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [currentStep]);
+
   return (
     <div className="relative min-h-screen pb-20 z-20">
       <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
@@ -69,7 +76,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
           </div>
         </div>
       ) : (
-        <div className="max-w-5xl mx-auto">
+        <div ref={formRef} className="max-w-5xl mx-auto">
           <form
             onSubmit={handleSubmit}
             className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${
