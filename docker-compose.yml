@@ -51,7 +51,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       SESSION_SAME_SITE: ${SESSION_SAME_SITE:-none}
       SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
-      ALUMNI_API_URL: http://host.docker.internal/api
+      ALUMNI_API_URL: https://puptaps.ojt-ims-bsit.net/api
       ALUMNI_API_TOKEN: ${ALUMNI_API_TOKEN}
       OCMS_BASE_URL: ${OCMS_BASE_URL}
       OCMS_CLIENT_ID: ${OCMS_CLIENT_ID}
