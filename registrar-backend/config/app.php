@@ -69,6 +69,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Display / Reporting Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Timestamps are stored in UTC (see 'timezone' above) — that part is
+    | correct and should stay that way. This value is the timezone used
+    | ONLY when a report/query needs to reason about "what local hour/day
+    | did this happen on" (e.g. peak-hours analytics, business-hours/SLA
+    | calculations). Keep this in one place so every such query stays in
+    | sync if the university's timezone or DST rules ever change.
+    |
+    */
+
+    'display_timezone' => env('APP_DISPLAY_TIMEZONE', 'Asia/Manila'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |
