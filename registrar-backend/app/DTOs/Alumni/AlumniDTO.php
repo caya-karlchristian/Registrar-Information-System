@@ -14,7 +14,7 @@ class AlumniDTO
         public readonly string  $courseId,
         public readonly ?string $courseDesc,
         public readonly int     $batch,
-        public readonly string  $yearGraduated,
+        public readonly ?string $yearGraduated,
         public readonly ?string $sex,
         public readonly ?string $birthday,
         public readonly ?string $email,
@@ -38,7 +38,7 @@ class AlumniDTO
             // Support both so this DTO works against either shape.
             courseDesc:    $data['course']['course_desc'] ?? $data['course_desc'] ?? null,
             batch:         $data['batch'],
-            yearGraduated: $data['year_graduated'],
+            yearGraduated: $data['year_graduated'] ?? null,
             sex:           $data['sex'] ?? null,
             birthday:      $data['birthday'] ?? null,
             email:         $data['email'] ?? null,
