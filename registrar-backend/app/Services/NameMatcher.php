@@ -66,6 +66,20 @@ class NameMatcher
      * the cashier team can't change how they enter names, RIS compensates
      * by trying multiple plausible formats rather than one "correct" one.
      *
+     * Also confirmed 2026-08-12: the missing-comma problem has a sibling —
+     * cashier admins are just as inconsistent about the *period* on a
+     * middle initial or suffix as they are about the comma. "JUAN S. DELA
+     * CRUZ" and "JUAN S DELA CRUZ" are the same person to a human, but the
+     * Cashier API does exact string matching, so a dropped period is a
+     * hard miss same as a dropped comma. This adds period-optional
+     * variants for the middle initial and the suffix, applied to the
+     * highest-priority (comma) format rather than cross-multiplied across
+     * every existing candidate — a full cross product (period x comma x
+     * order x suffix) would push the list into the dozens for the small
+     * fraction of people who have both a middle name and a suffix, and
+     * every extra candidate is one more live API call before a genuinely
+     * bad OR gets rejected.
+     *
      * @return string[]  Deduplicated, in priority order. Always includes
      *                    at least the primary formatCustomerName() output.
      */
@@ -78,29 +92,40 @@ class NameMatcher
         $last   = strtoupper(trim($lastName));
         $first  = strtoupper(trim($firstName));
         $middle = trim($middleName);
-        $suffixPart = trim($suffix) ? rtrim(strtoupper(trim($suffix)), '.') . '.' : '';
 
-        $middleInitial = $middle !== '' ? strtoupper(mb_substr($middle, 0, 1)) . '.' : '';
-        $middleFull    = $middle !== '' ? strtoupper($middle) : '';
+        $suffixBase   = trim($suffix) !== '' ? rtrim(strtoupper(trim($suffix)), '.') : '';
+        $suffixDotted = $suffixBase !== '' ? $suffixBase . '.' : '';
+        $suffixBare   = $suffixBase; // e.g. "JR" — admin dropped the period
+
+        $middleLetter        = $middle !== '' ? strtoupper(mb_substr($middle, 0, 1)) : '';
+        $middleInitialDotted = $middleLetter !== '' ? $middleLetter . '.' : '';
+        $middleInitialBare   = $middleLetter; // e.g. "S" — admin dropped the period
+        $middleFull          = $middle !== '' ? strtoupper($middle) : '';
 
         $candidates = [
             // 1. Current standard: "LAST, FIRST M.I." — matches the API
             //    doc's own sample names (e.g. "MENDOZA, JAMES MARTIN").
-            $this->buildComma($last, $first, $middleInitial, $suffixPart),
-            // 2. Full middle name, in case the admin typed it as-is.
-            $middleFull !== '' ? $this->buildComma($last, $first, $middleFull, $suffixPart) : null,
-            // 3. No middle name at all, in case the admin omitted it.
-            $this->buildComma($last, $first, '', $suffixPart),
-            // 4. Same "last name first" order, but no comma — covers an
+            $this->buildComma($last, $first, $middleInitialDotted, $suffixDotted),
+            // 2. Same, but middle initial has no trailing period — covers
+            //    an admin who typed "S" instead of "S." (2026-08-12).
+            $middleInitialBare !== '' ? $this->buildComma($last, $first, $middleInitialBare, $suffixDotted) : null,
+            // 3. Full middle name, in case the admin typed it as-is.
+            $middleFull !== '' ? $this->buildComma($last, $first, $middleFull, $suffixDotted) : null,
+            // 4. No middle name at all, in case the admin omitted it.
+            $this->buildComma($last, $first, '', $suffixDotted),
+            // 5. Same as #1, but suffix has no trailing period — covers
+            //    an admin who typed "JR" instead of "JR." (2026-08-12).
+            $suffixBare !== '' ? $this->buildComma($last, $first, $middleInitialDotted, $suffixBare) : null,
+            // 6. Same "last name first" order, but no comma — covers an
             //    admin who typed the name straight into the box without
             //    following the placeholder's convention at all.
-            $middleInitial !== '' ? $this->buildSpace([$last, $first, $middleInitial, $suffixPart]) : null,
-            $this->buildSpace([$last, $first, $suffixPart]),
-            // 5. Natural spoken order ("First Last"), no comma — covers an
+            $middleInitialDotted !== '' ? $this->buildSpace([$last, $first, $middleInitialDotted, $suffixDotted]) : null,
+            $this->buildSpace([$last, $first, $suffixDotted]),
+            // 7. Natural spoken order ("First Last"), no comma — covers an
             //    admin who typed the name the way they'd say it out loud
             //    rather than in registrar order.
-            $middleInitial !== '' ? $this->buildSpace([$first, $middleInitial, $last, $suffixPart]) : null,
-            $this->buildSpace([$first, $last, $suffixPart]),
+            $middleInitialDotted !== '' ? $this->buildSpace([$first, $middleInitialDotted, $last, $suffixDotted]) : null,
+            $this->buildSpace([$first, $last, $suffixDotted]),
         ];
 
         return array_values(array_unique(array_filter(
