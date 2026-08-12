@@ -87,14 +87,21 @@ test('the full candidate list has no exact duplicates', function () {
     expect($candidates)->toBe(array_values(array_unique($candidates)));
 });
 
-test('suffix is appended consistently across every candidate', function () {
+test('suffix appears with a period on most candidates, and bare on one', function () {
     $matcher = new NameMatcher();
 
     $candidates = $matcher->candidatesFor('Guevarra', 'Pedro', 'Alonzo', 'Jr');
 
+    // Every candidate carries the suffix in some form, but not every
+    // candidate is forced to end in "JR." anymore — one candidate now
+    // deliberately drops the period, since an admin dropping it is exactly
+    // the 2026-08-12 failure mode this fix targets.
     foreach ($candidates as $candidate) {
-        expect($candidate)->toEndWith('JR.');
+        expect($candidate)->toMatch('/JR\.?$/');
     }
+
+    expect($candidates)->toContain('GUEVARRA, PEDRO A. JR')
+        ->and(array_filter($candidates, fn ($c) => str_ends_with($c, 'JR')))->not->toBeEmpty();
 });
 
 test('candidatesFor never returns an empty list', function () {
@@ -103,4 +110,38 @@ test('candidatesFor never returns an empty list', function () {
     $candidates = $matcher->candidatesFor('Santos', 'Jose', '', '');
 
     expect($candidates)->not->toBeEmpty();
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Regression tests — 2026-08-12 incident: admin dropped the period on a
+// middle initial ("S" instead of "S."), which blocked a valid OR the same
+// way the missing-comma case did on 2026-08-11.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('candidates include a bare (no-period) middle-initial comma variant', function () {
+    $matcher = new NameMatcher();
+
+    $candidates = $matcher->candidatesFor('Dela Cruz', 'Juan', 'Santos', '');
+
+    expect($candidates)->toContain('DELA CRUZ, JUAN S.')
+        ->and($candidates)->toContain('DELA CRUZ, JUAN S');
+});
+
+test('candidates include a bare (no-period) suffix comma variant', function () {
+    $matcher = new NameMatcher();
+
+    $candidates = $matcher->candidatesFor('Guevarra', 'Pedro', '', 'Jr');
+
+    expect($candidates)->toContain('GUEVARRA, PEDRO JR.')
+        ->and($candidates)->toContain('GUEVARRA, PEDRO JR');
+});
+
+test('bare-period variants are skipped when there is no middle name or suffix', function () {
+    $matcher = new NameMatcher();
+
+    $candidates = $matcher->candidatesFor('Santos', 'Jose', '', '');
+
+    // No middle name and no suffix means there's nothing to drop a period
+    // from — the list shouldn't grow with redundant empty-variant entries.
+    expect($candidates)->toBe(array_values(array_unique($candidates)));
 });
