@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createDocumentRequest } from "../services/api"
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
@@ -21,10 +21,7 @@ const parseRequirements = (value) => {
     return value.map((item) => String(item).trim()).filter(Boolean);
   }
   if (typeof value === 'string') {
-    return value
-      .split('\n')
-      .map((item) => item.trim().replace(/,$/, ''))
-      .filter(Boolean);
+    return value.split(',').map((item) => item.trim()).filter(Boolean);
   }
   return [];
 };
@@ -41,6 +38,14 @@ const RequestForm = ({ showProfileStep = false }) => {
   } = useReferenceData();
 
   const [currentStep, setCurrentStep] = useState(1);
+  const formRef = useRef(null);
+
+  useEffect(() => {
+    if (formRef.current) {
+      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [currentStep]);
+
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -352,7 +357,7 @@ const RequestForm = ({ showProfileStep = false }) => {
           </div>
         </div>
       ) : (
-        <div className="max-w-5xl mx-auto -mt-2">
+        <div ref={formRef} className="max-w-5xl mx-auto -mt-2">
           <form
             className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}
             onSubmit={handleSubmit}
@@ -393,7 +398,6 @@ const RequestForm = ({ showProfileStep = false }) => {
 
                   <p>
                     <strong>D.</strong>REMINDERS:<br />
-                    • Requests must be submitted within one (1) week after receiving the receipt. Requests exceeding this period may be considered invalid.<br />
                     • For TOR (First Copy): Bring one (1) documentary stamp, two (2) colored 2x2 ID pictures in academic gown, valid PUP ID, and dummy diploma. In case of loss, an Affidavit of Loss is required.<br />
                     • For TOR (Second Copy): Bring one (1) violet documentary stamp and two (2) colored 2x2 ID pictures in formal attire with white background.<br />
                     • For Honorable Dismissal and other Certifications: Bring one (1) violet documentary stamp (or two (2) brown documentary stamps) per requested document.
