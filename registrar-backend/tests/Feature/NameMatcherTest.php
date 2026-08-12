@@ -38,14 +38,53 @@ test('candidates include a no-middle-name fallback', function () {
     expect($candidates)->toContain('DELA CRUZ, JUAN');
 });
 
-test('candidates are deduplicated when there is no middle name at all', function () {
+test('comma-form middle-name variants collapse when there is no middle name at all', function () {
     $matcher = new NameMatcher();
 
     $candidates = $matcher->candidatesFor('Reyes', 'Maria', '', '');
 
-    // With no middle name, the initial/full-middle/no-middle variants
-    // collapse to the same string — should appear once, not three times.
-    expect($candidates)->toBe(['REYES, MARIA']);
+    // With no middle name, the initial/full-middle/no-middle *comma* variants
+    // collapse to a single string — array_unique should drop the duplicates
+    // rather than repeating "REYES, MARIA" three times.
+    expect(array_count_values($candidates)['REYES, MARIA'])->toBe(1);
+});
+
+test('candidates include a no-comma, last-name-first variant', function () {
+    $matcher = new NameMatcher();
+
+    // Regression test for the 2026-08-11 incident: an OR was on file as
+    // "Floresca Duvan" — no comma, not following the Cashier form's own
+    // "LAST NAME, FIRST NAME M.I." placeholder at all. RIS's comma-only
+    // candidates all missed it; verified live via the Cashier API that
+    // this exact space-separated string is what matches.
+    $candidates = $matcher->candidatesFor('Floresca', 'Duvan', '', '');
+
+    expect($candidates)->toContain('FLORESCA DUVAN');
+});
+
+test('candidates include a no-comma, natural spoken-order variant', function () {
+    $matcher = new NameMatcher();
+
+    $candidates = $matcher->candidatesFor('Dela Cruz', 'Juan', '', '');
+
+    expect($candidates)->toContain('JUAN DELA CRUZ');
+});
+
+test('no-comma variants also carry the middle initial when one exists', function () {
+    $matcher = new NameMatcher();
+
+    $candidates = $matcher->candidatesFor('Romano', 'Jefferson', 'Camero', '');
+
+    expect($candidates)->toContain('ROMANO JEFFERSON C.')
+        ->and($candidates)->toContain('JEFFERSON C. ROMANO');
+});
+
+test('the full candidate list has no exact duplicates', function () {
+    $matcher = new NameMatcher();
+
+    $candidates = $matcher->candidatesFor('Guevarra', 'Pedro', 'Alonzo', 'Jr');
+
+    expect($candidates)->toBe(array_values(array_unique($candidates)));
 });
 
 test('suffix is appended consistently across every candidate', function () {

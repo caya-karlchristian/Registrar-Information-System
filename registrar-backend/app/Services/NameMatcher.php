@@ -56,6 +56,16 @@ class NameMatcher
      * Generate plausible name-string candidates for the same person,
      * most-likely-correct first.
      *
+     * Beyond the middle-name variants (initial / full / omitted), this
+     * also varies punctuation and word order. Confirmed 2026-08-11: the
+     * Cashier System's "Customer Name" field is free text an admin types
+     * by hand, and the "LAST NAME, FIRST NAME M.I." placeholder on its own
+     * form is not enforced — one real OR was on file simply as
+     * "Floresca Duvan" (no comma at all, not even following its own
+     * form's convention). Since the admin's format can't be predicted and
+     * the cashier team can't change how they enter names, RIS compensates
+     * by trying multiple plausible formats rather than one "correct" one.
+     *
      * @return string[]  Deduplicated, in priority order. Always includes
      *                    at least the primary formatCustomerName() output.
      */
@@ -74,23 +84,45 @@ class NameMatcher
         $middleFull    = $middle !== '' ? strtoupper($middle) : '';
 
         $candidates = [
-            // 1. Current standard: initial + suffix (matches the API doc's
-            //    own sample names, e.g. "MENDOZA, JAMES MARTIN").
-            $this->build($last, $first, $middleInitial, $suffixPart),
+            // 1. Current standard: "LAST, FIRST M.I." — matches the API
+            //    doc's own sample names (e.g. "MENDOZA, JAMES MARTIN").
+            $this->buildComma($last, $first, $middleInitial, $suffixPart),
             // 2. Full middle name, in case the admin typed it as-is.
-            $middleFull !== '' ? $this->build($last, $first, $middleFull, $suffixPart) : null,
+            $middleFull !== '' ? $this->buildComma($last, $first, $middleFull, $suffixPart) : null,
             // 3. No middle name at all, in case the admin omitted it.
-            $this->build($last, $first, '', $suffixPart),
+            $this->buildComma($last, $first, '', $suffixPart),
+            // 4. Same "last name first" order, but no comma — covers an
+            //    admin who typed the name straight into the box without
+            //    following the placeholder's convention at all.
+            $middleInitial !== '' ? $this->buildSpace([$last, $first, $middleInitial, $suffixPart]) : null,
+            $this->buildSpace([$last, $first, $suffixPart]),
+            // 5. Natural spoken order ("First Last"), no comma — covers an
+            //    admin who typed the name the way they'd say it out loud
+            //    rather than in registrar order.
+            $middleInitial !== '' ? $this->buildSpace([$first, $middleInitial, $last, $suffixPart]) : null,
+            $this->buildSpace([$first, $last, $suffixPart]),
         ];
 
-        return array_values(array_unique(array_filter($candidates, fn ($c) => $c !== null)));
+        return array_values(array_unique(array_filter(
+            $candidates,
+            fn ($c) => $c !== null && $c !== ''
+        )));
     }
 
-    private function build(string $last, string $first, string $middle, string $suffix): string
+    private function buildComma(string $last, string $first, string $middle, string $suffix): string
     {
         $given = implode(' ', array_filter([$first, $middle, $suffix]));
 
         return "{$last}, {$given}";
+    }
+
+    /**
+     * Join non-empty parts with a single space, no comma. Used for the
+     * no-punctuation candidate variants.
+     */
+    private function buildSpace(array $parts): string
+    {
+        return implode(' ', array_filter($parts, fn ($p) => $p !== ''));
     }
 
     // -------------------------------------------------------------------

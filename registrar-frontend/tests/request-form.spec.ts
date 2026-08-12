@@ -147,7 +147,7 @@ test.describe('Student Request Form E2E Tests', () => {
     await docDropdown.click();
 
     // Select 'Employment' from purpose dropdown
-    await page.locator('div:has(> label:has-text("Purpose of Request")) input').click();
+    await page.locator('div:has(> label:has-text("Purpose of Request")) button').click();
     await page.getByRole('button', { name: 'Employment', exact: true }).click();
     await page.getByRole('button', { name: 'Next' }).click();
 
