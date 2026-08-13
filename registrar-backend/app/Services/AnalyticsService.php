@@ -236,6 +236,81 @@ class AnalyticsService
         ];
     }
 
+    /**
+     * Splits elapsed time into the two SLA clocks introduced alongside the
+     * PendingSignature status (RequestStatusEnum::PendingSignature):
+     *
+     *   - registrar_time: business-hours-aware duration of segments where
+     *     old_status_id = Processing — i.e. time the Registrar itself
+     *     controlled, ending the moment they moved a request to either
+     *     ReadyToClaim directly or PendingSignature. This is the fair
+     *     number for the Registrar's own performance report; it no longer
+     *     includes time spent waiting on an external signatory.
+     *
+     *   - signature_time: business-hours-aware duration of segments where
+     *     old_status_id = PendingSignature — i.e. time an external signing
+     *     office (dean, department head, etc.) held the request before it
+     *     moved to ReadyToClaim. Grouped by document type only for now;
+     *     once individual signing offices are tracked as their own entity
+     *     (see the calendar-per-office note in DocumentRequestService::
+     *     recordStatusHistory()), this can be grouped by office too.
+     *
+     * Both use business_minutes (calendar-aware: office hours only,
+     * weekends/holidays excluded), not minutes_processed (raw wall-clock,
+     * cumulative since requested_at) — see the doc block on migration
+     * 2026_08_15_000000_add_pending_signature_status for why the two
+     * columns mean different things and aren't interchangeable here.
+     *
+     * Requests that never went through PendingSignature simply have zero
+     * matching rows in signature_time — this method doesn't assume every
+     * request needs a signature, only reports on the ones that did.
+     */
+    public function signatureTurnaroundTime(array $range): array
+    {
+        [$from, $to] = $range;
+
+        $registrarTime = DB::table('request_history as rh')
+            ->join('request_document as rd', 'rh.request_id', '=', 'rd.request_id')
+            ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+            ->where('rh.old_status_id', RequestStatusEnum::Processing->value)
+            ->whereBetween('rh.changed_at', [$from, $to])
+            ->whereNotNull('rh.business_minutes')
+            ->select(
+                'dt.document_type_id',
+                'dt.document_name',
+                DB::raw('ROUND(MIN(rh.business_minutes), 1) as min_minutes'),
+                DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes'),
+                DB::raw('ROUND(MAX(rh.business_minutes), 1) as max_minutes'),
+                DB::raw('COUNT(*) as sample_count')
+            )
+            ->groupBy('dt.document_type_id', 'dt.document_name')
+            ->orderBy('avg_minutes')
+            ->get();
+
+        $signatureTime = DB::table('request_history as rh')
+            ->join('request_document as rd', 'rh.request_id', '=', 'rd.request_id')
+            ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+            ->where('rh.old_status_id', RequestStatusEnum::PendingSignature->value)
+            ->whereBetween('rh.changed_at', [$from, $to])
+            ->whereNotNull('rh.business_minutes')
+            ->select(
+                'dt.document_type_id',
+                'dt.document_name',
+                DB::raw('ROUND(MIN(rh.business_minutes), 1) as min_minutes'),
+                DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes'),
+                DB::raw('ROUND(MAX(rh.business_minutes), 1) as max_minutes'),
+                DB::raw('COUNT(*) as sample_count')
+            )
+            ->groupBy('dt.document_type_id', 'dt.document_name')
+            ->orderBy('avg_minutes')
+            ->get();
+
+        return [
+            'registrar_time' => $registrarTime,
+            'signature_time' => $signatureTime,
+        ];
+    }
+
     // -------------------------------------------------------------------------
     // Peak hours heatmap
     // -------------------------------------------------------------------------

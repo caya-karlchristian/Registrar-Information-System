@@ -197,17 +197,26 @@ class DatabaseSeeder extends Seeder
         $rows = [
             // NOTE: confirmed against the production dump (request_status
             // table) — prod has exactly 4 rows: 1=Processing, 2=Ready to
-            // Claim, 3=Completed, 4=Forfeited. No row is named "Pending".
-            // The frontend (StaffDashboard.jsx) resolves its "actionable"
-            // status via `lowerNameToId.pending ?? STATUS_FALLBACK.PENDING`
-            // (STATUS_FALLBACK.PENDING = 1). Since prod has no row named
-            // "pending", that lookup falls through to the fallback (1),
-            // which correctly matches status_id 1. Seeding an actual
-            // "Pending" row at a *different* status_id (this used to do it
-            // at status_id=6) hijacks that lookup and makes the Ready
-            // button disappear for every real request. Do not add a
-            // "Pending" name here — status_id 1 stays "Processing" to
-            // match prod exactly.
+            // Claim, 3=Completed, 4=Forfeited. No row is named exactly
+            // "Pending" (lowercase). The frontend (staffDashboardUtils.js)
+            // resolves its "actionable" status via
+            // `lowerNameToId.pending ?? STATUS_FALLBACK.PENDING`
+            // (STATUS_FALLBACK.PENDING = 1) — an EXACT match on the string
+            // "pending". Since prod has no row named exactly "pending",
+            // that lookup falls through to the fallback (1), which
+            // correctly matches status_id 1. A prior attempt seeded a row
+            // named exactly "Pending" at status_id=6, which hijacked that
+            // exact-match lookup and made the Ready button disappear for
+            // every real request. Do not add a row named exactly
+            // "Pending" here — status_id 1 stays "Processing" to match
+            // prod exactly.
+            //
+            // status_id 6 below ("Pending Signature") is intentionally
+            // NOT the same landmine: it lowercases to "pending signature",
+            // not "pending", so it does not collide with the exact-match
+            // lookup above. See migration
+            // 2026_08_15_000000_add_pending_signature_status for the full
+            // history and the pre-flight check to run before deploying it.
             ['status_id' => 1,  'status_name' => 'Processing'],
             ['status_id' => 2,  'status_name' => 'Ready to Claim'],
             ['status_id' => 3,  'status_name' => 'Completed'],
@@ -216,6 +225,7 @@ class DatabaseSeeder extends Seeder
             // — kept only so existing document_request rows with status_id=5 still
             // resolve to a valid request_status row. Do not use for new requests.
             ['status_id' => 5,  'status_name' => 'Cancelled'],
+            ['status_id' => 6,  'status_name' => 'Pending Signature'],
             ['status_id' => 7,  'status_name' => 'On Hold'],
             ['status_id' => 8,  'status_name' => 'Rejected'],
             ['status_id' => 9,  'status_name' => 'Returned'],
@@ -331,6 +341,19 @@ class DatabaseSeeder extends Seeder
                 'trigger_event'        => 'ready_to_claim',
                 'title'                => 'Ready for Claiming',
                 'message_template'     => 'Your document is ready for claiming.',
+                'audience'             => NotificationAudienceEnum::StudentAlumni->value,
+                'is_active'            => 1,
+            ],
+            [
+                // Deliberately does NOT say "ready" or "come claim it" —
+                // this fires while the document is still waiting on an
+                // external office's signature, not with the registrar.
+                // Telling the user it's ready at this stage would send
+                // them in for a document that isn't actually there yet.
+                'notification_type_id' => 21,
+                'trigger_event'        => 'pending_signature',
+                'title'                => 'Awaiting Signature',
+                'message_template'     => 'Your request has completed registrar processing and is now awaiting signature from the concerned office.',
                 'audience'             => NotificationAudienceEnum::StudentAlumni->value,
                 'is_active'            => 1,
             ],

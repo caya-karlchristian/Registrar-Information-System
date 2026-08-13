@@ -128,10 +128,11 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-          <StatCard title="New Requests"     count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length}    color="yellow" />
-          <StatCard title="Processing"       count={requests.filter(r => r.statusName?.toLowerCase() === 'processing').length} color="blue" />
-          <StatCard title="Ready for Pickup" count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length}       color="green" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <StatCard title="New Requests"       count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length}    color="yellow" />
+          <StatCard title="Processing"         count={requests.filter(r => r.statusName?.toLowerCase() === 'processing').length} color="blue" />
+          <StatCard title="Awaiting Signature" count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING_SIGNATURE).length} color="orange" />
+          <StatCard title="Ready for Pickup"   count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length}       color="green" />
         </div>
       )}
 
@@ -428,6 +429,16 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                       )}
                       {!req.isArchived && req.statusId === resolvedStatusIds.PENDING && (
                         <button
+                          disabled={updatingId === req.id}
+                          onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.PENDING_SIGNATURE)}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'bg-orange-900/20 hover:bg-orange-900/30 text-orange-400 border border-orange-600' : 'bg-orange-500 hover:bg-orange-700'}`}
+                          title="Registrar's part is done — send this to an external office for signature. Stops the registrar's own processing-time clock and starts tracking the signing office's turnaround separately."
+                        >
+                          <CheckCircleIcon className="w-4 h-4" /> Awaiting Signature
+                        </button>
+                      )}
+                      {(!req.isArchived && (req.statusId === resolvedStatusIds.PENDING || req.statusId === resolvedStatusIds.PENDING_SIGNATURE)) && (
+                        <button
                           disabled={updatingId === req.id || (req.isCertificate && !printedCertificateIds.includes(req.id))}
                           onClick={() => {
                             if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
@@ -440,6 +451,8 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                           title={
                             req.isCertificate && !printedCertificateIds.includes(req.id)
                               ? 'Print certificate first'
+                              : req.statusId === resolvedStatusIds.PENDING_SIGNATURE
+                              ? 'Signature received — mark as Ready to claim'
                               : 'Mark as Ready to claim'
                           }
                         >

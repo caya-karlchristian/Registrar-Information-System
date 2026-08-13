@@ -14,6 +14,7 @@ export const CATEGORY_MAP = {
   status_updated:              { category: 'Update',      color: 'bg-blue-400' },
   request_processing:          { category: 'Processing',  color: 'bg-blue-400' },
   action_needed:               { category: 'Action',      color: 'bg-rose-600' },
+  pending_signature:           { category: 'Signature',   color: 'bg-orange-400' },
   ready_to_claim:              { category: 'Ready',       color: 'bg-green-400' },
   request_completed:           { category: 'Completed',   color: 'bg-green-400' },
   request_forfeited:           { category: 'Forfeited',   color: 'bg-rose-600' },

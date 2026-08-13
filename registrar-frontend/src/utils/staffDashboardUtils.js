@@ -1,5 +1,6 @@
 export const STATUS_FALLBACK = {
   PENDING: 1,
+  PENDING_SIGNATURE: 6,
   READY: 2,
   COMPLETED: 3,
   FORFEITED: 4,
@@ -19,6 +20,11 @@ export const resolveStatusIds = (requestStatuses) => {
   );
   return {
     PENDING: lowerNameToId.pending ?? STATUS_FALLBACK.PENDING,
+    // 'pending signature' is a distinct exact-match key from 'pending'
+    // above — this does NOT collide with the PENDING lookup. See the doc
+    // block on migration 2026_08_15_000000_add_pending_signature_status
+    // (backend) for the history of why that distinction matters here.
+    PENDING_SIGNATURE: lowerNameToId['pending signature'] ?? STATUS_FALLBACK.PENDING_SIGNATURE,
     READY: lowerNameToId['ready to claim'] ?? STATUS_FALLBACK.READY,
     COMPLETED: lowerNameToId.completed ?? STATUS_FALLBACK.COMPLETED,
     FORFEITED: lowerNameToId.forfeited ?? STATUS_FALLBACK.FORFEITED,
@@ -27,7 +33,7 @@ export const resolveStatusIds = (requestStatuses) => {
 
 /**
  * Default dashboard visibility rules:
- *  - Pending / Processing / Ready to Claim → always shown
+ *  - Pending / Processing / Pending Signature / Ready to Claim → always shown
  *  - Completed → shown only within 1 day of the request date
  *  - Everything else (Forfeited, Cancelled, ...) → hidden unless filtered/searched
  */
@@ -36,6 +42,7 @@ export const isDefaultVisible = (req, resolvedStatusIds) => {
   const name = String(statusName ?? '').trim().toLowerCase();
   if (statusId === resolvedStatusIds.PENDING || name === 'pending')         return true;
   if (name === 'processing')                                           return true;
+  if (statusId === resolvedStatusIds.PENDING_SIGNATURE || name === 'pending signature') return true;
   if (statusId === resolvedStatusIds.READY || name === 'ready to claim')    return true;
   if (statusId === resolvedStatusIds.COMPLETED || name === 'completed') {
     return timestamp > 0 && (Date.now() - timestamp) <= COMPLETED_VISIBILITY_MS;

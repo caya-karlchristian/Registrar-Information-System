@@ -78,6 +78,7 @@ const StudentDashboard = () => {
 const STUDENT_REFETCH_TRIGGERS = new Set([
   'request_submitted',   // confirmation: own submission landed
   'request_processing',  // admin started processing
+  'pending_signature',   // registrar done, awaiting external signature
   'ready_to_claim',      // ready for pickup
   'request_completed',   // done
   'request_forfeited',   // forfeited / expired

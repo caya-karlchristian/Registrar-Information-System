@@ -17,14 +17,15 @@
 
 // Status IDs mirror RequestStatusEnum in the backend:
 //   1 = Processing  2 = ReadyToClaim  3 = Completed
-//   4 = Forfeited   5 = Cancelled
+//   4 = Forfeited   5 = Cancelled     6 = PendingSignature
 // Keep in sync with backend Enums/RequestStatusEnum.php
 export const STATUS_CONFIG = {
-  1: { label: "Processing",     classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  2: { label: "Ready to Claim", classes: "bg-green-100 text-green-700 border-green-200"   },
-  3: { label: "Completed",      classes: "bg-gray-100 text-gray-700 border-gray-200"      },
-  4: { label: "Forfeited",      classes: "bg-red-100 text-red-700 border-red-200"         },
-  5: { label: "Cancelled",      classes: "bg-orange-100 text-orange-700 border-orange-200"},
+  1: { label: "Processing",        classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  2: { label: "Ready to Claim",    classes: "bg-green-100 text-green-700 border-green-200"   },
+  3: { label: "Completed",         classes: "bg-gray-100 text-gray-700 border-gray-200"      },
+  4: { label: "Forfeited",         classes: "bg-red-100 text-red-700 border-red-200"         },
+  5: { label: "Cancelled",         classes: "bg-orange-100 text-orange-700 border-orange-200"},
+  6: { label: "Awaiting Signature",classes: "bg-orange-100 text-orange-700 border-orange-200"},
 };
 
 export const TAB_MAP = {
@@ -33,6 +34,9 @@ export const TAB_MAP = {
   3: "history",   // Completed
   4: "history",   // Forfeited
   5: "history",   // Cancelled
+  6: "pending",   // Pending Signature — registrar-side view: still "in progress",
+                  // not yet claimable. Kept out of "ready" so a student doesn't
+                  // see "To Claim" for a document that isn't actually there yet.
 };
 
 export const TABS = [
@@ -68,6 +72,7 @@ export const PROGRESS_MAP = {
   3: 100,  // Completed
   4: 0,    // Forfeited
   5: 0,    // Cancelled
+  6: 60,   // Pending Signature — registrar's part is done, waiting externally
 };
 
 // @deprecated-shims

@@ -120,6 +120,17 @@ class AnalyticsController extends Controller
         );
     }
 
+    /**
+     * Registrar-controlled time vs. external-signatory time, split via the
+     * PendingSignature status (see AnalyticsService::signatureTurnaroundTime).
+     */
+    public function signatureTurnaround(Request $request)
+    {
+        return response()->json(
+            $this->cached($request, 'signature-turnaround', fn () => $this->analytics->signatureTurnaroundTime($this->dateRange($request)))
+        );
+    }
+
     public function peakHours(Request $request)
     {
         return response()->json(
