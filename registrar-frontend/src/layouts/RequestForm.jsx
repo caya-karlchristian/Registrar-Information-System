@@ -22,7 +22,10 @@ const parseRequirements = (value) => {
     return value.map((item) => String(item).trim()).filter(Boolean);
   }
   if (typeof value === 'string') {
-    return value.split(',').map((item) => item.trim()).filter(Boolean);
+    return value
+      .split('\n')
+      .map((item) => item.trim().replace(/,$/, ''))
+      .filter(Boolean);
   }
   return [];
 };
@@ -400,6 +403,7 @@ const RequestForm = ({ showProfileStep = false }) => {
 
                   <p>
                     <strong>D.</strong>REMINDERS:<br />
+                    • Requests must be submitted within one (1) week after receiving the receipt. Requests exceeding this period may be considered invalid.<br />
                     • For TOR (First Copy): Bring one (1) documentary stamp, two (2) colored 2x2 ID pictures in academic gown, valid PUP ID, and dummy diploma. In case of loss, an Affidavit of Loss is required.<br />
                     • For TOR (Second Copy): Bring one (1) violet documentary stamp and two (2) colored 2x2 ID pictures in formal attire with white background.<br />
                     • For Honorable Dismissal and other Certifications: Bring one (1) violet documentary stamp (or two (2) brown documentary stamps) per requested document.
