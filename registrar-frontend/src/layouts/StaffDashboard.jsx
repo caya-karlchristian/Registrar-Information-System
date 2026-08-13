@@ -429,10 +429,20 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                       )}
                       {!req.isArchived && req.statusId === resolvedStatusIds.PENDING && (
                         <button
-                          disabled={updatingId === req.id}
-                          onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.PENDING_SIGNATURE)}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'bg-orange-900/20 hover:bg-orange-900/30 text-orange-400 border border-orange-600' : 'bg-orange-500 hover:bg-orange-700'}`}
-                          title="Registrar's part is done — send this to an external office for signature. Stops the registrar's own processing-time clock and starts tracking the signing office's turnaround separately."
+                          disabled={updatingId === req.id || (req.isCertificate && !printedCertificateIds.includes(req.id))}
+                          onClick={() => {
+                            if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
+                              alert('Please generate and print the certificate first before sending it for signature.');
+                              return;
+                            }
+                            handleStatusUpdate(req.id, resolvedStatusIds.PENDING_SIGNATURE);
+                          }}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-orange-900/20 hover:bg-orange-900/30 text-orange-400 border border-orange-600' : 'bg-orange-500 hover:bg-orange-700'}`}
+                          title={
+                            req.isCertificate && !printedCertificateIds.includes(req.id)
+                              ? 'Print the certificate first before sending it for signature'
+                              : "Registrar's part is done — send this to an external office for signature. Stops the registrar's own processing-time clock and starts tracking the signing office's turnaround separately."
+                          }
                         >
                           <CheckCircleIcon className="w-4 h-4" /> Awaiting Signature
                         </button>
@@ -447,7 +457,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                             }
                             handleStatusUpdate(req.id, resolvedStatusIds.READY);
                           }}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
                           title={
                             req.isCertificate && !printedCertificateIds.includes(req.id)
                               ? 'Print certificate first'
@@ -464,7 +474,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                         <button
                           disabled={updatingId === req.id}
                           onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 ${isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'}`}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'}`}
                         >
                           <CheckCircleIcon className="w-4 h-4" /> Done
                         </button>
@@ -473,7 +483,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                         <button
                           disabled={updatingId === req.id}
                           onClick={() => handleRestoreOne(req.id)}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
                           title="Restore to Active Requests (original status kept)"
                         >
                           <CheckIcon className="w-4 h-4" /> Restore
@@ -482,7 +492,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                         <button
                           disabled={updatingId === req.id}
                           onClick={() => handleArchiveOne(req.id)}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 ${isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-500 hover:bg-amber-700'}`}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-500 hover:bg-amber-700'}`}
                           title="Archive this request"
                         >
                           <ArchiveBoxIcon className="w-4 h-4" /> Archive
