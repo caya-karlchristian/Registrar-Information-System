@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { useAlertToast } from "../context/AlertToastContext";
 import { getAccessRequests, approveAccessRequest, rejectAccessRequest } from "../services/api";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, ChevronUpIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
 import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
 import { AccessRequestsSkeleton } from "../components/LoadingSkeleton";
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
+import DashboardDropdown from "../components/DashboardDropdown";
 
 const STATUS_FILTERS = ["All", "Pending", "Approved", "Rejected", "Expired"];
 
@@ -59,6 +60,16 @@ const AccessRequestsQueue = () => {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
 
+  // Filtering & Sorting State
+  const [roleFilter, setRoleFilter] = useState("All");
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const roleDropdownRef = useRef(null);
+
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef(null);
+
+  const [sortOrder, setSortOrder] = useState("asc");
+
   const load = useCallback(() => {
     setLoading(true);
     const dbStatus = UI_TO_DB_STATUS[statusFilter];
@@ -74,29 +85,49 @@ const AccessRequestsQueue = () => {
 
   useEffect(() => {
     setSearchQuery("");
+    setRoleFilter("All");
+    setSortOrder("asc");
   }, [statusFilter]);
 
-  const filteredRequests = requests.filter((r) => {
+  const baseFiltered = requests.filter((r) => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
+    if (query) {
+      const fullName = [r.target_first_name, r.target_last_name].filter(Boolean).join(" ").toLowerCase();
+      const email = (r.target_email || "").toLowerCase();
+      const role = (r.requested_role || "Admin").toLowerCase();
+      const policyName = (r.requested_policy?.name || "").toLowerCase();
+      const justification = (r.justification || "").toLowerCase();
+      const requesterName = (r.requested_by?.name || r.requested_by?.email || "Unknown").toLowerCase();
+      const requesterEmail = (r.requested_by?.email || "").toLowerCase();
 
-    const fullName = [r.target_first_name, r.target_last_name].filter(Boolean).join(" ").toLowerCase();
-    const email = (r.target_email || "").toLowerCase();
-    const role = (r.requested_role || "Admin").toLowerCase();
-    const policyName = (r.requested_policy?.name || "").toLowerCase();
-    const justification = (r.justification || "").toLowerCase();
-    const requesterName = (r.requested_by?.name || r.requested_by?.email || "Unknown").toLowerCase();
-    const requesterEmail = (r.requested_by?.email || "").toLowerCase();
+      const match =
+        fullName.includes(query) ||
+        email.includes(query) ||
+        role.includes(query) ||
+        policyName.includes(query) ||
+        justification.includes(query) ||
+        requesterName.includes(query) ||
+        requesterEmail.includes(query);
+      if (!match) return false;
+    }
 
-    return (
-      fullName.includes(query) ||
-      email.includes(query) ||
-      role.includes(query) ||
-      policyName.includes(query) ||
-      justification.includes(query) ||
-      requesterName.includes(query) ||
-      requesterEmail.includes(query)
-    );
+    // Role Filter
+    if (roleFilter !== "All") {
+      const rRole = r.requested_role || "Admin";
+      if (rRole !== roleFilter) return false;
+    }
+
+    return true;
+  });
+
+  const filteredRequests = [...baseFiltered].sort((a, b) => {
+    const nameA = [a.target_first_name, a.target_last_name].filter(Boolean).join(" ");
+    const nameB = [b.target_first_name, b.target_last_name].filter(Boolean).join(" ");
+    if (sortOrder === "asc") {
+      return nameA.localeCompare(nameB);
+    } else {
+      return nameB.localeCompare(nameA);
+    }
   });
 
   const handleApprove = async (id) => {
@@ -150,6 +181,23 @@ const AccessRequestsQueue = () => {
             Review self-service requests for new admin or super admin accounts.
           </p>
         </div>
+
+        <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
+          {(roleFilter !== 'All' || statusFilter !== 'Pending' || sortOrder !== 'asc' || searchQuery.trim() !== '') && (
+            <button
+              type="button"
+              onClick={() => {
+                setRoleFilter('All');
+                setStatusFilter('Pending');
+                setSortOrder('asc');
+                setSearchQuery('');
+              }}
+              className={`px-4 py-2 border rounded-lg text-sm font-semibold transition-all cursor-pointer ${isDark ? 'border-gray-700 bg-[#2a2a2f] text-white hover:bg-white/10' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
       </div>
 
       <div className={`rounded-xl overflow-hidden border ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white border-gray-200 shadow-sm'}`}>
@@ -179,14 +227,82 @@ const AccessRequestsQueue = () => {
         <div className="overflow-x-auto">
           <table className="w-full min-w-175 text-sm">
             <thead>
-              <tr className={`border-b text-xs font-bold uppercase tracking-wider ${isDark ? 'border-[#3e4042] text-[#a09e9a] bg-[#1a1a1c]/20' : 'border-gray-200 text-gray-500 bg-gray-50/50'
+              <tr className={`border-b text-xs font-bold uppercase tracking-wider ${isDark ? 'border-[#3e4042] text-[#b0b3b8] bg-[#1a1a1c]/20' : 'border-gray-200 text-gray-500 bg-gray-50/50'
                 }`}>
                 <th className="px-5 py-4 text-center font-bold w-12">#</th>
-                <th className="px-5 py-4 text-left font-bold">Target User</th>
-                <th className="px-5 py-4 text-left font-bold">Requested Access</th>
+                <th className="px-5 py-4 text-left">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                    }}
+                    className={`flex items-center gap-1 text-xs uppercase font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}
+                  >
+                    <span>Target User</span>
+                    {sortOrder === 'asc' ? (
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
+                    ) : (
+                      <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" />
+                    )}
+                  </button>
+                </th>
+
+                {/* Requested Access dropdown */}
+                <th className="px-5 py-4 text-left font-bold">
+                  <DashboardDropdown
+                    isOpen={roleDropdownOpen}
+                    setIsOpen={setRoleDropdownOpen}
+                    dropdownRef={roleDropdownRef}
+                    align="left"
+                    trigger={
+                      <span className={roleFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
+                        Requested Access
+                      </span>
+                    }
+                    sections={[
+                      {
+                        title: 'Filter by Role',
+                        items: ['All', 'Admin', 'Super Admin'].map(option => ({
+                          label: option,
+                          isSelected: roleFilter === option,
+                          onClick: () => {
+                            setRoleFilter(option);
+                          }
+                        }))
+                      }
+                    ]}
+                  />
+                </th>
+
                 <th className="px-5 py-4 text-left font-bold">Justification & Requester</th>
                 <th className="px-5 py-4 text-center font-bold">Expiration Date</th>
-                <th className="px-5 py-4 text-center font-bold">Status</th>
+
+                {/* Status Filter dropdown */}
+                <th className="px-5 py-4 text-center font-bold">
+                  <DashboardDropdown
+                    isOpen={statusDropdownOpen}
+                    setIsOpen={setStatusDropdownOpen}
+                    dropdownRef={statusDropdownRef}
+                    align="center"
+                    trigger={
+                      <span className={statusFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
+                        Status
+                      </span>
+                    }
+                    sections={[
+                      {
+                        title: 'Filter by Status',
+                        items: STATUS_FILTERS.map(option => ({
+                          label: option,
+                          isSelected: statusFilter === option,
+                          onClick: () => {
+                            setStatusFilter(option);
+                          }
+                        }))
+                      }
+                    ]}
+                  />
+                </th>
                 <th className="px-5 py-4 text-center font-bold">Actions</th>
               </tr>
             </thead>
