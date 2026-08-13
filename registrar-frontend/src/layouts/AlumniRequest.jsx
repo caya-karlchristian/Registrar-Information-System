@@ -6,6 +6,7 @@ import MultiSelectDropdown from "../components/MultiSelection.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import SubmitConfirmationModal from "../components/SubmitConfirmationModal.jsx";
+import OfficeHoursNotice from "../components/OfficeHoursNotice.jsx";
 import qrCode from "../assets/qrcode.png";
 import { useTheme } from "../context/ThemeContext";
 import { useAlumniRequest } from "../hooks/useAlumniRequest";
@@ -67,9 +68,10 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
             <p className="mb-6 text-4xl text-center font-bold text-white mt-2">
               Thank you and keep safe always.
             </p>
+            <OfficeHoursNotice isDark={isDark} />
             <button
               onClick={handleConfirm}
-              className="bg-pup-yellow mt-70 hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95"
+              className="bg-pup-yellow mt-12 hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95"
             >
               Confirm
             </button>

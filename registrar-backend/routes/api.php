@@ -24,6 +24,7 @@ use App\Http\Controllers\PolicyController;
 use App\Http\Controllers\AccessRequestController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\SignatoryController;
+use App\Http\Controllers\BusinessHoursController;
 
 /*
 |--------------------------------------------------------------------------
@@ -38,6 +39,11 @@ Route::post('/auth/callback', [SsoCallbackController::class, 'handle'])
 
 Route::get('announcements',               [AnnouncementController::class, 'index']);
 Route::get('announcements/{announcement}', [AnnouncementController::class, 'show']);
+
+// Step 4: lets the public request form tell requesters whether the
+// Registrar is open right now, and when processing begins if not.
+Route::get('/business-hours/status', [BusinessHoursController::class, 'status'])
+    ->middleware('throttle:60,1');
 
 /*
 |--------------------------------------------------------------------------

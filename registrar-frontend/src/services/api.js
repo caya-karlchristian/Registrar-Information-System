@@ -220,6 +220,11 @@ export const getAllLogbookData = async (params = {}) => {
 
 export const getDocumentRequest   = (id)          => api.get(`/document-requests/${id}`);
 export const createDocumentRequest = (data)       => api.post("/document-requests", data);
+
+// Public — no auth required. Used by RequestForm's confirmation screen to
+// tell requesters whether the Registrar is open right now, and when
+// processing will begin if not.
+export const getBusinessHoursStatus = () => api.get("/business-hours/status");
 export const updateDocumentRequest = (id, data)   => api.put(`/document-requests/${id}`, data);
 export const deleteDocumentRequest = (id)         => api.delete(`/document-requests/${id}`);
 

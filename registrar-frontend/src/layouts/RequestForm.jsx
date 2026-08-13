@@ -9,6 +9,7 @@ import ErrorToast from "../components/ErrorToast.jsx";
 import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
+import OfficeHoursNotice from '../components/OfficeHoursNotice.jsx';
 import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useMutation } from '@tanstack/react-query';
@@ -351,9 +352,10 @@ const RequestForm = ({ showProfileStep = false }) => {
             <p className="mb-6 text-4xl font-bold text-white">
               Thank you and keep safe always.
             </p>
+            <OfficeHoursNotice isDark={isDark} />
             <button
               onClick={handleConfirm}
-              className={`w-32 font-bold py-2 px-6 rounded shadow-md transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
+              className={`mt-6 w-32 font-bold py-2 px-6 rounded shadow-md transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
             >
               Confirm
             </button>
