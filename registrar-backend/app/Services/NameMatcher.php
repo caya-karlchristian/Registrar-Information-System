@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 /**
@@ -31,8 +33,9 @@ namespace App\Services;
  * screenshot of the live payment form, 2026-08-11) — the placeholder
  * "LAST NAME, FIRST NAME M.I." is a hint, not an enforced format.
  * Nothing stops a cashier admin from typing a full middle name, dropping
- * it entirely, or reordering it. RIS's own formatCustomerName() produces
- * one specific format (middle initial, no full middle name — fixed
+ * it entirely, reordering it, or attaching a suffix to the last name
+ * instead of the given names. RIS's own formatCustomerName() produces one
+ * specific format (middle initial, no full middle name — fixed
  * 2026-08-11 for the same reason). If the admin's on-file string uses a
  * different convention than the one RIS guesses, the OR is real and paid
  * but verification still fails.
@@ -49,65 +52,139 @@ namespace App\Services;
  * This class does not call the API, log anything, or decide pass/fail —
  * it only generates candidate strings. The caller owns the retry loop
  * and the audit trail.
+ *
+ * Safety cap
+ * ----------
+ * Every candidate this method returns is a live call to a third-party
+ * API in the caller's retry loop. MAX_CANDIDATES bounds that regardless
+ * of how many variant dimensions get added over time (suffix placement,
+ * punctuation, word order, ...), so a future well-intentioned addition
+ * can't silently turn a handful of API calls into dozens per submission.
+ * Entries are pruned from the *end* of the priority-ordered list, so the
+ * most-likely formats are always kept.
  */
 class NameMatcher
 {
     /**
+     * Hard ceiling on the number of candidates returned. Chosen to comfortably
+     * cover every variant dimension currently implemented (suffix placement x
+     * punctuation x middle-name handling x word order) while keeping a single
+     * document-request submission from firing an unbounded number of calls at
+     * the Cashier API.
+     */
+    private const MAX_CANDIDATES = 16;
+
+    /** Longest input we'll accept per name part, applied before any processing. */
+    private const MAX_PART_LENGTH = 100;
+
+    /**
+     * Recognized name suffixes, shared between candidate generation and the
+     * legacy compare() path so the two can never silently drift apart.
+     */
+    private const KNOWN_SUFFIXES = ['JR', 'SR', 'II', 'III', 'IV', 'V'];
+
+    /**
      * Generate plausible name-string candidates for the same person,
      * most-likely-correct first.
      *
-     * Beyond the middle-name variants (initial / full / omitted), this
-     * also varies punctuation and word order. Confirmed 2026-08-11: the
-     * Cashier System's "Customer Name" field is free text an admin types
-     * by hand, and the "LAST NAME, FIRST NAME M.I." placeholder on its own
-     * form is not enforced — one real OR was on file simply as
-     * "Floresca Duvan" (no comma at all, not even following its own
-     * form's convention). Since the admin's format can't be predicted and
-     * the cashier team can't change how they enter names, RIS compensates
-     * by trying multiple plausible formats rather than one "correct" one.
+     * Confirmed 2026-08-11: the Cashier System's "Customer Name" field is
+     * free text an admin types by hand, and the "LAST NAME, FIRST NAME
+     * M.I." placeholder on its own form is not enforced — one real OR was
+     * on file simply as "Floresca Duvan" (no comma at all, not even
+     * following its own form's convention). Since the admin's format
+     * can't be predicted and the cashier team can't change how they enter
+     * names, RIS compensates by trying multiple plausible formats rather
+     * than one "correct" one.
      *
-     * Also confirmed 2026-08-12: the missing-comma problem has a sibling —
+     * Confirmed 2026-08-12: the missing-comma problem has a sibling —
      * cashier admins are just as inconsistent about the *period* on a
      * middle initial or suffix as they are about the comma. "JUAN S. DELA
      * CRUZ" and "JUAN S DELA CRUZ" are the same person to a human, but the
      * Cashier API does exact string matching, so a dropped period is a
-     * hard miss same as a dropped comma. This adds period-optional
-     * variants for the middle initial and the suffix, applied to the
-     * highest-priority (comma) format rather than cross-multiplied across
-     * every existing candidate — a full cross product (period x comma x
-     * order x suffix) would push the list into the dozens for the small
-     * fraction of people who have both a middle name and a suffix, and
-     * every extra candidate is one more live API call before a genuinely
-     * bad OR gets rejected.
+     * hard miss same as a dropped comma.
      *
-     * @return string[]  Deduplicated, in priority order. Always includes
-     *                    at least the primary formatCustomerName() output.
+     * Confirmed 2026-08-13: the suffix problem has a second sibling that
+     * period-optional variants don't cover — the suffix's *slot*, not its
+     * punctuation. A real OR was on file as "NONO JR., JOEGE C.", with
+     * the suffix folded into the LAST name ("NONO JR.") rather than
+     * appended to the given names. Every candidate before this fix put
+     * the suffix after the middle initial, so a suffixed person could
+     * never match regardless of how many punctuation variants existed.
+     * Reproduced live against the Cashier API before landing this fix.
+     *
+     * Hyphenated names (2026-08-13, anticipated rather than yet observed
+     * in a failure): a compound surname like "GARCIA-REYES" or a
+     * hyphenated first name like "MARY-JOY" has the same free-text
+     * problem as punctuation elsewhere — an admin may type the hyphen,
+     * a space, or nothing at all. This adds separator variants for any
+     * name part that actually contains a hyphen (zero cost when it
+     * doesn't). Deliberately NOT included: candidates that drop one half
+     * of a hyphenated name entirely (e.g. matching "GARCIA-REYES" against
+     * just "GARCIA"). Separator guessing is safe because it's still
+     * unambiguously the same name; dropping a component changes which
+     * name is being searched for, and could match a different real
+     * person's on-file record. For payment verification, a false match
+     * is a worse failure than one more manual review, so that dimension
+     * is intentionally left out rather than added later without thinking
+     * it through — see also the class docblock on why any addition here
+     * needs to weigh false-negative cost against false-positive risk.
+     *
+     * Each new variant dimension (punctuation, slot, order) is applied
+     * only to the highest-priority format rather than cross-multiplied
+     * across every existing candidate — a full cross product would push
+     * the list into the dozens for the fraction of people who have both a
+     * middle name and a suffix, and every extra candidate is one more
+     * live API call before a genuinely bad OR gets rejected. See
+     * MAX_CANDIDATES for the hard backstop on top of that discipline.
+     *
+     * @return string[]  Deduplicated, in priority order, capped at
+     *                    MAX_CANDIDATES. Always includes at least the
+     *                    primary "LAST, FIRST M.I." format.
      */
     public function candidatesFor(
         string $lastName,
         string $firstName,
         string $middleName = '',
-        string $suffix     = '',
+        string $suffix = '',
     ): array {
-        $last   = strtoupper(trim($lastName));
-        $first  = strtoupper(trim($firstName));
-        $middle = trim($middleName);
+        $last   = $this->sanitizePart($lastName);
+        $first  = $this->sanitizePart($firstName);
+        $middle = $this->sanitizePart($middleName);
 
-        $suffixBase   = trim($suffix) !== '' ? rtrim(strtoupper(trim($suffix)), '.') : '';
+        $suffixBase   = $this->sanitizeSuffix($suffix);
         $suffixDotted = $suffixBase !== '' ? $suffixBase . '.' : '';
         $suffixBare   = $suffixBase; // e.g. "JR" — admin dropped the period
 
-        $middleLetter        = $middle !== '' ? strtoupper(mb_substr($middle, 0, 1)) : '';
+        $middleLetter        = $middle !== '' ? mb_substr($middle, 0, 1) : '';
         $middleInitialDotted = $middleLetter !== '' ? $middleLetter . '.' : '';
         $middleInitialBare   = $middleLetter; // e.g. "S" — admin dropped the period
-        $middleFull          = $middle !== '' ? strtoupper($middle) : '';
+        $middleFull          = $middle;
+
+        // Suffix folded into the LAST-name slot (e.g. "NONO JR., JOEGE C.")
+        // rather than the given-name slot — see class docblock, 2026-08-13.
+        $lastWithSuffixDotted = $suffixDotted !== '' ? "{$last} {$suffixDotted}" : $last;
+        $lastWithSuffixBare   = $suffixBare !== '' ? "{$last} {$suffixBare}" : $last;
+
+        // Hyphen-separator variants — see class docblock, 2026-08-13. Only
+        // computed (and only added as candidates below) when the part
+        // actually contains a hyphen, so a non-hyphenated name pays
+        // nothing extra.
+        $lastHyphenToSpace = str_contains($last, '-') ? str_replace('-', ' ', $last) : null;
+        $lastHyphenRemoved = str_contains($last, '-') ? str_replace('-', '', $last) : null;
+        $firstHyphenToSpace = str_contains($first, '-') ? str_replace('-', ' ', $first) : null;
+        $firstHyphenRemoved = str_contains($first, '-') ? str_replace('-', '', $first) : null;
 
         $candidates = [
             // 1. Current standard: "LAST, FIRST M.I." — matches the API
             //    doc's own sample names (e.g. "MENDOZA, JAMES MARTIN").
             $this->buildComma($last, $first, $middleInitialDotted, $suffixDotted),
-            // 2. Same, but middle initial has no trailing period — covers
-            //    an admin who typed "S" instead of "S." (2026-08-12).
+            // 1b. Suffix attached to the last name instead of the given
+            //     names (2026-08-13 fix — see class docblock).
+            $suffixDotted !== '' ? $this->buildComma($lastWithSuffixDotted, $first, $middleInitialDotted, '') : null,
+            // 1c. Same, but the last-name-attached suffix has no period.
+            $suffixBare !== '' ? $this->buildComma($lastWithSuffixBare, $first, $middleInitialDotted, '') : null,
+            // 2. Same as #1, but middle initial has no trailing period —
+            //    covers an admin who typed "S" instead of "S." (2026-08-12).
             $middleInitialBare !== '' ? $this->buildComma($last, $first, $middleInitialBare, $suffixDotted) : null,
             // 3. Full middle name, in case the admin typed it as-is.
             $middleFull !== '' ? $this->buildComma($last, $first, $middleFull, $suffixDotted) : null,
@@ -116,6 +193,17 @@ class NameMatcher
             // 5. Same as #1, but suffix has no trailing period — covers
             //    an admin who typed "JR" instead of "JR." (2026-08-12).
             $suffixBare !== '' ? $this->buildComma($last, $first, $middleInitialDotted, $suffixBare) : null,
+            // 5b. Hyphenated last name, admin used a space instead — e.g.
+            //     "GARCIA REYES" for on-file "GARCIA-REYES" (2026-08-13).
+            $lastHyphenToSpace !== null ? $this->buildComma($lastHyphenToSpace, $first, $middleInitialDotted, $suffixDotted) : null,
+            // 5c. Same, but admin ran the hyphenated surname together
+            //     with no separator at all ("GARCIAREYES").
+            $lastHyphenRemoved !== null ? $this->buildComma($lastHyphenRemoved, $first, $middleInitialDotted, $suffixDotted) : null,
+            // 5d. Hyphenated first name, admin used a space instead — e.g.
+            //     "MARY JOY" for on-file "MARY-JOY".
+            $firstHyphenToSpace !== null ? $this->buildComma($last, $firstHyphenToSpace, $middleInitialDotted, $suffixDotted) : null,
+            // 5e. Same, but no separator at all ("MARYJOY").
+            $firstHyphenRemoved !== null ? $this->buildComma($last, $firstHyphenRemoved, $middleInitialDotted, $suffixDotted) : null,
             // 6. Same "last name first" order, but no comma — covers an
             //    admin who typed the name straight into the box without
             //    following the placeholder's convention at all.
@@ -128,10 +216,12 @@ class NameMatcher
             $this->buildSpace([$first, $last, $suffixDotted]),
         ];
 
-        return array_values(array_unique(array_filter(
+        $deduped = array_values(array_unique(array_filter(
             $candidates,
-            fn ($c) => $c !== null && $c !== ''
+            static fn (?string $c): bool => $c !== null && $c !== ''
         )));
+
+        return array_slice($deduped, 0, self::MAX_CANDIDATES);
     }
 
     private function buildComma(string $last, string $first, string $middle, string $suffix): string
@@ -147,7 +237,43 @@ class NameMatcher
      */
     private function buildSpace(array $parts): string
     {
-        return implode(' ', array_filter($parts, fn ($p) => $p !== ''));
+        return implode(' ', array_filter($parts, static fn (string $p): bool => $p !== ''));
+    }
+
+    /**
+     * Normalize and defensively bound a single name part before it's used
+     * to build strings sent to an external API.
+     *
+     * - Trims and uppercases (matches the Cashier convention).
+     * - Strips ASCII control characters, which have no legitimate place in
+     *   a person's name and could otherwise reach an outbound HTTP call or
+     *   an audit log unfiltered.
+     * - Collapses internal whitespace so a pasted double-space doesn't
+     *   silently produce a distinct, never-matching candidate.
+     * - Truncates to MAX_PART_LENGTH as a sane upper bound — profile data
+     *   should never legitimately need more, and this keeps a corrupted
+     *   or malicious field from growing the request body or log entries
+     *   unbounded.
+     */
+    private function sanitizePart(string $value): string
+    {
+        $value = preg_replace('/[\x00-\x1F\x7F]/', '', $value) ?? '';
+        $value = preg_replace('/\s+/', ' ', $value) ?? '';
+        $value = strtoupper(trim($value));
+
+        return mb_substr($value, 0, self::MAX_PART_LENGTH);
+    }
+
+    /**
+     * Same bounding as sanitizePart(), plus strips a trailing period so
+     * callers can consistently re-add it (dotted) or leave it off (bare)
+     * without worrying whether the source data already had one.
+     */
+    private function sanitizeSuffix(string $value): string
+    {
+        $value = $this->sanitizePart($value);
+
+        return $value !== '' ? rtrim($value, '.') : '';
     }
 
     // -------------------------------------------------------------------
@@ -222,7 +348,7 @@ class NameMatcher
     {
         $name = strtoupper(trim($name));
         $name = str_replace('.', '', $name);
-        $name = preg_replace('/\s+/', ' ', $name);
+        $name = preg_replace('/\s+/', ' ', $name) ?? $name;
 
         return trim($name);
     }
@@ -237,6 +363,8 @@ class NameMatcher
      * Falls back gracefully if there's no comma (treats the whole string
      * as the "last name" slot so it still gets *some* comparison rather
      * than throwing).
+     *
+     * @return array{0: string, 1: string, 2: string}
      */
     private function splitName(string $normalised): array
     {
@@ -279,10 +407,9 @@ class NameMatcher
 
     private function stripSuffixWords(string $value): string
     {
-        $suffixes = ['JR', 'SR', 'II', 'III', 'IV', 'V'];
-        $tokens   = array_filter(
+        $tokens = array_filter(
             explode(' ', $value),
-            fn (string $t) => !in_array($t, $suffixes, true)
+            static fn (string $t): bool => !in_array($t, self::KNOWN_SUFFIXES, true)
         );
 
         return implode(' ', $tokens);
