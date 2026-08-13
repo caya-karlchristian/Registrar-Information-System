@@ -51,10 +51,19 @@ class BusinessCalendarHoliday extends Model
      */
     public function coversDate($date): bool
     {
-        $day = \Illuminate\Support\Carbon::parse($date)->startOfDay();
-        $end = $this->end_date ?? $this->date;
+        // Compare plain calendar-date strings, not tz-bearing instants.
+        // $date typically arrives already localized to app.display_timezone
+        // (e.g. Asia/Manila) from BusinessCalendarService, while $this->date
+        // is an Eloquent 'date'-cast attribute instantiated in app.timezone
+        // (UTC). Comparing them as Carbon instants via greaterThanOrEqualTo/
+        // lessThanOrEqualTo silently shifts the boundary by the UTC offset
+        // (e.g. 8h for Manila), causing an off-by-one-day mismatch. A
+        // calendar date has no meaningful time-of-day component, so string
+        // comparison of Y-m-d sidesteps the timezone entirely.
+        $day   = \Illuminate\Support\Carbon::parse($date)->format('Y-m-d');
+        $start = $this->date->format('Y-m-d');
+        $end   = ($this->end_date ?? $this->date)->format('Y-m-d');
 
-        return $day->greaterThanOrEqualTo($this->date->clone()->startOfDay())
-            && $day->lessThanOrEqualTo($end->clone()->startOfDay());
+        return $day >= $start && $day <= $end;
     }
 }

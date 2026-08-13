@@ -49,17 +49,25 @@ class BusinessCalendarOverride extends Model
      */
     public function appliesTo($date): bool
     {
-        $day = Carbon::parse($date)->startOfDay();
+        // See BusinessCalendarHoliday::coversDate() for why this compares
+        // Y-m-d strings rather than Carbon instants: $date arrives localized
+        // to app.display_timezone (e.g. Asia/Manila) while effective_from/
+        // effective_until are Eloquent 'date'-cast attributes instantiated
+        // in app.timezone (UTC). Instant comparison silently shifts the
+        // boundary by the UTC offset and produces an off-by-one-day bug.
+        $day = Carbon::parse($date);
 
         if (strtolower($day->format('l')) !== $this->day_of_week) {
             return false;
         }
 
-        if ($day->lessThan($this->effective_from->clone()->startOfDay())) {
+        $dayStr = $day->format('Y-m-d');
+
+        if ($dayStr < $this->effective_from->format('Y-m-d')) {
             return false;
         }
 
-        if ($this->effective_until && $day->greaterThan($this->effective_until->clone()->startOfDay())) {
+        if ($this->effective_until && $dayStr > $this->effective_until->format('Y-m-d')) {
             return false;
         }
 
