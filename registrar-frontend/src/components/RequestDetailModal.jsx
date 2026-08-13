@@ -201,6 +201,7 @@ const getProgressLabel = (progress) => {
   switch (progress) {
     case 0:   return "Request was forfeited";
     case 25:  return "Request received and under review";
+    case 60:  return "Registrar processing complete — awaiting signature";
     case 75:  return "Document is ready to claim";
     case 100: return "Document Claimed";
     default:  return "Pending";

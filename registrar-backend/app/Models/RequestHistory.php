@@ -18,7 +18,7 @@ class RequestHistory extends Model
     // when changed_by is null, it's the only way to tell "automated
     // transition" (processed_by_email = 'system') apart from "the acting
     // user's account was later deleted" (processed_by_email = null too).
-    protected $fillable = ['request_id', 'old_status_id', 'new_status_id', 'changed_at', 'changed_by', 'processed_by_email', 'minutes_processed'];
+    protected $fillable = ['request_id', 'old_status_id', 'new_status_id', 'changed_at', 'changed_by', 'processed_by_email', 'minutes_processed', 'business_minutes'];
 
     public function request()
     {

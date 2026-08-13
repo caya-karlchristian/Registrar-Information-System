@@ -21,6 +21,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 {
     public function __construct(
         private NotificationServiceInterface $notificationService,
+        private BusinessCalendarService $businessCalendarService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -153,10 +154,15 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             //   1. Does this request have any certificate items? (hasCertificateItems)
             //   2. If yes, has at least one been generated?     (certCount > 0)
             //   3. If both fail → 422.  Otherwise → allow.
+            //
+            // Checked on ANY transition INTO ReadyToClaim, not just directly
+            // from Processing: since PendingSignature (Step 3) can also
+            // reach ReadyToClaim, a certificate request routed through
+            // signature-waiting must still have been generated before it's
+            // considered claimable.
             if (
                 isset($validated['status_id']) &&
-                (int) $validated['status_id'] === RequestStatusEnum::ReadyToClaim->value &&
-                (int) $oldStatusId            === RequestStatusEnum::Processing->value
+                (int) $validated['status_id'] === RequestStatusEnum::ReadyToClaim->value
             ) {
                 // Count rows in request_certificate that were submitted as part of
                 // this request (created during store(), referencing certificate_type).
@@ -382,7 +388,44 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
     private function recordStatusHistory(DocumentRequest $documentRequest, int $oldStatusId): void
     {
+        // minutes_processed: kept exactly as before (cumulative raw
+        // wall-clock minutes since requested_at) for backward compatibility
+        // with existing reports/dashboards that already read this column
+        // with that meaning. Do not repurpose it — see the migration
+        // 2026_08_15_000000_add_pending_signature_status doc block for why
+        // business_minutes exists as a separate column instead.
         $minutesProcessed = (int) $documentRequest->requested_at->diffInMinutes(now());
+
+        // business_minutes: the calendar-aware duration of THIS segment
+        // only — i.e. time elapsed since the previous status change (or
+        // since requested_at, if this is the request's first transition),
+        // counting only minutes inside office hours and skipping
+        // weekends/holidays. This is what makes it possible to fairly
+        // attribute elapsed time to whoever actually controlled it:
+        //   - a Processing → PendingSignature segment measures the
+        //     registrar's own turnaround.
+        //   - a PendingSignature → ReadyToClaim segment measures the
+        //     external signing office's turnaround.
+        //   - a Processing → ReadyToClaim segment (no signature needed)
+        //     measures the registrar's turnaround, same as before.
+        //
+        // Currently uses the default business calendar for every segment
+        // (BusinessCalendarService falls back to it when no calendar id is
+        // given). Per-office calendars are already supported by the
+        // service/schema (Step 2) — once individual signing offices are
+        // confirmed to keep different hours, look up that office's
+        // calendar_id here for PendingSignature → ReadyToClaim segments
+        // specifically, rather than changing this method's shape again.
+        $segmentStart = RequestHistory::where('request_id', $documentRequest->request_id)
+            ->orderByDesc('changed_at')
+            ->orderByDesc('request_history_id')
+            ->value('changed_at');
+
+        $segmentStart = $segmentStart
+            ? \Illuminate\Support\Carbon::parse($segmentStart)
+            : $documentRequest->requested_at;
+
+        $businessMinutes = $this->businessCalendarService->minutesBetween($segmentStart, now());
 
         RequestHistory::create([
             'request_id'        => $documentRequest->request_id,
@@ -391,6 +434,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             'changed_at'        => now(),
             'changed_by'        => Auth::id(),
             'minutes_processed' => $minutesProcessed,
+            'business_minutes'  => $businessMinutes,
         ]);
     }
 

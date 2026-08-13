@@ -24,6 +24,7 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
   'admin_incomplete_request',
   'status_updated',
   'request_processing',
+  'pending_signature',
   'ready_to_claim',
   'request_completed',
   'request_forfeited',

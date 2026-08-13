@@ -162,6 +162,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             Route::get('by-document-type', [AnalyticsController::class, 'byDocumentType']);
             Route::get('by-status',        [AnalyticsController::class, 'byStatus']);
             Route::get('processing-time',  [AnalyticsController::class, 'processingTime']);
+            Route::get('signature-turnaround', [AnalyticsController::class, 'signatureTurnaround']);
             Route::get('peak-hours',       [AnalyticsController::class, 'peakHours']);
             Route::get('by-purpose',       [AnalyticsController::class, 'byPurpose']);
             Route::post('ai-report', [AnalyticsController::class, 'aiReport'])

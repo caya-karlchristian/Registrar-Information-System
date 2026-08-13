@@ -48,11 +48,12 @@ import { useAuth } from "./AuthProvider";
 // stable by design (changing status IDs is a breaking migration, not a routine
 // admin action). We map over API-fetched statuses and merge this in.
 const STATUS_DISPLAY = {
-  1: { label: "Processing",     classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  2: { label: "Ready to Claim", classes: "bg-green-100 text-green-700 border-green-200"  },
-  3: { label: "Completed",      classes: "bg-gray-100 text-gray-700 border-gray-200"     },
-  4: { label: "Forfeited",      classes: "bg-red-100 text-red-700 border-red-200"        },
-  5: { label: "Cancelled",      classes: "bg-orange-100 text-orange-700 border-orange-200" },
+  1: { label: "Processing",         classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  2: { label: "Ready to Claim",     classes: "bg-green-100 text-green-700 border-green-200"  },
+  3: { label: "Completed",          classes: "bg-gray-100 text-gray-700 border-gray-200"     },
+  4: { label: "Forfeited",          classes: "bg-red-100 text-red-700 border-red-200"        },
+  5: { label: "Cancelled",          classes: "bg-orange-100 text-orange-700 border-orange-200" },
+  6: { label: "Awaiting Signature", classes: "bg-orange-100 text-orange-700 border-orange-200" },
 };
 
 const ReferenceDataContext = createContext(null);
