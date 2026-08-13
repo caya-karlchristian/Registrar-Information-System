@@ -566,15 +566,33 @@ const BusinessCalendarManagement = () => {
                     {fieldErrors.label && <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.label[0]}</p>}
                   </div>
 
-                  <label className={`flex items-center gap-2 text-sm font-medium cursor-pointer select-none ${isDark ? "text-[#e4e6eb]" : "text-gray-700"}`}>
-                    <input
-                      type="checkbox"
-                      checked={overrideForm.is_closed}
-                      onChange={(e) => setOverrideForm((prev) => ({ ...prev, is_closed: e.target.checked }))}
-                      className="h-4 w-4"
-                    />
-                    Closed on this day
-                  </label>
+                  <div>
+                    <label className={labelClass}>Status on This Day</label>
+                    <div className={`inline-flex p-0.5 rounded-full ${isDark ? "bg-[#18191a] border border-[#3e4042]" : "bg-gray-300"}`}>
+                      <button
+                        type="button"
+                        onClick={() => setOverrideForm((prev) => ({ ...prev, is_closed: true }))}
+                        className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                          overrideForm.is_closed
+                            ? "bg-white text-gray-900 shadow-sm"
+                            : (isDark ? "text-[#b0b3b8] hover:text-white" : "text-gray-600 hover:text-gray-900")
+                        }`}
+                      >
+                        Closed
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOverrideForm((prev) => ({ ...prev, is_closed: false }))}
+                        className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                          !overrideForm.is_closed
+                            ? "bg-white text-gray-900 shadow-sm"
+                            : (isDark ? "text-[#b0b3b8] hover:text-white" : "text-gray-600 hover:text-gray-900")
+                        }`}
+                      >
+                        Open
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>

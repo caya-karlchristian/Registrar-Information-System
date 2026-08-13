@@ -147,3 +147,47 @@ test('two overlapping exceptions on the same calendar are rejected', function ()
         'type' => 'suspension', 'label' => 'Overlaps', 'date' => '2026-03-12', 'end_date' => '2026-03-14',
     ], $actor, Request::create('/')))->toThrow(ValidationException::class);
 });
+
+test('explicitly clearing end_date on a multi-day exception collapses it to a single day (regression: QA 2026-08-13)', function () {
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $exception = $calendar->holidays()->create([
+        'type'     => 'suspension',
+        'label'    => 'Typhoon suspension',
+        'date'     => '2026-03-11',
+        'end_date' => '2026-03-13',
+    ]);
+
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    // The frontend sends end_date explicitly as null when the admin clears
+    // the field in the Edit modal — that must collapse the range down to
+    // the start date, not silently keep the old end_date just because the
+    // value looks "empty".
+    $updated = $service->update($exception, ['end_date' => null], $actor, Request::create('/'));
+
+    expect($updated->end_date->toDateString())->toBe($updated->date->toDateString())
+        ->and($updated->end_date->toDateString())->toBe('2026-03-11');
+});
+
+test('an end_date key that is entirely absent from the request still preserves the existing range', function () {
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $exception = $calendar->holidays()->create([
+        'type'     => 'suspension',
+        'label'    => 'Typhoon suspension',
+        'date'     => '2026-03-11',
+        'end_date' => '2026-03-13',
+    ]);
+
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    // No 'end_date' key at all (e.g. only the label changed) — distinct
+    // from the case above where the key is present with an explicit null.
+    $updated = $service->update($exception, ['label' => 'Renamed'], $actor, Request::create('/'));
+
+    expect($updated->label)->toBe('Renamed')
+        ->and($updated->end_date->toDateString())->toBe('2026-03-13');
+});

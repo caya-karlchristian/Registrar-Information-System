@@ -53,13 +53,21 @@ class CalendarExceptionService
 
         $date = $validated['date'] ?? $exception->date->toDateString();
 
-        // Only auto-follow the new start date when this was already a
-        // single-day closure — moving the start date of a *range* must
-        // never silently shrink it down to one day just because end_date
-        // wasn't part of this particular request. If the caller wants to
-        // change the range's length, they send end_date explicitly.
-        $endDate = $validated['end_date']
-            ?? ($wasSingleDay ? $date : $exception->end_date->toDateString());
+        // IMPORTANT: use array_key_exists, not ?? / isset. The request can
+        // send end_date as an explicit null to mean "collapse this back to
+        // a single day" — that's a real, meaningful value, distinct from
+        // end_date simply being absent from the request entirely (meaning
+        // "leave it alone"). ?? / isset can't tell those two cases apart
+        // (both look like "no value"), so they'd silently keep the old
+        // end_date even when the caller explicitly asked to clear it —
+        // a no-op PATCH that still reports success because nothing about
+        // the write itself failed. See CalendarOverrideService::update()'s
+        // identical handling of effective_until for the same reasoning.
+        if (array_key_exists('end_date', $validated)) {
+            $endDate = $validated['end_date'] ?? $date; // explicit null -> single day
+        } else {
+            $endDate = $wasSingleDay ? $date : $exception->end_date->toDateString();
+        }
 
         if ($endDate < $date) {
             throw ValidationException::withMessages([
