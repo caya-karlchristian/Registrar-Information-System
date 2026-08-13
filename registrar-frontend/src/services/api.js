@@ -165,6 +165,20 @@ export const updateSignatory   = (id, data)  => api.put(`/signatories/${id}`, da
 export const deleteSignatory   = (id)        => api.delete(`/signatories/${id}`);
 
 // -------------------------------------------------------
+// BUSINESS CALENDAR — one-off dated closures + recurring overrides
+// (Admin with the "business_calendar" module, or Super Admin)
+// -------------------------------------------------------
+export const getCalendarExceptions   = (params = {}) => api.get("/calendar-exceptions", { params });
+export const createCalendarException = (data)        => api.post("/calendar-exceptions", data);
+export const updateCalendarException = (id, data)    => api.put(`/calendar-exceptions/${id}`, data);
+export const deleteCalendarException = (id)          => api.delete(`/calendar-exceptions/${id}`);
+
+export const getCalendarOverrides    = (params = {}) => api.get("/calendar-overrides", { params });
+export const createCalendarOverride  = (data)        => api.post("/calendar-overrides", data);
+export const updateCalendarOverride  = (id, data)    => api.put(`/calendar-overrides/${id}`, data);
+export const deleteCalendarOverride  = (id)          => api.delete(`/calendar-overrides/${id}`);
+
+// -------------------------------------------------------
 // DOCUMENT REQUESTS (read: all | write: Student/Alumni | manage: Admin+)
 // Response shape from index: { current_page, data, last_page, per_page, total }
 // Read records from response.data.data, not response.data.

@@ -18,6 +18,7 @@ class AccessRequestResource extends JsonResource
             ],
             'target_email'       => $this->target_email,
             'target_first_name'  => $this->target_first_name,
+            'target_middle_name' => $this->target_middle_name,
             'target_last_name'   => $this->target_last_name,
             'requested_role_id'  => $this->requested_role_id,
             'requested_role'     => $this->requested_role_id === \App\Models\SystemUser::ROLE_SUPER_ADMIN ? 'Super Admin' : 'Admin',

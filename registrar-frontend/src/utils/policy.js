@@ -23,6 +23,7 @@ export const MODULE_KEYS = {
   LOGBOOK: "logbook",
   PROFILE: "profile",
   ACCESS_REQUESTS: "access_requests",
+  BUSINESS_CALENDAR: "business_calendar",
 };
 
 /**

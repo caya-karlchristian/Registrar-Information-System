@@ -18,6 +18,7 @@ class AccessRequest extends Model
         'requested_by',
         'target_email',
         'target_first_name',
+        'target_middle_name',
         'target_last_name',
         'requested_role_id',
         'requested_policy_id',

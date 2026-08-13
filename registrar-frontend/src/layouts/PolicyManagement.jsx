@@ -9,12 +9,16 @@
  * confirmation modal before calling deletePolicy() for each
  * selected custom policy.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "../context/ThemeContext";
 import {
   PlusIcon,
-  XMarkIcon
+  XMarkIcon,
+  ShieldCheckIcon,
+  ChevronUpIcon,
+  ChevronDownIcon
 } from "@heroicons/react/24/outline";
+import DashboardDropdown from "../components/DashboardDropdown";
 import { getSystemUsers, getPolicies, createPolicy, updatePolicy, deletePolicy } from "../services/api";
 import MultiSelection from "../components/MultiSelection";
 import SuccessToast from "../components/SuccessToast.jsx";
@@ -29,7 +33,8 @@ const MODULE_OPTIONS = [
   "Admin Analytics",
   "Admin Logbook",
   "Admin Profile",
-  "Access Requests"
+  "Access Requests",
+  "Business Calendar"
 ];
 
 const LABEL_TO_KEY = {
@@ -38,7 +43,8 @@ const LABEL_TO_KEY = {
   "Admin Analytics": "analytics",
   "Admin Logbook": "logbook",
   "Admin Profile": "profile",
-  "Access Requests": "access_requests"
+  "Access Requests": "access_requests",
+  "Business Calendar": "business_calendar"
 };
 
 const KEY_TO_LABEL = {
@@ -47,7 +53,8 @@ const KEY_TO_LABEL = {
   "analytics": "Admin Analytics",
   "logbook": "Admin Logbook",
   "profile": "Admin Profile",
-  "access_requests": "Access Requests"
+  "access_requests": "Access Requests",
+  "business_calendar": "Business Calendar"
 };
 
 const PolicyManagement = () => {
@@ -78,7 +85,6 @@ const PolicyManagement = () => {
   // Form fields
   const [policyName, setPolicyName] = useState("");
   const [selectedModuleValues, setSelectedModuleValues] = useState([]);
-  const [allowStudentStaffSwitch, setAllowStudentStaffSwitch] = useState(false);
 
   // Admin list modal
   const [isAdminListOpen, setIsAdminListOpen] = useState(false);
@@ -88,6 +94,17 @@ const PolicyManagement = () => {
   // Discard changes state
   const [initialFormState, setInitialFormState] = useState(null);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+  // Filter Dropdowns State & Refs
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState("All");
+  const typeDropdownRef = useRef(null);
+
+  const [sortOrder, setSortOrder] = useState("asc");
+
+  const [permissionDropdownOpen, setPermissionDropdownOpen] = useState(false);
+  const [permissionFilter, setPermissionFilter] = useState("All");
+  const permissionDropdownRef = useRef(null);
 
   // Fetch policies from the backend
   const fetchPolicies = useCallback(async () => {
@@ -121,7 +138,7 @@ const PolicyManagement = () => {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedPolicyIndices([]);
-  }, [search]);
+  }, [search, typeFilter, sortOrder, permissionFilter]);
 
   // A policy is "attached" to an admin when user.policy_id matches —
   // this is the real, server-persisted attachment (see users.policy_id
@@ -136,7 +153,6 @@ const PolicyManagement = () => {
     Object.entries(LABEL_TO_KEY).forEach(([label, key]) => {
       raw[key] = selectedLabels.includes(label) ? ["Access"] : [];
     });
-    raw['student_staff_switch'] = allowStudentStaffSwitch ? ["Access"] : [];
     return raw;
   };
 
@@ -283,10 +299,42 @@ const PolicyManagement = () => {
     setIsAdminListOpen(true);
   };
 
-  // Filter policies based on Search
-  const filteredPolicies = policies.filter((p) => {
-    return p.name.toLowerCase().includes(search.toLowerCase()) ||
+  const handleFilterChange = () => {
+    setCurrentPage(1);
+    setSelectedPolicyIndices([]);
+  };
+
+  // Filter policies based on Search & Dropdowns
+  const baseFiltered = policies.filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.permissions_label || "").toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+
+    // Type Filter
+    if (typeFilter !== "All") {
+      const isSystemPolicy = !!p.is_system;
+      if (typeFilter === "System Managed" && !isSystemPolicy) return false;
+      if (typeFilter === "Custom Policy" && isSystemPolicy) return false;
+    }
+
+    // Permission Filter
+    if (permissionFilter !== "All") {
+      const moduleKey = LABEL_TO_KEY[permissionFilter];
+      if (moduleKey) {
+        const hasAccess = Array.isArray(p.permissions?.[moduleKey]) && p.permissions[moduleKey].length > 0;
+        if (!hasAccess) return false;
+      }
+    }
+
+    return true;
+  });
+
+  const filteredPolicies = [...baseFiltered].sort((a, b) => {
+    if (sortOrder === "asc") {
+      return a.name.localeCompare(b.name);
+    } else {
+      return b.name.localeCompare(a.name);
+    }
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredPolicies.length / PER_PAGE));
@@ -398,10 +446,83 @@ const PolicyManagement = () => {
                   />
                 </th>
                 <th className="w-10 px-2 py-3 text-center"></th>
-                <th className="px-4 py-3 text-left">Policy name</th>
-                <th className="px-4 py-3 text-left">Type</th>
-                <th className="px-4 py-3 text-left">Used as</th>
-                <th className="px-4 py-3 text-left">Description</th>
+                {/* Policy name Sorting */}
+                <th className="px-4 py-3 text-left">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                      handleFilterChange();
+                    }}
+                    className={`flex items-center gap-1 text-xs uppercase font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}
+                  >
+                    <span>Policy name</span>
+                    {sortOrder === 'asc' ? (
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
+                    ) : (
+                      <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" />
+                    )}
+                  </button>
+                </th>
+
+                {/* Type Filter dropdown */}
+                <th className="px-4 py-3 text-left">
+                  <DashboardDropdown
+                    isOpen={typeDropdownOpen}
+                    setIsOpen={setTypeDropdownOpen}
+                    dropdownRef={typeDropdownRef}
+                    align="left"
+                    trigger={
+                      <span className={typeFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#a09e9a]' : 'text-gray-500')}>
+                        Type
+                      </span>
+                    }
+                    sections={[
+                      {
+                        title: 'Filter by Type',
+                        items: ['All', 'System Managed', 'Custom Policy'].map(option => ({
+                          label: option,
+                          isSelected: typeFilter === option,
+                          onClick: () => {
+                            setTypeFilter(option);
+                            handleFilterChange();
+                          }
+                        }))
+                      }
+                    ]}
+                  />
+                </th>
+
+                {/* Used as (Static) */}
+                <th className="px-4 py-3 text-left text-gray-500 dark:text-[#a09e9a] font-bold uppercase tracking-wider">Used as</th>
+
+                {/* Permissions Filter dropdown */}
+                <th className="px-4 py-3 text-left">
+                  <DashboardDropdown
+                    isOpen={permissionDropdownOpen}
+                    setIsOpen={setPermissionDropdownOpen}
+                    dropdownRef={permissionDropdownRef}
+                    align="left"
+                    trigger={
+                      <span className={permissionFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#a09e9a]' : 'text-gray-500')}>
+                        Permissions
+                      </span>
+                    }
+                    sections={[
+                      {
+                        title: 'Filter by Module Access',
+                        items: ['All', ...MODULE_OPTIONS].map(option => ({
+                          label: option,
+                          isSelected: permissionFilter === option,
+                          onClick: () => {
+                            setPermissionFilter(option);
+                            handleFilterChange();
+                          }
+                        }))
+                      }
+                    ]}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -442,12 +563,10 @@ const PolicyManagement = () => {
                         </div>
                       </td>
 
-                      {/* Cube Block symbol */}
+                      {/* Policy Shield Icon */}
                       <td className="px-2 py-3 text-center">
                         <div className="flex items-center justify-center">
-                          <svg className="w-5 h-5 text-orange-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M11 17a1 1 0 001.447.894l5-2.5A1 1 0 0018 14.5V9.632a1 1 0 00-.553-.894l-5-2.5A1 1 0 0011 7.132V17zM9 17V7.132a1 1 0 00-1.447-.894l-5 2.5A1 1 0 002 9.632v4.868a1 1 0 00.553.894l5 2.5A1 1 0 009 17zM10 2a1 1 0 00-.553.168l-7 4.5a1 1 0 000 1.664l7 4.5a1 1 0 001.106 0l7-4.5a1 1 0 000-1.664l-7-4.5A1 1 0 0010 2z" />
-                          </svg>
+                          <ShieldCheckIcon className="w-5 h-5 text-amber-500 shrink-0" />
                         </div>
                       </td>
 
@@ -460,11 +579,6 @@ const PolicyManagement = () => {
                           >
                             {policy.name}
                           </button>
-                          {Array.isArray(policy.permissions?.student_staff_switch) && policy.permissions.student_staff_switch.length > 0 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800/25">
-                              Switcher
-                            </span>
-                          )}
                         </div>
                       </td>
 
@@ -567,33 +681,6 @@ const PolicyManagement = () => {
                       selectedValues={selectedModuleValues}
                       onChange={(e) => setSelectedModuleValues(e.target.value)}
                     />
-                  </div>
-                </div>
-
-                {/* Multiple Role Options */}
-                <div className={`p-4 rounded-xl border flex flex-col gap-3 ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200 shadow-xs'
-                  }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        Role Switcher (Admin and Student)
-                      </span>
-                      <span className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                        Allow users under this policy to toggle between Admin and Student views.
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setAllowStudentStaffSwitch(!allowStudentStaffSwitch)}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${allowStudentStaffSwitch ? 'bg-green-500' : (isDark ? 'bg-gray-700' : 'bg-gray-200')
-                        }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${allowStudentStaffSwitch ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                      />
-                    </button>
                   </div>
                 </div>
               </div>

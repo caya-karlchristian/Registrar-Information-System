@@ -25,7 +25,7 @@ import {
   Pagination,
 } from '../components/StaffDashboardComponents';
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 15;
 
 const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
   const { isDark } = useTheme();

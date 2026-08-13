@@ -42,6 +42,7 @@ class AccessRequestService
             'requested_by'         => $request->user()->user_id,
             'target_email'         => $validated['target_email'],
             'target_first_name'    => $validated['target_first_name'],
+            'target_middle_name'   => $validated['target_middle_name'] ?? null,
             'target_last_name'     => $validated['target_last_name'],
             'requested_role_id'    => $validated['requested_role_id'],
             'requested_policy_id'  => $validated['requested_policy_id'] ?? null,
@@ -76,6 +77,7 @@ class AccessRequestService
                 'email'       => $accessRequest->target_email,
                 'role_id'     => $accessRequest->requested_role_id,
                 'first_name'  => $accessRequest->target_first_name,
+                'middle_name' => $accessRequest->target_middle_name,
                 'last_name'   => $accessRequest->target_last_name,
                 'policy_id'   => $accessRequest->requested_policy_id,
             ], $request);

@@ -21,6 +21,10 @@ class StoreStudentProfileRequest extends FormRequest
             'first_name'    => 'required|string|max:100',
             'middle_name'   => 'nullable|string|max:100',
             'last_name'     => 'required|string|max:100',
+            // max:20 matches the student_profile.suffix column width. See
+            // UpdateStudentProfileRequest for why this has to be accepted
+            // here rather than left to the OGOS sync — OGOS never sends it.
+            'suffix'        => 'nullable|string|max:20',
             'date_of_birth' => 'required|date',
             // permanent_address / contact_number intentionally excluded —
             // no such columns exist on student_profile (confirmed via

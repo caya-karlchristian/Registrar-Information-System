@@ -10,6 +10,24 @@ export const COMPLETED_VISIBILITY_MS = 24 * 60 * 60 * 1000;
 export const PRINTED_CERTIFICATE_STORAGE_KEY = 'printed-certificate-request-ids';
 
 /**
+ * Helper to convert ALL CAPS names into Title Case (e.g. Karl Christian Caya).
+ */
+export const formatTitleCase = (str) => {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map(word => {
+      return word
+        .split('-')
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join('-');
+    })
+    .join(' ');
+};
+
+/**
  * Resolves API status name to ID mappings based on database reference statuses.
  */
 export const resolveStatusIds = (requestStatuses) => {
@@ -124,9 +142,9 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
       },
     },
     studentName: r.student_profile
-      ? `${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`
+      ? formatTitleCase(`${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`)
       : r.alumni_profile
-      ? `${r.alumni_profile.first_name} ${r.alumni_profile.middle_name ?? ''} ${r.alumni_profile.last_name}`
+      ? formatTitleCase(`${r.alumni_profile.first_name} ${r.alumni_profile.middle_name ?? ''} ${r.alumni_profile.last_name}`)
       : 'N/A',
     studentNumber: r.academic_record?.student_number
       ?? r.alumni_academic_record?.student_number
@@ -194,6 +212,12 @@ export const filterAndSortRequests = (requests, { filterStatus, filterClassifica
       return matchesStatus && matchesClassification && matchesSearch;
     })
     .sort((a, b) => {
+      const aCompleted = String(a.statusId) === String(resolvedStatusIds?.COMPLETED) || String(a.statusName ?? '').trim().toLowerCase() === 'completed';
+      const bCompleted = String(b.statusId) === String(resolvedStatusIds?.COMPLETED) || String(b.statusName ?? '').trim().toLowerCase() === 'completed';
+
+      if (aCompleted && !bCompleted) return 1;
+      if (!aCompleted && bCompleted) return -1;
+
       if (sortOrder === 'Recent Requests') {
         return b.timestamp - a.timestamp;
       }

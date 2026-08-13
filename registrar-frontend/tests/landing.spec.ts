@@ -8,8 +8,8 @@ test.describe('Landing Page Tests', () => {
 
   test('1. Verify page elements and branding links', async ({ page }) => {
     // Assert main header titles are visible
-    await expect(page.getByRole('heading', { name: /Registrar/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Information System/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Registrar/i, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Information System/i, level: 1 })).toBeVisible();
     await expect(page.getByText('Academic Request. Redefined Simplicity.')).toBeVisible();
 
     // Verify presence of PUP Logo image
@@ -130,23 +130,30 @@ test.describe('Landing Page Tests', () => {
     await expect(page.getByRole('heading', { name: 'SYSTEM UPDATE' })).toBeVisible();
   });
 
-  test('6. Developer profiles section renders correctly', async ({ page }) => {
-    // Check that Tech4ward section is visible
-    await expect(page.getByRole('heading', { name: 'Together, We Think Forward' })).toBeVisible();
-    await expect(page.getByAltText('Tech4ward Logo')).toBeVisible();
+  test('6. Frequently asked questions section works correctly', async ({ page }) => {
+    // Check that FAQ section header is visible
+    await expect(page.getByRole('heading', { name: 'Frequently asked questions', level: 2 })).toBeVisible();
 
-    // Check that all 4 developer cards render with correct name and role
-    const members = [
-      { name: 'Karl Christian', role: 'PROJECT LEAD, UI/UX, AND DATABASE' },
-      { name: 'Ciara Marie', role: 'FRONTEND DEVELOPER' },
-      { name: 'Aron Stephen', role: 'BACKEND DEVELOPER' },
-      { name: 'Ma. Rose', role: 'DOCUMENT ANALYST AND QA' },
-    ];
+    // Check that the first FAQ question is visible
+    const firstQuestion = page.getByText('What is the Registrar Information System (RIS)?');
+    await expect(firstQuestion).toBeVisible();
 
-    for (const member of members) {
-      await expect(page.getByText(member.name)).toBeVisible();
-      await expect(page.getByText(member.role)).toBeVisible();
-    }
+    // Answer container should have collapsed class (max-h-0) initially
+    const firstAnswerContainer = page.locator('p', { hasText: 'The RIS is a secure' }).locator('..');
+    await expect(firstAnswerContainer).toHaveClass(/max-h-0/);
+
+    // Click the question to toggle visibility of the answer
+    await firstQuestion.click();
+    await expect(firstAnswerContainer).toHaveClass(/max-h-40/);
+
+    // Go to FAQ page 2
+    const page2Button = page.getByLabel('Go to FAQ page 2');
+    await expect(page2Button).toBeVisible();
+    await page2Button.click();
+
+    // Question from page 2 should now be visible
+    const page2Question = page.getByText('Is my personal data protected?');
+    await expect(page2Question).toBeVisible();
   });
 
   test('7. Copyright Footer text renders dynamic year', async ({ page }) => {

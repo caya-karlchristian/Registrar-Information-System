@@ -29,6 +29,7 @@ import DocumentAndCertificateManagement from './pages/DocumentAndCertificateMana
 import ReportManagement from './layouts/ReportManagement.jsx';
 import SystemSettings from './layouts/SystemSettings.jsx';
 import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
+import BusinessCalendarManagement from './layouts/BusinessCalendarManagement.jsx';
 
 // Auth
 import { ROLES, useAuth } from './context/AuthProvider';
@@ -157,6 +158,9 @@ const App = () => {
                 <Route path="access-requests" element={
                   <ModuleRoute module={MODULE_KEYS.ACCESS_REQUESTS}><RequestAccessPage /></ModuleRoute>
                 } />
+                <Route path="business-calendar" element={
+                  <ModuleRoute module={MODULE_KEYS.BUSINESS_CALENDAR}><BusinessCalendarManagement /></ModuleRoute>
+                } />
               </Route>
 
               {/* SUPER ADMIN (role: super_admin) */}
@@ -175,6 +179,7 @@ const App = () => {
                 <Route path="certificates" element={<Navigate to="../documents" replace />} />
                 <Route path="report" element={<ReportManagement />} />
                 <Route path="settings" element={<SystemSettings />} />
+                <Route path="business-calendar" element={<BusinessCalendarManagement />} />
                 <Route path="inbox" element={<InboxCenter />} />
               </Route>
 

@@ -128,12 +128,23 @@ class OgosStudentService
             default  => 'Male',
         };
 
+        // suffix now comes straight from OGOS ($student->suffix, sourced
+        // from the `suffixName` field — see OgosStudentDTO). OGOS is the
+        // source of truth for student identity data, same as
+        // first/middle/last name below, so this is a plain overwrite on
+        // every login, not a "preserve existing" merge — an admin
+        // correction made while OGOS is unreachable (see
+        // UserProvisioningService's OGOS-down fallback stub) is expected
+        // to be superseded by real OGOS data on the student's next
+        // successful sync, exactly like a manually-corrected first_name
+        // would be.
         $profile = StudentProfile::updateOrCreate(
             ['user_id' => $user->user_id],
             [
                 'first_name'     => $student->firstName,
                 'middle_name'    => $student->middleName,
                 'last_name'      => $student->lastName,
+                'suffix'         => $student->suffix,
                 'date_of_birth'  => $personal?->dateOfBirth  ?? '2000-01-01',
                 'place_of_birth' => $personal?->placeOfBirth ?? null,
                 'sex_at_birth'   => $sexAtBirth,
