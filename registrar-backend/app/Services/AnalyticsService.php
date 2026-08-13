@@ -245,11 +245,7 @@ class AnalyticsService
         [$from, $to] = $range;
 
         $rows = DocumentRequest::select(
-                DB::raw(
-            DB::connection()->getDriverName() === 'sqlite'
-                ? "CAST(strftime('%H', requested_at) AS INTEGER) as hour"
-                : 'HOUR(requested_at) as hour'
-        ),
+                DB::raw(self::hourExpression('requested_at') . ' as hour'),
                 DB::raw('COUNT(*) as total')
             )
             ->whereBetween('requested_at', [$from, $to])
@@ -363,15 +359,101 @@ class AnalyticsService
      *
      * Portable across MySQL/MariaDB (default), SQLite (tests/local), and
      * PostgreSQL (future migration path).
+     *
+     * IMPORTANT: columns are stored in UTC (config('app.timezone')), but a
+     * request made at 11:30 PM local time on the last day of the month is
+     * still ~3:30 PM UTC the same day, and one made at 12:30 AM local time
+     * on the 1st is ~4:30 PM UTC the day before. Near month boundaries that
+     * can push a request into the wrong month bucket, so we convert to the
+     * local display timezone first, same as hourExpression() below.
      */
     private static function monthExpression(string $column): string
     {
         $driver = DB::connection()->getDriverName();
+        $local  = self::localExpression($column, $driver);
 
         return match ($driver) {
-            'sqlite' => "strftime('%Y-%m', {$column})",
-            'pgsql'  => "to_char({$column}, 'YYYY-MM')",
-            default  => "DATE_FORMAT({$column}, '%Y-%m')",  // MySQL / MariaDB
+            'sqlite' => "strftime('%Y-%m', {$local})",
+            'pgsql'  => "to_char({$local}, 'YYYY-MM')",
+            default  => "DATE_FORMAT({$local}, '%Y-%m')",  // MySQL / MariaDB
         };
+    }
+
+    /**
+     * Return a SQL expression for the local (display-timezone) hour of a
+     * UTC-stored datetime column, as an integer 0-23.
+     *
+     * Bug this fixes: extracting HOUR()/strftime('%H', ...) directly off a
+     * UTC column reports the *UTC* hour, not the hour the request actually
+     * happened in for users/staff (Asia/Manila, UTC+8). A 1-2 PM local
+     * request is stored as 5-6 AM UTC and would otherwise show up as if it
+     * happened before dawn. We convert to the configured display timezone
+     * first, then extract the hour.
+     */
+    private static function hourExpression(string $column): string
+    {
+        $driver = DB::connection()->getDriverName();
+        $local  = self::localExpression($column, $driver);
+
+        return match ($driver) {
+            'sqlite' => "CAST(strftime('%H', {$local}) AS INTEGER)",
+            'pgsql'  => "EXTRACT(HOUR FROM {$local})",
+            default  => "HOUR({$local})",  // MySQL / MariaDB
+        };
+    }
+
+    /**
+     * Return a SQL expression that converts a UTC-stored datetime column to
+     * the application's configured display timezone (config('app.display_timezone'),
+     * default Asia/Manila). Centralised here so every "what local hour/day
+     * did this happen on" query converts the same way, once.
+     *
+     * MySQL: CONVERT_TZ with a fixed UTC offset (e.g. '+08:00') rather than
+     * a named zone, so this works even when the server's mysql.time_zone
+     * tables haven't been loaded (common on managed DB hosts).
+     */
+    private static function localExpression(string $column, string $driver): string
+    {
+        $timezone   = config('app.display_timezone', 'Asia/Manila');
+        $offsetSecs = self::utcOffsetSeconds($timezone);
+
+        return match ($driver) {
+            // SQLite modifiers want '+N minutes', not a '+HH:MM' string.
+            'sqlite' => "datetime({$column}, '" . self::sqliteMinutesModifier($offsetSecs) . "')",
+            'pgsql'  => "(({$column} AT TIME ZONE 'UTC') AT TIME ZONE '{$timezone}')",
+            // Fixed offset (not a named zone) so this doesn't depend on the
+            // mysql.time_zone_name tables being loaded on the DB host.
+            default  => "CONVERT_TZ({$column}, '+00:00', '" . self::hhmmOffset($offsetSecs) . "')",
+        };
+    }
+
+    /**
+     * Current UTC offset in seconds for a timezone name. Computed from PHP's
+     * timezone database rather than hardcoded so it stays correct if the
+     * configured timezone ever observes DST.
+     */
+    private static function utcOffsetSeconds(string $timezone): int
+    {
+        $tz = new \DateTimeZone($timezone);
+
+        return $tz->getOffset(new \DateTime('now', new \DateTimeZone('UTC')));
+    }
+
+    /** Format offset seconds as e.g. '+08:00', for MySQL CONVERT_TZ. */
+    private static function hhmmOffset(int $offsetSecs): string
+    {
+        $sign = $offsetSecs < 0 ? '-' : '+';
+        $abs  = abs($offsetSecs);
+
+        return sprintf('%s%02d:%02d', $sign, intdiv($abs, 3600), intdiv($abs % 3600, 60));
+    }
+
+    /** Format offset seconds as e.g. '+480 minutes', for SQLite datetime(). */
+    private static function sqliteMinutesModifier(int $offsetSecs): string
+    {
+        $minutes = intdiv($offsetSecs, 60);
+        $sign    = $minutes < 0 ? '-' : '+';
+
+        return sprintf('%s%d minutes', $sign, abs($minutes));
     }
 }
