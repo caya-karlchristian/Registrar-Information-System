@@ -20,6 +20,7 @@ class StoreAccessRequestRequest extends FormRequest
         return [
             'target_email'      => 'required|email|max:255',
             'target_first_name' => 'required|string|max:100',
+            'target_middle_name' => 'nullable|string|max:100',
             'target_last_name'  => 'required|string|max:100',
             'requested_role_id' => 'required|integer|in:' . SystemUser::ROLE_ADMIN . ',' . SystemUser::ROLE_SUPER_ADMIN,
             'requested_policy_id' => 'nullable|integer|exists:policies,policy_id',

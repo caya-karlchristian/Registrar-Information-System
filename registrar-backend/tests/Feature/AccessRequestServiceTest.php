@@ -87,9 +87,64 @@ test('store() rejects a target email that already belongs to a SystemUser', func
     ], arsRequest()))->toThrow(ValidationException::class);
 });
 
+test('store() persists an optional target middle name', function () {
+    arsActingAdmin();
+
+    $service = app(AccessRequestService::class);
+    $accessRequest = $service->store([
+        'target_email'       => 'withmiddle@example.com',
+        'target_first_name'  => 'New',
+        'target_middle_name' => 'Santos',
+        'target_last_name'   => 'Person',
+        'requested_role_id'  => SystemUser::ROLE_ADMIN,
+        'justification'      => 'Needs access to help at the front desk.',
+    ], arsRequest());
+
+    expect($accessRequest->target_middle_name)->toBe('Santos');
+});
+
+test('store() leaves target middle name null when omitted', function () {
+    arsActingAdmin();
+
+    $service = app(AccessRequestService::class);
+    $accessRequest = $service->store([
+        'target_email'      => 'nomiddle@example.com',
+        'target_first_name' => 'New',
+        'target_last_name'  => 'Person',
+        'requested_role_id' => SystemUser::ROLE_ADMIN,
+        'justification'     => 'Needs access to help at the front desk.',
+    ], arsRequest());
+
+    expect($accessRequest->target_middle_name)->toBeNull();
+});
+
 // ═════════════════════════════════════════════════════════════════════════════
 // approve()
 // ═════════════════════════════════════════════════════════════════════════════
+
+test('approve() carries the target middle name onto the created SystemUser profile', function () {
+    $submitter = arsActingAdmin();
+    $accessRequest = AccessRequest::create([
+        'requested_by'       => $submitter->user_id,
+        'target_email'       => 'approvedwithmiddle@example.com',
+        'target_first_name'  => 'Approved',
+        'target_middle_name' => 'Reyes',
+        'target_last_name'   => 'Person',
+        'requested_role_id'  => SystemUser::ROLE_ADMIN,
+        'justification'      => 'Needed.',
+        'status'             => AccessRequest::STATUS_REQUESTED,
+        'expires_at'         => now()->addDays(7),
+    ]);
+
+    arsActingSuperAdmin();
+    $service = app(AccessRequestService::class);
+    $user    = $service->approve($accessRequest, arsRequest());
+
+    $this->assertDatabaseHas('admin_profile', [
+        'user_id'     => $user->user_id,
+        'middle_name' => 'Reyes',
+    ]);
+});
 
 test('approve() creates a Pending Activation SystemUser and marks the request Fulfilled', function () {
     $submitter = arsActingAdmin();
