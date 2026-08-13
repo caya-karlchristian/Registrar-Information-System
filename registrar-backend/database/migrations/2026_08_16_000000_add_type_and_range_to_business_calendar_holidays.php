@@ -63,19 +63,38 @@ return new class extends Migration
         Schema::table('business_calendar_holidays', function (Blueprint $table) {
             $indexes = collect(Schema::getIndexes('business_calendar_holidays'))->pluck('name');
 
+            // Create the replacement index BEFORE dropping the old unique
+            // index. calendar_id's foreign key needs some index covering it
+            // at all times — on MySQL/InnoDB the old unique(calendar_id,
+            // date) was silently doing that job (calendar_id is its
+            // leftmost column). If we drop it first, there's a moment where
+            // no index covers calendar_id and MySQL refuses with error 1553
+            // ("needed in a foreign key constraint"). Blueprint commands run
+            // as separate sequential ALTER TABLE statements, not one atomic
+            // statement, so ordering here is significant. This new index
+            // also starts with calendar_id, so it takes over as the FK's
+            // supporting index the moment it's created, making the old
+            // unique index safe to drop right after.
+            if (!$indexes->contains('bch_calendar_range_idx')) {
+                $table->index(['calendar_id', 'date', 'end_date'], 'bch_calendar_range_idx');
+            }
+
             if ($indexes->contains('business_calendar_holidays_calendar_id_date_unique')) {
                 $table->dropUnique('business_calendar_holidays_calendar_id_date_unique');
             }
-
-            $table->index(['calendar_id', 'date', 'end_date'], 'bch_calendar_range_idx');
         });
     }
 
     public function down(): void
     {
         Schema::table('business_calendar_holidays', function (Blueprint $table) {
-            $table->dropIndex('bch_calendar_range_idx');
+            // Same ordering constraint as up(): add the restored unique
+            // index BEFORE dropping bch_calendar_range_idx, so calendar_id
+            // never goes a moment without an index covering its foreign
+            // key. Reversing this order reproduces MySQL error 1553 on
+            // rollback for the same reason it hit on the forward migration.
             $table->unique(['calendar_id', 'date']);
+            $table->dropIndex('bch_calendar_range_idx');
             $table->dropColumn(['type', 'end_date']);
         });
     }
