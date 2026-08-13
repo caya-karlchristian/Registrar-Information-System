@@ -11,6 +11,9 @@ namespace App\DTOs\Ogos;
  *   firstName:     string,
  *   middleName:    string,   ← plain string, empty string when absent
  *   lastName:      string,
+ *   suffixName:    string,   ← plain string, empty string when absent
+ *                                (confirmed via Postman capture, 2026-08-13
+ *                                — see $suffix property docblock below)
  *   email:         string,
  *   mobileNumber:  string,
  *   program:       { id, code, name },
@@ -50,8 +53,26 @@ readonly class OgosStudentDTO
         public ?int    $yearLevel,
         public ?string $section,       // string in real API ("1", "2A", etc.)
 
-        // Fields only available from /personal-info — null unless enriched
+        // suffix: IS returned by the flat student endpoint, under the key
+        // `suffixName` — NOT `suffix`. Confirmed via a Postman capture of a
+        // real GET /integrations/students/profile response, 2026-08-13
+        // (screenshot on file). Earlier revisions of this DTO assumed this
+        // field didn't exist on OGOS at all and left it permanently null;
+        // that was wrong — it was simply never read under its real key.
+        // That silent gap mattered beyond just display: RIS's Cashier OR
+        // name-matching (DocumentRequestController::store() ->
+        // NameMatcher::candidatesFor()) reads the suffix straight off the
+        // locally-stored student_profile row, so an unpopulated suffix here
+        // meant every generated candidate name omitted the suffix entirely
+        // — no amount of punctuation/placement guessing in NameMatcher
+        // could recover a suffix that was never passed in to begin with.
         public ?string $suffix       = null,
+
+        // Remaining fields below ARE genuinely available, but only from
+        // the separate /personal-info endpoint, and are NOT auto-populated
+        // onto this DTO either — callers must read them off the separate
+        // OgosPersonalInfoDTO returned by getStudentPersonalInfo(), same as
+        // OgosStudentService::upsertLocalRecords() already does via $personal.
         public ?string $gender       = null,
         public ?string $civilStatus  = null,
         public ?string $religion     = null,
@@ -83,6 +104,12 @@ readonly class OgosStudentDTO
 
             yearLevel: isset($data['yearLevel']) ? (int) $data['yearLevel'] : null,
             section:   self::nullableString($data['section'] ?? null),
+
+            // Real key is `suffixName`, not `suffix` — see property
+            // docblock above. Routed through nullableString() the same as
+            // middleName, since OGOS sends "" (not an absent key) when a
+            // student has no suffix.
+            suffix: self::nullableString($data['suffixName'] ?? null),
         );
     }
 
