@@ -33,7 +33,8 @@ const MODULE_OPTIONS = [
   "Admin Analytics",
   "Admin Logbook",
   "Admin Profile",
-  "Access Requests"
+  "Access Requests",
+  "Business Calendar"
 ];
 
 const LABEL_TO_KEY = {
@@ -42,7 +43,8 @@ const LABEL_TO_KEY = {
   "Admin Analytics": "analytics",
   "Admin Logbook": "logbook",
   "Admin Profile": "profile",
-  "Access Requests": "access_requests"
+  "Access Requests": "access_requests",
+  "Business Calendar": "business_calendar"
 };
 
 const KEY_TO_LABEL = {
@@ -51,7 +53,8 @@ const KEY_TO_LABEL = {
   "analytics": "Admin Analytics",
   "logbook": "Admin Logbook",
   "profile": "Admin Profile",
-  "access_requests": "Access Requests"
+  "access_requests": "Access Requests",
+  "business_calendar": "Business Calendar"
 };
 
 const PolicyManagement = () => {

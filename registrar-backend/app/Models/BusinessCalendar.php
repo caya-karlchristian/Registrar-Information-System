@@ -33,4 +33,9 @@ class BusinessCalendar extends Model
     {
         return $this->hasMany(BusinessCalendarHoliday::class, 'calendar_id', 'calendar_id');
     }
+
+    public function overrides()
+    {
+        return $this->hasMany(BusinessCalendarOverride::class, 'calendar_id', 'calendar_id');
+    }
 }
