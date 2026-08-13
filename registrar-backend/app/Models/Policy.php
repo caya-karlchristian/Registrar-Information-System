@@ -32,7 +32,7 @@ class Policy extends Model
      * touching this array (plus the frontend's mirrored MODULE_KEYS in
      * src/utils/policy.js).
      */
-    public const MODULE_KEYS = ['dashboard', 'inbox', 'analytics', 'logbook', 'profile', 'access_requests'];
+    public const MODULE_KEYS = ['dashboard', 'inbox', 'analytics', 'logbook', 'profile', 'access_requests', 'business_calendar'];
 
     /**
      * The policy new/legacy admin accounts fall back to when they have

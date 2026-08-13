@@ -67,6 +67,17 @@ class AuditLog extends Model
     public const ACTION_ANNOUNCEMENT_ARCHIVED = 'announcement_archived';
     public const ACTION_ANNOUNCEMENT_RESTORED = 'announcement_restored';
 
+    // Business calendar management — dated exceptions (holidays,
+    // suspensions, one-off events) and recurring overrides (e.g. WFH
+    // Mondays). Gated behind role:3,4 + module:business_calendar — see
+    // CalendarExceptionController / CalendarOverrideController.
+    public const ACTION_CALENDAR_EXCEPTION_CREATED = 'calendar_exception_created';
+    public const ACTION_CALENDAR_EXCEPTION_UPDATED = 'calendar_exception_updated';
+    public const ACTION_CALENDAR_EXCEPTION_DELETED = 'calendar_exception_deleted';
+    public const ACTION_CALENDAR_OVERRIDE_CREATED  = 'calendar_override_created';
+    public const ACTION_CALENDAR_OVERRIDE_UPDATED  = 'calendar_override_updated';
+    public const ACTION_CALENDAR_OVERRIDE_DELETED  = 'calendar_override_deleted';
+
     // User management — policy attachment (admins only)
     public const ACTION_POLICY_CREATED  = 'policy_created';
     public const ACTION_POLICY_UPDATED  = 'policy_updated';

@@ -25,6 +25,8 @@ use App\Http\Controllers\AccessRequestController;
 use App\Http\Controllers\RoleAssignmentController;
 use App\Http\Controllers\SignatoryController;
 use App\Http\Controllers\BusinessHoursController;
+use App\Http\Controllers\CalendarExceptionController;
+use App\Http\Controllers\CalendarOverrideController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,6 +45,11 @@ Route::get('announcements/{announcement}', [AnnouncementController::class, 'show
 // Step 4: lets the public request form tell requesters whether the
 // Registrar is open right now, and when processing begins if not.
 Route::get('/business-hours/status', [BusinessHoursController::class, 'status'])
+    ->middleware('throttle:60,1');
+
+// Step 5: heads-up list of upcoming closures (suspensions, events, WFH
+// days) for the same public request-form banner.
+Route::get('/business-hours/upcoming-closures', [BusinessHoursController::class, 'upcomingClosures'])
     ->middleware('throttle:60,1');
 
 /*
@@ -122,6 +129,25 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::post('/',    [RequestDocumentController::class, 'store'])->middleware('role:1,2');
         Route::put('{id}',  [RequestDocumentController::class, 'update'])->middleware('role:3');
         Route::delete('{id}', [RequestDocumentController::class, 'destroy'])->middleware('role:3');
+    });
+
+    // Business calendar management — dated exceptions (holidays,
+    // suspensions, events) and recurring overrides (e.g. WFH Mondays).
+    // Unlike announcements (role:4 only), this is open to any admin whose
+    // policy grants the "business_calendar" module — super admin always
+    // bypasses via RoleMiddleware regardless of policy. GET is included
+    // here (not left open like `GET /policies`) since exception/override
+    // rows can include internal notes not meant for students/alumni; the
+    // public banner reads from /business-hours/* instead, which returns
+    // only the derived open/closed status, not the raw admin records.
+    Route::middleware(['role:3,4', 'module:business_calendar'])->group(function () {
+        Route::apiResource('calendar-exceptions', CalendarExceptionController::class)
+            ->parameters(['calendar-exceptions' => 'exception'])
+            ->only(['index', 'store', 'update', 'destroy']);
+
+        Route::apiResource('calendar-overrides', CalendarOverrideController::class)
+            ->parameters(['calendar-overrides' => 'override'])
+            ->only(['index', 'store', 'update', 'destroy']);
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.
