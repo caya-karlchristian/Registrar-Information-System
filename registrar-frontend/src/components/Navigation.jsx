@@ -20,7 +20,8 @@ import {
   BriefcaseIcon,
   UserIcon,
   ShieldCheckIcon,
-  XMarkIcon
+  XMarkIcon,
+  CalendarDaysIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider";
 import { useTheme } from "../context/ThemeContext";
@@ -63,6 +64,7 @@ const ROLE_CONFIG = {
       { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon, module: MODULE_KEYS.ANALYTICS },
       { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon, module: MODULE_KEYS.LOGBOOK },
       { name: 'Access Requests', to: 'access-requests', icon: ClipboardDocumentCheckIcon, module: MODULE_KEYS.ACCESS_REQUESTS },
+      { name: 'Business Calendar', to: 'business-calendar', icon: CalendarDaysIcon, module: MODULE_KEYS.BUSINESS_CALENDAR },
       { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon, module: MODULE_KEYS.PROFILE },
     ],
   },
@@ -74,6 +76,7 @@ const ROLE_CONFIG = {
       { name: 'Document Management', to: 'documents', icon: TableCellsIcon },
       { name: 'Audit Trail', to: 'report', icon: UserCircleIcon },
       { name: 'Announcement Management', to: 'settings', icon: Cog6ToothIcon },
+      { name: 'Business Calendar', to: 'business-calendar', icon: CalendarDaysIcon },
     ],
   },
 };
