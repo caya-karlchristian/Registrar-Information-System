@@ -7,6 +7,7 @@ use App\Models\SystemUser;
 use App\Models\AuditLog;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Http\Requests\DocumentRequest\BulkRequestIdsRequest;
+use App\Http\Requests\DocumentRequest\ClaimDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\StoreDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\UpdateDocumentRequestRequest;
 use App\Services\DocumentRequestService;
@@ -360,6 +361,22 @@ class DocumentRequestController extends Controller
         $validated = $request->validated();
 
         $documentRequest = $this->requestService->updateRequest($documentRequest, $validated);
+
+        return response()->json($documentRequest->load(self::RELATIONS), 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /document-requests/claim
+    //
+    // QR Code Claiming Policy v1.0. No {documentRequest} route param —
+    // staff arrive with a scanned uuid or a typed claim_code, not a known
+    // request_id, so lookup happens inside the service. Authorization is
+    // handled by ClaimDocumentRequestRequest::authorize() (staff-only),
+    // same as every other write action in this controller.
+    // -------------------------------------------------------------------------
+    public function claim(ClaimDocumentRequestRequest $request)
+    {
+        $documentRequest = $this->requestService->claimRequest($request->validated());
 
         return response()->json($documentRequest->load(self::RELATIONS), 200);
     }

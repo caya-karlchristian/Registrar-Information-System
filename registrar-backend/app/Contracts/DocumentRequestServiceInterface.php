@@ -29,6 +29,20 @@ interface DocumentRequestServiceInterface
     public function updateRequest(DocumentRequest $documentRequest, array $validated): DocumentRequest;
 
     /**
+     * Claim a request via QR scan (uuid) or manual entry (claim_code).
+     *
+     * Looks the request up by whichever credential is supplied, then
+     * delegates the actual Completed transition to updateRequest() — so
+     * the row lock, archived-is-read-only guard, and allowedTransitions()
+     * check all apply exactly as they do for a manual admin status change.
+     *
+     * @throws \Illuminate\Http\Exceptions\HttpResponseException 404 if no
+     *         matching request exists; propagates whatever updateRequest()
+     *         throws (422) if the request isn't currently ReadyToClaim.
+     */
+    public function claimRequest(array $credential): DocumentRequest;
+
+    /**
      * Archive a single request. Reversible — does not touch status_id.
      * Any authorized admin may archive a request regardless of its
      * current status (see Archive Eligibility Policy – Administrator).

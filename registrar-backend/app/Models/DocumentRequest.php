@@ -45,9 +45,23 @@ class DocumentRequest extends Model
     ];
 
     /**
+     * Alphabet for claim_code: Crockford-style, excludes 0/O and 1/I/L
+     * so a code read aloud at the counter or hand-typed by staff can't
+     * be misheard/mistyped into a different valid-looking code.
+     */
+    private const CLAIM_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+    private const CLAIM_CODE_LENGTH   = 6;
+
+    /**
      * Auto-generate a UUID for every new request.
      * The uuid is exposed in the UI instead of the integer PK
      * to avoid leaking record counts and enabling enumeration.
+     *
+     * Also generates claim_code — the short human-typeable fallback used
+     * when a student has no phone or the QR scan fails (see QR Code
+     * Claiming Policy v1.0, and the claim_code migration docblock for the
+     * full reasoning). Generated the same way as uuid: on creating(),
+     * only if not already set, so factories/seeders can still override it.
      *
      * Also registers ExcludeArchivedScope so archived requests are
      * invisible to every query by default — see the scope's docblock
@@ -59,9 +73,38 @@ class DocumentRequest extends Model
             if (empty($request->uuid)) {
                 $request->uuid = (string) Str::uuid();
             }
+
+            if (empty($request->claim_code)) {
+                $request->claim_code = static::generateUniqueClaimCode();
+            }
         });
 
         static::addGlobalScope(new ExcludeArchivedScope());
+    }
+
+    /**
+     * Generate a claim_code guaranteed unique against existing rows.
+     *
+     * The alphabet + length give ~729M possible codes, so collisions are
+     * extremely unlikely — but correctness shouldn't rely on probability
+     * alone, hence the existence check rather than a bare random draw.
+     * withArchived()/withTrashed() are used so a code can never collide
+     * with an archived or soft-deleted request either.
+     */
+    private static function generateUniqueClaimCode(): string
+    {
+        $alphabetLength = strlen(self::CLAIM_CODE_ALPHABET);
+
+        do {
+            $code = '';
+            for ($i = 0; $i < self::CLAIM_CODE_LENGTH; $i++) {
+                $code .= self::CLAIM_CODE_ALPHABET[random_int(0, $alphabetLength - 1)];
+            }
+        } while (
+            static::withArchived()->withTrashed()->where('claim_code', $code)->exists()
+        );
+
+        return $code;
     }
 
     public function user()

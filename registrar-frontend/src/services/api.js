@@ -249,6 +249,19 @@ export const archiveDocumentRequests = (ids) => api.post(`/document-requests/arc
 export const restoreDocumentRequests = (ids) => api.post(`/document-requests/restore-bulk`, { request_ids: ids });
 
 // -------------------------------------------------------
+// CLAIMING (QR Code Claiming Policy v1.0) — staff/admin only.
+// Pass exactly one of the two: { uuid } from a decoded QR scan, or
+// { claim_code } from the manual-entry fallback field. Never both —
+// the backend rejects a payload containing both. On success the
+// matching request is transitioned to Completed and returned; on
+// failure the backend already distinguishes "no such code" (404) from
+// "not ready to claim yet" / "already claimed" (422) via the normal
+// status-transition guard, so surface err.response.data.message as-is
+// rather than writing a new message client-side.
+// -------------------------------------------------------
+export const claimDocumentRequest = (credential) => api.post(`/document-requests/claim`, credential);
+
+// -------------------------------------------------------
 // REQUEST HISTORY (read-only from the frontend)
 // -------------------------------------------------------
 export const getRequestHistory = () => api.get("/request-history");

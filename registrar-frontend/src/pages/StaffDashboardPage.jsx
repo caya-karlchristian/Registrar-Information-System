@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import StaffDashboard from '../layouts/StaffDashboard.jsx';
+import ClaimScannerModal from '../components/ClaimScannerModal.jsx';
 import { useTheme } from '../context/ThemeContext';
-import { QueueListIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
+import { QueueListIcon, ArchiveBoxIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
 const StaffDashboardPage = () => {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'archived'
+  const [scannerOpen, setScannerOpen] = useState(false);
   const { isDark } = useTheme();
 
   return (
@@ -46,11 +48,27 @@ const StaffDashboardPage = () => {
               <span>Archived records</span>
             </button>
           </div>
+
+          {/* Scan to Claim — only meaningful for the active-requests view;
+              archived requests are read-only (see archive/restore logic
+              elsewhere) and are never claimable. */}
+          {activeTab === 'active' && (
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 mb-2 rounded-lg bg-pup-maroon text-white text-sm font-bold hover:bg-pup-dark-maroon transition-colors shadow-sm"
+            >
+              <QrCodeIcon className="w-5 h-5" />
+              <span>Scan to Claim</span>
+            </button>
+          )}
         </div>
 
         {/* Dashboard View */}
         <StaffDashboard viewMode={activeTab} isEmbedded={true} />
       </div>
+
+      <ClaimScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} />
     </div>
   );
 };

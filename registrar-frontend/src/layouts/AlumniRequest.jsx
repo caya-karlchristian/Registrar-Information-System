@@ -6,6 +6,7 @@ import MultiSelectDropdown from "../components/MultiSelection.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import SubmitConfirmationModal from "../components/SubmitConfirmationModal.jsx";
+import ClaimTicket from "../components/ClaimTicket.jsx";
 import OfficeHoursNotice from "../components/OfficeHoursNotice.jsx";
 import qrCode from "../assets/qrcode.png";
 import { useTheme } from "../context/ThemeContext";
@@ -20,6 +21,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
   const {
     currentStep,
     isSubmitted,
+    claimTicket,
     errorMessage,
     setErrorMessage,
     showConfirmModal,
@@ -68,6 +70,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
             <p className="mb-6 text-4xl text-center font-bold text-white mt-2">
               Thank you and keep safe always.
             </p>
+            {/* QR Code Claiming Policy v1.0 §3.2, access point 1 */}
+            <ClaimTicket uuid={claimTicket?.uuid} claimCode={claimTicket?.claimCode} />
             <OfficeHoursNotice isDark={isDark} />
             <button
               onClick={handleConfirm}
