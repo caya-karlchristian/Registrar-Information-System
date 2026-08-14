@@ -300,6 +300,44 @@ const BusinessCalendarManagement = () => {
   };
 
   // -------------------------------------------------------
+  // Enable/disable — a live switch on each row, same pattern as
+  // Announcement's handleToggle: fires immediately, no modal, no
+  // confirmation. Disabling doesn't delete anything — the row stays in
+  // the list (and can be flipped back on) but has zero effect on the
+  // actual calendar the moment it's off (enforced server-side in
+  // BusinessCalendarService, not just hidden in this UI).
+  // -------------------------------------------------------
+  const handleToggleExceptionEnabled = async (item) => {
+    try {
+      const res = await updateCalendarException(item.holiday_id, { enabled: !item.enabled });
+      setExceptions((prev) => prev.map((e) => (e.holiday_id === item.holiday_id ? res.data : e)));
+    } catch (err) {
+      console.error("Failed to toggle closure:", err);
+      const status = err?.response?.status;
+      setErrorMsg(
+        status === 403
+          ? "You don't have permission to manage the business calendar."
+          : "Couldn't update this closure. Please try again."
+      );
+    }
+  };
+
+  const handleToggleOverrideEnabled = async (item) => {
+    try {
+      const res = await updateCalendarOverride(item.override_id, { enabled: !item.enabled });
+      setOverrides((prev) => prev.map((o) => (o.override_id === item.override_id ? res.data : o)));
+    } catch (err) {
+      console.error("Failed to toggle recurring override:", err);
+      const status = err?.response?.status;
+      setErrorMsg(
+        status === 403
+          ? "You don't have permission to manage the business calendar."
+          : "Couldn't update this recurring override. Please try again."
+      );
+    }
+  };
+
+  // -------------------------------------------------------
   // Client-side search over the currently loaded page
   // -------------------------------------------------------
   const filteredExceptions = exceptions.filter((item) => {
@@ -411,6 +449,7 @@ const BusinessCalendarManagement = () => {
                 typeBadge={TYPE_BADGE}
                 onEdit={openEditExceptionForm}
                 onDelete={(record) => setDeleteTarget({ kind: "exception", record })}
+                onToggleEnabled={handleToggleExceptionEnabled}
               />
             ) : (
               <OverridesTable
@@ -419,6 +458,7 @@ const BusinessCalendarManagement = () => {
                 isDark={isDark}
                 onEdit={openEditOverrideForm}
                 onDelete={(record) => setDeleteTarget({ kind: "override", record })}
+                onToggleEnabled={handleToggleOverrideEnabled}
               />
             )}
 
@@ -671,7 +711,7 @@ const FormActions = ({ isDark, saving, onCancel, editingId, createLabel }) => (
   </div>
 );
 
-const ExceptionsTable = ({ items, loading, isDark, typeBadge, onEdit, onDelete }) => {
+const ExceptionsTable = ({ items, loading, isDark, typeBadge, onEdit, onDelete, onToggleEnabled }) => {
   if (loading) {
     return <div className={`py-16 text-center text-sm ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Loading closures…</div>;
   }
@@ -688,18 +728,22 @@ const ExceptionsTable = ({ items, loading, isDark, typeBadge, onEdit, onDelete }
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-175 text-sm">
+      <table className="w-full min-w-200 text-sm">
         <thead>
           <tr className={isDark ? "border-b border-[#3e4042]" : "border-b border-gray-100"}>
             <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Label</th>
             <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Type</th>
             <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Dates</th>
+            <th className={`px-5 py-4 text-center font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Enabled</th>
             <th className={`px-5 py-4 text-center font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.holiday_id} className={`border-b last:border-0 transition-colors ${isDark ? "border-[#3e4042] hover:bg-[#2a2a2f]" : "border-gray-100 hover:bg-gray-50"}`}>
+            <tr
+              key={item.holiday_id}
+              className={`border-b last:border-0 transition-colors ${isDark ? "border-[#3e4042] hover:bg-[#2a2a2f]" : "border-gray-100 hover:bg-gray-50"} ${item.enabled ? "" : "opacity-50"}`}
+            >
               <td className={`px-5 py-4 font-semibold ${isDark ? "text-[#e4e6eb]" : "text-gray-800"}`}>{item.label}</td>
               <td className="px-5 py-4">
                 <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${typeBadge[item.type] ?? ""}`}>
@@ -712,6 +756,9 @@ const ExceptionsTable = ({ items, loading, isDark, typeBadge, onEdit, onDelete }
                   : `${formatDate(item.date)} – ${formatDate(item.end_date)}`}
               </td>
               <td className="px-5 py-4 text-center">
+                <EnabledSwitch isDark={isDark} enabled={item.enabled} onToggle={() => onToggleEnabled(item)} />
+              </td>
+              <td className="px-5 py-4 text-center">
                 <RowActions isDark={isDark} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />
               </td>
             </tr>
@@ -722,7 +769,7 @@ const ExceptionsTable = ({ items, loading, isDark, typeBadge, onEdit, onDelete }
   );
 };
 
-const OverridesTable = ({ items, loading, isDark, onEdit, onDelete }) => {
+const OverridesTable = ({ items, loading, isDark, onEdit, onDelete, onToggleEnabled }) => {
   if (loading) {
     return <div className={`py-16 text-center text-sm ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Loading recurring overrides…</div>;
   }
@@ -739,19 +786,23 @@ const OverridesTable = ({ items, loading, isDark, onEdit, onDelete }) => {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-175 text-sm">
+      <table className="w-full min-w-225 text-sm">
         <thead>
           <tr className={isDark ? "border-b border-[#3e4042]" : "border-b border-gray-100"}>
             <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Label</th>
             <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Day</th>
             <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Status</th>
             <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Effective</th>
+            <th className={`px-5 py-4 text-center font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Enabled</th>
             <th className={`px-5 py-4 text-center font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.override_id} className={`border-b last:border-0 transition-colors ${isDark ? "border-[#3e4042] hover:bg-[#2a2a2f]" : "border-gray-100 hover:bg-gray-50"}`}>
+            <tr
+              key={item.override_id}
+              className={`border-b last:border-0 transition-colors ${isDark ? "border-[#3e4042] hover:bg-[#2a2a2f]" : "border-gray-100 hover:bg-gray-50"} ${item.enabled ? "" : "opacity-50"}`}
+            >
               <td className={`px-5 py-4 font-semibold ${isDark ? "text-[#e4e6eb]" : "text-gray-800"}`}>{item.label}</td>
               <td className={`px-5 py-4 ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>{capitalize(item.day_of_week)}</td>
               <td className="px-5 py-4">
@@ -767,6 +818,9 @@ const OverridesTable = ({ items, loading, isDark, onEdit, onDelete }) => {
                 {formatDate(item.effective_from)} – {item.effective_until ? formatDate(item.effective_until) : "Until further notice"}
               </td>
               <td className="px-5 py-4 text-center">
+                <EnabledSwitch isDark={isDark} enabled={item.enabled} onToggle={() => onToggleEnabled(item)} />
+              </td>
+              <td className="px-5 py-4 text-center">
                 <RowActions isDark={isDark} onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />
               </td>
             </tr>
@@ -776,6 +830,25 @@ const OverridesTable = ({ items, loading, isDark, onEdit, onDelete }) => {
     </div>
   );
 };
+
+/** Live on/off switch — flips immediately via PATCH, no modal, matching Announcement's enabled toggle. */
+const EnabledSwitch = ({ isDark, enabled, onToggle }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    aria-pressed={enabled}
+    title={enabled ? "Enabled — click to disable" : "Disabled — click to enable"}
+    className={`relative inline-flex w-10 h-6 rounded-full transition-colors duration-200 cursor-pointer focus:outline-none ${
+      enabled ? (isDark ? "bg-green-900/20" : "bg-gray-700") : (isDark ? "bg-[#3e4042]" : "bg-gray-300")
+    }`}
+  >
+    <span
+      className={`inline-block w-4 h-4 mt-1 rounded-full bg-white shadow transform transition-transform duration-200 ${
+        enabled ? "translate-x-5" : "translate-x-1"
+      }`}
+    />
+  </button>
+);
 
 const RowActions = ({ isDark, onEdit, onDelete }) => (
   <div className="flex items-center justify-center gap-1">
