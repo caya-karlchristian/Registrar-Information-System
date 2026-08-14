@@ -5,6 +5,7 @@ import { getDocumentTypes } from "../services/api";
 import { PROGRESS_MAP } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
+import ClaimTicket from './ClaimTicket';
 
 const RequestDetailsModal = ({ request, onClose, user }) => {
   const { docTypeName, purposeName, certName } = useReferenceData();
@@ -100,6 +101,27 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               </div>
           </div>
           </Section>
+
+          {/* Claim Ticket — QR Code Claiming Policy v1.0 §3.2 access point 2
+              (dashboard). Shown for the entire lifetime a request is still
+              claimable — Processing (25%), PendingSignature (60%), and
+              ReadyToClaim (75%) — matching the pop-up shown immediately on
+              submit (RequestForm.jsx/AlumniRequest.jsx) and the inbox
+              notification sent at request_submitted: the student can access
+              their ticket from day one, not only once it's Ready to Claim.
+              Staff can only ever *act* on a scan once the request is
+              actually ReadyToClaim — that restriction is enforced
+              server-side in the claim endpoint, not by hiding the ticket
+              here. Hidden only once there's nothing left to claim:
+              Completed (100%) or Forfeited/Cancelled (0%). */}
+          {progress !== 0 && progress !== 100 && (
+            <Section title="Claim Ticket" isDark={isDark}>
+              <div className="flex justify-center">
+                <ClaimTicket uuid={request.uuid} claimCode={request.claim_code} />
+              </div>
+            </Section>
+          )}
+
           {/* Student Information */}
           {isStudent && (
             <Section title="Student Information" isDark={isDark}>

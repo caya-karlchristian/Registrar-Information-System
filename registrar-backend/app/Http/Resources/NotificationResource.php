@@ -32,6 +32,11 @@ class NotificationResource extends JsonResource
             // Checklist of documents/certificates and their requirements.
             // Present only on request_submitted notifications; null otherwise.
             'requirements' => $this->data['requirements'] ?? null,
+            // Claim ticket credentials — present only on ready_to_claim
+            // notifications; null otherwise. See DocumentRequestService::
+            // notifyOwnerOfStatusChange() for where these are populated.
+            'uuid'         => $this->data['uuid'] ?? null,
+            'claim_code'   => $this->data['claim_code'] ?? null,
             'announcement' => isset($this->data['announcement_id']) ? [
                 'id'      => $this->data['announcement_id'],
                 'title'   => $this->data['announcement_title'],

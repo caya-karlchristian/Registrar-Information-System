@@ -6,6 +6,7 @@ import { useNotificationsContext as useNotifications } from '../context/Notifica
 import { useTheme } from '../context/ThemeContext';
 import { InboxListSkeleton, InboxPreviewSkeleton } from '../components/LoadingSkeleton'; 
 import { EnvelopeOpenIcon } from '@heroicons/react/24/outline';
+import ClaimTicket from '../components/ClaimTicket';
 // CATEGORY_MAP lives in src/constants/notificationCategories.js
 // InboxCenter only uses the .category label from each entry.
 import { CATEGORY_MAP } from '../constants/notificationCategories';
@@ -313,6 +314,35 @@ const InboxCenter = () => {
                                   </p>
                                 </div>
                               ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Claim ticket ──
+                            QR Code Claiming Policy v1.0 §3.2 access point 3
+                            (inbox). uuid/claim_code are populated on both
+                            the request_submitted notification (so the
+                            ticket is available from day one, same as the
+                            submit pop-up) and again on ready_to_claim (see
+                            DocumentRequestService — submitRequest() and
+                            notifyOwnerOfStatusChange()), so this renders on
+                            whichever of those two messages the student
+                            opens. Gating on field presence here — rather
+                            than on selectedMail's type string — keeps this
+                            in sync with the backend automatically if that
+                            trigger list ever changes. ClaimTicket itself
+                            also no-ops on missing props, so this is a
+                            belt-and-suspenders check, not the only guard. */}
+                        {selectedMail._raw?.uuid && selectedMail._raw?.claim_code && (
+                          <div className={`rounded-lg border px-4 py-4 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
+                            <p className={`text-[11px] font-semibold uppercase tracking-widest mb-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                              Your Claim Ticket
+                            </p>
+                            <div className="flex justify-center">
+                              <ClaimTicket
+                                uuid={selectedMail._raw.uuid}
+                                claimCode={selectedMail._raw.claim_code}
+                              />
                             </div>
                           </div>
                         )}

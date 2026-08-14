@@ -91,12 +91,25 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         }
 
         // Notify the requester and all admins (never superadmins)
+        //
+        // uuid/claim_code go out here too, not just on the ReadyToClaim
+        // transition below — the claim ticket is meant to be available to
+        // the student from the moment they submit (same as the pop-up
+        // shown immediately after RequestForm.jsx/AlumniRequest.jsx submit),
+        // per QR Code Claiming Policy v1.0 §3.2's "pop-up, dashboard, inbox"
+        // access points. Staff can only ever *act* on it once the request
+        // is actually ReadyToClaim (§3.4, enforced server-side in the claim
+        // endpoint) — that's a scan-time restriction, not a visibility one,
+        // so there's no reason to withhold the ticket from the inbox until
+        // later.
         $this->notificationService->send(
             recipient:    $user,
             triggerEvent: 'request_submitted',
             data:         [
                 'request_id'   => $documentRequest->request_id,
                 'requirements' => $requirements,   // checklist shown in inbox
+                'uuid'         => $documentRequest->uuid,
+                'claim_code'   => $documentRequest->claim_code,
             ],
             requestId:    $documentRequest->request_id,
         );
@@ -491,10 +504,27 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         $trigger = $status->notificationTrigger();
 
         if ($trigger) {
+            $data = ['request_id' => $documentRequest->request_id];
+
+            // The ticket already went out on the request_submitted
+            // notification above (submitRequest()), so this isn't the only
+            // place it's available — but ReadyToClaim is the moment a
+            // student is actually being told "go claim this now," so it's
+            // worth repeating the ticket on this notification too rather
+            // than making them scroll back to find their original one.
+            // uuid/claim_code aren't sensitive by themselves (see
+            // ClaimTicket.jsx docblock: the QR alone can't complete a claim
+            // — staff still verify identity + requirements in person before
+            // scanning), so there's no downside to including them again.
+            if ($status === RequestStatusEnum::ReadyToClaim) {
+                $data['uuid']       = $documentRequest->uuid;
+                $data['claim_code'] = $documentRequest->claim_code;
+            }
+
             $this->notificationService->send(
                 recipient:    $owner,
                 triggerEvent: $trigger,
-                data:         ['request_id' => $documentRequest->request_id],
+                data:         $data,
                 requestId:    $documentRequest->request_id,
             );
         }
