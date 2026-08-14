@@ -9,6 +9,7 @@ import ErrorToast from "../components/ErrorToast.jsx";
 import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
+import ClaimTicket from '../components/ClaimTicket.jsx';
 import OfficeHoursNotice from '../components/OfficeHoursNotice.jsx';
 import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
@@ -53,6 +54,12 @@ const RequestForm = ({ showProfileStep = false }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  // Populated from the create response on success — holds just the two
+  // fields ClaimTicket needs. Not the whole DocumentRequest object: this
+  // screen has nothing else to do with the rest of it, and keeping only
+  // what's displayed avoids this state going stale/wrong if the request
+  // is later updated elsewhere while this tab is still open.
+  const [claimTicket, setClaimTicket] = useState(null);
 
   const availableDocs = useMemo(() => {
     return documentTypes.filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id));
@@ -223,7 +230,15 @@ const RequestForm = ({ showProfileStep = false }) => {
 
   const mutation = useMutation({
     mutationFn: createDocumentRequest,
-    onSuccess: () => {
+    onSuccess: (response) => {
+      // response.data is the full created DocumentRequest (see
+      // DocumentRequestController::store) — uuid/claim_code are always
+      // present since DocumentRequest::booted() generates both for
+      // every new row, and neither is in $hidden.
+      setClaimTicket({
+        uuid: response?.data?.uuid ?? null,
+        claimCode: response?.data?.claim_code ?? null,
+      });
       setIsSubmitted(true);
     },
     onError: (error) => {
@@ -352,6 +367,11 @@ const RequestForm = ({ showProfileStep = false }) => {
             <p className="mb-6 text-4xl font-bold text-white">
               Thank you and keep safe always.
             </p>
+            {/* QR Code Claiming Policy v1.0 §3.2, access point 1: the
+                claim ticket is shown here, immediately after validation.
+                Renders nothing if claimTicket is still null/incomplete
+                (see ClaimTicket) rather than blocking this screen on it. */}
+            <ClaimTicket uuid={claimTicket?.uuid} claimCode={claimTicket?.claimCode} />
             <OfficeHoursNotice isDark={isDark} />
             <button
               onClick={handleConfirm}

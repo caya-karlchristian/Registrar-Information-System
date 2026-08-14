@@ -24,6 +24,9 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  // See RequestForm.jsx's identical claimTicket state — only the two
+  // fields ClaimTicket needs, not the whole created request.
+  const [claimTicket, setClaimTicket] = useState(null);
 
   const availableDocs = useMemo(() => {
     return documentTypes.filter((doc) => ALUMNI_ACCESS_IDS.includes(doc.access_id));
@@ -172,7 +175,11 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
 
   const mutation = useMutation({
     mutationFn: createDocumentRequest,
-    onSuccess: () => {
+    onSuccess: (response) => {
+      setClaimTicket({
+        uuid: response?.data?.uuid ?? null,
+        claimCode: response?.data?.claim_code ?? null,
+      });
       setIsSubmitted(true);
     },
     onError: (error) => {
@@ -303,6 +310,7 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   return {
     currentStep,
     isSubmitted,
+    claimTicket,
     errorMessage,
     setErrorMessage,
     showConfirmModal,
