@@ -94,6 +94,7 @@ class CalendarOverrideService
     private function assertNoOverlap(int $calendarId, string $dayOfWeek, string $from, ?string $until, ?int $excludeId = null): void
     {
         $overlap = BusinessCalendarOverride::where('calendar_id', $calendarId)
+            ->where('enabled', true)
             ->where('day_of_week', $dayOfWeek)
             ->where('effective_from', '<=', $until ?? '9999-12-31')
             ->where(function ($query) use ($from) {

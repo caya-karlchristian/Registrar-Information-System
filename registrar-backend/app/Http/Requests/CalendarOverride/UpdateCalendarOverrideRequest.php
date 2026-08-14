@@ -19,6 +19,7 @@ class UpdateCalendarOverrideRequest extends FormRequest
             'label'            => 'sometimes|required|string|max:255',
             'effective_from'   => 'sometimes|required|date',
             'effective_until'  => 'nullable|date|after_or_equal:effective_from',
+            'enabled'          => 'sometimes|boolean',
         ];
     }
 }

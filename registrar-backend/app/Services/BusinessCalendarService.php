@@ -315,14 +315,19 @@ class BusinessCalendarService
         // (kept as parameters for readability at call sites and in case a
         // future caller wants a genuinely scoped variant); filtering by
         // date still happens per-day via coversDate() in exceptionFor().
+        //
+        // enabled=false is excluded here, at the single point every public
+        // read (currentStatus, minutesBetween, upcomingClosures) funnels
+        // through — a disabled closure must have zero effect on the
+        // calendar, not just look inert in the admin list.
         return $this->exceptionsCache[$calendar->calendar_id]
-            ??= $calendar->holidays()->get();
+            ??= $calendar->holidays()->where('enabled', true)->get();
     }
 
     private function activeOverrides(BusinessCalendar $calendar, CarbonInterface $start, CarbonInterface $end)
     {
         return $this->overridesCache[$calendar->calendar_id]
-            ??= $calendar->overrides()->get();
+            ??= $calendar->overrides()->where('enabled', true)->get();
     }
 
     private function resolveCalendar(?int $calendarId): BusinessCalendar

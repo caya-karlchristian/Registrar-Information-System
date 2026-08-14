@@ -115,6 +115,7 @@ class CalendarExceptionService
     private function assertNoOverlap(int $calendarId, string $date, string $endDate, ?int $excludeId = null): void
     {
         $overlap = BusinessCalendarHoliday::where('calendar_id', $calendarId)
+            ->where('enabled', true)
             ->where('date', '<=', $endDate)
             ->where('end_date', '>=', $date)
             ->when($excludeId, fn ($query) => $query->where('holiday_id', '!=', $excludeId))

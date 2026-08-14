@@ -27,12 +27,14 @@ class BusinessCalendarOverride extends Model
         'label',
         'effective_from',
         'effective_until',
+        'enabled',
     ];
 
     protected $casts = [
         'is_closed'       => 'boolean',
         'effective_from'  => 'date',
         'effective_until' => 'date',
+        'enabled'         => 'boolean',
         'created_at'      => 'datetime',
         'updated_at'      => 'datetime',
     ];

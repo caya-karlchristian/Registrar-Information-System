@@ -191,3 +191,69 @@ test('an end_date key that is entirely absent from the request still preserves t
     expect($updated->label)->toBe('Renamed')
         ->and($updated->end_date->toDateString())->toBe('2026-03-13');
 });
+
+test('a disabled exception no longer closes the office, even though the row still exists', function () {
+    $service = new BusinessCalendarService();
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $calendar->holidays()->create([
+        'type' => 'suspension', 'label' => 'Called-off suspension',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'enabled' => false,
+    ]);
+
+    $status = $service->currentStatus(Carbon::parse('2026-03-11 10:00:00', 'Asia/Manila'));
+
+    expect($status['is_open'])->toBeTrue();
+});
+
+test('a disabled recurring override no longer closes its weekday', function () {
+    $service = new BusinessCalendarService();
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $calendar->overrides()->create([
+        'day_of_week' => 'monday', 'is_closed' => true, 'label' => 'Paused WFH Monday',
+        'effective_from' => '2026-01-01', 'effective_until' => null,
+        'enabled' => false,
+    ]);
+
+    $status = $service->currentStatus(Carbon::parse('2026-03-09 10:00:00', 'Asia/Manila')); // a Monday
+
+    expect($status['is_open'])->toBeTrue();
+});
+
+test('a disabled exception does not block a new closure covering the same dates', function () {
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+    $calendar->holidays()->create([
+        'type' => 'event', 'label' => 'Cancelled event',
+        'date' => '2026-03-11', 'end_date' => '2026-03-13',
+        'enabled' => false,
+    ]);
+
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $exception = $service->create([
+        'type' => 'suspension', 'label' => 'Real suspension', 'date' => '2026-03-12', 'end_date' => '2026-03-14',
+    ], $actor, Request::create('/'));
+
+    expect($exception->label)->toBe('Real suspension');
+});
+
+test('toggling enabled off via update() takes effect immediately, and back on again restores it', function () {
+    $service = new BusinessCalendarService();
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $exception = $calendar->holidays()->create([
+        'type' => 'suspension', 'label' => 'Toggle me', 'date' => '2026-03-11', 'end_date' => '2026-03-11',
+    ]);
+
+    $exceptionService = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $exceptionService->update($exception, ['enabled' => false], $actor, Request::create('/'));
+    expect((new BusinessCalendarService())->currentStatus(Carbon::parse('2026-03-11 10:00:00', 'Asia/Manila'))['is_open'])->toBeTrue();
+
+    $exceptionService->update($exception->refresh(), ['enabled' => true], $actor, Request::create('/'));
+    expect((new BusinessCalendarService())->currentStatus(Carbon::parse('2026-03-11 10:00:00', 'Asia/Manila'))['is_open'])->toBeFalse();
+});

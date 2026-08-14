@@ -31,11 +31,13 @@ class BusinessCalendarHoliday extends Model
         'end_date',
         'type',
         'label',
+        'enabled',
     ];
 
     protected $casts = [
         'date'       => 'date',
         'end_date'   => 'date',
+        'enabled'    => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

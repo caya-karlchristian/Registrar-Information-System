@@ -19,6 +19,7 @@ class UpdateCalendarExceptionRequest extends FormRequest
             'label'    => 'sometimes|required|string|max:255',
             'date'     => 'sometimes|required|date',
             'end_date' => 'nullable|date|after_or_equal:date',
+            'enabled'  => 'sometimes|boolean',
         ];
     }
 }
