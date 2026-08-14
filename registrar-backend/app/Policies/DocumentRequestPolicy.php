@@ -69,6 +69,17 @@ class DocumentRequestPolicy
     }
 
     // -------------------------------------------------------
+    // Claim a request (QR scan or manual claim_code entry)
+    // Only admin/super admin operate the claiming counter —
+    // same authorization shape as update(), since claiming is
+    // ultimately just a specific status transition performed by staff.
+    // -------------------------------------------------------
+    public function claim(SystemUser $user): bool
+    {
+        return $user->isStaff();
+    }
+
+    // -------------------------------------------------------
     // Archive / restore a request
     // Per the Archive Eligibility Policy – Administrator, any
     // authorized admin/super admin may archive or restore a request
