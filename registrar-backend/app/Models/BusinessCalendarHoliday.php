@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @property \Illuminate\Support\Carbon $date      Start of the closure (inclusive)
  * @property \Illuminate\Support\Carbon $end_date  End of the closure (inclusive) — equals $date for a single day
+ * @property string|null $closed_from_time  'H:i:s' — if set, `date` (only `date`, never `end_date` or the
+ *                                           days between) is open normally until this time, then closes.
+ *                                           Null means the classic full-day closure, unchanged.
  */
 class BusinessCalendarHoliday extends Model
 {
@@ -29,6 +32,7 @@ class BusinessCalendarHoliday extends Model
         'calendar_id',
         'date',
         'end_date',
+        'closed_from_time',
         'type',
         'label',
         'enabled',

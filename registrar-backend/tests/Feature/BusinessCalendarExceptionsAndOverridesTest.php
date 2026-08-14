@@ -240,6 +240,80 @@ test('a disabled exception does not block a new closure covering the same dates'
     expect($exception->label)->toBe('Real suspension');
 });
 
+test('creating an exception with a valid closed_from_time stores it', function () {
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $exception = $service->create([
+        'type' => 'suspension', 'label' => 'Typhoon suspension',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '15:00',
+    ], $actor, Request::create('/'));
+
+    expect(Carbon::parse($exception->closed_from_time)->format('H:i'))->toBe('15:00');
+});
+
+test('a closed_from_time at or before the normal opening time is rejected', function () {
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    // Default calendar opens at 08:00 — 07:30 isn't a partial closure,
+    // it's a full one.
+    expect(fn () => $service->create([
+        'type' => 'suspension', 'label' => 'Bad cutoff',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '07:30',
+    ], $actor, Request::create('/')))->toThrow(ValidationException::class);
+
+    // Exactly the opening time is also rejected — that's still "the
+    // whole day," not a partial closure.
+    expect(fn () => $service->create([
+        'type' => 'suspension', 'label' => 'Bad cutoff',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '08:00',
+    ], $actor, Request::create('/')))->toThrow(ValidationException::class);
+});
+
+test('explicitly clearing closed_from_time on update collapses the exception back to a full-day closure', function () {
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $exception = $calendar->holidays()->create([
+        'type' => 'suspension', 'label' => 'Typhoon suspension',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '15:00',
+    ]);
+
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    // Same array_key_exists shape as the end_date regression above: an
+    // explicit null must actually clear the cutoff, not be ignored.
+    $updated = $service->update($exception, ['closed_from_time' => null], $actor, Request::create('/'));
+
+    expect($updated->closed_from_time)->toBeNull();
+
+    $status = (new BusinessCalendarService())->currentStatus(Carbon::parse('2026-03-11 16:00:00', 'Asia/Manila'));
+    expect($status['is_open'])->toBeFalse(); // now fully closed all day, past what used to be "open" before 3pm
+});
+
+test('a closed_from_time key entirely absent from an update request preserves the existing cutoff', function () {
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $exception = $calendar->holidays()->create([
+        'type' => 'suspension', 'label' => 'Typhoon suspension',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '15:00',
+    ]);
+
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $updated = $service->update($exception, ['label' => 'Renamed'], $actor, Request::create('/'));
+
+    expect($updated->label)->toBe('Renamed')
+        ->and(Carbon::parse($updated->closed_from_time)->format('H:i'))->toBe('15:00');
+});
+
 test('toggling enabled off via update() takes effect immediately, and back on again restores it', function () {
     $service = new BusinessCalendarService();
     $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();

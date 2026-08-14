@@ -37,7 +37,7 @@ const DAYS_OF_WEEK = [
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
 ];
 
-const EMPTY_EXCEPTION_FORM = { type: "holiday", label: "", date: "", end_date: "" };
+const EMPTY_EXCEPTION_FORM = { type: "holiday", label: "", date: "", end_date: "", closed_from_time: "" };
 const EMPTY_OVERRIDE_FORM = { day_of_week: "monday", is_closed: true, label: "", effective_from: "", effective_until: "" };
 
 const formatDate = (dateStr) => {
@@ -46,6 +46,17 @@ const formatDate = (dateStr) => {
 };
 
 const capitalize = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+// closed_from_time comes back from the API as "HH:MM:SS" (or "HH:MM" —
+// the backend accepts either); either shape parses fine into a display
+// string like "3:00 PM" via a throwaway Date on an arbitrary day.
+const formatTime = (timeStr) => {
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":");
+  const d = new Date();
+  d.setHours(Number(h), Number(m), 0, 0);
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+};
 
 /**
  * Admin/superadmin screen for the business calendar's two closure
@@ -171,6 +182,9 @@ const BusinessCalendarManagement = () => {
       label: exception.label,
       date: exception.date?.slice(0, 10) ?? "",
       end_date: exception.end_date?.slice(0, 10) ?? "",
+      // Trim to "HH:MM" for the <input type="time">, regardless of
+      // whether the API returned "HH:MM" or "HH:MM:SS".
+      closed_from_time: exception.closed_from_time?.slice(0, 5) ?? "",
     });
     setFieldErrors({});
     setIsFormOpen(true);
@@ -208,6 +222,10 @@ const BusinessCalendarManagement = () => {
       label: exceptionForm.label.trim(),
       date: exceptionForm.date,
       end_date: exceptionForm.end_date || null,
+      // Explicit null (not omitted) so clearing the field on an edit
+      // actually clears the cutoff server-side — see
+      // CalendarExceptionService::update()'s array_key_exists handling.
+      closed_from_time: exceptionForm.closed_from_time || null,
     };
 
     try {
@@ -343,7 +361,7 @@ const BusinessCalendarManagement = () => {
   const filteredExceptions = exceptions.filter((item) => {
     const query = search.toLowerCase().trim();
     if (!query) return true;
-    return [item.label, item.type, item.date, item.end_date].join(" ").toLowerCase().includes(query);
+    return [item.label, item.type, item.date, item.end_date, item.closed_from_time].join(" ").toLowerCase().includes(query);
   });
 
   const filteredOverrides = overrides.filter((item) => {
@@ -570,6 +588,20 @@ const BusinessCalendarManagement = () => {
                       {fieldErrors.end_date && <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.end_date[0]}</p>}
                     </div>
                   </div>
+
+                  <div>
+                    <label className={labelClass}>Closes Early At (Optional)</label>
+                    <input
+                      type="time"
+                      value={exceptionForm.closed_from_time}
+                      onChange={(e) => setExceptionForm((prev) => ({ ...prev, closed_from_time: e.target.value }))}
+                      className={inputClass}
+                    />
+                    <p className={`mt-1 text-[11px] ${isDark ? "text-[#8a8d91]" : "text-gray-400"}`}>
+                      Leave blank for a full-day closure. Only affects the first day — if this is a multi-day range, later days are closed all day regardless.
+                    </p>
+                    {fieldErrors.closed_from_time && <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.closed_from_time[0]}</p>}
+                  </div>
                 </div>
 
                 <FormActions isDark={isDark} saving={saving} onCancel={closeForm} editingId={editingId} createLabel="Add Closure" />
@@ -754,6 +786,11 @@ const ExceptionsTable = ({ items, loading, isDark, typeBadge, onEdit, onDelete, 
                 {item.date === item.end_date
                   ? formatDate(item.date)
                   : `${formatDate(item.date)} – ${formatDate(item.end_date)}`}
+                {item.closed_from_time && (
+                  <span className={`block text-xs ${isDark ? "text-[#8a8d91]" : "text-gray-400"}`}>
+                    (closed from {formatTime(item.closed_from_time)})
+                  </span>
+                )}
               </td>
               <td className="px-5 py-4 text-center">
                 <EnabledSwitch isDark={isDark} enabled={item.enabled} onToggle={() => onToggleEnabled(item)} />
