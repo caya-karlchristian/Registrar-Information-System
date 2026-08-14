@@ -446,7 +446,7 @@ const LogbookRecords = () => {
                     'border-gray-200 hover:bg-gray-50 text-gray-700'}`}>
 
                       <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                        {formatDateLong(row.requested_at) || 'N/A'}
+                        {formatDateTimeLong(row.requested_at) || 'N/A'}
                       </td>
 
                       <td className="p-3 sm:p-4 text-center font-bold whitespace-nowrap">

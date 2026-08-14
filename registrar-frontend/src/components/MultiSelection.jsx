@@ -74,46 +74,68 @@ const MultiSelectDropdown = ({
         {label}
       </label>
 
-      {/* Trigger Button */}
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full p-2.5 rounded border cursor-pointer flex justify-between items-center min-h-10 focus:outline-none focus:ring-2 focus:ring-[#FFC72C] focus:border-pup-maroon text-left ${isDark ? 'bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb]' : 'bg-white border-gray-300 text-gray-700'}`}
+      {/* Trigger Container */}
+      <div
+        onClick={() => {
+          setIsOpen(true);
+          searchInputRef.current?.focus();
+        }}
+        className={`w-full p-2.5 rounded border cursor-text flex justify-between items-center min-h-10 focus-within:ring-2 focus-within:ring-[#FFC72C] focus-within:border-transparent text-left transition-all ${
+          isOpen ? 'ring-2 ring-[#FFC72C] border-transparent' : ''
+        } ${isDark ? 'bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb]' : 'bg-white border-gray-300 text-gray-700'}`}
       >
-        <div className="flex flex-wrap gap-1">
-          {selectedValues.length === 0 ? (
-            <span className={`text-sm ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
-              Select documents...
-            </span>
-          ) : (
-            selectedValues.map((val) => (
-              <span
-                key={val}
-                className={`text-xs px-2 py-1 rounded flex items-center ${isDark ? 'bg-pup-yellow text-pup-maroon' : 'bg-pup-maroon text-white'}`}
+        <div className="flex flex-wrap gap-1 items-center flex-1 pr-2">
+          {selectedValues.map((val) => (
+            <span
+              key={val}
+              className={`text-xs px-2 py-1 rounded flex items-center ${isDark ? 'bg-pup-yellow text-pup-maroon font-bold' : 'bg-pup-maroon text-white font-bold'}`}
+            >
+              {val}
+              <button
+                type="button"
+                aria-label={`Remove ${val}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleOption(val);
+                  searchInputRef.current?.focus();
+                }}
+                className="ml-1 hover:text-red-200 text-white/80 cursor-pointer flex items-center rounded focus:outline-none"
               >
-                {val}
-                <span
-                  role="button"
-                  aria-label={`Remove ${val}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleOption(val);
-                  }}
-                  className="ml-1 hover:text-red-200 text-white/80 cursor-pointer flex items-center rounded"
-                >
-                  <XMarkIcon className="w-3 h-3" />
-                </span>
-              </span>
-            ))
-          )}
+                <XMarkIcon className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder={selectedValues.length === 0 ? "Select documents..." : ""}
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setIsOpen(true);
+            }}
+            onFocus={() => setIsOpen(true)}
+            className={`flex-grow bg-transparent border-0 outline-none p-0 text-sm min-w-[80px] focus:ring-0 ${
+              isDark ? 'text-[#e4e6eb] placeholder-gray-500' : 'text-gray-700 placeholder-gray-400'
+            }`}
+          />
         </div>
 
-        <ChevronDownIcon
-          className={`w-5 h-5 transition-transform duration-200 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'} ${
-            isOpen ? "rotate-180" : ""
-          }`}
-        />
-      </button>
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen((prev) => !prev);
+          }}
+          className="cursor-pointer pr-1 shrink-0"
+        >
+          <ChevronDownIcon
+            className={`w-5 h-5 transition-transform duration-200 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'} ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          />
+        </span>
+      </div>
 
       {/* Dropdown Options */}
       {isOpen && (
@@ -123,21 +145,6 @@ const MultiSelectDropdown = ({
           }`}
           style={isDark ? {} : { boxShadow: '0 8px 32px -4px rgba(0,0,0,0.18), 0 2px 8px -2px rgba(0,0,0,0.10)', border: '1px solid #FFC72C' }}
         >
-          {/* Search Input Box */}
-          <div className={`p-2 border-b ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full px-3 py-2 text-sm rounded-lg border outline-none transition-all duration-200 ${
-                isDark
-                  ? 'bg-[#2b2c2d] border-[#3e4042] text-[#e4e6eb] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 placeholder-gray-500'
-                  : 'bg-white border-gray-200 text-gray-700 focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 placeholder-gray-400'
-              }`}
-            />
-          </div>
 
           {/* Options List Container */}
           <div className="max-h-52 overflow-y-auto flex flex-col">

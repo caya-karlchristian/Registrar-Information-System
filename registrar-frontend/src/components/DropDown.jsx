@@ -50,31 +50,49 @@ const DropdownGroup = ({ label, name, value, onChange, options, required = false
         {required && <span className={isDark ? 'text-[#FFC72C]' : 'text-red-500'} title="Required"> *</span>}
       </label>
 
-      {/* Trigger Button */}
+      {/* Trigger Button / Input */}
       <div className="relative">
-        <button
-          type="button"
+        {open ? (
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={value || "Search..."}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={`
+              w-full flex items-center justify-between gap-2 pl-3 pr-10 py-3 rounded-lg text-sm font-medium shadow-sm focus:outline-none border transition-colors text-left
+              ring-2 ring-[#FFC72C] border-transparent
+              ${isDark ? 'bg-[#1f1f1f] text-[#e4e6eb] border-[#3e4042]' : 'bg-white text-gray-700 border-gray-200'}
+            `}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className={`
+              w-full flex items-center justify-between gap-2 pl-3 pr-10 py-3 rounded-lg text-sm font-medium shadow-sm focus:outline-none border transition-colors text-left cursor-pointer
+              border-transparent hover:border-gray-200
+              ${isDark ? 'bg-[#1f1f1f] text-[#e4e6eb] border-[#3e4042]' : 'bg-white text-gray-700 border-gray-200'}
+            `}
+          >
+            <span className={value ? '' : (isDark ? 'text-gray-500' : 'text-gray-400')}>
+              {value || "Please Select"}
+            </span>
+          </button>
+        )}
+
+        {/* Toggle Arrow (Clickable) */}
+        <span 
           onClick={() => setOpen((prev) => !prev)}
-          className={`
-            w-full flex items-center justify-between gap-2 pl-3 pr-10 py-3 rounded-lg text-sm font-medium shadow-sm focus:outline-none border transition-colors text-left cursor-pointer
-            ${open ? 'ring-2 ring-[#FFC72C] border-transparent' : 'border-transparent hover:border-gray-200'}
-            ${isDark ? 'bg-[#1f1f1f] text-[#e4e6eb] border-[#3e4042]' : 'bg-white text-gray-700 border-gray-200'}
-          `}
+          className="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer z-10"
         >
-          <span className={value ? '' : (isDark ? 'text-gray-500' : 'text-gray-400')}>
-            {value || "Please Select"}
-          </span>
-          
-          {/* Toggle Arrow (Clickable) */}
-          <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-            <ChevronDownIcon
-              className={`w-4 h-4 transition-transform duration-200 
-                ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'} 
-                ${open ? 'rotate-180 text-[#FFC72C]' : ''}
-              `}
-            />
-          </span>
-        </button>
+          <ChevronDownIcon
+            className={`w-4 h-4 transition-transform duration-200 
+              ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'} 
+              ${open ? 'rotate-180 text-[#FFC72C]' : ''}
+            `}
+          />
+        </span>
 
         {/* Dropdown Menu */}
         {open && (
@@ -82,22 +100,6 @@ const DropdownGroup = ({ label, name, value, onChange, options, required = false
             className={`absolute z-50 mt-1.5 w-full rounded-xl overflow-hidden ${isDark ? 'bg-[#1f1f1f]' : 'bg-white'}`}
             style={{ boxShadow: '0 8px 32px -4px rgba(0,0,0,0.18), 0 2px 8px -2px rgba(0,0,0,0.10)', border: '1px solid #FFC72C' }}
           >
-            {/* Search Input Box */}
-            <div className={`p-2 border-b ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
-              <input
-                ref={inputRef}
-                type="text"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full px-3 py-2 text-sm rounded-lg border outline-none transition-all duration-200 ${
-                  isDark
-                    ? 'bg-[#2b2c2d] border-[#3e4042] text-[#e4e6eb] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 placeholder-gray-500'
-                    : 'bg-white border-gray-200 text-gray-700 focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 placeholder-gray-400'
-                }`}
-              />
-            </div>
-
             <ul className="max-h-56 overflow-y-auto py-1 dropdown-scroll">
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((option) => {
