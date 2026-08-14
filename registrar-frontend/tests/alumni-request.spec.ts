@@ -128,10 +128,10 @@ test.describe('Alumni Request Form E2E Tests', () => {
     await expect(page.getByText('Documents Requested')).toBeVisible();
 
     // Select 'Honorable Dismissal' from multi-select dropdown
-    const docDropdown = page.locator('div:has(> label:has-text("Documents Requested")) > button');
+    const docDropdown = page.locator('div:has(> label:has-text("Documents Requested")) input');
     await docDropdown.click();
     await page.getByRole('button', { name: 'Honorable Dismissal', exact: true }).click();
-    await docDropdown.click(); // Close
+    await page.locator('div:has(> label:has-text("Documents Requested")) .cursor-pointer.pr-1').click(); // Close
 
     // Select 'Employment' from purpose dropdown
     await page.locator('div:has(> label:has-text("Purpose of Request")) button').click();

@@ -140,11 +140,11 @@ test.describe('Student Request Form E2E Tests', () => {
     await expect(page.getByText('Documents Requested')).toBeVisible();
 
     // Select 'Transcript of Records' from multi-select
-    const docDropdown = page.locator('div:has(> label:has-text("Documents Requested")) > button');
+    const docDropdown = page.locator('div:has(> label:has-text("Documents Requested")) input');
     await docDropdown.click();
     await page.getByRole('button', { name: 'Transcript of Records', exact: true }).click();
     // Close dropdown
-    await docDropdown.click();
+    await page.locator('div:has(> label:has-text("Documents Requested")) .cursor-pointer.pr-1').click();
 
     // Select 'Employment' from purpose dropdown
     await page.locator('div:has(> label:has-text("Purpose of Request")) button').click();
