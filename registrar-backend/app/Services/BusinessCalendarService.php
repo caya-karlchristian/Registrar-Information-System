@@ -30,6 +30,11 @@ use RuntimeException;
  *      notice." Only consulted when no dated exception applies.
  *   3. The calendar's baseline weekly_hours — the normal Mon-Fri schedule.
  *
+ * A dated exception doesn't have to close the *entire* day — see
+ * dayWindow()'s docblock below for closed_from_time, which lets an
+ * exception's own start date stay open normally up to a declared cutoff
+ * instead of closing from midnight.
+ *
  * Calendars are looked up once per instance and memoized in $calendarCache,
  * since the same service instance is typically reused across many
  * minutesBetween() calls within a single request/report generation (e.g.
@@ -100,25 +105,14 @@ class BusinessCalendarService
                 );
             }
 
-            $hours = $this->closed($cursor, $exceptions, $overrides)
-                ? null
-                : ($weeklyHours[strtolower($cursor->format('l'))] ?? null);
+            $window = $this->dayWindow($cursor, $weeklyHours, $exceptions, $overrides);
 
-            if ($hours !== null && !empty($hours['open']) && !empty($hours['close'])) {
-                $open  = $cursor->clone()->setTimeFromTimeString($hours['open']);
-                $close = $cursor->clone()->setTimeFromTimeString($hours['close']);
+            if ($window !== null) {
+                $windowStart = $window['open']->greaterThan($start) ? $window['open'] : $start;
+                $windowEnd   = $window['close']->lessThan($end) ? $window['close'] : $end;
 
-                // Overnight windows (close <= open, e.g. an office spanning
-                // midnight) aren't supported yet — skip rather than
-                // silently produce a negative/garbage window. None of the
-                // university's current offices need this.
-                if ($close->greaterThan($open)) {
-                    $windowStart = $open->greaterThan($start) ? $open : $start;
-                    $windowEnd   = $close->lessThan($end) ? $close : $end;
-
-                    if ($windowEnd->greaterThan($windowStart)) {
-                        $totalMinutes += $windowStart->diffInMinutes($windowEnd);
-                    }
+                if ($windowEnd->greaterThan($windowStart)) {
+                    $totalMinutes += $windowStart->diffInMinutes($windowEnd);
                 }
             }
 
@@ -163,21 +157,7 @@ class BusinessCalendarService
         $exceptions = $this->exceptionsOverlapping($calendar, $rangeStart, $rangeEnd);
         $overrides  = $this->activeOverrides($calendar, $rangeStart, $rangeEnd);
 
-        $windowFor = function (CarbonInterface $day) use ($weeklyHours, $exceptions, $overrides) {
-            if ($this->closed($day, $exceptions, $overrides)) {
-                return null;
-            }
-
-            $hours = $weeklyHours[strtolower($day->format('l'))] ?? null;
-            if (!$hours || empty($hours['open']) || empty($hours['close'])) {
-                return null;
-            }
-
-            $open  = $day->clone()->setTimeFromTimeString($hours['open']);
-            $close = $day->clone()->setTimeFromTimeString($hours['close']);
-
-            return $close->greaterThan($open) ? ['open' => $open, 'close' => $close] : null;
-        };
+        $windowFor = fn (CarbonInterface $day) => $this->dayWindow($day, $weeklyHours, $exceptions, $overrides);
 
         // Currently inside today's window?
         $todayWindow = $windowFor($at);
@@ -272,24 +252,105 @@ class BusinessCalendarService
     // Internals
     // -------------------------------------------------------
 
-    private function closed(CarbonInterface $day, $exceptions, $overrides): bool
+    /**
+     * The actual open window for $day, if any — the single source of
+     * truth both minutesBetween() and currentStatus() walk day-by-day and
+     * ask for, replacing what used to be two separate closed()/hours
+     * lookups that could in principle disagree.
+     *
+     * Precedence (most specific wins), same order as the class docblock:
+     *   1. A dated exception (business_calendar_holidays) covering $day.
+     *      - If $day is the exception's own start date AND it has a
+     *        closed_from_time set, the day is open normally up to that
+     *        time — a shortened window, [open, min(closed_from_time,
+     *        normal_close)].
+     *      - Otherwise (day 2+ of a multi-day range, or closed_from_time
+     *        is null) — fully closed, null. closed_from_time only ever
+     *        applies to the exception's own start date; a 3-day typhoon
+     *        suspension declared on day one at 3pm is fully closed on
+     *        days two and three regardless.
+     *   2. A recurring override that applies and is_closed — null,
+     *      untouched by partial closures (whole-day-only for now).
+     *   3. The calendar's baseline weekly_hours for that day-of-week.
+     *
+     * Overnight windows (close <= open) are skipped everywhere here, same
+     * restriction as before this refactor — no current office needs one.
+     *
+     * @return array{open: CarbonInterface, close: CarbonInterface}|null
+     */
+    private function dayWindow(CarbonInterface $day, array $weeklyHours, $exceptions, $overrides): ?array
     {
-        if ($this->exceptionFor($day, $exceptions)) {
-            return true;
+        if ($exception = $this->exceptionFor($day, $exceptions)) {
+            $isExceptionStartDate = $day->format('Y-m-d') === $exception->date->format('Y-m-d');
+
+            if (!$isExceptionStartDate || !$exception->closed_from_time) {
+                return null; // full-day closure
+            }
+
+            $hours = $weeklyHours[strtolower($day->format('l'))] ?? null;
+            if (!$hours || empty($hours['open'])) {
+                return null; // nothing to partially close — no normal opening this weekday
+            }
+
+            $open   = $day->clone()->setTimeFromTimeString($hours['open']);
+            $cutoff = $day->clone()->setTimeFromTimeString($exception->closed_from_time);
+
+            // The shorter of the declared cutoff and the day's normal
+            // close wins — a closed_from_time later than normal closing
+            // shouldn't extend the day.
+            $normalClose = !empty($hours['close']) ? $day->clone()->setTimeFromTimeString($hours['close']) : null;
+            $close = $normalClose && $normalClose->lessThan($cutoff) ? $normalClose : $cutoff;
+
+            return $close->greaterThan($open) ? ['open' => $open, 'close' => $close] : null;
         }
 
         $override = $this->overrideFor($day, $overrides);
+        if ($override !== null && $override->is_closed) {
+            return null;
+        }
 
-        return $override !== null && $override->is_closed;
+        $hours = $weeklyHours[strtolower($day->format('l'))] ?? null;
+        if (!$hours || empty($hours['open']) || empty($hours['close'])) {
+            return null;
+        }
+
+        $open  = $day->clone()->setTimeFromTimeString($hours['open']);
+        $close = $day->clone()->setTimeFromTimeString($hours['close']);
+
+        return $close->greaterThan($open) ? ['open' => $open, 'close' => $close] : null;
     }
 
-    private function closureLabel(CarbonInterface $day, $exceptions, $overrides): ?string
+    /**
+     * The exception/override label explaining why $at is closed right
+     * now — or null when it's closed for a plain, unremarkable reason
+     * (a normal weekend/evening outside any window).
+     *
+     * Time-aware for partial-cutoff exceptions specifically: on an
+     * exception's start date with closed_from_time set, the office is
+     * genuinely open (under its own shortened window) up until that
+     * cutoff. Querying *before* the cutoff — e.g. 6 AM, before the day's
+     * normal opening — is closed for the ordinary "not open yet" reason,
+     * not because of the declared closure; attributing the label that
+     * early would misleadingly tell a student the office is shut for a
+     * typhoon suspension hours before that suspension actually takes
+     * effect. Only once $at reaches the cutoff does the label apply.
+     */
+    private function closureLabel(CarbonInterface $at, $exceptions, $overrides): ?string
     {
-        if ($exception = $this->exceptionFor($day, $exceptions)) {
+        if ($exception = $this->exceptionFor($at, $exceptions)) {
+            $isExceptionStartDate = $at->format('Y-m-d') === $exception->date->format('Y-m-d');
+
+            if ($isExceptionStartDate && $exception->closed_from_time) {
+                $cutoff = $at->clone()->setTimeFromTimeString($exception->closed_from_time);
+                if ($at->lessThan($cutoff)) {
+                    return null; // not in effect yet today
+                }
+            }
+
             return $exception->label;
         }
 
-        $override = $this->overrideFor($day, $overrides);
+        $override = $this->overrideFor($at, $overrides);
         if ($override && $override->is_closed) {
             return $override->label;
         }
@@ -315,14 +376,19 @@ class BusinessCalendarService
         // (kept as parameters for readability at call sites and in case a
         // future caller wants a genuinely scoped variant); filtering by
         // date still happens per-day via coversDate() in exceptionFor().
+        //
+        // enabled=false is excluded here, at the single point every public
+        // read (currentStatus, minutesBetween, upcomingClosures) funnels
+        // through — a disabled closure must have zero effect on the
+        // calendar, not just look inert in the admin list.
         return $this->exceptionsCache[$calendar->calendar_id]
-            ??= $calendar->holidays()->get();
+            ??= $calendar->holidays()->where('enabled', true)->get();
     }
 
     private function activeOverrides(BusinessCalendar $calendar, CarbonInterface $start, CarbonInterface $end)
     {
         return $this->overridesCache[$calendar->calendar_id]
-            ??= $calendar->overrides()->get();
+            ??= $calendar->overrides()->where('enabled', true)->get();
     }
 
     private function resolveCalendar(?int $calendarId): BusinessCalendar

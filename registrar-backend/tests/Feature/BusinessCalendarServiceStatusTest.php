@@ -95,6 +95,73 @@ test('treats the exact opening minute as open, and the exact closing minute as c
     expect($service->currentStatus($atClose, $calendar->calendar_id)['is_open'])->toBeFalse();
 });
 
+test('reports open with an early closes_at on a partial-cutoff day, before the cutoff', function () {
+    $service = new BusinessCalendarService();
+
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+    $calendar->holidays()->create([
+        'date'             => '2026-03-11', // Wednesday
+        'label'            => 'Typhoon suspension',
+        'type'             => 'suspension',
+        'closed_from_time' => '15:00',
+    ]);
+
+    // Wednesday 10 AM — before the 3pm cutoff. The public banner should
+    // say the office closes early today, not show the normal 8pm.
+    $at = Carbon::parse('2026-03-11 10:00:00', 'Asia/Manila');
+
+    $status = $service->currentStatus($at);
+
+    expect($status['is_open'])->toBeTrue()
+        ->and($status['reason'])->toBeNull()
+        ->and($status['closes_at']->toDateTimeString())->toBe('2026-03-11 15:00:00');
+});
+
+test('reports closed with the exception label as the reason once the cutoff has passed', function () {
+    $service = new BusinessCalendarService();
+
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+    $calendar->holidays()->create([
+        'date'             => '2026-03-11', // Wednesday
+        'label'            => 'Typhoon suspension',
+        'type'             => 'suspension',
+        'closed_from_time' => '15:00',
+    ]);
+
+    // Wednesday 4 PM — past the 3pm cutoff. Next open day (Wed's window
+    // is spent) is Thursday 8 AM.
+    $at = Carbon::parse('2026-03-11 16:00:00', 'Asia/Manila');
+
+    $status = $service->currentStatus($at);
+
+    expect($status['is_open'])->toBeFalse()
+        ->and($status['reason'])->toBe('Typhoon suspension')
+        ->and($status['next_open_at']->toDateTimeString())->toBe('2026-03-12 08:00:00');
+});
+
+test('does not attribute the closure reason before the cutoff has taken effect', function () {
+    $service = new BusinessCalendarService();
+
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+    $calendar->holidays()->create([
+        'date'             => '2026-03-11', // Wednesday
+        'label'            => 'Typhoon suspension',
+        'type'             => 'suspension',
+        'closed_from_time' => '15:00',
+    ]);
+
+    // Wednesday 6 AM — before the normal 8am opening, same day as the
+    // suspension but well before its 3pm cutoff. Closed simply because
+    // the office hasn't opened yet, not because of the suspension.
+    $at = Carbon::parse('2026-03-11 06:00:00', 'Asia/Manila');
+
+    $status = $service->currentStatus($at);
+
+    expect($status['is_open'])->toBeFalse()
+        ->and($status['reason'])->toBeNull()
+        ->and($status['next_open_at']->toDateTimeString())->toBe('2026-03-11 08:00:00');
+});
+
 test('falls back to the is_default calendar when no id is given', function () {
     $service = new BusinessCalendarService();
 

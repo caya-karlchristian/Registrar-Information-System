@@ -191,3 +191,143 @@ test('an end_date key that is entirely absent from the request still preserves t
     expect($updated->label)->toBe('Renamed')
         ->and($updated->end_date->toDateString())->toBe('2026-03-13');
 });
+
+test('a disabled exception no longer closes the office, even though the row still exists', function () {
+    $service = new BusinessCalendarService();
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $calendar->holidays()->create([
+        'type' => 'suspension', 'label' => 'Called-off suspension',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'enabled' => false,
+    ]);
+
+    $status = $service->currentStatus(Carbon::parse('2026-03-11 10:00:00', 'Asia/Manila'));
+
+    expect($status['is_open'])->toBeTrue();
+});
+
+test('a disabled recurring override no longer closes its weekday', function () {
+    $service = new BusinessCalendarService();
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $calendar->overrides()->create([
+        'day_of_week' => 'monday', 'is_closed' => true, 'label' => 'Paused WFH Monday',
+        'effective_from' => '2026-01-01', 'effective_until' => null,
+        'enabled' => false,
+    ]);
+
+    $status = $service->currentStatus(Carbon::parse('2026-03-09 10:00:00', 'Asia/Manila')); // a Monday
+
+    expect($status['is_open'])->toBeTrue();
+});
+
+test('a disabled exception does not block a new closure covering the same dates', function () {
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+    $calendar->holidays()->create([
+        'type' => 'event', 'label' => 'Cancelled event',
+        'date' => '2026-03-11', 'end_date' => '2026-03-13',
+        'enabled' => false,
+    ]);
+
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $exception = $service->create([
+        'type' => 'suspension', 'label' => 'Real suspension', 'date' => '2026-03-12', 'end_date' => '2026-03-14',
+    ], $actor, Request::create('/'));
+
+    expect($exception->label)->toBe('Real suspension');
+});
+
+test('creating an exception with a valid closed_from_time stores it', function () {
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $exception = $service->create([
+        'type' => 'suspension', 'label' => 'Typhoon suspension',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '15:00',
+    ], $actor, Request::create('/'));
+
+    expect(Carbon::parse($exception->closed_from_time)->format('H:i'))->toBe('15:00');
+});
+
+test('a closed_from_time at or before the normal opening time is rejected', function () {
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    // Default calendar opens at 08:00 — 07:30 isn't a partial closure,
+    // it's a full one.
+    expect(fn () => $service->create([
+        'type' => 'suspension', 'label' => 'Bad cutoff',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '07:30',
+    ], $actor, Request::create('/')))->toThrow(ValidationException::class);
+
+    // Exactly the opening time is also rejected — that's still "the
+    // whole day," not a partial closure.
+    expect(fn () => $service->create([
+        'type' => 'suspension', 'label' => 'Bad cutoff',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '08:00',
+    ], $actor, Request::create('/')))->toThrow(ValidationException::class);
+});
+
+test('explicitly clearing closed_from_time on update collapses the exception back to a full-day closure', function () {
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $exception = $calendar->holidays()->create([
+        'type' => 'suspension', 'label' => 'Typhoon suspension',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '15:00',
+    ]);
+
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    // Same array_key_exists shape as the end_date regression above: an
+    // explicit null must actually clear the cutoff, not be ignored.
+    $updated = $service->update($exception, ['closed_from_time' => null], $actor, Request::create('/'));
+
+    expect($updated->closed_from_time)->toBeNull();
+
+    $status = (new BusinessCalendarService())->currentStatus(Carbon::parse('2026-03-11 16:00:00', 'Asia/Manila'));
+    expect($status['is_open'])->toBeFalse(); // now fully closed all day, past what used to be "open" before 3pm
+});
+
+test('a closed_from_time key entirely absent from an update request preserves the existing cutoff', function () {
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $exception = $calendar->holidays()->create([
+        'type' => 'suspension', 'label' => 'Typhoon suspension',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '15:00',
+    ]);
+
+    $service = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $updated = $service->update($exception, ['label' => 'Renamed'], $actor, Request::create('/'));
+
+    expect($updated->label)->toBe('Renamed')
+        ->and(Carbon::parse($updated->closed_from_time)->format('H:i'))->toBe('15:00');
+});
+
+test('toggling enabled off via update() takes effect immediately, and back on again restores it', function () {
+    $service = new BusinessCalendarService();
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+
+    $exception = $calendar->holidays()->create([
+        'type' => 'suspension', 'label' => 'Toggle me', 'date' => '2026-03-11', 'end_date' => '2026-03-11',
+    ]);
+
+    $exceptionService = app(CalendarExceptionService::class);
+    $actor = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $exceptionService->update($exception, ['enabled' => false], $actor, Request::create('/'));
+    expect((new BusinessCalendarService())->currentStatus(Carbon::parse('2026-03-11 10:00:00', 'Asia/Manila'))['is_open'])->toBeTrue();
+
+    $exceptionService->update($exception->refresh(), ['enabled' => true], $actor, Request::create('/'));
+    expect((new BusinessCalendarService())->currentStatus(Carbon::parse('2026-03-11 10:00:00', 'Asia/Manila'))['is_open'])->toBeFalse();
+});

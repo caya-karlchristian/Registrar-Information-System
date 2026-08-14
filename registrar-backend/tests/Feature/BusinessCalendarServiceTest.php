@@ -69,6 +69,63 @@ test('falls back to the is_default calendar when no id is given', function () {
         ->and($default->name)->toBe('Default University Hours');
 });
 
+test('minutesBetween counts only the morning hours before a same-day cutoff', function () {
+    $service = new BusinessCalendarService();
+
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+    $calendar->holidays()->create([
+        'date'             => '2026-03-11', // Wednesday
+        'label'            => 'Typhoon suspension',
+        'type'             => 'suspension',
+        'closed_from_time' => '15:00',
+    ]);
+
+    // Tuesday 10 AM -> Thursday 10 AM. Wednesday should only contribute
+    // its 8am-3pm morning window (7h), not the full 8am-8pm day, and
+    // Thursday resumes normally.
+    $start = Carbon::parse('2026-03-10 10:00:00', 'Asia/Manila'); // Tuesday
+    $end   = Carbon::parse('2026-03-12 10:00:00', 'Asia/Manila'); // Thursday
+
+    expect($service->minutesBetween($start, $end))->toBe((10 + 7 + 2) * 60);
+});
+
+test('minutesBetween treats day 2+ of a multi-day exception as fully closed even with a cutoff on day 1', function () {
+    $service = new BusinessCalendarService();
+
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+    $calendar->holidays()->create([
+        'date'             => '2026-03-11', // Wednesday
+        'end_date'         => '2026-03-12', // Thursday
+        'label'            => 'Typhoon suspension',
+        'type'             => 'suspension',
+        'closed_from_time' => '15:00', // only ever applies to the start date
+    ]);
+
+    // Tuesday 10 AM -> Friday 10 AM. Wed contributes 8am-3pm (7h); Thu is
+    // fully closed (day 2 of the range, cutoff doesn't apply); Fri
+    // resumes with 8am-10am (2h).
+    $start = Carbon::parse('2026-03-10 10:00:00', 'Asia/Manila'); // Tuesday
+    $end   = Carbon::parse('2026-03-13 10:00:00', 'Asia/Manila'); // Friday
+
+    expect($service->minutesBetween($start, $end))->toBe((10 + 7 + 0 + 2) * 60);
+});
+
+test('closed_from_time: null behaves identically to a plain full-day closure', function () {
+    $service = new BusinessCalendarService();
+
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+    $calendar->holidays()->create([
+        'date'             => '2026-03-11', // Wednesday
+        'label'            => 'Test Holiday',
+        'closed_from_time' => null,
+    ]);
+
+    $start = Carbon::parse('2026-03-10 10:00:00', 'Asia/Manila'); // Tuesday
+    $end   = Carbon::parse('2026-03-12 10:00:00', 'Asia/Manila'); // Thursday
+
+    expect($service->minutesBetween($start, $end))->toBe((10 + 2) * 60);
+});
+
 test('returns zero when end is before or equal to start', function () {
     $service = new BusinessCalendarService();
 

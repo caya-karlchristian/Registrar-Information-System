@@ -22,6 +22,12 @@ class StoreCalendarExceptionRequest extends FormRequest
             'label'       => 'required|string|max:255',
             'date'        => 'required|date',
             'end_date'    => 'nullable|date|after_or_equal:date',
+            // 'H:i' (e.g. "15:00") to match the frontend's <input type="time">.
+            // Whether this is actually *after* the day's normal opening
+            // time is checked in CalendarExceptionService, not here — that
+            // needs the calendar's weekly_hours, which a FormRequest has
+            // no business reaching into.
+            'closed_from_time' => 'nullable|date_format:H:i',
         ];
     }
 }
