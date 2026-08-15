@@ -200,7 +200,10 @@ test('delete() succeeds for an unassigned custom policy', function () {
 test('delete() still refuses a system-managed policy before checking usage', function () {
     polActor();
 
-    $policy = Policy::create(['name' => Policy::DEFAULT_NAME, 'permissions' => [], 'is_system' => true]);
+    // 'No Access' (Policy::DEFAULT_NAME) is already seeded as a real
+    // is_system row by the policies migration, and `name` is unique —
+    // use a different name so this test doesn't collide with it.
+    $policy = Policy::create(['name' => 'Test System Policy', 'permissions' => [], 'is_system' => true]);
 
     expect(fn () => app(PolicyService::class)->delete($policy, polRequest()))
         ->toThrow(PolicyException::class, 'System-managed policies cannot be deleted.');
