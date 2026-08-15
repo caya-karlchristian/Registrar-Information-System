@@ -292,16 +292,23 @@ test('a closed_from_time at or before the normal opening time is rejected', func
 test('creating an exception via the API rejects a closed_from_time outside 8 AM–8 PM', function () {
     calendarExceptionActingSuperAdmin();
 
+    // A future Monday — guaranteed to be both in the future (won't trip
+    // the past-date rule below) and a normal 08:00–20:00 business day on
+    // the default calendar (won't trip the "must be after normal opening"
+    // service-level check either), so this test exercises only the 8
+    // AM–8 PM window rule in isolation.
+    $date = Carbon::now(config('app.display_timezone', 'Asia/Manila'))->next(Carbon::MONDAY)->toDateString();
+
     $tooEarly = $this->postJson('/api/calendar-exceptions', [
         'type' => 'suspension', 'label' => 'Too early',
-        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'date' => $date, 'end_date' => $date,
         'closed_from_time' => '05:00',
     ]);
     $tooEarly->assertStatus(422)->assertJsonValidationErrors('closed_from_time');
 
     $tooLate = $this->postJson('/api/calendar-exceptions', [
         'type' => 'suspension', 'label' => 'Too late',
-        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'date' => $date, 'end_date' => $date,
         'closed_from_time' => '21:00',
     ]);
     $tooLate->assertStatus(422)->assertJsonValidationErrors('closed_from_time');
@@ -312,6 +319,11 @@ test('creating an exception via the API rejects a closed_from_time outside 8 AM�
 test('creating an exception via the API accepts closed_from_time at the 8 AM–8 PM boundaries', function () {
     calendarExceptionActingSuperAdmin();
 
+    // Two distinct future weekdays so the two closures below don't
+    // overlap (assertNoOverlap would otherwise reject the second one).
+    $monday  = Carbon::now(config('app.display_timezone', 'Asia/Manila'))->next(Carbon::MONDAY)->toDateString();
+    $tuesday = Carbon::now(config('app.display_timezone', 'Asia/Manila'))->next(Carbon::TUESDAY)->toDateString();
+
     // 08:00 is within the request's own validation bounds, but the
     // service-level "must be after the day's normal opening time" check
     // (see the test above this one in the file) will still reject it if
@@ -321,17 +333,70 @@ test('creating an exception via the API accepts closed_from_time at the 8 AM–8
     // literal upper boundary.
     $withinWindow = $this->postJson('/api/calendar-exceptions', [
         'type' => 'suspension', 'label' => 'Within window',
-        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'date' => $monday, 'end_date' => $monday,
         'closed_from_time' => '08:01',
     ]);
     $withinWindow->assertStatus(201);
 
     $upperBoundary = $this->postJson('/api/calendar-exceptions', [
         'type' => 'suspension', 'label' => 'Upper boundary',
-        'date' => '2026-03-12', 'end_date' => '2026-03-12',
+        'date' => $tuesday, 'end_date' => $tuesday,
         'closed_from_time' => '20:00',
     ]);
     $upperBoundary->assertStatus(201);
+});
+
+test('creating an exception with a past date is rejected', function () {
+    calendarExceptionActingSuperAdmin();
+
+    $yesterday = Carbon::now(config('app.display_timezone', 'Asia/Manila'))->subDay()->toDateString();
+
+    $response = $this->postJson('/api/calendar-exceptions', [
+        'type' => 'suspension', 'label' => 'Backdated closure',
+        'date' => $yesterday, 'end_date' => $yesterday,
+    ]);
+
+    $response->assertStatus(422)->assertJsonValidationErrors('date');
+    expect(BusinessCalendarHoliday::count())->toBe(0);
+});
+
+test('creating an exception dated today is accepted', function () {
+    calendarExceptionActingSuperAdmin();
+
+    // "Today" per the app's display timezone, not the test runner's
+    // local/UTC time — see the matching comment in
+    // StoreCalendarExceptionRequest. Same-day closures (e.g. an
+    // emergency suspension declared the morning of) must stay allowed.
+    $today = Carbon::now(config('app.display_timezone', 'Asia/Manila'))->toDateString();
+
+    $response = $this->postJson('/api/calendar-exceptions', [
+        'type' => 'suspension', 'label' => 'Same-day suspension',
+        'date' => $today, 'end_date' => $today,
+    ]);
+
+    $response->assertStatus(201);
+});
+
+test('editing an existing closure that already has a past date is still allowed', function () {
+    $calendar = BusinessCalendar::where('is_default', true)->firstOrFail();
+    $pastDate = Carbon::now(config('app.display_timezone', 'Asia/Manila'))->subMonth()->toDateString();
+
+    $exception = $calendar->holidays()->create([
+        'type' => 'holiday', 'label' => 'Old label',
+        'date' => $pastDate, 'end_date' => $pastDate,
+    ]);
+
+    calendarExceptionActingSuperAdmin();
+
+    // The past-date rule is scoped to *creation* (StoreCalendarExceptionRequest)
+    // only — UpdateCalendarExceptionRequest deliberately has no such rule,
+    // so correcting a typo on a historical entry keeps working.
+    $response = $this->putJson("/api/calendar-exceptions/{$exception->holiday_id}", [
+        'label' => 'Corrected label',
+    ]);
+
+    $response->assertStatus(200);
+    expect($exception->fresh()->label)->toBe('Corrected label');
 });
 
 test('explicitly clearing closed_from_time on update collapses the exception back to a full-day closure', function () {

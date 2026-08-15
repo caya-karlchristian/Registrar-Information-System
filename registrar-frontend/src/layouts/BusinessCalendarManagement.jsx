@@ -42,6 +42,20 @@ const EMPTY_EXCEPTION_FORM = { type: "holiday", label: "", date: "", end_date: "
 const EMPTY_OVERRIDE_FORM = { day_of_week: "monday", is_closed: true, label: "", effective_from: "", effective_until: "" };
 
 /**
+ * Today's date as a local 'YYYY-MM-DD' string. Deliberately built from
+ * getFullYear/getMonth/getDate (not toISOString(), which is UTC-based and
+ * can land on the wrong calendar day depending on the browser's offset) —
+ * same approach CalendarGridView uses for its own "today" comparisons.
+ * Used to stop staff from picking an already-past date when creating a
+ * new closure; the backend (StoreCalendarExceptionRequest) is the
+ * authoritative check, this just gives immediate feedback in the picker.
+ */
+const getTodayDateString = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+};
+
+/**
  * Admin/superadmin screen for the business calendar's two closure mechanisms.
  * Updated to display a premium month-based Calendar Grid, List view, and status cards.
  */
@@ -746,6 +760,12 @@ const BusinessCalendarManagement = () => {
                         value={exceptionForm.date}
                         onChange={(e) => setExceptionForm((prev) => ({ ...prev, date: e.target.value }))}
                         required
+                        // Only enforced when creating a new closure — an
+                        // already-editing closure may legitimately have a
+                        // past date (e.g. fixing a typo in an old entry's
+                        // label), and blocking that with a min here would
+                        // make the native date picker refuse to submit.
+                        min={editingId ? undefined : getTodayDateString()}
                         voiceEnabled={false}
                         labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
                       />

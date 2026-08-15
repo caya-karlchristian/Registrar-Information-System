@@ -292,7 +292,16 @@ export const CalendarGridView = ({
       const y = dateObj.getFullYear();
       const m = String(dateObj.getMonth() + 1).padStart(2, "0");
       const d = String(dateObj.getDate()).padStart(2, "0");
-      onAddException(`${y}-${m}-${d}`);
+      const cellStr = `${y}-${m}-${d}`;
+      // A blank cell in the past isn't editable — nothing to open. Only
+      // block *new* closures this way; a cell that already has a record
+      // (handled above) stays clickable regardless of date, since editing
+      // a past closure's other fields is still allowed. The backend
+      // (StoreCalendarExceptionRequest) is the authoritative check —
+      // this is just to stop the picker from pre-filling a date that
+      // would be rejected anyway.
+      if (cellStr < todayStr) return;
+      onAddException(cellStr);
     }
   };
 
@@ -372,6 +381,11 @@ export const CalendarGridView = ({
               const d = String(day.dateObj.getDate()).padStart(2, "0");
               const currentCellStr = `${y}-${m}-${d}`;
               const isTodayCell = currentCellStr === todayStr;
+              // An empty past day can't be turned into a new closure (see
+              // handleCellClick) — styled as non-interactive so that's
+              // obvious before the user tries to click it. A past day that
+              // already has a record stays fully interactive (editable).
+              const isUnselectablePastCell = !details && currentCellStr < todayStr;
 
               // Color styles for calendar capsules
               let capsuleClass = "";
@@ -418,7 +432,9 @@ export const CalendarGridView = ({
                 <div
                   key={idx}
                   onClick={() => handleCellClick(day.dateObj, details)}
-                  className={`min-h-24 sm:min-h-28 p-2.5 rounded-xl border flex flex-col justify-between transition-all select-none cursor-pointer ${
+                  className={`min-h-24 sm:min-h-28 p-2.5 rounded-xl border flex flex-col justify-between transition-all select-none ${
+                    isUnselectablePastCell ? "cursor-not-allowed" : "cursor-pointer"
+                  } ${
                     isDark
                       ? day.isCurrentMonth
                         ? "bg-[#242526] hover:bg-[#2a2a2f]/60 border-[#3e4042]"
@@ -426,7 +442,9 @@ export const CalendarGridView = ({
                       : day.isCurrentMonth
                         ? "bg-white hover:bg-gray-50/80 border-gray-200"
                         : "bg-gray-50/50 border-gray-150/60 text-gray-400"
-                  } ${isTodayCell ? (isDark ? "ring-2 ring-yellow-400 border-yellow-400 z-10" : "ring-2 ring-pup-dark-maroon border-pup-dark-maroon z-10") : ""}`}
+                  } ${isTodayCell ? (isDark ? "ring-2 ring-yellow-400 border-yellow-400 z-10" : "ring-2 ring-pup-dark-maroon border-pup-dark-maroon z-10") : ""} ${
+                    isUnselectablePastCell ? "opacity-60 hover:bg-transparent" : ""
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className={`text-xs sm:text-sm font-extrabold ${
