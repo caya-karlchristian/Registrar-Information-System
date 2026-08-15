@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\NotificationServiceInterface;
 use App\Models\AccessRequest;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
@@ -23,8 +24,9 @@ use Illuminate\Validation\ValidationException;
 class AccessRequestService
 {
     public function __construct(
-        private AdminUserService $adminUserService,
-        private AuditLogger      $auditLogger,
+        private AdminUserService           $adminUserService,
+        private AuditLogger                $auditLogger,
+        private NotificationServiceInterface $notificationService,
     ) {}
 
     /**
@@ -56,6 +58,19 @@ class AccessRequestService
             'target_email'      => $accessRequest->target_email,
             'access_request_id' => $accessRequest->id,
         ]);
+
+        // Notify every Super Admin — they're the only ones who can review
+        // this (see AccessRequestPolicy). requestId stays null: Notification
+        // ::request_id is FK'd to document_requests, not access_requests, so
+        // the access request's own id travels in `data` instead, same as the
+        // audit log above.
+        $this->notificationService->sendToSuperAdmins(
+            triggerEvent: 'access_request_submitted',
+            data: [
+                'target_email'      => $accessRequest->target_email,
+                'access_request_id' => $accessRequest->id,
+            ],
+        );
 
         return $accessRequest;
     }

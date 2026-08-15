@@ -313,3 +313,76 @@ test('an admin without the access_requests module cannot submit a request', func
         'justification'     => 'Should be blocked.',
     ])->assertStatus(403);
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// store() — notifies Super Admins
+// (QA fix: submitting an access request never notified anyone who could
+// actually review it. QUEUE_CONNECTION=sync in tests — see phpunit.xml —
+// so the dispatched SendBulkNotificationJob runs inline, no Queue::fake()
+// needed to observe its effect on the notifications table.)
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('store() notifies every Activated Super Admin', function () {
+    $superAdminOne = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN, 'status' => 'Activated']);
+    $superAdminTwo = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN, 'status' => 'Activated']);
+    $actor = arsActingAdmin();
+
+    $service = app(AccessRequestService::class);
+    $accessRequest = $service->store([
+        'target_email'      => 'notify-me@example.com',
+        'target_first_name' => 'Notify',
+        'target_last_name'  => 'Me',
+        'requested_role_id' => SystemUser::ROLE_ADMIN,
+        'justification'     => 'Needs review.',
+    ], arsRequest());
+
+    foreach ([$superAdminOne, $superAdminTwo] as $superAdmin) {
+        $notification = \App\Models\Notification::where('notifiable_type', SystemUser::class)
+            ->where('notifiable_id', $superAdmin->user_id)
+            ->first();
+
+        expect($notification)->not->toBeNull();
+        expect($notification->data['access_request_id'])->toBe($accessRequest->id);
+        expect($notification->data['target_email'])->toBe('notify-me@example.com');
+    }
+});
+
+test('store() does not notify a regular Admin', function () {
+    $actor = arsActingAdmin();
+    $otherAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'status' => 'Activated', 'policy_id' => null]);
+
+    $service = app(AccessRequestService::class);
+    $service->store([
+        'target_email'      => 'no-notify-admin@example.com',
+        'target_first_name' => 'No',
+        'target_last_name'  => 'Notify',
+        'requested_role_id' => SystemUser::ROLE_ADMIN,
+        'justification'     => 'Needs review.',
+    ], arsRequest());
+
+    $notification = \App\Models\Notification::where('notifiable_type', SystemUser::class)
+        ->where('notifiable_id', $otherAdmin->user_id)
+        ->first();
+
+    expect($notification)->toBeNull();
+});
+
+test('store() does not notify an inactive Super Admin', function () {
+    $actor = arsActingAdmin();
+    $inactiveSuperAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN, 'status' => 'Deactivated']);
+
+    $service = app(AccessRequestService::class);
+    $service->store([
+        'target_email'      => 'no-notify-inactive@example.com',
+        'target_first_name' => 'No',
+        'target_last_name'  => 'Notify',
+        'requested_role_id' => SystemUser::ROLE_ADMIN,
+        'justification'     => 'Needs review.',
+    ], arsRequest());
+
+    $notification = \App\Models\Notification::where('notifiable_type', SystemUser::class)
+        ->where('notifiable_id', $inactiveSuperAdmin->user_id)
+        ->first();
+
+    expect($notification)->toBeNull();
+});
