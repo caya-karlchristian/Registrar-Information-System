@@ -7,7 +7,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
 } from '@heroicons/react/24/solid';
-import { CheckIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, EllipsisVerticalIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
@@ -17,6 +17,7 @@ import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
 import DashboardDropdown from '../components/DashboardDropdown.jsx';
 import { useTheme } from '../context/ThemeContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { useAlertToast } from '../context/AlertToastContext';
 import {
   StatCard,
   Th,
@@ -27,8 +28,146 @@ import {
 
 const ITEMS_PER_PAGE = 15;
 
-const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
+const RowActionsDropdown = ({
+  req,
+  viewMode,
+  resolvedStatusIds,
+  onViewDetails,
+  onGenerateCert,
+  onArchive,
+  onRestore,
+  updatingId,
+  isDark,
+}) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const dropdownRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const showGenerateCert = !req.isArchived && req.isCertificate && req.statusId === resolvedStatusIds.PENDING;
+  const isUpdating = updatingId === req.id;
+
+  return (
+    <div className="relative inline-block text-left" ref={dropdownRef}>
+      <button
+        type="button"
+        title="More Actions"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`p-2 rounded-lg transition-colors flex items-center justify-center focus:outline-none ${
+          isOpen
+            ? isDark
+              ? 'bg-[#2a2a2f] text-[#ffc72c] border border-[#ffc72c]/30'
+              : 'bg-gray-100 text-[#800000] border border-gray-200'
+            : isDark
+            ? 'text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] border border-transparent'
+            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 border border-transparent'
+        }`}
+      >
+        <EllipsisVerticalIcon className="w-5 h-5" />
+      </button>
+
+      {isOpen && (
+        <div
+          className={`absolute right-0 mt-1.5 w-44 rounded-xl shadow-lg border z-50 overflow-hidden text-left ${
+            isDark ? 'bg-[#1f1f1f] text-[#e4e6eb] border-[#3e4042]' : 'bg-white text-gray-700 border-gray-200'
+          }`}
+          style={{
+            boxShadow: '0 8px 32px -4px rgba(0,0,0,0.18), 0 2px 8px -2px rgba(0,0,0,0.10)',
+          }}
+        >
+          <div className="py-1 flex flex-col gap-0.5">
+            {/* View Details */}
+            <button
+              type="button"
+              onClick={() => {
+                onViewDetails();
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold transition-colors ${
+                isDark ? 'hover:bg-[#2a2a2f] text-[#e4e6eb]' : 'hover:bg-gray-50 text-gray-700'
+              }`}
+            >
+              <EyeIcon className="w-4 h-4 text-gray-400 dark:text-[#808080]" />
+              View Details
+            </button>
+
+            {/* Generate Certificate (if applicable) */}
+            {showGenerateCert && (
+              <button
+                type="button"
+                onClick={() => {
+                  onGenerateCert();
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold transition-colors ${
+                  isDark ? 'hover:bg-[#2a2a2f] text-[#e4e6eb]' : 'hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                <ArrowDownTrayIcon className="w-4 h-4 text-gray-400 dark:text-[#808080]" />
+                Generate Certificate
+              </button>
+            )}
+
+            <div className={`border-t my-0.5 ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`} />
+
+            {/* Archive / Restore */}
+            {viewMode === 'archived' ? (
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => {
+                  onRestore();
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                  isDark ? 'hover:bg-[#2a2a2f] text-[#e4e6eb]' : 'hover:bg-gray-50 text-gray-750'
+                }`}
+              >
+                <CheckIcon className="w-4 h-4 text-gray-400 dark:text-[#808080]" />
+                Restore
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => {
+                  onArchive();
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                  isDark ? 'hover:bg-[#2a2a2f] text-[#e4e6eb]' : 'hover:bg-gray-50 text-gray-750'
+                }`}
+              >
+                <ArchiveBoxIcon className="w-4 h-4 text-gray-400 dark:text-[#808080]" />
+                Archive
+              </button>
+            )}
+          </div>
+
+          {/* Gold bottom accent */}
+          <div className="h-1 w-full bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim }) => {
   const { isDark } = useTheme();
+  const { showError } = useAlertToast();
 
   const {
     requests,
@@ -131,7 +270,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard title="New Requests"       count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length}    color="yellow" />
           <StatCard title="Processing"         count={requests.filter(r => r.statusName?.toLowerCase() === 'processing').length} color="blue" />
-          <StatCard title="Awaiting Signature" count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING_SIGNATURE).length} color="orange" />
+          <StatCard title="Awaiting Signature" count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING_SIGNATURE).length} color="amber" />
           <StatCard title="Ready for Pickup"   count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length}       color="green" />
         </div>
       )}
@@ -267,6 +406,17 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
               Clear Filters
             </button>
           )}
+
+          {viewMode === 'active' && onScanToClaim && (
+            <button
+              type="button"
+              onClick={onScanToClaim}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pup-maroon text-white text-sm font-bold hover:bg-pup-dark-maroon transition-all active:scale-95 shadow-sm shrink-0"
+            >
+              <QrCodeIcon className="w-5 h-5" />
+              <span>Scan to Claim</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -339,7 +489,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                   ]}
                 />
               </Th>
-              <Th center>Actions</Th>
+              <th className={`px-6 py-4 text-xs uppercase font-bold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'} text-center w-[320px] min-w-[320px]`}>Actions</th>
             </tr>
           </thead>
           <tbody className={isDark ? 'divide-y divide-[#3e4042]' : 'divide-y divide-gray-100'}>
@@ -414,50 +564,52 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                   </Td>
                   <Td center><span className={isDark ? 'font-semibold text-[#e4e6eb]' : 'font-semibold text-gray-700'}>{req.copies}</span></Td>
                   <Td center><StatusBadge status={req.statusName} /></Td>
-                  <Td center>
-                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 sm:gap-2 min-w-0">
-                      {!req.isArchived && req.isCertificate && req.statusId === resolvedStatusIds.PENDING && (
-                        <button
-                          title="Generate Certificate"
-                          onClick={() => {
-                            setCertRequest(req);
-                          }}
-                          className={isDark ? 'p-2 text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}
-                        >
-                          <ArrowDownTrayIcon className="w-5 h-5" />
-                        </button>
-                      )}
+                  <td className={`px-6 py-4 text-sm ${isDark ? 'text-[#e4e6eb]' : 'text-inherit'} w-[320px] min-w-[320px]`}>
+                    <div className="flex items-center justify-end gap-2 w-full">
                       {!req.isArchived && req.statusId === resolvedStatusIds.PENDING && (
                         <button
-                          disabled={updatingId === req.id || (req.isCertificate && !printedCertificateIds.includes(req.id))}
+                          disabled={updatingId === req.id}
                           onClick={() => {
                             if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
-                              alert('Please generate and print the certificate first before sending it for signature.');
+                              showError('You need to process or print the certificate first.');
                               return;
                             }
                             handleStatusUpdate(req.id, resolvedStatusIds.PENDING_SIGNATURE);
                           }}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-orange-900/20 hover:bg-orange-900/30 text-orange-400 border border-orange-600' : 'bg-orange-500 hover:bg-orange-700'}`}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                            req.isCertificate && !printedCertificateIds.includes(req.id)
+                              ? 'opacity-40 filter blur-[0.5px] cursor-pointer'
+                              : ''
+                          } ${isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-200'}`}
                           title={
                             req.isCertificate && !printedCertificateIds.includes(req.id)
                               ? 'Print the certificate first before sending it for signature'
                               : "Registrar's part is done — send this to an external office for signature. Stops the registrar's own processing-time clock and starts tracking the signing office's turnaround separately."
                           }
                         >
-                          <CheckCircleIcon className="w-4 h-4" /> Awaiting Signature
+                          <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
+                            isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-white text-amber-700'
+                          }`}>
+                            <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
+                          </span>
+                          <span>Awaiting Signature</span>
                         </button>
                       )}
                       {(!req.isArchived && (req.statusId === resolvedStatusIds.PENDING || req.statusId === resolvedStatusIds.PENDING_SIGNATURE)) && (
                         <button
-                          disabled={updatingId === req.id || (req.isCertificate && !printedCertificateIds.includes(req.id))}
+                          disabled={updatingId === req.id}
                           onClick={() => {
                             if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
-                              alert('Please generate and print the certificate first before marking this request as Ready to claim.');
+                              showError('You need to process or print the certificate first.');
                               return;
                             }
                             handleStatusUpdate(req.id, resolvedStatusIds.READY);
                           }}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                            req.isCertificate && !printedCertificateIds.includes(req.id)
+                              ? 'opacity-40 filter blur-[0.5px] cursor-pointer'
+                              : ''
+                          } ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
                           title={
                             req.isCertificate && !printedCertificateIds.includes(req.id)
                               ? 'Print certificate first'
@@ -469,7 +621,6 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                           <CheckCircleIcon className="w-4 h-4" /> Ready
                         </button>
                       )}
-
                       {!req.isArchived && req.statusId === resolvedStatusIds.READY && (
                         <button
                           disabled={updatingId === req.id}
@@ -478,35 +629,21 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false }) => {
                         >
                           <CheckCircleIcon className="w-4 h-4" /> Done
                         </button>
-                      )}              
-                      {viewMode === 'archived' ? (
-                        <button
-                          disabled={updatingId === req.id}
-                          onClick={() => handleRestoreOne(req.id)}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
-                          title="Restore to Active Requests (original status kept)"
-                        >
-                          <CheckIcon className="w-4 h-4" /> Restore
-                        </button>
-                      ) : (
-                        <button
-                          disabled={updatingId === req.id}
-                          onClick={() => handleArchiveOne(req.id)}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-500 hover:bg-amber-700'}`}
-                          title="Archive this request"
-                        >
-                          <ArchiveBoxIcon className="w-4 h-4" /> Archive
-                        </button>
                       )}
-                      <button
-                        title="View Details"
-                        onClick={() => setSelectedRequest(req.rawRequest)}
-                        className={`flex items-center justify-center gap-1 px-3 py-1.5 ${isDark ? 'p-2text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c] rounded-lg transition' : 'p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition'}`}
-                      >
-                        <EyeIcon className="w-5 h-5" />
-                      </button>                     
+
+                      <RowActionsDropdown
+                        req={req}
+                        viewMode={viewMode}
+                        resolvedStatusIds={resolvedStatusIds}
+                        onViewDetails={() => setSelectedRequest(req.rawRequest)}
+                        onGenerateCert={() => setCertRequest(req)}
+                        onArchive={() => handleArchiveOne(req.id)}
+                        onRestore={() => handleRestoreOne(req.id)}
+                        updatingId={updatingId}
+                        isDark={isDark}
+                      />
                     </div>
-                  </Td>
+                  </td>
                 </tr>
               ))
             )}
