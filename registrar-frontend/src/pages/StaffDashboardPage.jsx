@@ -48,24 +48,15 @@ const StaffDashboardPage = () => {
               <span>Archived records</span>
             </button>
           </div>
-
-          {/* Scan to Claim — only meaningful for the active-requests view;
-              archived requests are read-only (see archive/restore logic
-              elsewhere) and are never claimable. */}
-          {activeTab === 'active' && (
-            <button
-              type="button"
-              onClick={() => setScannerOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 mb-2 rounded-lg bg-pup-maroon text-white text-sm font-bold hover:bg-pup-dark-maroon transition-colors shadow-sm"
-            >
-              <QrCodeIcon className="w-5 h-5" />
-              <span>Scan to Claim</span>
-            </button>
-          )}
+          {/* Scan to Claim button has been moved down to the Search row inside StaffDashboard component */}
         </div>
 
         {/* Dashboard View */}
-        <StaffDashboard viewMode={activeTab} isEmbedded={true} />
+        <StaffDashboard 
+          viewMode={activeTab} 
+          isEmbedded={true} 
+          onScanToClaim={() => setScannerOpen(true)} 
+        />
       </div>
 
       <ClaimScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} />
