@@ -10,8 +10,23 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
+
+// Mirrors certMakeUser() in CertificationTypeControllerTest.php — super
+// admin bypasses EnsureModuleAccess entirely (see
+// SystemUser::hasModuleAccess()), so it's the simplest actor for
+// HTTP-level tests against the calendar-exceptions routes.
+function calendarExceptionActingSuperAdmin(): SystemUser
+{
+    $user = SystemUser::factory()->create([
+        'role_id' => SystemUser::ROLE_SUPER_ADMIN,
+        'status' => 'Activated',
+    ]);
+    Sanctum::actingAs($user);
+    return $user;
+}
 
 beforeEach(function () {
     config(['app.display_timezone' => 'Asia/Manila']);
@@ -272,6 +287,51 @@ test('a closed_from_time at or before the normal opening time is rejected', func
         'date' => '2026-03-11', 'end_date' => '2026-03-11',
         'closed_from_time' => '08:00',
     ], $actor, Request::create('/')))->toThrow(ValidationException::class);
+});
+
+test('creating an exception via the API rejects a closed_from_time outside 8 AM–8 PM', function () {
+    calendarExceptionActingSuperAdmin();
+
+    $tooEarly = $this->postJson('/api/calendar-exceptions', [
+        'type' => 'suspension', 'label' => 'Too early',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '05:00',
+    ]);
+    $tooEarly->assertStatus(422)->assertJsonValidationErrors('closed_from_time');
+
+    $tooLate = $this->postJson('/api/calendar-exceptions', [
+        'type' => 'suspension', 'label' => 'Too late',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '21:00',
+    ]);
+    $tooLate->assertStatus(422)->assertJsonValidationErrors('closed_from_time');
+
+    expect(BusinessCalendarHoliday::count())->toBe(0);
+});
+
+test('creating an exception via the API accepts closed_from_time at the 8 AM–8 PM boundaries', function () {
+    calendarExceptionActingSuperAdmin();
+
+    // 08:00 is within the request's own validation bounds, but the
+    // service-level "must be after the day's normal opening time" check
+    // (see the test above this one in the file) will still reject it if
+    // the default calendar also opens at 08:00 — so exercise the two
+    // rules independently by using a time comfortably inside the window
+    // that's also after the default calendar's opening time, plus the
+    // literal upper boundary.
+    $withinWindow = $this->postJson('/api/calendar-exceptions', [
+        'type' => 'suspension', 'label' => 'Within window',
+        'date' => '2026-03-11', 'end_date' => '2026-03-11',
+        'closed_from_time' => '08:01',
+    ]);
+    $withinWindow->assertStatus(201);
+
+    $upperBoundary = $this->postJson('/api/calendar-exceptions', [
+        'type' => 'suspension', 'label' => 'Upper boundary',
+        'date' => '2026-03-12', 'end_date' => '2026-03-12',
+        'closed_from_time' => '20:00',
+    ]);
+    $upperBoundary->assertStatus(201);
 });
 
 test('explicitly clearing closed_from_time on update collapses the exception back to a full-day closure', function () {

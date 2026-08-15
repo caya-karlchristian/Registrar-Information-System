@@ -23,11 +23,23 @@ class StoreCalendarExceptionRequest extends FormRequest
             'date'        => 'required|date',
             'end_date'    => 'nullable|date|after_or_equal:date',
             // 'H:i' (e.g. "15:00") to match the frontend's <input type="time">.
-            // Whether this is actually *after* the day's normal opening
-            // time is checked in CalendarExceptionService, not here — that
-            // needs the calendar's weekly_hours, which a FormRequest has
-            // no business reaching into.
-            'closed_from_time' => 'nullable|date_format:H:i',
+            // Registrar closes-early times are restricted to the 8 AM–8 PM
+            // window regardless of calendar — a value outside normal
+            // business hours is a data-entry mistake, not a real partial
+            // closure. Whether the time is actually *after* the day's
+            // normal opening time (a separate, calendar-specific check) is
+            // done in CalendarExceptionService, not here — that needs the
+            // calendar's weekly_hours, which a FormRequest has no business
+            // reaching into.
+            'closed_from_time' => 'nullable|date_format:H:i|after_or_equal:08:00|before_or_equal:20:00',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'closed_from_time.after_or_equal'  => 'Closes-early time can\'t be earlier than 8:00 AM.',
+            'closed_from_time.before_or_equal' => 'Closes-early time can\'t be later than 8:00 PM.',
         ];
     }
 }

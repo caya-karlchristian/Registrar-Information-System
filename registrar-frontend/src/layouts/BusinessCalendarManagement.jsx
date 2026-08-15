@@ -774,11 +774,18 @@ const BusinessCalendarManagement = () => {
                       type="time"
                       value={exceptionForm.closed_from_time}
                       onChange={(e) => setExceptionForm((prev) => ({ ...prev, closed_from_time: e.target.value }))}
+                      // Registrar closes-early times are restricted to
+                      // 8 AM–8 PM (kept in sync with the backend's
+                      // Store/UpdateCalendarExceptionRequest validation) —
+                      // min/max steer the native time picker away from
+                      // values the server would reject anyway.
+                      min="08:00"
+                      max="20:00"
                       voiceEnabled={false}
                       labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
                     />
                     <p className={`mt-1 text-[11px] ${isDark ? 'text-[#8a8d91]' : 'text-gray-400'}`}>
-                      Leave blank for a full-day closure. Only affects the first day — if this is a multi-day range, later days are closed all day regardless.
+                      Leave blank for a full-day closure. Must be between 8:00 AM and 8:00 PM. Only affects the first day — if this is a multi-day range, later days are closed all day regardless.
                     </p>
                     {fieldErrors.closed_from_time && <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.closed_from_time[0]}</p>}
                   </div>
