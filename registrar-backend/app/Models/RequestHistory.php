@@ -20,6 +20,19 @@ class RequestHistory extends Model
     // user's account was later deleted" (processed_by_email = null too).
     protected $fillable = ['request_id', 'old_status_id', 'new_status_id', 'changed_at', 'changed_by', 'processed_by_email', 'minutes_processed', 'business_minutes'];
 
+    // changed_at is stored as a naive UTC DATETIME column (app.timezone =
+    // UTC). Without this cast, Eloquent returns/serializes it as a raw
+    // "Y-m-d H:i:s" string with no timezone marker; the frontend's
+    // `new Date(...)` then parses that space-separated format as LOCAL
+    // time instead of UTC, showing every "processed" timestamp pulled
+    // from history (Ready to Claim / Completed / etc. — see
+    // logbookHelpers.js) 8 hours off in Asia/Manila. Casting to
+    // 'datetime' makes Eloquent serialize it as proper ISO-8601 with a
+    // 'Z' suffix, same as DocumentRequest::requested_at already does.
+    protected $casts = [
+        'changed_at' => 'datetime',
+    ];
+
     public function request()
     {
         return $this->belongsTo(DocumentRequest::class, 'request_id');
