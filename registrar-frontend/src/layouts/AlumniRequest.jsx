@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
@@ -16,6 +17,7 @@ import { getTodayDate } from "../utils/helpers";
 
 const AlumniRequestForm = ({ showProfileStep = false }) => {
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   const formRef = useRef(null);
 
   const {
@@ -48,6 +50,26 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
     finalStep,
   } = useAlumniRequest({ showProfileStep });
 
+  const handleGoToDashboard = () => {
+    if (window.location.pathname.startsWith('/staff')) {
+      navigate('/staff/dashboard');
+    } else if (window.location.pathname.startsWith('/alumni')) {
+      navigate('/alumni/home');
+    } else {
+      navigate('/student/home');
+    }
+  };
+
+  const handleGoToInbox = () => {
+    if (window.location.pathname.startsWith('/staff')) {
+      navigate('/staff/inbox');
+    } else if (window.location.pathname.startsWith('/alumni')) {
+      navigate('/alumni/inbox');
+    } else {
+      navigate('/student/inbox');
+    }
+  };
+
   useEffect(() => {
     if (formRef.current) {
       formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -58,27 +80,90 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
     <div className="relative min-h-screen pb-20 z-20">
       <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
       {isSubmitted ? (
-        <div className="max-w-5xl mx-auto">
-          <div
-            className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 items-center justify-center text-center px-10 flex flex-col relative ${
-              isDark ? "bg-[#242526]" : "bg-pup-dark-maroon"
-            }`}
-          >
-            <p className="mb-6 text-4xl text-center font-bold text-white mt-35">
-              Please be patient as we process your requested document.
+        <div className="max-w-4xl mx-auto">
+          <div className="shadow-2xl border-t-4 border-pup-yellow flex flex-col items-center text-center px-6 py-12 md:px-10 lg:px-16 bg-[#660000]">
+            {/* Green Check Icon */}
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 text-green-400/80 mb-6 shrink-0">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+
+            {/* Title & Subtitle */}
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3 tracking-wide">
+              Request Submitted Successfully
+            </h2>
+            <p className="text-white/80 text-[10px] sm:text-base max-w-xl mx-auto mb-6 font-medium">
+              Please be patient as we process your requested document. Thank you and keep safe always!
             </p>
-            <p className="mb-6 text-4xl text-center font-bold text-white mt-2">
-              Thank you and keep safe always.
+
+            {/* Top Divider */}
+            <div className="w-full max-w-4xl mx-auto border-t border-dashed border-white/15 my-6" />
+
+            {/* Side-by-Side Grid Container */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mx-auto my-4 items-start text-left">
+              {/* Left Column: Office Hours Notice */}
+              <div className="flex flex-col gap-4 w-full">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center md:text-left">
+                  Processing Schedule & Hours
+                </h3>
+                <OfficeHoursNotice isDark={isDark} />
+              </div>
+
+              {/* Right Column: Claim Details & QR */}
+              <div className="flex flex-col gap-4 w-full">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center md:text-left">
+                  Claim Ticket & Code
+                </h3>
+
+                {/* Claim Code Box */}
+                <div className="w-full bg-[#181110] border border-white/5 rounded-xl p-5 text-center shadow-inner">
+                  <span className="text-3xl font-black text-white tracking-[0.25em] font-mono select-all uppercase">
+                    {claimTicket?.claimCode ? claimTicket.claimCode.split('').join(' ') : '— — — — — —'}
+                  </span>
+                </div>
+
+                {/* Go to Inbox Button */}
+                <div className="w-full">
+                  <button
+                    type="button"
+                    onClick={handleGoToInbox}
+                    className="flex items-center justify-center gap-2 px-8 py-2.5 rounded-lg font-bold text-sm shadow-md transition-all active:scale-95 cursor-pointer text-white bg-[#800000] hover:bg-[#6c0000] w-full max-w-[280px] mx-auto"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-4m-8 0v-4" />
+                    </svg>
+                    Go to Inbox
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* QR Code Simple Note */}
+            <p className="text-white/50 text-[12px] text-center leading-relaxed w-full max-w-xl mx-auto">
+              Note: View/download your claim ticket QR code in your inbox or present the manual claim code when claiming.
             </p>
-            {/* QR Code Claiming Policy v1.0 §3.2, access point 1 */}
-            <ClaimTicket uuid={claimTicket?.uuid} claimCode={claimTicket?.claimCode} />
-            <OfficeHoursNotice isDark={isDark} />
-            <button
-              onClick={handleConfirm}
-              className="bg-pup-yellow mt-12 hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95"
-            >
-              Confirm
-            </button>
+
+            {/* Bottom Divider */}
+            <div className="w-full max-w-4xl mx-auto border-t border-dashed border-white/15 my-6" />
+
+            {/* Bottom Navigation Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-xl mx-auto mt-6">
+              <button
+                type="button"
+                onClick={handleConfirm}
+                className="w-full sm:w-1/2 py-3 px-6 rounded-lg font-bold text-sm border border-white/10 bg-[#3d0c0c] hover:bg-[#4c1212] text-white transition-all shadow-md active:scale-95 text-center cursor-pointer"
+              >
+                Create Another Request
+              </button>
+              <button
+                type="button"
+                onClick={handleGoToDashboard}
+                className="w-full sm:w-1/2 py-3 px-8 rounded-lg font-bold text-sm bg-[#F8BF1E] hover:bg-[#e6b01b] text-pup-maroon transition-all shadow-md active:scale-95 text-center cursor-pointer"
+              >
+                Go to Dashboard
+              </button>
+            </div>
           </div>
         </div>
       ) : (

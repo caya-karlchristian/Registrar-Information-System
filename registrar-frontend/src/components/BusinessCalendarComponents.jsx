@@ -474,7 +474,7 @@ export const CalendarGridView = ({
           <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
             {MONTHS[currentMonth].toUpperCase()} CLOSURES
           </h3>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-77.5 overflow-y-auto pr-1.5 custom-scrollbar">
             {activeMonthExceptions.length === 0 ? (
               <div className={`p-4 rounded-xl border text-center text-xs leading-relaxed ${
                 isDark ? "border-[#3e4042] bg-[#242526]/50 text-[#b0b3b8]" : "border-gray-150 bg-white text-gray-500"
@@ -537,7 +537,7 @@ export const CalendarGridView = ({
           <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
             WEEKLY SCHEDULE
           </h3>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-77.5 overflow-y-auto pr-1.5 custom-scrollbar">
             {activeMonthOverrides.length === 0 ? (
               <div className={`p-4 rounded-xl border text-center text-xs leading-relaxed ${
                 isDark ? "border-[#3e4042] bg-[#242526]/50 text-[#b0b3b8]" : "border-gray-150 bg-white text-gray-500"

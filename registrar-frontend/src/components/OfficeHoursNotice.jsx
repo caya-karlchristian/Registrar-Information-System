@@ -53,26 +53,18 @@ const OfficeHoursNotice = ({ isDark }) => {
 
   if (failed || !status) return null;
 
-  const baseClasses = 'mt-6 max-w-lg mx-auto rounded-lg border px-5 py-4 text-sm text-left leading-relaxed';
+  const baseClasses = 'w-full max-w-xl mx-auto rounded-xl border px-6 py-4 text-sm text-left leading-relaxed shadow-sm';
 
   if (status.is_open) {
     return (
-      <div
-        className={`${baseClasses} ${
-          isDark ? 'bg-green-900/20 border-green-600 text-green-300' : 'bg-green-50 border-green-300 text-green-800'
-        }`}
-      >
+      <div className={`${baseClasses} bg-[#F0FDF4] border-[#BBF7D0] text-[#166534]`}>
         <strong>Our office is open right now</strong> (Mon–Fri, 8:00 AM–8:00 PM). Your request has been received and processing will begin today.
       </div>
     );
   }
 
   return (
-    <div
-      className={`${baseClasses} ${
-        isDark ? 'bg-amber-900/20 border-amber-600 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-800'
-      }`}
-    >
+    <div className={`${baseClasses} bg-[#FFFDF5] border-[#F5E3B5] text-[#78350F]`}>
       <strong>Our office is currently closed</strong> (open Mon–Fri, 8:00 AM–8:00 PM). Your request has already been received — processing will begin on{' '}
       <strong>{formatDateTime(status.next_open_at)}</strong>.
     </div>

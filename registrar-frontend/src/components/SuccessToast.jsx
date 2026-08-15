@@ -45,7 +45,7 @@ const SuccessToast = ({ message, onClose }) => {
       style={{
         top: `${headerHeight + 16}px`,
       }}
-      className={`fixed left-1/2 -translate-x-1/2 md:left-auto md:right-5 md:translate-x-0 z-9999 flex items-center w-[calc(100vw-24px)] md:w-85 px-4 py-3 rounded-lg shadow-xl animate-in slide-in-from-top-2 md:slide-in-from-right-4 fade-in duration-300 transition-all duration-300 ${
+      className={`fixed left-1/2 -translate-x-1/2 md:left-auto md:right-5 md:translate-x-0 z-200000 flex items-center w-[calc(100vw-24px)] md:w-85 px-4 py-3 rounded-lg shadow-xl animate-in slide-in-from-top-2 md:slide-in-from-right-4 fade-in duration-300 transition-all duration-300 ${
         isDark 
           ? 'text-[#e4e6eb] bg-[#242526] border border-[#3e4042]' 
           : 'text-white bg-green-600 border border-white/20'

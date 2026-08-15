@@ -242,6 +242,7 @@ test.describe('Staff Dashboard E2E Tests', () => {
     await expect(page.getByText('Maria Santos Reyes')).toBeVisible();
 
     // 3. Test Details Modal triggers on clicking the View Details button
+    await page.locator('tr:has-text("Juan Dela Cruz")').getByRole('button', { name: 'More Actions' }).click();
     await page.locator('tr:has-text("Juan Dela Cruz")').getByRole('button', { name: 'View Details' }).click();
     
     // Check that the request details drawer opens
@@ -259,5 +260,35 @@ test.describe('Staff Dashboard E2E Tests', () => {
     // Switch back to Active
     await page.getByRole('button', { name: 'Active requests' }).click();
     await expect(page.getByText('Juan Dela Cruz')).toBeVisible();
+  });
+
+  test('Verify opening and using the Scan to Claim modal (tab switching, inputs)', async ({ page }) => {
+    // Navigate to staff dashboard
+    await page.goto('/staff/dashboard');
+
+    // 1. Verify "Scan to Claim" button is visible next to Search
+    const scanBtn = page.getByRole('button', { name: 'Scan to Claim' });
+    await expect(scanBtn).toBeVisible();
+    await scanBtn.click();
+
+    // 2. Verify modal opened
+    await expect(page.getByRole('heading', { name: 'Scan QR code' })).toBeVisible();
+
+    // 3. Verify Scan QR Code tab details
+    await expect(page.getByRole('button', { name: 'Scan QR Code' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enter Claim Code' })).toBeVisible();
+    await expect(page.getByText('Point your QR code at the camera. If the camera isn\'t working, switch to the "Enter Claim Code" tab.')).toBeVisible();
+
+    // 4. Switch to Enter Claim Code tab
+    await page.getByRole('button', { name: 'Enter Claim Code' }).click();
+    await expect(page.getByText('Enter the 6-digit code sent in your inbox.')).toBeVisible();
+
+    // 5. Verify passcode input boxes render
+    const inputs = page.locator('input[placeholder="0"]');
+    await expect(inputs).toHaveCount(6);
+
+    // 6. Close the scanner modal
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('heading', { name: 'Scan QR code' })).not.toBeVisible();
   });
 });

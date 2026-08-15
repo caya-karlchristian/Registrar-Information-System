@@ -9,6 +9,7 @@ export const StatCard = ({ title, count, color }) => {
     blue: isDark ? 'border-blue-400 text-blue-400' : 'border-blue-500 text-blue-500',
     green: isDark ? 'border-green-400 text-green-400' : 'border-green-500 text-green-500',
     orange: isDark ? 'border-orange-400 text-orange-400' : 'border-orange-500 text-orange-500',
+    amber: isDark ? 'border-amber-400 text-amber-400' : 'border-amber-500 text-amber-600',
   };
   return (
     <div className={`p-6 rounded-xl shadow border-l-4 ${isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white'} ${colors[color]}`}>
@@ -43,7 +44,7 @@ export const StatusBadge = ({ status }) => {
     ? {
         pending: 'bg-yellow-900/20 text-yellow-400 border-yellow-600',
         processing: 'bg-blue-900/20 text-blue-400 border-blue-600',
-        'pending signature': 'bg-orange-900/20 text-orange-400 border-orange-600',
+        'pending signature': 'bg-amber-900/20 text-amber-400 border-amber-600',
         'ready to claim': 'bg-green-900/20 text-green-400 border-green-600',
         completed: 'bg-gray-700/20 text-gray-300 border-gray-400',
         forfeited: 'bg-gray-700/20 text-gray-300 border-gray-400',
@@ -52,7 +53,7 @@ export const StatusBadge = ({ status }) => {
     : {
         pending: 'bg-yellow-100 text-yellow-700 border-yellow-200',
         processing: 'bg-blue-100 text-blue-700 border-blue-200',
-        'pending signature': 'bg-orange-100 text-orange-700 border-orange-200',
+        'pending signature': 'bg-amber-100 text-amber-700 border-amber-200',
         'ready to claim': 'bg-green-100 text-green-700 border-green-200',
         completed: 'bg-gray-100 text-gray-700 border-gray-200',
         forfeited: 'bg-gray-100 text-gray-700 border-gray-200',
