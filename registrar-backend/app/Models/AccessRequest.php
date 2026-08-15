@@ -20,6 +20,7 @@ class AccessRequest extends Model
         'target_first_name',
         'target_middle_name',
         'target_last_name',
+        'target_suffix',
         'requested_role_id',
         'requested_policy_id',
         'justification',

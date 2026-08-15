@@ -118,6 +118,37 @@ test('store() leaves target middle name null when omitted', function () {
     expect($accessRequest->target_middle_name)->toBeNull();
 });
 
+test('store() persists an optional target suffix', function () {
+    arsActingAdmin();
+
+    $service = app(AccessRequestService::class);
+    $accessRequest = $service->store([
+        'target_email'      => 'withsuffix@example.com',
+        'target_first_name' => 'New',
+        'target_last_name'  => 'Person',
+        'target_suffix'     => 'Jr.',
+        'requested_role_id' => SystemUser::ROLE_ADMIN,
+        'justification'     => 'Needs access to help at the front desk.',
+    ], arsRequest());
+
+    expect($accessRequest->target_suffix)->toBe('Jr.');
+});
+
+test('store() leaves target suffix null when omitted', function () {
+    arsActingAdmin();
+
+    $service = app(AccessRequestService::class);
+    $accessRequest = $service->store([
+        'target_email'      => 'nosuffix@example.com',
+        'target_first_name' => 'New',
+        'target_last_name'  => 'Person',
+        'requested_role_id' => SystemUser::ROLE_ADMIN,
+        'justification'     => 'Needs access to help at the front desk.',
+    ], arsRequest());
+
+    expect($accessRequest->target_suffix)->toBeNull();
+});
+
 // ═════════════════════════════════════════════════════════════════════════════
 // approve()
 // ═════════════════════════════════════════════════════════════════════════════
@@ -143,6 +174,30 @@ test('approve() carries the target middle name onto the created SystemUser profi
     $this->assertDatabaseHas('admin_profile', [
         'user_id'     => $user->user_id,
         'middle_name' => 'Reyes',
+    ]);
+});
+
+test('approve() carries the target suffix onto the created SystemUser profile', function () {
+    $submitter = arsActingAdmin();
+    $accessRequest = AccessRequest::create([
+        'requested_by'       => $submitter->user_id,
+        'target_email'       => 'approvedwithsuffix@example.com',
+        'target_first_name'  => 'Approved',
+        'target_last_name'   => 'Person',
+        'target_suffix'      => 'III',
+        'requested_role_id'  => SystemUser::ROLE_ADMIN,
+        'justification'      => 'Needed.',
+        'status'             => AccessRequest::STATUS_REQUESTED,
+        'expires_at'         => now()->addDays(7),
+    ]);
+
+    arsActingSuperAdmin();
+    $service = app(AccessRequestService::class);
+    $user    = $service->approve($accessRequest, arsRequest());
+
+    $this->assertDatabaseHas('admin_profile', [
+        'user_id' => $user->user_id,
+        'suffix'  => 'III',
     ]);
 });
 

@@ -104,7 +104,7 @@ const AccessRequestsQueue = ({ onPendingCountChange }) => {
   const baseFiltered = requests.filter((r) => {
     const query = searchQuery.toLowerCase().trim();
     if (query) {
-      const fullName = [r.target_first_name, r.target_middle_name, r.target_last_name].filter(Boolean).join(" ").toLowerCase();
+      const fullName = [r.target_first_name, r.target_middle_name, r.target_last_name, r.target_suffix].filter(Boolean).join(" ").toLowerCase();
       const email = (r.target_email || "").toLowerCase();
       const role = (r.requested_role || "Admin").toLowerCase();
       const policyName = (r.requested_policy?.name || "").toLowerCase();
@@ -133,8 +133,8 @@ const AccessRequestsQueue = ({ onPendingCountChange }) => {
   });
 
   const filteredRequests = [...baseFiltered].sort((a, b) => {
-    const nameA = [a.target_first_name, a.target_middle_name, a.target_last_name].filter(Boolean).join(" ");
-    const nameB = [b.target_first_name, b.target_middle_name, b.target_last_name].filter(Boolean).join(" ");
+    const nameA = [a.target_first_name, a.target_middle_name, a.target_last_name, a.target_suffix].filter(Boolean).join(" ");
+    const nameB = [b.target_first_name, b.target_middle_name, b.target_last_name, b.target_suffix].filter(Boolean).join(" ");
     if (sortOrder === "asc") {
       return nameA.localeCompare(nameB);
     } else {
@@ -341,7 +341,7 @@ const AccessRequestsQueue = ({ onPendingCountChange }) => {
                 </tr>
               ) : (
                 filteredRequests.map((r, idx) => {
-                  const fullName = [r.target_first_name, r.target_middle_name, r.target_last_name].filter(Boolean).join(" ");
+                  const fullName = [r.target_first_name, r.target_middle_name, r.target_last_name, r.target_suffix].filter(Boolean).join(" ");
                   const requesterName = r.requested_by?.name || r.requested_by?.email || 'Unknown';
 
                   return (
@@ -471,7 +471,7 @@ const AccessRequestsQueue = ({ onPendingCountChange }) => {
             <div className="p-6 space-y-4">
               <div className={`p-4 rounded-xl border ${isDark ? 'bg-[#1f1f1f]/60 border-[#3e4042]' : 'bg-gray-50 border-gray-200'}`}>
                 <div className="text-xs uppercase font-bold tracking-wider mb-2 text-gray-500">Target User</div>
-                <div className="font-semibold text-sm">{[rejectTarget.target_first_name, rejectTarget.target_middle_name, rejectTarget.target_last_name].filter(Boolean).join(" ")}</div>
+                <div className="font-semibold text-sm">{[rejectTarget.target_first_name, rejectTarget.target_middle_name, rejectTarget.target_last_name, rejectTarget.target_suffix].filter(Boolean).join(" ")}</div>
                 <div className={`text-xs mt-0.5 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-550'}`}>{rejectTarget.target_email}</div>
               </div>
 

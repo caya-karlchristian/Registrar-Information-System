@@ -44,6 +44,7 @@ class AccessRequestService
             'target_first_name'    => $validated['target_first_name'],
             'target_middle_name'   => $validated['target_middle_name'] ?? null,
             'target_last_name'     => $validated['target_last_name'],
+            'target_suffix'        => $validated['target_suffix'] ?? null,
             'requested_role_id'    => $validated['requested_role_id'],
             'requested_policy_id'  => $validated['requested_policy_id'] ?? null,
             'justification'        => $validated['justification'],
@@ -79,6 +80,7 @@ class AccessRequestService
                 'first_name'  => $accessRequest->target_first_name,
                 'middle_name' => $accessRequest->target_middle_name,
                 'last_name'   => $accessRequest->target_last_name,
+                'suffix'      => $accessRequest->target_suffix,
                 'policy_id'   => $accessRequest->requested_policy_id,
             ], $request);
 
