@@ -11,6 +11,7 @@ import {
 import { claimDocumentRequest } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { useAlertToast } from '../context/AlertToastContext';
+import { formatName } from '../utils/formatters';
 
 /**
  * ClaimScannerModal — the staff-facing counterpart to ClaimTicket.
@@ -260,7 +261,12 @@ const ClaimScannerModal = ({ open, onClose }) => {
   };
 
   const handleFocus = (index) => {
-    inputRefs.current[index]?.select();
+    const firstEmptyIndex = inputRefs.current.findIndex((ref) => ref && ref.value === '');
+    if (firstEmptyIndex !== -1 && index > firstEmptyIndex) {
+      inputRefs.current[firstEmptyIndex]?.focus();
+    } else {
+      inputRefs.current[index]?.select();
+    }
   };
 
   const handleManualSubmit = (e) => {
@@ -277,13 +283,7 @@ const ClaimScannerModal = ({ open, onClose }) => {
 
   if (!open) return null;
 
-  const ownerName = claimedRequest
-    ? (claimedRequest.student_profile
-      ? `${claimedRequest.student_profile.first_name} ${claimedRequest.student_profile.last_name}`
-      : claimedRequest.alumni_profile
-        ? `${claimedRequest.alumni_profile.first_name} ${claimedRequest.alumni_profile.last_name}`
-        : 'Unknown requester')
-    : '';
+  const ownerName = claimedRequest ? formatName(claimedRequest) || 'Unknown requester' : '';
 
   return createPortal(
     <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
@@ -471,7 +471,7 @@ const ClaimScannerModal = ({ open, onClose }) => {
                   </div>
                   
                   {/* 6-Digit input boxes */}
-                  <div className="flex justify-between gap-2">
+                  <div className="flex justify-between gap-2 sm:gap-3">
                     {manualCode.map((digit, idx) => (
                       <input
                         key={idx}
@@ -486,7 +486,7 @@ const ClaimScannerModal = ({ open, onClose }) => {
                         onPaste={handlePaste}
                         placeholder="0"
                         disabled={phase === 'submitting'}
-                        className={`w-12 h-12 sm:w-14 sm:h-14 text-center text-lg sm:text-xl font-bold rounded-xl border transition-all duration-200 focus:outline-none ${
+                        className={`w-10 h-10 sm:w-14 sm:h-14 text-center text-base sm:text-xl font-bold rounded-lg sm:rounded-xl border transition-all duration-200 focus:outline-none ${
                           isDark
                             ? 'bg-[#1a1a1a] border-[#27272a] text-white placeholder-zinc-700 focus:border-pup-yellow focus:ring-1 focus:ring-pup-yellow'
                             : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-300 focus:border-pup-maroon focus:ring-1 focus:ring-pup-maroon'

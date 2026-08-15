@@ -144,13 +144,13 @@ useEffect(() => {
           <div key={`${tab.value}-${isDark}`} className="w-full flex justify-center">
             <button
               onClick={() => setActiveTab(tab.value)}
-              className={`relative w-full max-w-xs p-4 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-3 group ${
+              className={`relative w-full max-w-xs p-2.5 sm:p-4 rounded-xl border-2 transition-all duration-300 flex items-center justify-center gap-3 group ${
                 activeTab === tab.value
                   ? `${isDark ? tab.darkActive : tab.active} shadow-lg scale-105`
                   : `${isDark ? tab.darkInactive : tab.inactive} hover:shadow-md`
               }`}
             >
-              <span className="font-bold text-lg">{tab.label}</span>
+              <span className="font-bold text-sm sm:text-base md:text-lg whitespace-nowrap">{tab.label}</span>
               <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-sm ring-2 ring-white">
                 {requests.filter((req) => req.type === tab.value).length}
               </span>
@@ -206,11 +206,11 @@ useEffect(() => {
                 >
                   {/* Item Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${req.config.classes}`}>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase border shrink-0 whitespace-nowrap ${req.config.classes}`}>
                         {req.config.label}
                       </span>
-                      <span className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
+                      <span className={`text-xs truncate ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
                         {req.uuid ?? `#${req.request_id}`} • {new Date(req.requested_at).toLocaleDateString()}
                       </span>
                     </div>

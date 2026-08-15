@@ -33,6 +33,7 @@ import { useTheme } from "../context/ThemeContext";
 import { UserTableSkeleton } from '../components/LoadingSkeleton';
 import PolicyModal from "../components/PolicyModal";
 import DashboardDropdown from "../components/DashboardDropdown.jsx";
+import { formatName } from "../utils/formatters";
 
 /**
  * UserManagement — User Management: Policy Attachment
@@ -341,8 +342,7 @@ const UserManagement = () => {
             </h1>
           </div>
           <p className={`text-xs mt-1 ${isDark ? 'text-gray-455' : 'text-gray-500'}`}>
-            Create, edit, and manage admin access, roles, and passwords.
-          </p>
+            Create and manage system user accounts, assign roles, configure access policies, and set local passwords.          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
@@ -503,10 +503,7 @@ const UserManagement = () => {
               </tr>            
               ) : (
               paginated.map((user) => {
-                const profile = user.admin_profile;
-                const fullName = profile
-                  ? [profile.first_name, profile.last_name].filter(Boolean).join(" ")
-                  : "—";
+                const fullName = formatName(user.admin_profile) || "—";
                 const isSuperAdmin = user.role_id === 4;
                 const policy = getUserPolicy(user);
 

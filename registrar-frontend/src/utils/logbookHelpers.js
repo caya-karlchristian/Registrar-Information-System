@@ -4,6 +4,7 @@
  * logbookDocx.js (export).  A single source of truth prevents drift between
  * what the UI shows and what ends up in the exported document.
  */
+import { formatName } from './formatters.js';
 
 // ---------------------------------------------------------------------------
 // Date / time formatters
@@ -90,18 +91,9 @@ export const toProperCase = (value = '') =>
     })
     .join(' ');
 
-/** Build "Last, First M." from a request row */
 export const getFullName = (row) => {
-  const p =
-    row.student_profile ||
-    row.alumni_profile ||
-    row.user?.student_profile ||
-    row.user?.alumni_profile;
-  if (!p) return 'Walk-in Client';
-  const middle = p.middle_name ? ` ${p.middle_name.trim().charAt(0).toUpperCase()}.` : '';
-  const last  = toProperCase(p.last_name  || p.lastname  || '');
-  const first = toProperCase(p.first_name || p.firstname || '');
-  return `${last}, ${first}${middle}`.trim();
+  const name = formatName(row, { lastNameFirst: true, middleInitialOnly: true });
+  return name || 'Walk-in Client';
 };
 
 /** Extract the course string from a request row */

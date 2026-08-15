@@ -16,6 +16,8 @@
  * Order here also defines the order options are shown in the filter.
  * Keep this list in sync with RequestStatusEnum on the backend.
  */
+import { formatName } from './formatters';
+
 export const WORKFLOW_STATUS_NAMES = [
   'Processing',
   'Pending Signature',
@@ -194,11 +196,7 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
         status_name: computedStatusName,
       },
     },
-    studentName: r.student_profile
-      ? formatTitleCase(`${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`)
-      : r.alumni_profile
-      ? formatTitleCase(`${r.alumni_profile.first_name} ${r.alumni_profile.middle_name ?? ''} ${r.alumni_profile.last_name}`)
-      : 'N/A',
+    studentName: formatName(r) || 'N/A',
     studentNumber: r.academic_record?.student_number
       ?? r.alumni_academic_record?.student_number
       ?? 'N/A',

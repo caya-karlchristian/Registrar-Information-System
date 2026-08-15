@@ -353,7 +353,7 @@ export const CalendarGridView = ({
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /> Suspension</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-500" /> Event</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Weekly – open</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Weekly – closed</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" /> Weekly – closed</span>
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-400" /> Weekend</span>
         </div>
 
@@ -363,13 +363,13 @@ export const CalendarGridView = ({
           <div className={`grid grid-cols-7 text-center text-xs font-bold tracking-wider uppercase py-2 ${
             isDark ? "text-[#b0b3b8]" : "text-gray-500"
           }`}>
-            <div>Sun</div>
-            <div>Mon</div>
-            <div>Tue</div>
-            <div>Wed</div>
-            <div>Thu</div>
-            <div>Fri</div>
-            <div>Sat</div>
+            <div><span className="hidden sm:inline">Sun</span><span className="sm:hidden">S</span></div>
+            <div><span className="hidden sm:inline">Mon</span><span className="sm:hidden">M</span></div>
+            <div><span className="hidden sm:inline">Tue</span><span className="sm:hidden">T</span></div>
+            <div><span className="hidden sm:inline">Wed</span><span className="sm:hidden">W</span></div>
+            <div><span className="hidden sm:inline">Thu</span><span className="sm:hidden">T</span></div>
+            <div><span className="hidden sm:inline">Fri</span><span className="sm:hidden">F</span></div>
+            <div><span className="hidden sm:inline">Sat</span><span className="sm:hidden">S</span></div>
           </div>
 
           {/* Grid Cells */}
@@ -404,8 +404,8 @@ export const CalendarGridView = ({
                     : "bg-purple-50 text-purple-700 border-purple-200";
                 } else if (details.kind === "weekly-closed") {
                   capsuleClass = isDark
-                    ? "bg-yellow-950/30 text-yellow-300 border-yellow-900/40"
-                    : "bg-yellow-50 text-yellow-700 border-yellow-200";
+                    ? "bg-blue-950/30 text-blue-300 border-blue-900/40"
+                    : "bg-blue-50 text-blue-700 border-blue-200";
                 } else if (details.kind === "weekly-open") {
                   capsuleClass = isDark
                     ? "bg-emerald-950/30 text-emerald-300 border-emerald-900/40"
@@ -423,7 +423,7 @@ export const CalendarGridView = ({
                 if (details.kind === "holiday") dotClass = "bg-rose-500";
                 else if (details.kind === "suspension") dotClass = "bg-amber-500";
                 else if (details.kind === "event") dotClass = "bg-purple-500";
-                else if (details.kind === "weekly-closed") dotClass = "bg-yellow-500";
+                else if (details.kind === "weekly-closed") dotClass = "bg-blue-500";
                 else if (details.kind === "weekly-open") dotClass = "bg-emerald-500";
                 else if (details.kind === "weekend") dotClass = "bg-gray-400";
               }
@@ -432,7 +432,7 @@ export const CalendarGridView = ({
                 <div
                   key={idx}
                   onClick={() => handleCellClick(day.dateObj, details)}
-                  className={`min-h-24 sm:min-h-28 p-2.5 rounded-xl border flex flex-col justify-between transition-all select-none ${
+                  className={`min-h-[72px] sm:min-h-28 p-1 sm:p-2.5 rounded-lg sm:rounded-xl border flex flex-col justify-between transition-all select-none ${
                     isUnselectablePastCell ? "cursor-not-allowed" : "cursor-pointer"
                   } ${
                     isDark
@@ -446,7 +446,7 @@ export const CalendarGridView = ({
                     isUnselectablePastCell ? "opacity-60 hover:bg-transparent" : ""
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
                     <span className={`text-xs sm:text-sm font-extrabold ${
                       isTodayCell 
                         ? (isDark ? "text-yellow-400" : "text-pup-dark-maroon")
@@ -457,7 +457,7 @@ export const CalendarGridView = ({
                       {day.dayNumber}
                     </span>
                     {isTodayCell && (
-                      <span className={`text-[9px] uppercase tracking-wider px-1 rounded-sm font-bold ${
+                      <span className={`text-[8px] sm:text-[9px] uppercase tracking-wider px-1 rounded-sm font-bold ${
                         isDark ? "bg-yellow-400/20 text-yellow-400" : "bg-pup-dark-maroon/10 text-pup-dark-maroon"
                       }`}>
                         Today
@@ -465,7 +465,8 @@ export const CalendarGridView = ({
                     )}
                   </div>
 
-                  <div className="mt-1 flex flex-col gap-1 overflow-hidden">
+                  {/* Desktop text-based capsule */}
+                  <div className="mt-1 hidden sm:flex flex-col gap-1 overflow-hidden">
                     {details && details.kind !== "weekend" && (
                       <div
                         className={`group/capsule relative px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold border transition-all cursor-pointer flex items-center gap-1 truncate ${capsuleClass} hover:opacity-90 active:scale-[0.98]`}
@@ -474,6 +475,16 @@ export const CalendarGridView = ({
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} />
                         <span className="truncate pr-1">{details.label}</span>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Mobile-only dot indicator */}
+                  <div className="flex sm:hidden justify-center items-center mt-1">
+                    {details && details.kind !== "weekend" && (
+                      <span 
+                        className={`w-2 h-2 rounded-full ${dotClass}`} 
+                        title={`${details.label} (${capitalize(details.kind)})`}
+                      />
                     )}
                   </div>
                 </div>
