@@ -18,9 +18,12 @@ abstract class TestCase extends BaseTestCase
     // (RefreshDatabaseState::$migrated caches this — it's not re-seeded on
     // every single test, only the first migrate:fresh of the run).
     //
-    // DatabaseSeeder's LocalDevSeeder call stays guarded behind
-    // app()->environment('local'), so this does NOT create the fake local
-    // dev accounts/sample data in the testing environment — only the
-    // reference tables every feature test actually depends on.
+    // DatabaseSeeder::run() does NOT call LocalDevSeeder at all — that
+    // seeder is invoked only from start.sh at container boot, never from
+    // the db:seed path this triggers — so this does NOT create the fake
+    // local dev accounts/sample data in the testing environment, only
+    // the reference tables every feature test actually depends on. See
+    // DatabaseSeeder::run()'s docblock for why an env-var guard inside
+    // the seeder call itself wasn't a reliable enough boundary on its own.
     protected $seed = true;
 }

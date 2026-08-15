@@ -46,16 +46,36 @@ class DatabaseSeeder extends Seeder
 
         // LocalAuthPasswordSeeder was removed — it contained real plaintext
         // passwords committed to source control. Do not recreate it with
-        // real credentials. For local dev accounts, use LocalDevSeeder
-        // below, which generates fake accounts with Laravel's standard
-        // dev password via the existing factories.
-
-        // Fake accounts + sample data for local development only.
-        // Never runs against staging or production (guarded inside
-        // LocalDevSeeder itself, not just here, as a second safety check).
-        if (app()->environment('local')) {
-            $this->call(LocalDevSeeder::class);
-        }
+        // real credentials. For local dev accounts, use LocalDevSeeder,
+        // which generates fake accounts with Laravel's standard dev
+        // password via the existing factories.
+        //
+        // LocalDevSeeder is intentionally NOT called from here. It used to
+        // be gated behind app()->environment('local'), then behind an
+        // env('SEED_LOCAL_DEV_ACCOUNTS') flag — both were env-var-based
+        // guards, and both turned out to be readable as truthy during
+        // `php artisan test` inside the local docker-compose container:
+        // SEED_LOCAL_DEV_ACCOUNTS=true is set in docker-compose.local.yml's
+        // `environment:` block, which applies to every process started in
+        // that container (including `docker compose exec backend php
+        // artisan test`), and phpunit.xml's <env> tags only override the
+        // variables they explicitly list — SEED_LOCAL_DEV_ACCOUNTS was
+        // never one of them, so the container-level value leaked straight
+        // through into env('SEED_LOCAL_DEV_ACCOUNTS', false) regardless of
+        // APP_ENV=testing. That let the 4 fixed accounts (including a
+        // "Juan Dela Cruz" and "maria@gmail.com") get seeded once per test
+        // run via TestCase::$seed, silently inflating count-based
+        // assertions in RoleAssignmentSearchTest, AlumniProvisioningTest,
+        // and UserProvisioningServiceTest.
+        //
+        // Any env-var guard here is fixable only by remembering to keep
+        // phpunit.xml's override list in sync forever. Instead, local dev
+        // seeding is invoked directly from start.sh — a script that only
+        // ever runs at container boot, never as part of `php artisan
+        // test` or RefreshDatabase's `migrate:fresh --seed` — via
+        // `php artisan db:seed --class=LocalDevSeeder`. That makes it
+        // structurally impossible for this seeder to run during tests,
+        // independent of any environment variable's value or precedence.
     }
 
     // ─────────────────────────────────────────────

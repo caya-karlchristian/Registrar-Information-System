@@ -128,16 +128,10 @@ class IdpClient
             return;
         }
 
-        
         [$body, $status, $error] = $this->postWithAuth('/api/v1/auth/logout', [
             'client_id' => $this->clientId,
             'user_id'   => $userId,
         ], $accessToken);
-            
-        $url = $this->baseUrl . '/logout?' . http_build_query([
-            'client_id' => $this->clientId,
-            'user_id'   => $userId,
-        ]);
 
         Log::info('SSO: IdP logout called', [
             'user_id'     => $userId,
@@ -384,8 +378,14 @@ class IdpClient
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
         ]);
-        [$body, $status] = $this->execRaw($ch);
-        return [$body, $status];
+        // Return all three elements execRaw() produces (body, status, error).
+        // logout() below needs $error to detect connectivity failures that
+        // never produce a >=400 HTTP status (there's no HTTP status at all
+        // when the request never reached the IdP). createUser() — the only
+        // other caller — still destructures just [$body, $status]; PHP
+        // array destructuring ignores the extra element, so that call site
+        // is unaffected by this change.
+        return $this->execRaw($ch);
     }
 
     /**

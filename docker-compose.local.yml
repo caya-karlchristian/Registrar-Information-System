@@ -29,6 +29,16 @@ services:
       SESSION_SAME_SITE: lax
       QUEUE_CONNECTION: sync
       TELESCOPE_ENABLED: "true"
+      # Single-purpose flag for DatabaseSeeder/LocalDevSeeder — seeds the
+      # 4 fixed local dev accounts (super_admin, admin, student, alumni).
+      # Deliberately NOT the same thing as APP_ENV=local above: that value
+      # was found to leak into `php artisan test` runs inside this same
+      # container (app()->environment() reporting 'local' there too),
+      # which let LocalDevSeeder run during tests and silently pollute
+      # count-based assertions. This flag has no other meaning and is
+      # absent from every other compose file and from phpunit.xml, so it
+      # can't be similarly confused with anything test-related.
+      SEED_LOCAL_DEV_ACCOUNTS: "true"
       # Third-party integrations default to mock/off locally —
       # override in your own .env only if you specifically need
       # to test against a real sandbox/staging endpoint.
