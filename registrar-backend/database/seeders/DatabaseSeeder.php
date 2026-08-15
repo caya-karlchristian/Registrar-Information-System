@@ -485,6 +485,18 @@ class DatabaseSeeder extends Seeder
                 'audience'             => NotificationAudienceEnum::SuperAdmin->value,
                 'is_active'            => 1,
             ],
+            [
+                // Fires when an Admin submits a new access request
+                // (AccessRequestService::store()) — only a Super Admin can
+                // approve/reject one (see AccessRequestPolicy), so this is
+                // Super-Admin-only, same as notification_type_id 20.
+                'notification_type_id' => 22,
+                'trigger_event'        => 'access_request_submitted',
+                'title'                => 'New Access Request',
+                'message_template'     => 'A new access request for :target_email has been submitted and is awaiting your review.',
+                'audience'             => NotificationAudienceEnum::SuperAdmin->value,
+                'is_active'            => 1,
+            ],
         ];
 
         foreach ($rows as $row) {
