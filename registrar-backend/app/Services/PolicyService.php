@@ -92,7 +92,8 @@ class PolicyService
     }
 
     /**
-     * @throws PolicyException if the policy is system-managed.
+     * @throws PolicyException if the policy is system-managed, or if it is
+     *         currently assigned to one or more users.
      */
     public function delete(Policy $policy, Request $request): void
     {
@@ -100,20 +101,37 @@ class PolicyService
             throw new PolicyException('System-managed policies cannot be deleted.');
         }
 
-        DB::transaction(function () use ($policy, $request) {
-            // Admins holding this policy fall back to "no policy attached"
-            // rather than being left pointing at a deleted row. The
-            // frontend / attachToUser() default-resolution logic then
-            // takes over the next time their access is displayed or
-            // re-evaluated — same behavior the localStorage-only version
-            // had when a policy name stopped existing.
-            SystemUser::where('policy_id', $policy->policy_id)
-                ->update(['policy_id' => null]);
+        if ($this->isInUse($policy)) {
+            throw new PolicyException(
+                'This policy is currently assigned to one or more users and cannot be deleted. '
+                . 'Reassign or detach it from those users first.'
+            );
+        }
 
+        DB::transaction(function () use ($policy, $request) {
             $policy->delete();
 
             $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_POLICY_DELETED);
         });
+    }
+
+    /**
+     * Whether $policy is currently attached to anyone — either as an
+     * admin's primary policy_id (SystemUser) or via a live grant
+     * (RoleAssignment). Mirrors the two places attachToUser() writes
+     * policy_id to, so "in use" here means the same thing it means there.
+     * Revoked/expired RoleAssignment rows are historical and intentionally
+     * excluded — they don't grant this policy to anyone right now.
+     */
+    private function isInUse(Policy $policy): bool
+    {
+        $hasPrimaryHolders = SystemUser::where('policy_id', $policy->policy_id)->exists();
+
+        $hasActiveAssignments = RoleAssignment::where('policy_id', $policy->policy_id)
+            ->active()
+            ->exists();
+
+        return $hasPrimaryHolders || $hasActiveAssignments;
     }
 
     // -------------------------------------------------------------------------
