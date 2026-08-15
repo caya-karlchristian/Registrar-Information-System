@@ -25,6 +25,7 @@ import {
   StatusBadge,
   Pagination,
 } from '../components/StaffDashboardComponents';
+import { getWorkflowStatusOptions } from '../utils/staffDashboardUtils';
 
 const ITEMS_PER_PAGE = 15;
 
@@ -236,13 +237,11 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
     }
   };
   
-  const statusFilterOptions = [
-    'All',
-    ...requestStatuses
-      .map(s => s?.status_name)
-      .filter(Boolean)
-      .filter((name, index, self) => self.indexOf(name) === index),
-  ];
+  // Only real, reachable request-workflow statuses are offered here —
+  // see getWorkflowStatusOptions for why the raw reference-data rows
+  // (which include unrelated/orphaned entries like "On Hold", "Rejected",
+  // "Returned", "Draft", "Archived") are not used directly.
+  const statusFilterOptions = ['All', ...getWorkflowStatusOptions(requestStatuses)];
 
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
