@@ -107,7 +107,10 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                 <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center md:text-left">
                   Processing Schedule & Hours
                 </h3>
-                <OfficeHoursNotice isDark={isDark} />
+                <OfficeHoursNotice isDark={isDark} small={true} />
+                <p className="text-white/50 text-[11px] text-center md:text-left leading-relaxed max-w-sm">
+                  Note: View/download your claim ticket QR code in your inbox or present the manual claim code when claiming.
+                </p>
               </div>
 
               {/* Right Column: Claim Details & QR */}
@@ -116,33 +119,10 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                   Claim Ticket & Code
                 </h3>
 
-                {/* Claim Code Box */}
-                <div className="w-full bg-[#181110] border border-white/5 rounded-xl p-5 text-center shadow-inner">
-                  <span className="text-3xl font-black text-white tracking-[0.25em] font-mono select-all uppercase">
-                    {claimTicket?.claimCode ? claimTicket.claimCode.split('').join(' ') : '— — — — — —'}
-                  </span>
-                </div>
-
-                {/* Go to Inbox Button */}
-                <div className="w-full">
-                  <button
-                    type="button"
-                    onClick={handleGoToInbox}
-                    className="flex items-center justify-center gap-2 px-8 py-2.5 rounded-lg font-bold text-sm shadow-md transition-all active:scale-95 cursor-pointer text-white bg-[#800000] hover:bg-[#6c0000] w-full max-w-[280px] mx-auto"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-4m-8 0v-4" />
-                    </svg>
-                    Go to Inbox
-                  </button>
-                </div>
+                {/* Claim Ticket Component */}
+                <ClaimTicket uuid={claimTicket?.uuid} claimCode={claimTicket?.claimCode} small={true} />
               </div>
             </div>
-
-            {/* QR Code Simple Note */}
-            <p className="text-white/50 text-[12px] text-center leading-relaxed w-full max-w-xl mx-auto">
-              Note: View/download your claim ticket QR code in your inbox or present the manual claim code when claiming.
-            </p>
 
             {/* Bottom Divider */}
             <div className="w-full max-w-4xl mx-auto border-t border-dashed border-white/15 my-6" />
@@ -170,9 +150,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
         <div ref={formRef} className="max-w-5xl mx-auto">
           <form
             onSubmit={handleSubmit}
-            className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${
-              isDark ? "bg-[#242526]" : "bg-pup-dark-maroon"
-            }`}
+            className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${isDark ? "bg-[#242526]" : "bg-pup-dark-maroon"
+              }`}
             noValidate
           >
             <div className="flex flex-col items-center pt-8 pb-4">
@@ -180,9 +159,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                 {Array.from({ length: totalSteps }, (_, idx) => idx + 1).map((step) => (
                   <div
                     key={step}
-                    className={`w-4 h-4 rounded-full border border-pup-yellow ${
-                      step <= currentStep ? "bg-pup-yellow" : isDark ? "bg-[#3a3b3c]" : "bg-white"
-                    }`}
+                    className={`w-4 h-4 rounded-full border border-pup-yellow ${step <= currentStep ? "bg-pup-yellow" : isDark ? "bg-[#3a3b3c]" : "bg-white"
+                      }`}
                   />
                 ))}
               </div>
@@ -205,9 +183,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
               {/* STEP 1: TERMS & CONDITIONS */}
               {currentStep === 1 && (
                 <div
-                  className={`space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px] ${
-                    isDark ? "text-[#e4e6eb]" : ""
-                  }`}
+                  className={`space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px] ${isDark ? "text-[#e4e6eb]" : ""
+                    }`}
                 >
                   <p>
                     <strong>A.</strong> In compliance with the Data Privacy Act (DPA) of 2012, and its
@@ -232,8 +209,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                     stamp (violet) and two colored 2x2 pictures in formal attire with a white background.
                     For Honorable Dismissal and other certifications, please bring one violet documentary
                     stamp (or two brown documentary stamps) per requested document. <strong>Requests must
-                    be submitted within one (1) week after receiving the documentary receipt. Requests
-                    submitted beyond this period may no longer be considered valid.</strong>
+                      be submitted within one (1) week after receiving the documentary receipt. Requests
+                      submitted beyond this period may no longer be considered valid.</strong>
                   </p>
 
                   <p>
@@ -357,9 +334,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                 <div className="space-y-6 animate-fadeIn">
                   <div className="grid grid-cols-1 gap-6 w-full mt-10">
                     <div
-                      className={`space-y-3 p-4 rounded-lg border ${
-                        isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
-                      }`}
+                      className={`space-y-3 p-4 rounded-lg border ${isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
+                        }`}
                     >
                       <p className={`text-sm text-justify lg:text-[15px] ${isDark ? "text-[#e4e6eb]" : ""}`}>
                         For TOR request for further studies, please secure an HONORABLE DISMISSAL first.
@@ -412,9 +388,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-1 w-full -mt-2">
                     <div
-                      className={`p-4 rounded-lg border ${
-                        isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
-                      }`}
+                      className={`p-4 rounded-lg border ${isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
+                        }`}
                     >
                       <h3 className="text-pup-yellow font-bold mb-3 uppercase text-sm tracking-wide">
                         Number of copies per document
@@ -432,14 +407,13 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                                     type="number"
                                     min="1"
                                     max="10"
-                                    className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${
-                                      isDark
+                                    className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${isDark
                                         ? "bg-[#242526] border-[#3e4042] text-[#e4e6eb] focus:bg-[#2b2c2d] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30"
                                         : "bg-gray-50 border-gray-300 text-gray-700 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
-                                    }`}
+                                      }`}
                                     value={
                                       formData.documentCopies[doc] === undefined
-                                        ? ""
+                                        ? 1
                                         : formData.documentCopies[doc]
                                     }
                                     onChange={(e) => {
@@ -470,11 +444,10 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                                   type="number"
                                   min="1"
                                   max="10"
-                                  className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${
-                                    isDark
+                                  className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${isDark
                                       ? "bg-[#242526] border-[#3e4042] text-[#e4e6eb] focus:bg-[#2b2c2d] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30"
                                       : "bg-gray-50 border-gray-300 text-gray-700 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
-                                  }`}
+                                    }`}
                                   value={
                                     formData.certCopies[certName] === undefined
                                       ? ""
@@ -499,9 +472,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                   </div>
                   <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div
-                      className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border -mt-2 ${
-                        isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
-                      }`}
+                      className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border -mt-2 ${isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
+                        }`}
                     >
                       {formData.documentsRequested.map((doc, index) => {
                         const docData = availableDocs.find((d) => d.document_name === doc);
@@ -509,17 +481,16 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                           ? Array.isArray(docData.document_requirements)
                             ? docData.document_requirements
                             : docData.document_requirements
-                                .split("\n")
-                                .map((r) => r.trim().replace(/,$/, ""))
-                                .filter(Boolean)
+                              .split("\n")
+                              .map((r) => r.trim().replace(/,$/, ""))
+                              .filter(Boolean)
                           : [];
 
                         return (
                           <div
                             key={index}
-                            className={`p-4 rounded-lg border px-4 py-3 ${
-                              isDark ? "bg-[#242526] border-[#3e4042]" : "bg-white/10 border-white/10"
-                            }`}
+                            className={`p-4 rounded-lg border px-4 py-3 ${isDark ? "bg-[#242526] border-[#3e4042]" : "bg-white/10 border-white/10"
+                              }`}
                           >
                             <div className="flex items-center gap-2 mb-3">
                               <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
@@ -533,9 +504,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                                 requirements.map((req, i) => (
                                   <li
                                     key={i}
-                                    className={`flex items-start gap-2 text-xs leading-relaxed min-w-0 ${
-                                      isDark ? "text-[#b0b3b8]" : "text-white/80"
-                                    }`}
+                                    className={`flex items-start gap-2 text-xs leading-relaxed min-w-0 ${isDark ? "text-[#b0b3b8]" : "text-white/80"
+                                      }`}
                                   >
                                     <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
 
@@ -557,9 +527,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                     <div className="-mt-9 flex justify-center items-start">
                       <div className=" p-4 md:mt-4 lg:mt-5 w-full max-w-sm max-h-lg flex flex-col items-center">
                         <p
-                          className={`lg:mt-2 text-[10px] text-center leading-relaxed ${
-                            isDark ? "text-[#b0b3b8]" : "text-white/70"
-                          }`}
+                          className={`lg:mt-2 text-[10px] text-center leading-relaxed ${isDark ? "text-[#b0b3b8]" : "text-white/70"
+                            }`}
                         >
                           <strong>REMINDER</strong>: Your feedback is important to us. Kindly take a moment
                           to share your experience.
@@ -619,7 +588,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
         onClose={() => setShowConfirmModal(false)}
         onConfirm={() => {
           setShowConfirmModal(false);
-          handleSubmit({ preventDefault: () => {} });
+          handleSubmit({ preventDefault: () => { } });
         }}
         title="Submit Confirmation"
         message="Are you sure you want to submit your request?"
