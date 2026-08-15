@@ -7,6 +7,7 @@ import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
 import { AccessRequestsSkeleton } from "../components/LoadingSkeleton";
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import DashboardDropdown from "../components/DashboardDropdown";
+import { formatName } from "../utils/formatters";
 
 const STATUS_FILTERS = ["All", "Pending", "Approved", "Rejected", "Expired"];
 
@@ -104,7 +105,7 @@ const AccessRequestsQueue = ({ onPendingCountChange }) => {
   const baseFiltered = requests.filter((r) => {
     const query = searchQuery.toLowerCase().trim();
     if (query) {
-      const fullName = [r.target_first_name, r.target_middle_name, r.target_last_name, r.target_suffix].filter(Boolean).join(" ").toLowerCase();
+      const fullName = formatName(r).toLowerCase();
       const email = (r.target_email || "").toLowerCase();
       const role = (r.requested_role || "Admin").toLowerCase();
       const policyName = (r.requested_policy?.name || "").toLowerCase();
@@ -133,8 +134,8 @@ const AccessRequestsQueue = ({ onPendingCountChange }) => {
   });
 
   const filteredRequests = [...baseFiltered].sort((a, b) => {
-    const nameA = [a.target_first_name, a.target_middle_name, a.target_last_name, a.target_suffix].filter(Boolean).join(" ");
-    const nameB = [b.target_first_name, b.target_middle_name, b.target_last_name, b.target_suffix].filter(Boolean).join(" ");
+    const nameA = formatName(a);
+    const nameB = formatName(b);
     if (sortOrder === "asc") {
       return nameA.localeCompare(nameB);
     } else {
@@ -341,7 +342,7 @@ const AccessRequestsQueue = ({ onPendingCountChange }) => {
                 </tr>
               ) : (
                 filteredRequests.map((r, idx) => {
-                  const fullName = [r.target_first_name, r.target_middle_name, r.target_last_name, r.target_suffix].filter(Boolean).join(" ");
+                  const fullName = formatName(r);
                   const requesterName = r.requested_by?.name || r.requested_by?.email || 'Unknown';
 
                   return (
