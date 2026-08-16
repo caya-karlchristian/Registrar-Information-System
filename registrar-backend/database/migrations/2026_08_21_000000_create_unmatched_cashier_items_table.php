@@ -26,7 +26,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('unmatched_cashier_items', function (Blueprint $table) {
-            $table->id('unmatched_cashier_item_id');
+            // Plain integer autoincrement, matching every other table's PK
+            // convention in this schema (see e.g. document_type_id,
+            // certificate_type_id in create_base_schema) rather than
+            // Laravel's default bigIncrements — kept consistent so this
+            // table doesn't stand out as the one exception.
+            $table->integer('unmatched_cashier_item_id')->autoIncrement();
 
             // Raw label exactly as it appeared on the receipt (pre-normalisation)
             // so an admin reviewing it sees precisely what the cashier system sent.
@@ -45,7 +50,14 @@ return new class extends Migration
             // cashier_document_patterns, so resolved rows can be hidden from the
             // default admin view without deleting the audit trail of what happened.
             $table->timestamp('resolved_at')->nullable();
-            $table->unsignedBigInteger('resolved_by')->nullable();
+            // Plain `integer`, NOT unsignedBigInteger — users.user_id is declared
+            // as a plain autoincrement `integer` column (see create_base_schema
+            // migration), and existing FKs against it (e.g. document_type.archived_by
+            // in the 2026_07_14 migration) use the same plain `integer` type. A
+            // bigint-vs-int mismatch fails to create the FK constraint on MySQL
+            // even though SQLite (what the test suite runs on) is lenient enough
+            // to let it slide silently — this must match exactly for production.
+            $table->integer('resolved_by')->nullable();
 
             $table->timestamps();
 
