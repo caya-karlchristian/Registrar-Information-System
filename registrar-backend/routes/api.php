@@ -116,6 +116,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::post('archive-bulk',                [DocumentRequestController::class, 'archiveBulk'])->middleware('role:3');
         Route::post('restore-bulk',                [DocumentRequestController::class, 'restoreBulk'])->middleware('role:3');
         Route::post('claim',                       [DocumentRequestController::class, 'claim'])->middleware('role:3');
+        // Dedicated throttle on top of the group's throttle:60,1 — OR
+        // numbers look sequential (see cashier sample data), so this is a
+        // soft enumeration surface (probing which numbers return `valid`)
+        // even though it never creates or discloses a DocumentRequest.
+        // 10/min is generous for a real student retrying a mistyped OR a
+        // few times, tight enough to make scripted probing impractical.
+        Route::post('verify-or', [DocumentRequestController::class, 'verifyOfficialReceipt'])
+            ->middleware(['role:1,2', 'throttle:10,1']);
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show']);
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware('role:3');
