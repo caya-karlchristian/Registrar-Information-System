@@ -18,6 +18,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AiQueryController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
+use App\Http\Controllers\UnmatchedCashierItemController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
@@ -217,6 +218,13 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
         Route::put('request-purposes/{id}',    [RequestPurposeController::class, 'update']);
         Route::delete('request-purposes/{id}', [RequestPurposeController::class, 'destroy']);
+
+        // Unmatched cashier receipt labels — admin review screen backing
+        // the naming-drift fix from CashierDocumentSuggester. See
+        // UnmatchedCashierItemController's class docblock.
+        Route::get('unmatched-cashier-items',              [UnmatchedCashierItemController::class, 'index']);
+        Route::post('unmatched-cashier-items/{id}/resolve', [UnmatchedCashierItemController::class, 'resolve']);
+        Route::post('unmatched-cashier-items/{id}/dismiss', [UnmatchedCashierItemController::class, 'dismiss']);
 
         // Signatories (certificate signees) — admin-only end to end,
         // unlike document-types/certifications above whose GET is open to
