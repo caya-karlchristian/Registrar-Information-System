@@ -38,6 +38,21 @@ if [ "${APP_ENV:-}" != "local" ]; then
 	php artisan optimize
 fi
 
+# Seed base reference data (roles, access_type, programs, policies,
+# document_type, certificate_type, etc.) before LocalDevSeeder runs.
+# Local dev uses a disposable MySQL volume, so unlike staging/prod —
+# which already carry this data from real history and only ever run
+# `php artisan migrate --force` in their deploy workflows — a fresh
+# local database has empty reference tables after `migrate` alone.
+# LocalDevSeeder assumes these rows already exist (e.g. it inserts
+# users with role_id values that must already be present in `roles`,
+# or the insert fails on the fk_users_role constraint). Every row
+# DatabaseSeeder::run() writes goes through updateOrInsert, so this is
+# safe and cheap to run on every local boot, not just the first one.
+if [ "${APP_ENV:-}" = "local" ]; then
+	php artisan db:seed --force
+fi
+
 # Seed the 4 fixed local dev accounts — local dev only, and invoked here
 # rather than from DatabaseSeeder::run() on purpose. This script only runs
 # at container boot, never during `php artisan test` (RefreshDatabase's
