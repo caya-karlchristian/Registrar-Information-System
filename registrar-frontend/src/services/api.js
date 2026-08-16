@@ -155,6 +155,20 @@ export const uploadCertificationLayoutLogo = (id, formData) =>
   });
 
 // -------------------------------------------------------
+// UNMATCHED CASHIER ITEMS (Admin+) — receipt labels
+// CashierDocumentSuggester couldn't match to any document/certificate
+// type's cashier_document_patterns. Backs the admin review screen that
+// closes the naming-drift loop: attach a label to the right type once
+// and every future receipt using it auto-matches, no deploy needed.
+// -------------------------------------------------------
+export const getUnmatchedCashierItems = (params = {}) =>
+  api.get("/unmatched-cashier-items", { params });
+export const resolveUnmatchedCashierItem = (id, data) =>
+  api.post(`/unmatched-cashier-items/${id}/resolve`, data);
+export const dismissUnmatchedCashierItem = (id) =>
+  api.post(`/unmatched-cashier-items/${id}/dismiss`);
+
+// -------------------------------------------------------
 // SIGNATORIES (certificate signees) — read/write: Admin only
 // (unlike document-types/certifications, GET is admin-only here too —
 // see routes/api.php)
@@ -234,6 +248,14 @@ export const getAllLogbookData = async (params = {}) => {
 
 export const getDocumentRequest   = (id)          => api.get(`/document-requests/${id}`);
 export const createDocumentRequest = (data)       => api.post("/document-requests", data);
+
+// Verifies an OR Number + Date of Payment against the cashier system and
+// returns document/certificate suggestions derived from the receipt —
+// does NOT create a DocumentRequest. Used by RequestForm's OR-first wizard
+// step to pre-populate the Documents step before the student picks
+// anything. createDocumentRequest above still re-verifies and re-matches
+// strictly at final submit; this call is advisory only.
+export const verifyOfficialReceipt = (data)       => api.post("/document-requests/verify-or", data);
 
 // Public — no auth required. Used by RequestForm's confirmation screen to
 // tell requesters whether the Registrar is open right now, and when

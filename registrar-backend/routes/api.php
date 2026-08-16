@@ -18,6 +18,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AiQueryController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
+use App\Http\Controllers\UnmatchedCashierItemController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
@@ -116,6 +117,23 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::post('archive-bulk',                [DocumentRequestController::class, 'archiveBulk'])->middleware('role:3');
         Route::post('restore-bulk',                [DocumentRequestController::class, 'restoreBulk'])->middleware('role:3');
         Route::post('claim',                       [DocumentRequestController::class, 'claim'])->middleware('role:3');
+        // Dedicated throttle on top of the group's throttle:60,1 — OR
+        // numbers look sequential (see cashier sample data), so this is a
+        // soft enumeration surface (probing which numbers return `valid`)
+        // even though it never creates or discloses a DocumentRequest.
+        // 10/min is generous for a real student retrying a mistyped OR a
+        // few times, tight enough to make scripted probing impractical.
+        // Distinct prefix ('verify-or') is required, not cosmetic: Laravel's
+        // ThrottleRequests keys a limiter as $prefix.sha1($userId), with an
+        // empty prefix by default. Without one here, this middleware shares
+        // its cache key with the group's throttle:60,1 above (same user,
+        // same empty prefix) — every request then increments BOTH counters,
+        // and the tighter one here trips at roughly half its configured
+        // value (10/min effectively became ~5/min). See the same fix
+        // applied to system-users store, ai-report/ai-query, and
+        // search-users below — all had the identical collision.
+        Route::post('verify-or', [DocumentRequestController::class, 'verifyOfficialReceipt'])
+            ->middleware(['role:1,2', 'throttle:10,1,verify-or']);
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show']);
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware('role:3');
@@ -199,16 +217,27 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             Route::get('signature-turnaround', [AnalyticsController::class, 'signatureTurnaround']);
             Route::get('peak-hours',       [AnalyticsController::class, 'peakHours']);
             Route::get('by-purpose',       [AnalyticsController::class, 'byPurpose']);
+            // Distinct prefixes below — see the verify-or route's comment
+            // for why an unprefixed throttle stacked under the group's
+            // throttle:60,1 shares its counter and trips at roughly half
+            // its configured value.
             Route::post('ai-report', [AnalyticsController::class, 'aiReport'])
-                ->middleware('throttle:30,1');
+                ->middleware('throttle:30,1,ai-report');
             // Phase 3 — Conversational NLQ
             Route::post('ai-query', [AiQueryController::class, 'query'])
-                ->middleware('throttle:30,1');
+                ->middleware('throttle:30,1,ai-query');
         });
 
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
         Route::put('request-purposes/{id}',    [RequestPurposeController::class, 'update']);
         Route::delete('request-purposes/{id}', [RequestPurposeController::class, 'destroy']);
+
+        // Unmatched cashier receipt labels — admin review screen backing
+        // the naming-drift fix from CashierDocumentSuggester. See
+        // UnmatchedCashierItemController's class docblock.
+        Route::get('unmatched-cashier-items',              [UnmatchedCashierItemController::class, 'index']);
+        Route::post('unmatched-cashier-items/{id}/resolve', [UnmatchedCashierItemController::class, 'resolve']);
+        Route::post('unmatched-cashier-items/{id}/dismiss', [UnmatchedCashierItemController::class, 'dismiss']);
 
         // Signatories (certificate signees) — admin-only end to end,
         // unlike document-types/certifications above whose GET is open to
@@ -224,10 +253,12 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         // Admin creation gets its own dedicated, tighter throttle on top of
         // the group's throttle:60,1 — this is now the primary defense
         // against bulk/automated admin creation (see IdpClient::createUser()
-        // docblock re: x-api-key-only auth on the IdP side).
+        // docblock re: x-api-key-only auth on the IdP side). Distinct
+        // prefix required — see the verify-or route's comment for why an
+        // unprefixed throttle here would share the group's counter.
         Route::apiResource('system-users', SystemUserController::class)->except(['store']);
         Route::post('system-users', [SystemUserController::class, 'store'])
-            ->middleware('throttle:5,1')
+            ->middleware('throttle:5,1,system-users-store')
             ->name('system-users.store');
 
         Route::patch('system-users/{id}/policy', [SystemUserController::class, 'attachPolicy']);
@@ -286,9 +317,11 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             // throttle:60,1 — this endpoint returns a broader slice of
             // the user directory than anything else Super Admin can
             // query, so it gets its own tighter ceiling against
-            // scripted enumeration.
+            // scripted enumeration. Distinct prefix required — see the
+            // verify-or route's comment for why an unprefixed throttle
+            // here would share the group's counter.
             Route::get('search-users', [RoleAssignmentController::class, 'searchUsers'])
-                ->middleware('throttle:30,1');
+                ->middleware('throttle:30,1,search-users');
 
             Route::get('/',                          [RoleAssignmentController::class, 'index']);
             Route::post('/',                          [RoleAssignmentController::class, 'store']);
