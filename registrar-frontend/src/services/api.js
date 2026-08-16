@@ -235,6 +235,14 @@ export const getAllLogbookData = async (params = {}) => {
 export const getDocumentRequest   = (id)          => api.get(`/document-requests/${id}`);
 export const createDocumentRequest = (data)       => api.post("/document-requests", data);
 
+// Verifies an OR Number + Date of Payment against the cashier system and
+// returns document/certificate suggestions derived from the receipt —
+// does NOT create a DocumentRequest. Used by RequestForm's OR-first wizard
+// step to pre-populate the Documents step before the student picks
+// anything. createDocumentRequest above still re-verifies and re-matches
+// strictly at final submit; this call is advisory only.
+export const verifyOfficialReceipt = (data)       => api.post("/document-requests/verify-or", data);
+
 // Public — no auth required. Used by RequestForm's confirmation screen to
 // tell requesters whether the Registrar is open right now, and when
 // processing will begin if not.

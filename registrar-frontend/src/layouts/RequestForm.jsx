@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from 'qrcode.react';
-import { createDocumentRequest } from "../services/api"
+import { createDocumentRequest, verifyOfficialReceipt } from "../services/api"
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
@@ -64,6 +64,18 @@ const RequestForm = ({ showProfileStep = false }) => {
   // is later updated elsewhere while this tab is still open.
   const [claimTicket, setClaimTicket] = useState(null);
 
+  // OR-first wizard: populated once verifyOfficialReceipt() succeeds.
+  // unresolvedItems holds receipt lines the suggester couldn't match to
+  // any document/certificate type (see CashierDocumentSuggester) —
+  // surfaced so they're never silently dropped. autoFilledNames tags
+  // which currently-selected documents/certifications came from the
+  // suggestion (vs. the student picking them manually) purely for the
+  // "Auto-filled from OR #..." badge; it does not gate anything
+  // server-side — final submit re-verifies from scratch regardless of
+  // how an item got onto the form.
+  const [unresolvedItems, setUnresolvedItems] = useState([]);
+  const [autoFilledNames, setAutoFilledNames] = useState([]);
+
   const [copied, setCopied] = useState(false);
   const handleCopyCode = async () => {
     if (!claimTicket?.claimCode) return;
@@ -117,26 +129,10 @@ const RequestForm = ({ showProfileStep = false }) => {
   const handlePreSubmit = (e) => {
     e.preventDefault();
 
-    if (!(formData.receiptNumber || '').trim()) {
-      setErrorMessage("Please enter the Official Receipt Number.");
-      return;
-    }
-
-    if (!/^\d{7}$/.test((formData.receiptNumber || '').trim())) {
-      setErrorMessage("Official Receipt Number must be exactly 7 digits.");
-      return;
-    }
-
-    if (!formData.dateOfPayment) {
-      setErrorMessage("Please select the date of payment.");
-      return;
-    }
-
-    if (formData.dateOfPayment < getDateDaysAgo(7) || formData.dateOfPayment > getTodayDate()) {
-      setErrorMessage("Date of payment must be within the last 7 days up to today.");
-      return;
-    }
-
+    // OR Number / Date of Payment are validated and verified against the
+    // cashier API earlier now (see handleVerifyOr, triggered when leaving
+    // the OR-verification step) — this final step only has copies left
+    // to check before confirming.
     const hasInvalidDocCopy = formData.documentsRequested
       .filter((doc) => !doc.toLowerCase().includes("certif"))
       .some((doc) => {
@@ -178,7 +174,94 @@ const RequestForm = ({ showProfileStep = false }) => {
   };
 
   const hasProfileStep = showProfileStep;
-  const finalStep = hasProfileStep ? 4 : 3;
+  const finalStep = hasProfileStep ? 5 : 4;
+  const orStep = hasProfileStep ? 3 : 2;
+  const docStep = hasProfileStep ? 4 : 3;
+
+  const verifyOrMutation = useMutation({
+    mutationFn: verifyOfficialReceipt,
+    onSuccess: (response) => {
+      const suggestions = response?.data?.suggestions ?? { documents: [], certificates: [], unresolved: [] };
+
+      const suggestedDocNames = [];
+      const suggestedCertNames = [];
+      const newDocCopies = {};
+      const newCertCopies = {};
+
+      (suggestions.documents || []).forEach((doc) => {
+        // Prefer the name from the live reference-data list (availableDocs)
+        // over whatever the backend echoed back — they should always agree
+        // since both come from the same document_type table, but this
+        // guards against staleness between the two requests, and it's what
+        // documentOptions/MultiSelectDropdown expects to match against.
+        const known = availableDocs.find((d) => d.document_type_id === doc.document_type_id);
+        const name = known?.document_name ?? doc.document_name;
+        if (!name) return;
+        suggestedDocNames.push(name);
+        newDocCopies[name] = doc.number_of_copies || 1;
+      });
+
+      (suggestions.certificates || []).forEach((cert) => {
+        const known = availableCertifications.find((c) => c.certificate_type_id === cert.certificate_type_id);
+        const name = known?.certificate_name ?? cert.certificate_name;
+        if (!name) return;
+        suggestedCertNames.push(name);
+        newCertCopies[name] = cert.number_of_copies || 1;
+      });
+
+      setFormData((prev) => ({
+        ...prev,
+        // Merge rather than replace: if the student goes Back and forward
+        // again after manually adding something, a re-verify shouldn't
+        // wipe out a manual pick — everything here is still fully
+        // editable on the next step regardless of how it got added.
+        documentsRequested: Array.from(new Set([...(prev.documentsRequested || []), ...suggestedDocNames])),
+        certification: Array.from(new Set([...(prev.certification || []), ...suggestedCertNames])),
+        documentCopies: { ...prev.documentCopies, ...newDocCopies },
+        certCopies: { ...prev.certCopies, ...newCertCopies },
+      }));
+
+      setAutoFilledNames([...suggestedDocNames, ...suggestedCertNames]);
+      setUnresolvedItems(suggestions.unresolved || []);
+      setErrorMessage("");
+      setCurrentStep((s) => s + 1);
+    },
+    onError: (error) => {
+      console.error("OR verification error:", error.response?.data || error);
+      setErrorMessage(
+        error.response?.data?.message
+        || "We couldn't verify that Official Receipt. Please check the details and try again."
+      );
+    },
+  });
+
+  const handleVerifyOr = () => {
+    if (!(formData.receiptNumber || '').trim()) {
+      setErrorMessage("Please enter the Official Receipt Number.");
+      return;
+    }
+
+    if (!/^\d{7}$/.test((formData.receiptNumber || '').trim())) {
+      setErrorMessage("Official Receipt Number must be exactly 7 digits.");
+      return;
+    }
+
+    if (!formData.dateOfPayment) {
+      setErrorMessage("Please select the date of payment.");
+      return;
+    }
+
+    if (formData.dateOfPayment < getDateDaysAgo(7) || formData.dateOfPayment > getTodayDate()) {
+      setErrorMessage("Date of payment must be within the last 7 days up to today.");
+      return;
+    }
+
+    setErrorMessage("");
+    verifyOrMutation.mutate({
+      or_number: formData.receiptNumber.trim(),
+      receipt_date: formData.dateOfPayment,
+    });
+  };
 
   const nextStep = (e) => {
     e.preventDefault();
@@ -220,17 +303,27 @@ const RequestForm = ({ showProfileStep = false }) => {
       }
     }
 
-    if (currentStep === (hasProfileStep ? 3 : 2) && formData.documentsRequested.length === 0) {
+    // OR-verification step: don't just advance — verify against the
+    // cashier API first (see handleVerifyOr). Advancing on success/failure
+    // is handled entirely inside that function via the mutation's
+    // callbacks, so we return here rather than falling through to the
+    // plain setCurrentStep increment below.
+    if (currentStep === orStep) {
+      handleVerifyOr();
+      return;
+    }
+
+    if (currentStep === docStep && formData.documentsRequested.length === 0) {
       setErrorMessage("Please select at least one document to proceed.");
       return;
     }
 
-    if (currentStep === (hasProfileStep ? 3 : 2) && formData.purposeOfRequest.length === 0) {
+    if (currentStep === docStep && formData.purposeOfRequest.length === 0) {
       setErrorMessage("Please select a purpose for your request.");
       return;
     }
 
-    if (currentStep === (hasProfileStep ? 3 : 2) && showCertificationDropdown && formData.certification.length === 0) {
+    if (currentStep === docStep && showCertificationDropdown && formData.certification.length === 0) {
       setErrorMessage("Please specify the certification type.");
       return;
     }
@@ -303,6 +396,7 @@ const RequestForm = ({ showProfileStep = false }) => {
   };
 
   const isLoading = mutation.isPending;
+  const isVerifyingOr = verifyOrMutation.isPending;
 
   const handleConfirm = () => {
     setIsSubmitted(false);
@@ -325,6 +419,9 @@ const RequestForm = ({ showProfileStep = false }) => {
     });
     setErrorMessage("");
     mutation.reset();
+    verifyOrMutation.reset();
+    setUnresolvedItems([]);
+    setAutoFilledNames([]);
   };
 
   const handleGoToDashboard = () => {
@@ -356,13 +453,15 @@ const RequestForm = ({ showProfileStep = false }) => {
     ? {
       1: "Terms & Conditions",
       2: "Student Profile",
-      3: "Document Request",
-      4: "Payment and Document Details",
+      3: "Official Receipt Verification",
+      4: "Document Request",
+      5: "Number of Copies & Claim Ticket",
     }
     : {
       1: "Terms & Conditions",
-      2: "Document Request",
-      3: "Payment and Document Details",
+      2: "Official Receipt Verification",
+      3: "Document Request",
+      4: "Number of Copies & Claim Ticket",
     };
 
   const purposeOptions = availablePurposes.length > 0
@@ -393,6 +492,7 @@ const RequestForm = ({ showProfileStep = false }) => {
     <>
       <div className="relative min-h-screen pb-20 z-20">
         <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
+        <LoadingOverlay isVisible={isVerifyingOr} message="Verifying Official Receipt..." />
         {isSubmitted ? (
           <div className="max-w-4xl mx-auto">
             <div className="shadow-2xl border-t-4 border-pup-yellow flex flex-col items-center text-center px-6 py-12 md:px-10 lg:px-16 bg-[#660000]">
@@ -582,9 +682,67 @@ const RequestForm = ({ showProfileStep = false }) => {
                   </div>
                 )}
 
-                {/* STEP 3: Documents Requested */}
-                {currentStep === (hasProfileStep ? 3 : 2) && (
+                {/* STEP: Official Receipt Verification (new — moved ahead of
+                    Documents so the receipt can drive what gets suggested).
+                    Clicking Next here calls handleVerifyOr(), which hits
+                    verify-or and only advances on a successful match. */}
+                {currentStep === orStep && (
+                  <div className="space-y-6 animate-fadeIn -mt-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <InputGroup
+                        name="receiptNumber"
+                        label="Official Receipt Number"
+                        value={formData.receiptNumber}
+                        onChange={handleInputChange}
+                        placeholder='XXXXXXX'
+                        required
+                        voiceEnabled
+                      />
+                      <InputGroup
+                        name="dateOfPayment"
+                        label="Date of Payment"
+                        type="date"
+                        value={formData.dateOfPayment}
+                        onChange={handleInputChange}
+                        min={getDateDaysAgo(7)}
+                        max={getTodayDate()}
+                        required
+                        voiceEnabled={false}
+                      />
+                    </div>
+                    <p className="text-white/60 text-xs leading-relaxed">
+                      We'll verify this against the Cashier's Office and use it to suggest which
+                      documents to request on the next step — you'll still be able to review and
+                      change your selection before submitting.
+                    </p>
+                  </div>
+                )}
+
+                {/* STEP: Documents Requested */}
+                {currentStep === docStep && (
                   <div className="space-y-6 animate-fadeIn">
+                    {autoFilledNames.length > 0 && (
+                      <div className={`p-3 rounded-lg border text-xs ${isDark ? 'bg-[#2d3a2d] border-green-800 text-green-200' : 'bg-green-50 border-green-200 text-green-800'}`}>
+                        <strong>Auto-filled from OR #{formData.receiptNumber}</strong> — we pre-selected the
+                        document(s)/certification(s) that match your receipt. Uncheck anything that's
+                        wrong, or add more below.
+                      </div>
+                    )}
+
+                    {unresolvedItems.length > 0 && (
+                      <div className={`p-3 rounded-lg border text-xs space-y-1 ${isDark ? 'bg-[#3a2f1a] border-yellow-800 text-yellow-200' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
+                        <strong>We found these on your receipt but couldn't match them automatically:</strong>
+                        <ul className="list-disc list-inside">
+                          {unresolvedItems.map((item, i) => (
+                            <li key={i}>
+                              {item.label}{item.amount ? ` — ₱${item.amount}` : ''} (qty {item.quantity})
+                            </li>
+                          ))}
+                        </ul>
+                        <p>Please select the matching document below, or contact the registrar's office if unsure.</p>
+                      </div>
+                    )}
+
                     <MultiSelectDropdown
                       name="documentsRequested"
                       label="Documents Requested"
@@ -615,31 +773,9 @@ const RequestForm = ({ showProfileStep = false }) => {
                   </div>
                 )}
 
-                {/* STEP 4: Payment & Copies */}
-                {currentStep === (hasProfileStep ? 4 : 3) && (
+                {/* STEP: Number of Copies & Claim Ticket */}
+                {currentStep === finalStep && (
                   <div className="space-y-6 animate-fadeIn -mt-1">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <InputGroup
-                        name="receiptNumber"
-                        label="Official Receipt Number"
-                        value={formData.receiptNumber}
-                        onChange={handleInputChange}
-                        placeholder='XXXXXXX'
-                        required
-                        voiceEnabled
-                      />
-                      <InputGroup
-                        name="dateOfPayment"
-                        label="Date of Payment"
-                        type="date"
-                        value={formData.dateOfPayment}
-                        onChange={handleInputChange}
-                        min={getDateDaysAgo(7)}
-                        max={getTodayDate()}
-                        required
-                        voiceEnabled={false}
-                      />
-                    </div>
                     <div className={`p-4 rounded-lg border -mb-1 ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
                       <h3 className="text-[#eebc48] font-bold mb-3 uppercase text-sm tracking-wide">
                         Number of copies per document
@@ -783,9 +919,12 @@ const RequestForm = ({ showProfileStep = false }) => {
                 <button
                   type="button"
                   onClick={currentStep < finalStep ? nextStep : handlePreSubmit}
-                  className={`font-bold py-2 px-6 rounded shadow-md w-32 ml-auto transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
+                  disabled={isVerifyingOr}
+                  className={`font-bold py-2 px-6 rounded shadow-md w-32 ml-auto transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
                 >
-                  {currentStep < finalStep ? "Next" : "Submit"}
+                  {currentStep === orStep && isVerifyingOr
+                    ? "Verifying..."
+                    : currentStep < finalStep ? "Next" : "Submit"}
                 </button>
 
               </div>
