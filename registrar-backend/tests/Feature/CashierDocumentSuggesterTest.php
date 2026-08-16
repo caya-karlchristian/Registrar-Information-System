@@ -35,11 +35,11 @@ function makeSuggestibleCertType(string $name, array $patterns, int $accessId = 
 // ═════════════════════════════════════════════════════════════════════════════
 
 test('suggests a document type whose pattern exactly matches a receipt line', function () {
-    $docType = makeSuggestibleDocType('Transcript of Records', ['Transcript of Records']);
+    $docType = makeSuggestibleDocType('Test Fixture Transcript', ['Test Fixture Transcript']);
 
     $suggester = new CashierDocumentSuggester();
     $result = $suggester->suggest([
-        ['document' => 'Transcript of Records', 'amount' => '150.00', 'quantity' => 2],
+        ['document' => 'Test Fixture Transcript', 'amount' => '150.00', 'quantity' => 2],
     ]);
 
     expect($result['documents'])->toHaveCount(1)
@@ -63,11 +63,11 @@ test('suggests a certificate type whose pattern exactly matches a receipt line',
 });
 
 test('matching is case-insensitive and tolerant of extra whitespace/punctuation', function () {
-    $docType = makeSuggestibleDocType('Informative Copy of Grades', ['Informative Copy of Grades']);
+    $docType = makeSuggestibleDocType('Test Fixture Grade Copy', ['Test Fixture Grade Copy']);
 
     $suggester = new CashierDocumentSuggester();
     $result = $suggester->suggest([
-        ['document' => '  informative   copy of grades.', 'amount' => '150.00', 'quantity' => 1],
+        ['document' => '  test   fixture  grade copy.', 'amount' => '150.00', 'quantity' => 1],
     ]);
 
     expect($result['documents'])->toHaveCount(1)
@@ -75,7 +75,7 @@ test('matching is case-insensitive and tolerant of extra whitespace/punctuation'
 });
 
 test('a receipt line matching no pattern is unresolved, not silently dropped', function () {
-    makeSuggestibleDocType('Transcript of Records', ['Transcript of Records']);
+    makeSuggestibleDocType('Test Fixture Transcript', ['Test Fixture Transcript']);
 
     $suggester = new CashierDocumentSuggester();
     $result = $suggester->suggest([
@@ -89,12 +89,12 @@ test('a receipt line matching no pattern is unresolved, not silently dropped', f
 });
 
 test('sums quantities when the same document label appears on multiple receipt lines', function () {
-    $docType = makeSuggestibleDocType('Transcript of Records', ['Transcript of Records']);
+    $docType = makeSuggestibleDocType('Test Fixture Transcript', ['Test Fixture Transcript']);
 
     $suggester = new CashierDocumentSuggester();
     $result = $suggester->suggest([
-        ['document' => 'Transcript of Records', 'quantity' => 1],
-        ['document' => 'Transcript of Records', 'quantity' => 2],
+        ['document' => 'Test Fixture Transcript', 'quantity' => 1],
+        ['document' => 'Test Fixture Transcript', 'quantity' => 2],
     ]);
 
     expect($result['documents'])->toHaveCount(1)
@@ -103,11 +103,11 @@ test('sums quantities when the same document label appears on multiple receipt l
 });
 
 test('suggested copies are capped at 10 to match StoreDocumentRequestRequest\'s own limit', function () {
-    $docType = makeSuggestibleDocType('Transcript of Records', ['Transcript of Records']);
+    $docType = makeSuggestibleDocType('Test Fixture Transcript', ['Test Fixture Transcript']);
 
     $suggester = new CashierDocumentSuggester();
     $result = $suggester->suggest([
-        ['document' => 'Transcript of Records', 'quantity' => 25],
+        ['document' => 'Test Fixture Transcript', 'quantity' => 25],
     ]);
 
     expect($result['documents'][0]['number_of_copies'])->toBe(10);
@@ -118,12 +118,12 @@ test('suggested copies are capped at 10 to match StoreDocumentRequestRequest\'s 
 // ═════════════════════════════════════════════════════════════════════════════
 
 test('does not suggest an archived document type even if its pattern matches', function () {
-    $docType = makeSuggestibleDocType('Transcript of Records', ['Transcript of Records']);
+    $docType = makeSuggestibleDocType('Test Fixture Transcript', ['Test Fixture Transcript']);
     $docType->update(['is_archived' => true]);
 
     $suggester = new CashierDocumentSuggester();
     $result = $suggester->suggest([
-        ['document' => 'Transcript of Records', 'quantity' => 1],
+        ['document' => 'Test Fixture Transcript', 'quantity' => 1],
     ]);
 
     expect($result['documents'])->toBeEmpty()
@@ -185,12 +185,12 @@ test('a blank document label on a receipt line is skipped, not treated as unreso
 });
 
 test('two receipt lines can independently resolve to a document and a certificate', function () {
-    $docType  = makeSuggestibleDocType('Transcript of Records', ['Transcript of Records']);
+    $docType  = makeSuggestibleDocType('Test Fixture Transcript', ['Test Fixture Transcript']);
     $certType = makeSuggestibleCertType('Good Moral Certificate', ['Good Moral Certificate']);
 
     $suggester = new CashierDocumentSuggester();
     $result = $suggester->suggest([
-        ['document' => 'Transcript of Records', 'quantity' => 1],
+        ['document' => 'Test Fixture Transcript', 'quantity' => 1],
         ['document' => 'Good Moral Certificate', 'quantity' => 1],
     ]);
 

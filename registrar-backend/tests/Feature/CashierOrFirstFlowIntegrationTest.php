@@ -39,11 +39,11 @@ test('a full verify-then-submit flow: suggestions from verify-or successfully cr
     config(['services.cashier.api_key' => 'test-key', 'services.cashier.single_use' => true]);
 
     $docType = DocumentType::create([
-        'document_name'             => 'Informative Copy of Grades',
+        'document_name'             => 'Test Fixture Grade Copy',
         'document_description'      => '',
         'document_process_period'   => 5,
         'access_id'                 => 1,
-        'cashier_document_patterns' => ['Informative Copy of Grades'],
+        'cashier_document_patterns' => ['Test Fixture Grade Copy'],
     ]);
     $purpose = RequestPurpose::create(['purpose_name' => 'Employment']);
 
@@ -56,7 +56,7 @@ test('a full verify-then-submit flow: suggestions from verify-or successfully cr
                 'customer_name'    => 'CORDOVA, ARON STEPHEN S.',
                 'transaction_date' => now()->toDateTimeString(),
                 'items' => [
-                    ['document' => 'Informative Copy of Grades', 'amount' => '150.00', 'quantity' => 1],
+                    ['document' => 'Test Fixture Grade Copy', 'amount' => '150.00', 'quantity' => 1],
                 ],
             ],
         ], 200),
@@ -101,11 +101,11 @@ test('after a successful submission, a second verify-or on the same OR is reject
     config(['services.cashier.api_key' => 'test-key', 'services.cashier.single_use' => true]);
 
     $docType = DocumentType::create([
-        'document_name'             => 'Informative Copy of Grades',
+        'document_name'             => 'Test Fixture Grade Copy',
         'document_description'      => '',
         'document_process_period'   => 5,
         'access_id'                 => 1,
-        'cashier_document_patterns' => ['Informative Copy of Grades'],
+        'cashier_document_patterns' => ['Test Fixture Grade Copy'],
     ]);
     $purpose = RequestPurpose::create(['purpose_name' => 'Employment']);
 
@@ -115,7 +115,7 @@ test('after a successful submission, a second verify-or on the same OR is reject
             'data' => [
                 'receipt_number' => 1000001, 'customer_name' => 'CORDOVA, ARON STEPHEN S.',
                 'transaction_date' => now()->toDateTimeString(),
-                'items' => [['document' => 'Informative Copy of Grades', 'amount' => '150.00', 'quantity' => 1]],
+                'items' => [['document' => 'Test Fixture Grade Copy', 'amount' => '150.00', 'quantity' => 1]],
             ],
         ], 200),
     ]);
@@ -159,14 +159,14 @@ test('store() still strictly rejects a submission that adds an item verify-or ne
     config(['services.cashier.api_key' => 'test-key']);
 
     $paidFor   = DocumentType::create([
-        'document_name' => 'Informative Copy of Grades', 'document_description' => '',
+        'document_name' => 'Test Fixture Grade Copy', 'document_description' => '',
         'document_process_period' => 5, 'access_id' => 1,
-        'cashier_document_patterns' => ['Informative Copy of Grades'],
+        'cashier_document_patterns' => ['Test Fixture Grade Copy'],
     ]);
     $notPaidFor = DocumentType::create([
-        'document_name' => 'Transcript of Records', 'document_description' => '',
+        'document_name' => 'Test Fixture Transcript', 'document_description' => '',
         'document_process_period' => 5, 'access_id' => 1,
-        'cashier_document_patterns' => ['Transcript of Records'],
+        'cashier_document_patterns' => ['Test Fixture Transcript'],
     ]);
     $purpose = RequestPurpose::create(['purpose_name' => 'Employment']);
 
@@ -176,7 +176,7 @@ test('store() still strictly rejects a submission that adds an item verify-or ne
             'data' => [
                 'receipt_number' => 1000001, 'customer_name' => 'CORDOVA, ARON STEPHEN S.',
                 'transaction_date' => now()->toDateTimeString(),
-                'items' => [['document' => 'Informative Copy of Grades', 'amount' => '150.00', 'quantity' => 1]],
+                'items' => [['document' => 'Test Fixture Grade Copy', 'amount' => '150.00', 'quantity' => 1]],
             ],
         ], 200),
     ]);

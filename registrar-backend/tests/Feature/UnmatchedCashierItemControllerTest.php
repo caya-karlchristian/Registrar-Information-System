@@ -194,8 +194,17 @@ test('resolving an already-resolved item returns a conflict instead of double-pr
 test('resolving a nonexistent item returns 404', function () {
     actingAsAdmin();
 
+    // Must be a real, existing document_type_id — ResolveUnmatchedCashierItemRequest's
+    // exists:document_type,document_type_id rule runs during controller-dependency
+    // resolution, before this route's own UnmatchedCashierItem::find($id) 404 check
+    // ever executes. An invalid id here fails validation (422) before the item-not-found
+    // check gets a chance to run, masking the very case this test is meant to verify.
+    $docType = DocumentType::create([
+        'document_name' => 'X', 'document_description' => '', 'document_process_period' => 1, 'access_id' => 1,
+    ]);
+
     $this->postJson('/api/unmatched-cashier-items/999999/resolve', [
-        'document_type_id' => 1,
+        'document_type_id' => $docType->document_type_id,
     ])->assertStatus(404);
 });
 

@@ -87,11 +87,11 @@ test('verify-or returns document suggestions derived from the cashier receipt', 
     config(['services.cashier.api_key' => 'test-key']);
 
     $docType = DocumentType::create([
-        'document_name'             => 'Informative Copy of Grades',
+        'document_name'             => 'Test Fixture Grade Copy',
         'document_description'      => '',
         'document_process_period'   => 5,
         'access_id'                 => 1,
-        'cashier_document_patterns' => ['Informative Copy of Grades'],
+        'cashier_document_patterns' => ['Test Fixture Grade Copy'],
     ]);
 
     Http::fake([
@@ -103,7 +103,7 @@ test('verify-or returns document suggestions derived from the cashier receipt', 
                 'customer_name'    => 'DELA CRUZ, JUAN S.',
                 'transaction_date' => now()->toDateTimeString(),
                 'items' => [
-                    ['document' => 'Informative Copy of Grades', 'amount' => '150.00', 'quantity' => 1],
+                    ['document' => 'Test Fixture Grade Copy', 'amount' => '150.00', 'quantity' => 1],
                 ],
             ],
         ], 200),
