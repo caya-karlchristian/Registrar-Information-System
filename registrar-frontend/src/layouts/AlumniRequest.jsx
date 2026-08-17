@@ -203,15 +203,12 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                   </p>
 
                   <p>
-                    <strong>D.</strong> REMINDERS: For TOR (first copy), please bring one documentary stamp,
-                    two colored 2x2 pictures in academic gown, PUP ID, and dummy diploma (in case of loss,
-                    please bring an affidavit of loss). For TOR (second copy), please bring one documentary
-                    stamp (violet) and two colored 2x2 pictures in formal attire with a white background.
-                    For Honorable Dismissal and other certifications, please bring one violet documentary
-                    stamp (or two brown documentary stamps) per requested document. <strong>Requests must
-                      be submitted within one (1) week after receiving the documentary receipt. Requests
-                      submitted beyond this period may no longer be considered valid.</strong>
-                  </p>
+                    <strong>D.</strong> REMINDERS:<br />
+                      • Requests must be submitted within one (1) week after receiving the receipt. Requests exceeding this period may be considered invalid.<br />
+                      • For TOR (First Copy): Bring one (1) documentary stamp, two (2) colored 2x2 ID pictures in academic gown, valid PUP ID, and dummy diploma. In case of loss, an Affidavit of Loss is required.<br />
+                      • For TOR (Second Copy): Bring one (1) violet documentary stamp and two (2) colored 2x2 ID pictures in formal attire with white background.<br />
+                      • For Honorable Dismissal and other Certifications: Bring one (1) violet documentary stamp (or two (2) brown documentary stamps) per requested document.
+                    </p>
 
                   <p>
                     <strong>E.</strong> In compliance with R.A. No. 10173 (Data Privacy Act of 2012),
