@@ -20,6 +20,7 @@ class AccessRequestResource extends JsonResource
             'target_first_name'  => $this->target_first_name,
             'target_middle_name' => $this->target_middle_name,
             'target_last_name'   => $this->target_last_name,
+            'target_suffix'      => $this->target_suffix,
             'requested_role_id'  => $this->requested_role_id,
             'requested_role'     => $this->requested_role_id === \App\Models\SystemUser::ROLE_SUPER_ADMIN ? 'Super Admin' : 'Admin',
             'requested_policy'   => $this->whenLoaded('requestedPolicy', fn () => $this->requestedPolicy ? [

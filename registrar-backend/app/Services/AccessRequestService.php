@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\NotificationServiceInterface;
 use App\Models\AccessRequest;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
@@ -23,8 +24,9 @@ use Illuminate\Validation\ValidationException;
 class AccessRequestService
 {
     public function __construct(
-        private AdminUserService $adminUserService,
-        private AuditLogger      $auditLogger,
+        private AdminUserService           $adminUserService,
+        private AuditLogger                $auditLogger,
+        private NotificationServiceInterface $notificationService,
     ) {}
 
     /**
@@ -44,6 +46,7 @@ class AccessRequestService
             'target_first_name'    => $validated['target_first_name'],
             'target_middle_name'   => $validated['target_middle_name'] ?? null,
             'target_last_name'     => $validated['target_last_name'],
+            'target_suffix'        => $validated['target_suffix'] ?? null,
             'requested_role_id'    => $validated['requested_role_id'],
             'requested_policy_id'  => $validated['requested_policy_id'] ?? null,
             'justification'        => $validated['justification'],
@@ -55,6 +58,19 @@ class AccessRequestService
             'target_email'      => $accessRequest->target_email,
             'access_request_id' => $accessRequest->id,
         ]);
+
+        // Notify every Super Admin — they're the only ones who can review
+        // this (see AccessRequestPolicy). requestId stays null: Notification
+        // ::request_id is FK'd to document_requests, not access_requests, so
+        // the access request's own id travels in `data` instead, same as the
+        // audit log above.
+        $this->notificationService->sendToSuperAdmins(
+            triggerEvent: 'access_request_submitted',
+            data: [
+                'target_email'      => $accessRequest->target_email,
+                'access_request_id' => $accessRequest->id,
+            ],
+        );
 
         return $accessRequest;
     }
@@ -79,6 +95,7 @@ class AccessRequestService
                 'first_name'  => $accessRequest->target_first_name,
                 'middle_name' => $accessRequest->target_middle_name,
                 'last_name'   => $accessRequest->target_last_name,
+                'suffix'      => $accessRequest->target_suffix,
                 'policy_id'   => $accessRequest->requested_policy_id,
             ], $request);
 

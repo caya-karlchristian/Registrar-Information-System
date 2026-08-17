@@ -98,6 +98,11 @@ class AuditLog extends Model
     // currently does not (see 2026-08-11 incident notes).
     public const ACTION_CASHIER_VERIFICATION = 'cashier_verification';
 
+    // Unmatched cashier receipt labels — admin resolution (see
+    // UnmatchedCashierItem, CashierDocumentSuggester)
+    public const ACTION_UNMATCHED_CASHIER_ITEM_RESOLVED  = 'unmatched_cashier_item_resolved';
+    public const ACTION_UNMATCHED_CASHIER_ITEM_DISMISSED = 'unmatched_cashier_item_dismissed';
+
     // -------------------------------------------------------
     // Relationship back to the acting user (nullable — may be deleted)
     // -------------------------------------------------------

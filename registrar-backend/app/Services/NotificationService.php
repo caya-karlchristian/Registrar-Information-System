@@ -135,6 +135,26 @@ class NotificationService implements NotificationServiceInterface
     }
 
     // -------------------------------------------------------
+    // SEND TO ALL SUPER ADMINS
+    // -------------------------------------------------------
+    // Convenience method for super-admin-only audience notifications
+    // (e.g. access request submissions — only a Super Admin can
+    // review/approve those, so regular Admins are not targeted).
+    // -------------------------------------------------------
+    public function sendToSuperAdmins(
+        string $triggerEvent,
+        array  $data      = [],
+        ?int   $requestId = null,
+    ): void {
+        dispatch(new SendBulkNotificationJob(
+            triggerEvent: $triggerEvent,
+            data:         $data,
+            onlyRoleIds:  [SystemUser::ROLE_SUPER_ADMIN],
+            requestId:    $requestId,
+        ));
+    }
+
+    // -------------------------------------------------------
     // SEND TO ALL ADMINS AND SUPER ADMINS
     // -------------------------------------------------------
     // Convenience method for admin-audience notifications.

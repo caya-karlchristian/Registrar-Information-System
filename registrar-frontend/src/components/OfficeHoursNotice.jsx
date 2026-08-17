@@ -18,20 +18,8 @@ const formatDateTime = (iso) => {
  * Tells the requester, right on the submission confirmation screen,
  * whether the Registrar is open right now and — if not — exactly when
  * processing on their request will begin.
- *
- * Fetches /business-hours/status itself on mount rather than receiving
- * it as a prop, so it can drop into any confirmation screen (student,
- * alumni) with zero changes to that screen's existing state/hooks. The
- * fetch happens the moment this renders, i.e. right at submission —
- * matching the "tell them immediately" decision, not a stale value
- * computed earlier in the form flow.
- *
- * Fails silently (renders nothing) on error — this is a supplementary
- * detail on top of an already-successful submission, not something
- * that should block or clutter the confirmation screen if the status
- * endpoint is unreachable.
  */
-const OfficeHoursNotice = ({ isDark }) => {
+const OfficeHoursNotice = ({ isDark, small = false }) => {
   const [status, setStatus] = useState(null);
   const [failed, setFailed] = useState(false);
 
@@ -53,28 +41,50 @@ const OfficeHoursNotice = ({ isDark }) => {
 
   if (failed || !status) return null;
 
-  const baseClasses = 'mt-6 max-w-lg mx-auto rounded-lg border px-5 py-4 text-sm text-left leading-relaxed';
-
-  if (status.is_open) {
-    return (
-      <div
-        className={`${baseClasses} ${
-          isDark ? 'bg-green-900/20 border-green-600 text-green-300' : 'bg-green-50 border-green-300 text-green-800'
-        }`}
-      >
-        <strong>Our office is open right now</strong> (Mon–Fri, 8:00 AM–8:00 PM). Your request has been received and processing will begin today.
-      </div>
-    );
-  }
+  const containerClasses = `flex flex-col justify-between transition-all duration-300 relative overflow-hidden ${
+    small ? 'gap-3 p-4 sm:p-5 rounded-xl border' : 'gap-4 p-6 rounded-2xl border'
+  } ${
+    isDark
+      ? 'bg-[#1e1e1e] border-[#333333] shadow-[0_8px_30px_rgb(0,0,0,0.4)] text-zinc-400'
+      : 'bg-white border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.06)] text-gray-700'
+  }`;
 
   return (
-    <div
-      className={`${baseClasses} ${
-        isDark ? 'bg-amber-900/20 border-amber-600 text-amber-300' : 'bg-amber-50 border-amber-300 text-amber-800'
-      }`}
-    >
-      <strong>Our office is currently closed</strong> (open Mon–Fri, 8:00 AM–8:00 PM). Your request has already been received — processing will begin on{' '}
-      <strong>{formatDateTime(status.next_open_at)}</strong>.
+    <div className={containerClasses} style={{ minWidth: '280px', maxWidth: small ? '420px' : '540px' }}>
+      {/* Decorative top gold/maroon accent bar */}
+      <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#800000] via-[#FFC72C] to-[#800000]" />
+
+      {/* Details container */}
+      <div className="flex flex-col gap-2 mt-1">
+        <div className="flex flex-col gap-1 text-left">
+          <span className={`font-extrabold uppercase tracking-[0.15em] text-[#8C6239] ${
+            small ? 'text-[10px] sm:text-[11px]' : 'text-[11px]'
+          }`}>
+            OFFICE SCHEDULE
+          </span>
+          <h4 className={`font-black text-gray-900 dark:text-white mt-1 mb-1 ${
+            small ? 'text-sm sm:text-base' : 'text-base'
+          }`}>
+            Office is {status.is_open ? (
+              <span className="text-green-600">OPEN</span>
+            ) : (
+              <span className="text-red-600">CLOSED</span>
+            )}
+          </h4>
+        </div>
+        <p className={`leading-relaxed text-left text-gray-500 dark:text-zinc-400 ${
+          small ? 'text-[10px] sm:text-[11px]' : 'text-[11px]'
+        }`}>
+          {status.is_open ? (
+            '(Mon: Work From Home, Tue–Fri: 8:00 AM–8:00 PM). Your request has been received and processing will begin today.'
+          ) : (
+            <>
+              (Mon: Work From Home, Tue–Fri: 8:00 AM–8:00 PM). Your request has already been received — processing will begin on{' '}
+              <span className="font-bold text-gray-950 dark:text-white">{formatDateTime(status.next_open_at)}</span>.
+            </>
+          )}
+        </p>
+      </div>
     </div>
   );
 };

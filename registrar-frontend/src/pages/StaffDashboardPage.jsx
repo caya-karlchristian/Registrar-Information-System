@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import StaffDashboard from '../layouts/StaffDashboard.jsx';
+import ClaimScannerModal from '../components/ClaimScannerModal.jsx';
 import { useTheme } from '../context/ThemeContext';
-import { QueueListIcon, ArchiveBoxIcon } from '@heroicons/react/24/outline';
+import { QueueListIcon, ArchiveBoxIcon, QrCodeIcon } from '@heroicons/react/24/outline';
 
 const StaffDashboardPage = () => {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'archived'
+  const [scannerOpen, setScannerOpen] = useState(false);
   const { isDark } = useTheme();
 
   return (
@@ -46,11 +48,18 @@ const StaffDashboardPage = () => {
               <span>Archived records</span>
             </button>
           </div>
+          {/* Scan to Claim button has been moved down to the Search row inside StaffDashboard component */}
         </div>
 
         {/* Dashboard View */}
-        <StaffDashboard viewMode={activeTab} isEmbedded={true} />
+        <StaffDashboard 
+          viewMode={activeTab} 
+          isEmbedded={true} 
+          onScanToClaim={() => setScannerOpen(true)} 
+        />
       </div>
+
+      <ClaimScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} />
     </div>
   );
 };

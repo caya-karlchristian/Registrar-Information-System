@@ -91,12 +91,25 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         }
 
         // Notify the requester and all admins (never superadmins)
+        //
+        // uuid/claim_code go out here too, not just on the ReadyToClaim
+        // transition below — the claim ticket is meant to be available to
+        // the student from the moment they submit (same as the pop-up
+        // shown immediately after RequestForm.jsx/AlumniRequest.jsx submit),
+        // per QR Code Claiming Policy v1.0 §3.2's "pop-up, dashboard, inbox"
+        // access points. Staff can only ever *act* on it once the request
+        // is actually ReadyToClaim (§3.4, enforced server-side in the claim
+        // endpoint) — that's a scan-time restriction, not a visibility one,
+        // so there's no reason to withhold the ticket from the inbox until
+        // later.
         $this->notificationService->send(
             recipient:    $user,
             triggerEvent: 'request_submitted',
             data:         [
                 'request_id'   => $documentRequest->request_id,
                 'requirements' => $requirements,   // checklist shown in inbox
+                'uuid'         => $documentRequest->uuid,
+                'claim_code'   => $documentRequest->claim_code,
             ],
             requestId:    $documentRequest->request_id,
         );
@@ -216,6 +229,50 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
             return $documentRequest;
         }); // end DB::transaction
+    }
+
+    // -------------------------------------------------------------------------
+    // Claim (QR scan / manual claim_code)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param array{uuid?: string, claim_code?: string} $credential exactly
+     *        one key set — enforced by ClaimDocumentRequestRequest before
+     *        this is ever called.
+     */
+    public function claimRequest(array $credential): DocumentRequest
+    {
+        // Plain lookup, no lock here on purpose: updateRequest() below
+        // re-fetches by request_id under lockForUpdate() and re-validates
+        // everything (archived, transition-allowed) against the committed
+        // state at that point. Locking twice on two different query shapes
+        // (by uuid/claim_code here, by request_id there) would only add
+        // deadlock surface for no extra safety.
+        //
+        // The default ExcludeArchivedScope applies here same as any other
+        // query, so an archived request's code/uuid simply won't match —
+        // consistent with archived requests being read-only everywhere else.
+        $documentRequest = DocumentRequest::query()
+            ->when(isset($credential['uuid']), fn ($q) => $q->where('uuid', $credential['uuid']))
+            ->when(isset($credential['claim_code']), fn ($q) => $q->where('claim_code', $credential['claim_code']))
+            ->first();
+
+        if (!$documentRequest) {
+            // Deliberately generic — doesn't reveal whether a uuid or
+            // claim_code was the invalid part of the payload.
+            abort(404, 'No matching request found for that code.');
+        }
+
+        // Reuses the exact same guarded path a manual admin status change
+        // goes through: row lock, "archived is read-only", and
+        // allowedTransitions() — which only permits ReadyToClaim →
+        // Completed. That means a request that's still Processing, or
+        // one that was already Completed by an earlier scan, is rejected
+        // here with the same clear 422 updateRequest() already produces,
+        // with no extra logic needed to distinguish those cases.
+        return $this->updateRequest($documentRequest, [
+            'status_id' => RequestStatusEnum::Completed->value,
+        ]);
     }
 
     // -------------------------------------------------------------------------
@@ -447,10 +504,27 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         $trigger = $status->notificationTrigger();
 
         if ($trigger) {
+            $data = ['request_id' => $documentRequest->request_id];
+
+            // The ticket already went out on the request_submitted
+            // notification above (submitRequest()), so this isn't the only
+            // place it's available — but ReadyToClaim is the moment a
+            // student is actually being told "go claim this now," so it's
+            // worth repeating the ticket on this notification too rather
+            // than making them scroll back to find their original one.
+            // uuid/claim_code aren't sensitive by themselves (see
+            // ClaimTicket.jsx docblock: the QR alone can't complete a claim
+            // — staff still verify identity + requirements in person before
+            // scanning), so there's no downside to including them again.
+            if ($status === RequestStatusEnum::ReadyToClaim) {
+                $data['uuid']       = $documentRequest->uuid;
+                $data['claim_code'] = $documentRequest->claim_code;
+            }
+
             $this->notificationService->send(
                 recipient:    $owner,
                 triggerEvent: $trigger,
-                data:         ['request_id' => $documentRequest->request_id],
+                data:         $data,
                 requestId:    $documentRequest->request_id,
             );
         }

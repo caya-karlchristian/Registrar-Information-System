@@ -47,6 +47,32 @@ class NotificationController extends Controller
     }
 
     // -------------------------------------------------------
+    // GET /notifications/{id}
+    // -------------------------------------------------------
+    // Single-resource fetch used by the frontend to hydrate a notification
+    // after receiving the lean WebSocket event (NotificationSent). The
+    // broadcast payload intentionally omits large/sensitive fields
+    // (requirements checklist, claim_code, announcement body) to keep the
+    // broadcast queue fast and to avoid pushing sensitive claim data over
+    // the WebSocket transport. This endpoint returns the full
+    // NotificationResource shape — the same one index() uses — so the
+    // frontend has one canonical shape for a notification, fetched over
+    // an authenticated request instead of a broadcast frame.
+    public function show(Request $request, string $id): NotificationResource
+    {
+        /** @var SystemUser $user */
+        $user = $request->user();
+
+        $notification = Notification::with('type')
+            ->where('id', $id)
+            ->where('notifiable_type', SystemUser::class)
+            ->where('notifiable_id', $user->user_id)
+            ->firstOrFail();
+
+        return new NotificationResource($notification);
+    }
+
+    // -------------------------------------------------------
     // GET /notifications/unread-count
     // -------------------------------------------------------
     public function unreadCount(Request $request): JsonResponse

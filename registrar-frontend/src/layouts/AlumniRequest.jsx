@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import InputGroup from "../components/InputGroup.jsx";
 import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
@@ -6,6 +7,7 @@ import MultiSelectDropdown from "../components/MultiSelection.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import SubmitConfirmationModal from "../components/SubmitConfirmationModal.jsx";
+import ClaimTicket from "../components/ClaimTicket.jsx";
 import OfficeHoursNotice from "../components/OfficeHoursNotice.jsx";
 import qrCode from "../assets/qrcode.png";
 import { useTheme } from "../context/ThemeContext";
@@ -15,11 +17,13 @@ import { getTodayDate } from "../utils/helpers";
 
 const AlumniRequestForm = ({ showProfileStep = false }) => {
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   const formRef = useRef(null);
 
   const {
     currentStep,
     isSubmitted,
+    claimTicket,
     errorMessage,
     setErrorMessage,
     showConfirmModal,
@@ -46,6 +50,26 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
     finalStep,
   } = useAlumniRequest({ showProfileStep });
 
+  const handleGoToDashboard = () => {
+    if (window.location.pathname.startsWith('/staff')) {
+      navigate('/staff/dashboard');
+    } else if (window.location.pathname.startsWith('/alumni')) {
+      navigate('/alumni/home');
+    } else {
+      navigate('/student/home');
+    }
+  };
+
+  const handleGoToInbox = () => {
+    if (window.location.pathname.startsWith('/staff')) {
+      navigate('/staff/inbox');
+    } else if (window.location.pathname.startsWith('/alumni')) {
+      navigate('/alumni/inbox');
+    } else {
+      navigate('/student/inbox');
+    }
+  };
+
   useEffect(() => {
     if (formRef.current) {
       formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -56,34 +80,78 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
     <div className="relative min-h-screen pb-20 z-20">
       <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
       {isSubmitted ? (
-        <div className="max-w-5xl mx-auto">
-          <div
-            className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 items-center justify-center text-center px-10 flex flex-col relative ${
-              isDark ? "bg-[#242526]" : "bg-pup-dark-maroon"
-            }`}
-          >
-            <p className="mb-6 text-4xl text-center font-bold text-white mt-35">
-              Please be patient as we process your requested document.
+        <div className="max-w-4xl mx-auto">
+          <div className="shadow-2xl border-t-4 border-pup-yellow flex flex-col items-center text-center px-6 py-12 md:px-10 lg:px-16 bg-[#660000]">
+            {/* Green Check Icon */}
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 text-green-400/80 mb-6 shrink-0">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+
+            {/* Title & Subtitle */}
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3 tracking-wide">
+              Request Submitted Successfully
+            </h2>
+            <p className="text-white/80 text-[10px] sm:text-base max-w-xl mx-auto mb-6 font-medium">
+              Please be patient as we process your requested document. Thank you and keep safe always!
             </p>
-            <p className="mb-6 text-4xl text-center font-bold text-white mt-2">
-              Thank you and keep safe always.
-            </p>
-            <OfficeHoursNotice isDark={isDark} />
-            <button
-              onClick={handleConfirm}
-              className="bg-pup-yellow mt-12 hover:bg-[#eeb61b] text-pup-maroon w-32 font-bold py-2 px-6 rounded shadow-md transition-transform active:scale-95"
-            >
-              Confirm
-            </button>
+
+            {/* Top Divider */}
+            <div className="w-full max-w-4xl mx-auto border-t border-dashed border-white/15 my-6" />
+
+            {/* Side-by-Side Grid Container */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mx-auto my-4 items-start text-left">
+              {/* Left Column: Office Hours Notice */}
+              <div className="flex flex-col gap-4 w-full">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center md:text-left">
+                  Processing Schedule & Hours
+                </h3>
+                <OfficeHoursNotice isDark={isDark} small={true} />
+                <p className="text-white/50 text-[11px] text-center md:text-left leading-relaxed max-w-sm">
+                  Note: View/download your claim ticket QR code in your inbox or present the manual claim code when claiming.
+                </p>
+              </div>
+
+              {/* Right Column: Claim Details & QR */}
+              <div className="flex flex-col gap-4 w-full">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center md:text-left">
+                  Claim Ticket & Code
+                </h3>
+
+                {/* Claim Ticket Component */}
+                <ClaimTicket uuid={claimTicket?.uuid} claimCode={claimTicket?.claimCode} small={true} />
+              </div>
+            </div>
+
+            {/* Bottom Divider */}
+            <div className="w-full max-w-4xl mx-auto border-t border-dashed border-white/15 my-6" />
+
+            {/* Bottom Navigation Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-xl mx-auto mt-6">
+              <button
+                type="button"
+                onClick={handleConfirm}
+                className="w-full sm:w-1/2 py-3 px-6 rounded-lg font-bold text-sm border border-white/10 bg-[#3d0c0c] hover:bg-[#4c1212] text-white transition-all shadow-md active:scale-95 text-center cursor-pointer"
+              >
+                Create Another Request
+              </button>
+              <button
+                type="button"
+                onClick={handleGoToDashboard}
+                className="w-full sm:w-1/2 py-3 px-8 rounded-lg font-bold text-sm bg-[#F8BF1E] hover:bg-[#e6b01b] text-pup-maroon transition-all shadow-md active:scale-95 text-center cursor-pointer"
+              >
+                Go to Dashboard
+              </button>
+            </div>
           </div>
         </div>
       ) : (
         <div ref={formRef} className="max-w-5xl mx-auto">
           <form
             onSubmit={handleSubmit}
-            className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${
-              isDark ? "bg-[#242526]" : "bg-pup-dark-maroon"
-            }`}
+            className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${isDark ? "bg-[#242526]" : "bg-pup-dark-maroon"
+              }`}
             noValidate
           >
             <div className="flex flex-col items-center pt-8 pb-4">
@@ -91,9 +159,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                 {Array.from({ length: totalSteps }, (_, idx) => idx + 1).map((step) => (
                   <div
                     key={step}
-                    className={`w-4 h-4 rounded-full border border-pup-yellow ${
-                      step <= currentStep ? "bg-pup-yellow" : isDark ? "bg-[#3a3b3c]" : "bg-white"
-                    }`}
+                    className={`w-4 h-4 rounded-full border border-pup-yellow ${step <= currentStep ? "bg-pup-yellow" : isDark ? "bg-[#3a3b3c]" : "bg-white"
+                      }`}
                   />
                 ))}
               </div>
@@ -116,9 +183,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
               {/* STEP 1: TERMS & CONDITIONS */}
               {currentStep === 1 && (
                 <div
-                  className={`space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px] ${
-                    isDark ? "text-[#e4e6eb]" : ""
-                  }`}
+                  className={`space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px] ${isDark ? "text-[#e4e6eb]" : ""
+                    }`}
                 >
                   <p>
                     <strong>A.</strong> In compliance with the Data Privacy Act (DPA) of 2012, and its
@@ -143,8 +209,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                     stamp (violet) and two colored 2x2 pictures in formal attire with a white background.
                     For Honorable Dismissal and other certifications, please bring one violet documentary
                     stamp (or two brown documentary stamps) per requested document. <strong>Requests must
-                    be submitted within one (1) week after receiving the documentary receipt. Requests
-                    submitted beyond this period may no longer be considered valid.</strong>
+                      be submitted within one (1) week after receiving the documentary receipt. Requests
+                      submitted beyond this period may no longer be considered valid.</strong>
                   </p>
 
                   <p>
@@ -268,9 +334,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                 <div className="space-y-6 animate-fadeIn">
                   <div className="grid grid-cols-1 gap-6 w-full mt-10">
                     <div
-                      className={`space-y-3 p-4 rounded-lg border ${
-                        isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
-                      }`}
+                      className={`space-y-3 p-4 rounded-lg border ${isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
+                        }`}
                     >
                       <p className={`text-sm text-justify lg:text-[15px] ${isDark ? "text-[#e4e6eb]" : ""}`}>
                         For TOR request for further studies, please secure an HONORABLE DISMISSAL first.
@@ -323,9 +388,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-1 w-full -mt-2">
                     <div
-                      className={`p-4 rounded-lg border ${
-                        isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
-                      }`}
+                      className={`p-4 rounded-lg border ${isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
+                        }`}
                     >
                       <h3 className="text-pup-yellow font-bold mb-3 uppercase text-sm tracking-wide">
                         Number of copies per document
@@ -343,14 +407,13 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                                     type="number"
                                     min="1"
                                     max="10"
-                                    className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${
-                                      isDark
+                                    className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${isDark
                                         ? "bg-[#242526] border-[#3e4042] text-[#e4e6eb] focus:bg-[#2b2c2d] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30"
                                         : "bg-gray-50 border-gray-300 text-gray-700 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
-                                    }`}
+                                      }`}
                                     value={
                                       formData.documentCopies[doc] === undefined
-                                        ? ""
+                                        ? 1
                                         : formData.documentCopies[doc]
                                     }
                                     onChange={(e) => {
@@ -381,11 +444,10 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                                   type="number"
                                   min="1"
                                   max="10"
-                                  className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${
-                                    isDark
+                                  className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 border ${isDark
                                       ? "bg-[#242526] border-[#3e4042] text-[#e4e6eb] focus:bg-[#2b2c2d] focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30"
                                       : "bg-gray-50 border-gray-300 text-gray-700 focus:bg-white focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 focus:text-black"
-                                  }`}
+                                    }`}
                                   value={
                                     formData.certCopies[certName] === undefined
                                       ? ""
@@ -410,9 +472,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                   </div>
                   <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div
-                      className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border -mt-2 ${
-                        isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
-                      }`}
+                      className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border -mt-2 ${isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white/10 border-white/10"
+                        }`}
                     >
                       {formData.documentsRequested.map((doc, index) => {
                         const docData = availableDocs.find((d) => d.document_name === doc);
@@ -420,17 +481,16 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                           ? Array.isArray(docData.document_requirements)
                             ? docData.document_requirements
                             : docData.document_requirements
-                                .split("\n")
-                                .map((r) => r.trim().replace(/,$/, ""))
-                                .filter(Boolean)
+                              .split("\n")
+                              .map((r) => r.trim().replace(/,$/, ""))
+                              .filter(Boolean)
                           : [];
 
                         return (
                           <div
                             key={index}
-                            className={`p-4 rounded-lg border px-4 py-3 ${
-                              isDark ? "bg-[#242526] border-[#3e4042]" : "bg-white/10 border-white/10"
-                            }`}
+                            className={`p-4 rounded-lg border px-4 py-3 ${isDark ? "bg-[#242526] border-[#3e4042]" : "bg-white/10 border-white/10"
+                              }`}
                           >
                             <div className="flex items-center gap-2 mb-3">
                               <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
@@ -444,9 +504,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                                 requirements.map((req, i) => (
                                   <li
                                     key={i}
-                                    className={`flex items-start gap-2 text-xs leading-relaxed min-w-0 ${
-                                      isDark ? "text-[#b0b3b8]" : "text-white/80"
-                                    }`}
+                                    className={`flex items-start gap-2 text-xs leading-relaxed min-w-0 ${isDark ? "text-[#b0b3b8]" : "text-white/80"
+                                      }`}
                                   >
                                     <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
 
@@ -468,9 +527,8 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                     <div className="-mt-9 flex justify-center items-start">
                       <div className=" p-4 md:mt-4 lg:mt-5 w-full max-w-sm max-h-lg flex flex-col items-center">
                         <p
-                          className={`lg:mt-2 text-[10px] text-center leading-relaxed ${
-                            isDark ? "text-[#b0b3b8]" : "text-white/70"
-                          }`}
+                          className={`lg:mt-2 text-[10px] text-center leading-relaxed ${isDark ? "text-[#b0b3b8]" : "text-white/70"
+                            }`}
                         >
                           <strong>REMINDER</strong>: Your feedback is important to us. Kindly take a moment
                           to share your experience.
@@ -530,7 +588,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
         onClose={() => setShowConfirmModal(false)}
         onConfirm={() => {
           setShowConfirmModal(false);
-          handleSubmit({ preventDefault: () => {} });
+          handleSubmit({ preventDefault: () => { } });
         }}
         title="Submit Confirmation"
         message="Are you sure you want to submit your request?"

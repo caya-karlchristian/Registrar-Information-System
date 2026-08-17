@@ -1,12 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import UserManagement from "../layouts/UserManagement";
 import PolicyManagement from "../layouts/PolicyManagement";
 import AccessRequestsQueue from "../layouts/AccessRequestsQueue";
+import { getAccessRequests } from "../services/api";
 
 const UserManagementPage = () => {
   const { isDark } = useTheme();
   const [activeTab, setActiveTab] = useState("accounts"); // "accounts" | "policies" | "access-requests"
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    getAccessRequests({ status: "Requested" })
+      .then((res) => {
+        setPendingCount(res.data?.data?.length ?? 0);
+      })
+      .catch(() => {});
+  }, []);
 
   const tabs = [
     { key: "accounts", label: "Admin Accounts" },
@@ -36,7 +46,12 @@ const UserManagementPage = () => {
                   : "text-gray-500 hover:text-gray-900"
                 }`}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              {tab.key === "access-requests" && pendingCount > 0 && (
+                <span className="absolute -top-2.5 -right-3.5 px-1.75 py-0.5 rounded-full text-[9px] font-black leading-none bg-red-500 text-white shadow-[0_2px_4px_rgba(239,68,68,0.3)]">
+                  {pendingCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -47,7 +62,7 @@ const UserManagementPage = () => {
         }`}>
         {activeTab === "accounts" && <UserManagement />}
         {activeTab === "policies" && <PolicyManagement />}
-        {activeTab === "access-requests" && <AccessRequestsQueue />}
+        {activeTab === "access-requests" && <AccessRequestsQueue onPendingCountChange={setPendingCount} />}
       </div>
 
     </div>

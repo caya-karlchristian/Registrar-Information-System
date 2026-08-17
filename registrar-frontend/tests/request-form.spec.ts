@@ -103,7 +103,29 @@ test.describe('Student Request Form E2E Tests', () => {
       }
     });
 
-    // 7. Mock form submission endpoint
+    // 7. Mock the OR-first verify-or step — hit before Documents now (see
+    // RequestForm.jsx's orStep/docStep reorder). The mutation's onSuccess
+    // reads response.data.suggestions.{documents,certificates,unresolved}
+    // and uses each suggested document_type_id to look up a name from the
+    // already-mocked /api/document-types list above, so this id must
+    // match one of those (1 = 'Transcript of Records').
+    await page.route('**/api/document-requests/verify-or', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          valid: true,
+          is_mock: true,
+          suggestions: {
+            documents: [{ document_type_id: 1, number_of_copies: 1 }],
+            certificates: [],
+            unresolved: [],
+          },
+        }),
+      });
+    });
+
+    // 8. Mock form submission endpoint
     await page.route('**/api/document-requests', async (route) => {
       if (route.request().method() === 'POST') {
         await route.fulfill({
@@ -136,30 +158,33 @@ test.describe('Student Request Form E2E Tests', () => {
     await page.locator('input[name="termsAgreed"]').check();
     await page.getByRole('button', { name: 'Next' }).click();
 
-    // --- STEP 2: STUDENT REQUEST (Document & Purpose Selection) ---
+    // --- STEP 2: OFFICIAL RECEIPT VERIFICATION ---
+    // Moved ahead of Documents (OR-first wizard reorder) — clicking Next
+    // here calls handleVerifyOr(), which POSTs to verify-or and only
+    // advances on a successful match (mocked above).
+    await page.getByPlaceholder('XXXXXXX').fill('1234567');
+
+    const today = new Date().toISOString().split('T')[0];
+    await page.locator('input[name="dateOfPayment"]').fill(today);
+
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    // --- STEP 3: DOCUMENT REQUEST (Document & Purpose Selection) ---
     await expect(page.getByText('Documents Requested')).toBeVisible();
 
-    // Select 'Transcript of Records' from multi-select
-    const docDropdown = page.locator('div:has(> label:has-text("Documents Requested")) > button');
-    await docDropdown.click();
-    await page.getByRole('button', { name: 'Transcript of Records', exact: true }).click();
-    // Close dropdown
-    await docDropdown.click();
+    // 'Transcript of Records' should already be selected — auto-filled
+    // from the verify-or suggestion above — so just confirm the
+    // auto-fill banner and the pill are present rather than re-selecting.
+    await expect(page.getByText(/Auto-filled from OR #1234567/)).toBeVisible();
+    await expect(page.getByText('Transcript of Records', { exact: true })).toBeVisible();
 
     // Select 'Employment' from purpose dropdown
     await page.locator('div:has(> label:has-text("Purpose of Request")) button').click();
     await page.getByRole('button', { name: 'Employment', exact: true }).click();
     await page.getByRole('button', { name: 'Next' }).click();
 
-    // --- STEP 3: PAYMENT AND DOCUMENT DETAILS ---
-    await expect(page.getByRole('heading', { name: 'Payment and Document Details' })).toBeVisible();
-
-    // Fill in OR Number (must be exactly 7 digits)
-    await page.getByPlaceholder('XXXXXXX').fill('1234567');
-
-    // Fill in Date of Payment (today's date)
-    const today = new Date().toISOString().split('T')[0];
-    await page.locator('input[name="dateOfPayment"]').fill(today);
+    // --- STEP 4: NUMBER OF COPIES & CLAIM TICKET ---
+    await expect(page.getByText('Number of copies per document')).toBeVisible();
 
     // Click Submit
     await page.getByRole('button', { name: 'Submit' }).click();

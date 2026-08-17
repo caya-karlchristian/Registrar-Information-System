@@ -98,6 +98,16 @@ test('GET /me for admin returns role_name = admin', function () {
 // ═════════════════════════════════════════════════════════════════════════════
 
 test('student can submit a document request', function () {
+    // Without this, CASHIER_API_KEY can leak in from the local .env via
+    // docker-compose.local.yml's env_file: .env on the backend service —
+    // phpunit.xml's <env> block doesn't list CASHIER_API_KEY, so it isn't
+    // forced back to empty the way APP_ENV etc. are. That flips
+    // CashierService into live mode and this OR number, which isn't a
+    // real receipt, gets rejected as NOT_FOUND instead of accepted.
+    // Every other cashier-touching test in this suite sets this
+    // explicitly for the same reason — see CashierTest.php, RisGapTest.php.
+    config(['services.cashier.api_key' => '']);
+
     $user = makeStudentWithProfile();
     ['purpose' => $purpose, 'docType' => $docType] = seedReferenceData();
 

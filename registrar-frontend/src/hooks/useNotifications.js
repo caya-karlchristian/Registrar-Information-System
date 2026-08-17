@@ -126,13 +126,34 @@ export const useNotifications = (onNewNotification = null) => {
             return;
         }
 
-        const handleNewNotification = (e) => {
+        // The WebSocket event (NotificationSent::broadcastWith()) is
+        // intentionally lean — it carries enough to show a toast/badge
+        // instantly, but omits larger/sensitive fields (requirements
+        // checklist, claim_code, announcement body) to keep the broadcast
+        // queue fast and avoid pushing sensitive data over the socket
+        // transport. Treat `e` as a signal, not the canonical record:
+        // render the stub immediately for a snappy UI, then hydrate it
+        // via the same REST shape (NotificationResource) that
+        // fetchNotifications() already uses, so a full reload is never
+        // required to see fields the socket payload doesn't carry.
+        const handleNewNotification = async (e) => {
             setNotifications(prev => {
                 if (prev.some(n => n.id === e.id)) return prev; // deduplicate
-                return [e, ...prev];
+                return [e, ...prev]; // optimistic stub
             });
             setUnreadCount(c => c + 1);
             if (typeof onNewNotificationRef.current === 'function') onNewNotificationRef.current(e);
+
+            try {
+                const { data } = await api.get(`/notifications/${e.id}`);
+                setNotifications(prev =>
+                    prev.map(n => (n.id === e.id ? data.data : n))
+                );
+            } catch (err) {
+                // Stub stays in place (title/message still correct) — the
+                // extra fields just won't appear until the next full refetch.
+                console.error('[useNotifications] hydrate failed:', err);
+            }
         };
 
         const channelName = `notifications.${user.user_id}`;

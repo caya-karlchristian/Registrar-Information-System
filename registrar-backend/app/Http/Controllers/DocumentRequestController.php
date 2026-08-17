@@ -7,13 +7,17 @@ use App\Models\SystemUser;
 use App\Models\AuditLog;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Http\Requests\DocumentRequest\BulkRequestIdsRequest;
+use App\Http\Requests\DocumentRequest\ClaimDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\StoreDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\UpdateDocumentRequestRequest;
+use App\Http\Requests\DocumentRequest\VerifyOfficialReceiptRequest;
 use App\Services\DocumentRequestService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use App\Services\CashierService;
 use App\Services\CashierDocumentMatcher;
+use App\Services\CashierDocumentSuggester;
 use App\Services\NameMatcher;
 use Illuminate\Support\Facades\Auth;
 
@@ -49,6 +53,7 @@ class DocumentRequestController extends Controller
         private DocumentRequestServiceInterface $requestService,
         private CashierService                  $cashierService,
         private CashierDocumentMatcher          $documentMatcher,
+        private CashierDocumentSuggester        $documentSuggester,
         private AuditLogger                     $auditLogger,
         private NameMatcher                     $nameMatcher,
     ) {}
@@ -235,114 +240,41 @@ class DocumentRequestController extends Controller
         }
 
         // or-validation: verify OR before creating request
+        //
+        // This is the money-facing gate and stays exactly as strict as it
+        // always was: verifyReceiptAgainstCashier() below is a straight
+        // extraction of what used to live inline here (same retry loop,
+        // same audit log call, same error messages) — nothing about it
+        // got weaker when verifyOfficialReceipt() below started reusing
+        // it. CashierDocumentMatcher (the strict cross-check against
+        // whatever the student actually confirmed) still runs here and
+        // ONLY here, unchanged.
         if (!empty($validated['or_number'])) {
             /** @var \App\Models\SystemUser $user */
             $user = Auth::user();
 
-            // Resolve the customer name from the user's profile.
-            // Students and alumni have separate profile tables;
-            // admins submitting on behalf of a student are not expected
-            // to hit this path (walk-in requests bypass OR validation).
-            $profile = $user->studentProfile ?? $user->alumniProfile ?? null;
+            $verification = $this->verifyReceiptAgainstCashier($request, $user, $validated['or_number']);
 
-            if ($profile) {
-                // The Cashier API does exact string matching against a
-                // free-text "Customer Name" field the Cashier System
-                // itself doesn't validate (confirmed via screenshot of
-                // its payment form). On failure it never tells us what
-                // name is actually on file — NOT_FOUND means either
-                // "wrong OR" or "wrong name", indistinguishably — so
-                // there's nothing to compare against after the fact.
-                // Instead: try a small set of plausible name formattings
-                // for this same person, stopping at the first one the API
-                // accepts. Every attempt is logged so the eventual
-                // decision is traceable.
-                $candidates = $this->nameMatcher->candidatesFor(
-                    $profile->last_name   ?? '',
-                    $profile->first_name  ?? '',
-                    $profile->middle_name ?? '',
-                    $profile->suffix      ?? '',
+            if ($verification['error'] !== null) {
+                return $verification['error'];
+            }
+
+            // document-validation: cross-check paid items against requested items.
+            // Only runs when the cashier API returns items[] (live mode).
+            // Mock mode / no-profile skips all checks gracefully — every
+            // item passes when there is nothing to match against.
+            if (!$verification['is_mock']) {
+                $matchResult = $this->documentMatcher->match(
+                    cashierItems: $verification['cashier_items'],
+                    documents:    $validated['documents']    ?? [],
+                    certificates: $validated['certificates'] ?? [],
                 );
 
-                $verification   = null;
-                $matchedName    = null;
-                $attemptsLog    = [];
-
-                foreach ($candidates as $candidate) {
-                    $attempt = $this->cashierService->verifyPayment(
-                        $validated['or_number'],
-                        $candidate,
-                    );
-
-                    $attemptsLog[] = [
-                        'name'   => $candidate,
-                        'valid'  => $attempt['valid'],
-                        'reason' => $attempt['reason'] ?? null,
-                    ];
-
-                    $verification = $attempt;
-                    $matchedName  = $candidate;
-
-                    if ($attempt['valid']) {
-                        break; // found a formatting the cashier accepts — stop here
-                    }
-
-                    // Only worth trying alternate formattings when the
-                    // failure is a real lookup miss. An API_ERROR (server
-                    // error / connection failure) won't be fixed by a
-                    // different name string, and retrying it 2-3x in a
-                    // row would just add latency to an already-failing
-                    // request for no benefit.
-                    if (($attempt['reason'] ?? null) === 'API_ERROR') {
-                        break;
-                    }
-                }
-
-                $isMockAttempt = $verification['data']['_mock'] ?? false;
-
-                $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
-                    'or_number'      => $validated['or_number'],
-                    'attempts'       => $attemptsLog,
-                    'matched_name'   => $verification['valid'] ? $matchedName : null,
-                    'is_mock'        => $isMockAttempt,
-                    'final_approved' => $verification['valid'],
-                ]);
-
-                if (!$verification['valid']) {
-                    $reason = $verification['reason'] ?? 'NOT_FOUND';
-
-                    $message = match ($reason) {
-                        'NOT_FOUND' => 'The OR number could not be found. Please check your Official Receipt and try again.',
-                        'API_ERROR' => 'Payment verification is temporarily unavailable. Please try again later.',
-                        default     => 'Payment verification failed. Please contact the registrar\'s office.',
-                    };
-
+                if (!$matchResult['valid']) {
                     return response()->json([
-                        'message' => $message,
-                        'errors'  => ['or_number' => [$message]],
+                        'message' => $matchResult['message'],
+                        'errors'  => $matchResult['errors'],
                     ], 422);
-                }
-
-                // document-validation: cross-check paid items against requested items.
-                // Only runs when the cashier API returns items[] (live mode).
-                // Mock mode returns an empty items array, which skips all checks
-                // gracefully — every item passes when there is nothing to match against.
-                $cashierItems = $verification['data']['items'] ?? [];
-                $isMock       = $verification['data']['_mock'] ?? false;
-
-                if (!$isMock) {
-                    $matchResult = $this->documentMatcher->match(
-                        cashierItems: $cashierItems,
-                        documents:    $validated['documents']    ?? [],
-                        certificates: $validated['certificates'] ?? [],
-                    );
-
-                    if (!$matchResult['valid']) {
-                        return response()->json([
-                            'message' => $matchResult['message'],
-                            'errors'  => $matchResult['errors'],
-                        ], 422);
-                    }
                 }
             }
         }
@@ -353,6 +285,168 @@ class DocumentRequestController extends Controller
     }
 
     // -------------------------------------------------------------------------
+    // POST /document-requests/verify-or
+    //
+    // New first step of the request wizard (OR-first reorder): verifies the
+    // OR number/payment date against the cashier API and returns document
+    // suggestions derived from the receipt — WITHOUT creating a
+    // DocumentRequest. The frontend uses this to pre-populate the Documents
+    // step; everything it returns stays editable, and store() above still
+    // re-verifies and re-matches from scratch at final submit. See
+    // CashierDocumentSuggester's class docblock for why this is a distinct,
+    // deliberately softer check than the strict matcher.
+    // -------------------------------------------------------------------------
+    public function verifyOfficialReceipt(VerifyOfficialReceiptRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+
+        // Same single-use guard as store() — no point suggesting documents
+        // against an OR that final submit will reject outright. This does
+        // NOT mark the OR as used; only a successful store() does that
+        // (by way of the created DocumentRequest row itself).
+        if ($this->cashierService->isOrAlreadyUsed($validated['or_number'])) {
+            $message = 'This OR number has already been used for a previous request. Each Official Receipt can only be used once.';
+            return response()->json([
+                'message' => $message,
+                'errors'  => ['or_number' => [$message]],
+            ], 422);
+        }
+
+        /** @var \App\Models\SystemUser $user */
+        $user = Auth::user();
+
+        $verification = $this->verifyReceiptAgainstCashier($request, $user, $validated['or_number']);
+
+        if ($verification['error'] !== null) {
+            return $verification['error'];
+        }
+
+        $suggestions = $this->documentSuggester->suggest($verification['cashier_items']);
+
+        return response()->json([
+            'valid'        => true,
+            'or_number'    => $validated['or_number'],
+            'receipt_date' => $validated['receipt_date'],
+            'is_mock'      => $verification['is_mock'],
+            'suggestions'  => $suggestions,
+        ], 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // Shared OR-verification helper — used by store() (final, strict
+    // submission) and verifyOfficialReceipt() (pre-submission suggestion
+    // step) so the name-candidate retry loop and audit trail can never
+    // drift between the two call sites. Extracted unchanged from what used
+    // to be store()'s own inline logic.
+    //
+    // Does NOT run CashierDocumentMatcher or CashierDocumentSuggester —
+    // those stay specific to each caller. This method only answers "is
+    // this OR number, for this user, valid?" and hands back the raw
+    // cashier line items for the caller to do what it needs with.
+    //
+    // @return array{
+    //     error: JsonResponse|null,
+    //     cashier_items: array,
+    //     is_mock: bool,
+    // }
+    // -------------------------------------------------------------------------
+    private function verifyReceiptAgainstCashier(Request $request, \App\Models\SystemUser $user, string $orNumber): array
+    {
+        // Resolve the customer name from the user's profile. Students and
+        // alumni have separate profile tables; admins submitting on behalf
+        // of a student are not expected to hit this path (walk-in requests
+        // bypass OR validation entirely) — and verifyOfficialReceipt() is
+        // only ever reachable by role:1,2 (student/alumni) per the route,
+        // so this branch is a defensive fallback there, not the common case.
+        $profile = $user->studentProfile ?? $user->alumniProfile ?? null;
+
+        if (!$profile) {
+            return ['error' => null, 'cashier_items' => [], 'is_mock' => true];
+        }
+
+        // The Cashier API does exact string matching against a free-text
+        // "Customer Name" field the Cashier System itself doesn't validate
+        // (confirmed via screenshot of its payment form). On failure it
+        // never tells us what name is actually on file — NOT_FOUND means
+        // either "wrong OR" or "wrong name", indistinguishably — so
+        // there's nothing to compare against after the fact. Instead: try
+        // a small set of plausible name formattings for this same person,
+        // stopping at the first one the API accepts. Every attempt is
+        // logged so the eventual decision is traceable.
+        $candidates = $this->nameMatcher->candidatesFor(
+            $profile->last_name   ?? '',
+            $profile->first_name  ?? '',
+            $profile->middle_name ?? '',
+            $profile->suffix      ?? '',
+        );
+
+        $verification = null;
+        $matchedName  = null;
+        $attemptsLog  = [];
+
+        foreach ($candidates as $candidate) {
+            $attempt = $this->cashierService->verifyPayment($orNumber, $candidate);
+
+            $attemptsLog[] = [
+                'name'   => $candidate,
+                'valid'  => $attempt['valid'],
+                'reason' => $attempt['reason'] ?? null,
+            ];
+
+            $verification = $attempt;
+            $matchedName  = $candidate;
+
+            if ($attempt['valid']) {
+                break; // found a formatting the cashier accepts — stop here
+            }
+
+            // Only worth trying alternate formattings when the failure is
+            // a real lookup miss. An API_ERROR (server error / connection
+            // failure) won't be fixed by a different name string, and
+            // retrying it 2-3x in a row would just add latency to an
+            // already-failing request for no benefit.
+            if (($attempt['reason'] ?? null) === 'API_ERROR') {
+                break;
+            }
+        }
+
+        $isMockAttempt = $verification['data']['_mock'] ?? false;
+
+        $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
+            'or_number'      => $orNumber,
+            'attempts'       => $attemptsLog,
+            'matched_name'   => $verification['valid'] ? $matchedName : null,
+            'is_mock'        => $isMockAttempt,
+            'final_approved' => $verification['valid'],
+        ]);
+
+        if (!$verification['valid']) {
+            $reason = $verification['reason'] ?? 'NOT_FOUND';
+
+            $message = match ($reason) {
+                'NOT_FOUND' => 'The OR number could not be found. Please check your Official Receipt and try again.',
+                'API_ERROR' => 'Payment verification is temporarily unavailable. Please try again later.',
+                default     => 'Payment verification failed. Please contact the registrar\'s office.',
+            };
+
+            return [
+                'error' => response()->json([
+                    'message' => $message,
+                    'errors'  => ['or_number' => [$message]],
+                ], 422),
+                'cashier_items' => [],
+                'is_mock'       => $isMockAttempt,
+            ];
+        }
+
+        return [
+            'error'         => null,
+            'cashier_items' => $verification['data']['items'] ?? [],
+            'is_mock'       => $isMockAttempt,
+        ];
+    }
+
+    // -------------------------------------------------------------------------
     // PUT /document-requests/{documentRequest}
     // -------------------------------------------------------------------------
     public function update(UpdateDocumentRequestRequest $request, DocumentRequest $documentRequest)
@@ -360,6 +454,22 @@ class DocumentRequestController extends Controller
         $validated = $request->validated();
 
         $documentRequest = $this->requestService->updateRequest($documentRequest, $validated);
+
+        return response()->json($documentRequest->load(self::RELATIONS), 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /document-requests/claim
+    //
+    // QR Code Claiming Policy v1.0. No {documentRequest} route param —
+    // staff arrive with a scanned uuid or a typed claim_code, not a known
+    // request_id, so lookup happens inside the service. Authorization is
+    // handled by ClaimDocumentRequestRequest::authorize() (staff-only),
+    // same as every other write action in this controller.
+    // -------------------------------------------------------------------------
+    public function claim(ClaimDocumentRequestRequest $request)
+    {
+        $documentRequest = $this->requestService->claimRequest($request->validated());
 
         return response()->json($documentRequest->load(self::RELATIONS), 200);
     }

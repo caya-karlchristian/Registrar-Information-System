@@ -1,3 +1,58 @@
+/**
+ * Status names that correspond to an actual reachable (or historically
+ * reachable) value of document_request.status_id, per
+ * app/Enums/RequestStatusEnum.php on the backend.
+ *
+ * The `request_status` reference table also contains rows that were never
+ * wired into the document-request workflow at all — e.g. "On Hold",
+ * "Rejected" (that name belongs to a *different* feature, Access
+ * Requests), "Returned", "Draft" — or that describe an unrelated concept
+ * ("Archived" is the separate document_request.is_archived flag, not a
+ * status). Those rows exist only for legacy/reference-table reasons and
+ * must never be offered as selectable options in the Staff Dashboard
+ * status filter: picking one would silently return zero results forever,
+ * since no request can ever hold that status.
+ *
+ * Order here also defines the order options are shown in the filter.
+ * Keep this list in sync with RequestStatusEnum on the backend.
+ */
+import { formatName } from './formatters';
+
+export const WORKFLOW_STATUS_NAMES = [
+  'Processing',
+  'Pending Signature',
+  'Ready to Claim',
+  'Completed',
+  'Forfeited',
+  // Deprecated: unreachable for any new request (see the @deprecated note
+  // on RequestStatusEnum::Cancelled) but kept selectable so staff can
+  // still filter historical requests that were cancelled before the
+  // status was retired.
+  'Cancelled',
+];
+
+/**
+ * Builds the list of status names safe to show in the Staff Dashboard
+ * status filter, from the live reference-data rows returned by the API.
+ * Filters out reference rows with no corresponding reachable workflow
+ * status (see WORKFLOW_STATUS_NAMES above), de-dupes, and orders them to
+ * match the workflow's natural progression rather than table insertion
+ * order.
+ */
+export const getWorkflowStatusOptions = (requestStatuses) => {
+  const allowedLowerNames = new Set(WORKFLOW_STATUS_NAMES.map(n => n.toLowerCase()));
+
+  const availableNames = (requestStatuses ?? [])
+    .map(s => s?.status_name)
+    .filter(Boolean)
+    .filter((name, index, self) => self.indexOf(name) === index)
+    .filter(name => allowedLowerNames.has(name.toLowerCase()));
+
+  return WORKFLOW_STATUS_NAMES.filter(name =>
+    availableNames.some(available => available.toLowerCase() === name.toLowerCase())
+  );
+};
+
 export const STATUS_FALLBACK = {
   PENDING: 1,
   PENDING_SIGNATURE: 6,
@@ -141,11 +196,7 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
         status_name: computedStatusName,
       },
     },
-    studentName: r.student_profile
-      ? formatTitleCase(`${r.student_profile.first_name} ${r.student_profile.middle_name ?? ''} ${r.student_profile.last_name}`)
-      : r.alumni_profile
-      ? formatTitleCase(`${r.alumni_profile.first_name} ${r.alumni_profile.middle_name ?? ''} ${r.alumni_profile.last_name}`)
-      : 'N/A',
+    studentName: formatName(r) || 'N/A',
     studentNumber: r.academic_record?.student_number
       ?? r.alumni_academic_record?.student_number
       ?? 'N/A',

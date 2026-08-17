@@ -24,6 +24,15 @@ interface NotificationServiceInterface
     ): ?Notification;
 
     /**
+     * Dispatch a bulk-notification job targeting only super-admin users.
+     */
+    public function sendToSuperAdmins(
+        string $triggerEvent,
+        array  $data      = [],
+        ?int   $requestId = null,
+    ): void;
+
+    /**
      * Dispatch a bulk-notification job targeting only admin and super-admin users.
      */
     public function sendToAdmins(

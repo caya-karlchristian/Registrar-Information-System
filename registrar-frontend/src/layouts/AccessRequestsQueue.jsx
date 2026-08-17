@@ -7,6 +7,7 @@ import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
 import { AccessRequestsSkeleton } from "../components/LoadingSkeleton";
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import DashboardDropdown from "../components/DashboardDropdown";
+import { formatName } from "../utils/formatters";
 
 const STATUS_FILTERS = ["All", "Pending", "Approved", "Rejected", "Expired"];
 
@@ -48,7 +49,7 @@ const getStatusBadgeClasses = (status, isDark) => {
  * (see App.jsx), so no additional role check is needed here; the
  * backend still enforces it independently (AccessRequestPolicy).
  */
-const AccessRequestsQueue = () => {
+const AccessRequestsQueue = ({ onPendingCountChange }) => {
   const { isDark } = useTheme();
   const { showSuccess, showError } = useAlertToast();
 
@@ -74,10 +75,22 @@ const AccessRequestsQueue = () => {
     setLoading(true);
     const dbStatus = UI_TO_DB_STATUS[statusFilter];
     getAccessRequests(statusFilter !== "All" ? { status: dbStatus } : {})
-      .then((res) => setRequests(res.data?.data ?? []))
+      .then((res) => {
+        const data = res.data?.data ?? [];
+        setRequests(data);
+        if (onPendingCountChange) {
+          if (statusFilter === "Pending") {
+            onPendingCountChange(data.length);
+          } else {
+            getAccessRequests({ status: "Requested" })
+              .then((r) => onPendingCountChange(r.data?.data?.length ?? 0))
+              .catch(() => {});
+          }
+        }
+      })
       .catch(() => showError("Failed to load access requests."))
       .finally(() => setLoading(false));
-  }, [statusFilter, showError]);
+  }, [statusFilter, showError, onPendingCountChange]);
 
   useEffect(() => {
     load();
@@ -92,7 +105,7 @@ const AccessRequestsQueue = () => {
   const baseFiltered = requests.filter((r) => {
     const query = searchQuery.toLowerCase().trim();
     if (query) {
-      const fullName = [r.target_first_name, r.target_last_name].filter(Boolean).join(" ").toLowerCase();
+      const fullName = formatName(r).toLowerCase();
       const email = (r.target_email || "").toLowerCase();
       const role = (r.requested_role || "Admin").toLowerCase();
       const policyName = (r.requested_policy?.name || "").toLowerCase();
@@ -121,8 +134,8 @@ const AccessRequestsQueue = () => {
   });
 
   const filteredRequests = [...baseFiltered].sort((a, b) => {
-    const nameA = [a.target_first_name, a.target_last_name].filter(Boolean).join(" ");
-    const nameB = [b.target_first_name, b.target_last_name].filter(Boolean).join(" ");
+    const nameA = formatName(a);
+    const nameB = formatName(b);
     if (sortOrder === "asc") {
       return nameA.localeCompare(nameB);
     } else {
@@ -329,7 +342,7 @@ const AccessRequestsQueue = () => {
                 </tr>
               ) : (
                 filteredRequests.map((r, idx) => {
-                  const fullName = [r.target_first_name, r.target_last_name].filter(Boolean).join(" ");
+                  const fullName = formatName(r);
                   const requesterName = r.requested_by?.name || r.requested_by?.email || 'Unknown';
 
                   return (
@@ -459,7 +472,7 @@ const AccessRequestsQueue = () => {
             <div className="p-6 space-y-4">
               <div className={`p-4 rounded-xl border ${isDark ? 'bg-[#1f1f1f]/60 border-[#3e4042]' : 'bg-gray-50 border-gray-200'}`}>
                 <div className="text-xs uppercase font-bold tracking-wider mb-2 text-gray-500">Target User</div>
-                <div className="font-semibold text-sm">{rejectTarget.target_first_name} {rejectTarget.target_last_name}</div>
+                <div className="font-semibold text-sm">{[rejectTarget.target_first_name, rejectTarget.target_middle_name, rejectTarget.target_last_name, rejectTarget.target_suffix].filter(Boolean).join(" ")}</div>
                 <div className={`text-xs mt-0.5 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-550'}`}>{rejectTarget.target_email}</div>
               </div>
 

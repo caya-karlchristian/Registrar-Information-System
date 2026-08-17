@@ -13,7 +13,9 @@ const ROLE_TO_ID = { "Admin": 3, "Super Admin": 4 };
 
 const EMPTY_FORM = {
   target_first_name: "",
+  target_middle_name: "",
   target_last_name: "",
+  target_suffix: "",
   target_email: "",
   requested_role: "Admin",
   requested_policy: "",
@@ -105,7 +107,9 @@ const RequestAccessPage = () => {
 
       await submitAccessRequest({
         target_first_name: form.target_first_name,
+        target_middle_name: form.target_middle_name,
         target_last_name:  form.target_last_name,
+        target_suffix:     form.target_suffix,
         target_email:      form.target_email,
         requested_role_id: ROLE_TO_ID[form.requested_role],
         requested_policy_id: policy?.policy_id,
@@ -184,7 +188,7 @@ const RequestAccessPage = () => {
                       >
                         <div className="min-w-0 flex-1">
                           <h4 className={`text-sm font-bold truncate ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
-                            {r.target_first_name} {r.target_last_name}
+                            {[r.target_first_name, r.target_middle_name, r.target_last_name, r.target_suffix].filter(Boolean).join(" ")}
                           </h4>
                           <p className={`text-xs mt-0.5 truncate ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                             {r.target_email}
@@ -220,11 +224,15 @@ const RequestAccessPage = () => {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <InputGroup label="First Name" name="target_first_name" value={form.target_first_name}
                       onChange={handleChange} placeholder="e.g. Juan" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-650'} />
+                    <InputGroup label="Middle Name" name="target_middle_name" value={form.target_middle_name}
+                      onChange={handleChange} placeholder="e.g. Santos" labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-650'} />
                     <InputGroup label="Last Name" name="target_last_name" value={form.target_last_name}
                       onChange={handleChange} placeholder="e.g. dela Cruz" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-655'} />
+                    <InputGroup label="Suffix" name="target_suffix" value={form.target_suffix}
+                      onChange={handleChange} placeholder="e.g. Jr., Sr." labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-650'} />
                   </div>
 
                   <InputGroup label="Email" name="target_email" type="email" value={form.target_email}

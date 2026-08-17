@@ -18,11 +18,23 @@
         </include>
     </source>
     <php>
-        <env name="APP_ENV" value="testing"/>
+        <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="log"/>
         <env name="CACHE_STORE" value="array"/>
+        <!-- Without this, docker-compose.local.yml's env_file: .env on the
+             backend service leaks the real local CASHIER_API_KEY into
+             `php artisan test` runs (Laravel's env() prefers an
+             already-set OS env var over any .env.testing value, and this
+             tag list is the only thing phpunit.xml actually forces). That
+             silently flips CashierService into live mode for any test
+             that doesn't reset it by hand — see RisFeatureTest.php and
+             the SEED_LOCAL_DEV_ACCOUNTS comment in DatabaseSeeder.php for
+             the same class of bug. Forcing it here closes it for every
+             test, present and future, instead of relying on each test to
+             remember `config(['services.cashier.api_key' => ''])`. -->
+        <env name="CASHIER_API_KEY" value="" force="true"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="MAIL_MAILER" value="array"/>

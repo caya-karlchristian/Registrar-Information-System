@@ -233,9 +233,48 @@ jobs:
 
       - name: Sync build to S3
         run: |
+          # Step 1 — upload new hashed assets, no --delete yet. Old assets
+          # from the previous deploy are left in place for now; this step
+          # can never leave the bucket in a broken state since nothing is
+          # removed here, only added.
+          aws s3 sync ./dist s3://ris-frontend-app/ \
+            --region ap-southeast-1 \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html"
+
+          # Step 2 — prune orphaned assets from the previous deploy.
+          # Deliberately unfiltered (no --exclude) and run BEFORE the
+          # index.html upload below, for two reasons:
+          #   1. Combining --exclude with --delete in a single `aws s3
+          #      sync` call has inconsistent, version-dependent behaviour
+          #      in the AWS CLI itself (see aws/aws-cli#4923 and #1268) —
+          #      in the worst case it deletes the excluded destination
+          #      file instead of protecting it. Since index.html still
+          #      exists in ./dist (nothing excludes it from this call),
+          #      that whole failure class doesn't apply here: sync only
+          #      ever deletes destination files that are absent from the
+          #      source entirely, and index.html is never absent.
+          #   2. Running this BEFORE the index.html upload (not after)
+          #      means the deploy's actual "make index.html live" step is
+          #      the last, authoritative write — nothing later can
+          #      silently revert its cache-control. If this cleanup sync's
+          #      timestamp comparison happens to decide index.html itself
+          #      needs re-uploading, it would (harmlessly) apply the
+          #      long-cache header from this command — but step 3 below
+          #      unconditionally overwrites it with the correct one right
+          #      after, so the final state is deterministic either way.
           aws s3 sync ./dist s3://ris-frontend-app/ \
             --delete \
-            --region ap-southeast-1
+            --region ap-southeast-1 \
+            --cache-control "public, max-age=31536000, immutable"
+
+          # Step 3 — publish index.html last, always. This is what makes
+          # the new deploy live, and its cache-control is guaranteed
+          # correct regardless of anything step 2 touched.
+          aws s3 cp ./dist/index.html s3://ris-frontend-app/index.html \
+            --region ap-southeast-1 \
+            --cache-control "no-cache, must-revalidate" \
+            --content-type "text/html"
 
       - name: Invalidate CloudFront cache
         run: |

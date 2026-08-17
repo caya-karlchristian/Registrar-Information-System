@@ -18,6 +18,7 @@ use App\Services\Ocms\OcmsAdminService;
 use App\Services\Ogos\OgosStudentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class UserProvisioningService
@@ -41,12 +42,68 @@ class UserProvisioningService
     public function provision(array $profile, Request $request): ProvisioningResult
     {
         $email      = $profile['email'];
+        $idpUserId  = $profile['id'] ?? null;
         $firstName  = $profile['first_name']  ?? null;
         $middleName = $profile['middle_name']  ?? null;
         $lastName   = $profile['last_name']    ?? null;
 
-        return DB::transaction(function () use ($email, $firstName, $middleName, $lastName, $profile, $request) {
-            $existing = SystemUser::where('email', $email)->first();
+        return DB::transaction(function () use ($email, $idpUserId, $firstName, $middleName, $lastName, $profile, $request) {
+            // Match by IdP UUID first. This is the durable identity link —
+            // it survives the user changing their PUP webmail address at
+            // the IdP, which email-only matching does not (see incident:
+            // an email change would previously look like a brand-new user,
+            // orphaning all history under the old email's row).
+            //
+            // Email is only used as a fallback, for accounts that don't
+            // have an idp_user_id yet — e.g. a Pending Activation admin's
+            // very first login (AdminUserService::create() sets
+            // idp_user_id = null on invite), or a not-yet-registered
+            // person's first-ever login below. Every account that has
+            // ever successfully logged in already has idp_user_id set —
+            // see ensureBaselineRoleAssignment()'s sibling guarantee, the
+            // Pending Activation -> Activated transition further down,
+            // and the SystemUser::create() call below, all of which write
+            // idp_user_id in the same step that sets status = 'Activated'.
+            $existing = $idpUserId
+                ? SystemUser::where('idp_user_id', $idpUserId)->first()
+                : null;
+
+            if (!$existing) {
+                $existing = SystemUser::where('email', $email)->first();
+            }
+
+            // Matched by UUID but the email on file is stale — the user
+            // changed their PUP webmail at the IdP. Sync it here, before
+            // anything else below reads $existing->email, so the record
+            // stays queryable/matchable by the new email too (e.g. by
+            // OGOS/PUPTAPS lookups elsewhere, which key on email).
+            //
+            // Guarded against the `email` unique constraint: if some other
+            // row already holds the new email (a pre-existing data
+            // conflict this fix doesn't attempt to resolve automatically),
+            // skip the sync and log loudly rather than let a raw
+            // QueryException take down the login.
+            if ($existing && $idpUserId && $existing->idp_user_id === $idpUserId && $existing->email !== $email) {
+                $emailTaken = SystemUser::where('email', $email)
+                    ->where('user_id', '!=', $existing->user_id)
+                    ->exists();
+
+                if ($emailTaken) {
+                    Log::error('SSO: cannot sync changed email — new email already belongs to a different user_id', [
+                        'user_id'   => $existing->user_id,
+                        'old_email' => $existing->email,
+                        'new_email' => $email,
+                    ]);
+                } else {
+                    Log::info('SSO: email changed at IdP, syncing local record', [
+                        'user_id'   => $existing->user_id,
+                        'old_email' => $existing->email,
+                        'new_email' => $email,
+                    ]);
+                    $existing->email = $email;
+                    $existing->save();
+                }
+            }
 
             // RIS is the source of truth for who can use RIS. A Deactivated
             // record is rejected here regardless of what the IdP currently
