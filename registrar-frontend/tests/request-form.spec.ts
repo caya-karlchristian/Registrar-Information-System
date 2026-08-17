@@ -119,7 +119,11 @@ test.describe('Student Request Form E2E Tests', () => {
           suggestions: {
             documents: [{ document_type_id: 1, number_of_copies: 1 }],
             certificates: [],
-            unresolved: [],
+            unresolved: [
+              { label: 'CAV/Apostille (DFA) - undergraduate', amount: '620.00', quantity: 1 },
+              { label: 'CAV/Apostille (DFA) with Special Certification', amount: '1070.00', quantity: 1 },
+              { label: 'Additional Unresolved Document', amount: '150.00', quantity: 2 }
+            ],
           },
         }),
       });
@@ -177,6 +181,17 @@ test.describe('Student Request Form E2E Tests', () => {
     // auto-fill banner and the pill are present rather than re-selecting.
     await expect(page.getByText(/Auto-filled from OR #1234567/)).toBeVisible();
     await expect(page.getByText('Transcript of Records', { exact: true })).toBeVisible();
+
+    // Verify the "Couldn't match automatically" unresolved items box at the bottom
+    await expect(page.getByText("Couldn't match automatically")).toBeVisible();
+    await expect(page.getByText("3 items")).toBeVisible();
+    await expect(page.getByText("CAV/Apostille (DFA) - undergraduate")).toBeVisible();
+    await expect(page.getByText("₱620.00 • qty 1")).toBeVisible();
+    await expect(page.getByText("CAV/Apostille (DFA) with Special Certification")).toBeVisible();
+    await expect(page.getByText("₱1,070.00 • qty 1")).toBeVisible();
+    await expect(page.getByText("Additional Unresolved Document")).toBeVisible();
+    await expect(page.getByText("₱150.00 • qty 2")).toBeVisible();
+    await expect(page.getByText("Select the matching document below, or contact the registrar's office if unsure.")).toBeVisible();
 
     // Select 'Employment' from purpose dropdown
     await page.locator('div:has(> label:has-text("Purpose of Request")) button').click();

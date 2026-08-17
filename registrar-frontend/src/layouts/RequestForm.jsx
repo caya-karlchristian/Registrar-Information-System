@@ -16,6 +16,7 @@ import OfficeHoursNotice from '../components/OfficeHoursNotice.jsx';
 import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useMutation } from '@tanstack/react-query';
+import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 const STUDENT_ACCESS_IDS = [1, 3];
 
@@ -722,24 +723,15 @@ const RequestForm = ({ showProfileStep = false }) => {
                 {currentStep === docStep && (
                   <div className="space-y-6 animate-fadeIn">
                     {autoFilledNames.length > 0 && (
-                      <div className={`p-3 rounded-lg border text-xs ${isDark ? 'bg-[#2d3a2d] border-green-800 text-green-200' : 'bg-green-50 border-green-200 text-green-800'}`}>
-                        <strong>Auto-filled from OR #{formData.receiptNumber}</strong> — we pre-selected the
-                        document(s)/certification(s) that match your receipt. Uncheck anything that's
-                        wrong, or add more below.
-                      </div>
-                    )}
-
-                    {unresolvedItems.length > 0 && (
-                      <div className={`p-3 rounded-lg border text-xs space-y-1 ${isDark ? 'bg-[#3a2f1a] border-yellow-800 text-yellow-200' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
-                        <strong>We found these on your receipt but couldn't match them automatically:</strong>
-                        <ul className="list-disc list-inside">
-                          {unresolvedItems.map((item, i) => (
-                            <li key={i}>
-                              {item.label}{item.amount ? ` — ₱${item.amount}` : ''} (qty {item.quantity})
-                            </li>
-                          ))}
-                        </ul>
-                        <p>Please select the matching document below, or contact the registrar's office if unsure.</p>
+                      <div className={`flex items-start gap-3 p-4 rounded-xl border text-sm transition-all ${
+                        isDark
+                          ? 'bg-[#3a3b3c] border-[#4e4f50] text-[#e4e6eb]'
+                          : 'bg-white/10 border-white/20 text-white'
+                      }`}>
+                        <InformationCircleIcon className="w-5 h-5 flex-shrink-0 text-white/80 mt-0.5" />
+                        <div className="leading-relaxed">
+                          Auto-filled from <span className="text-[#FFC72C] font-semibold">OR #{formData.receiptNumber}</span> — we pre-selected the documents that match your receipt. Uncheck anything wrong, or add more below.
+                        </div>
                       </div>
                     )}
 
@@ -770,6 +762,41 @@ const RequestForm = ({ showProfileStep = false }) => {
                       required
                       options={purposeOptions}
                     />
+
+                    {unresolvedItems.length > 0 && (
+                      <div className={`p-4 rounded-xl border text-sm transition-all ${
+                        isDark
+                          ? 'bg-[#3a3b3c]/50 border-[#FFC72C]/30'
+                          : 'bg-white/5 border-[#FFC72C]/30'
+                      }`}>
+                        <div className={`flex items-center justify-between pb-3 border-b ${isDark ? 'border-[#4e4f50]/40' : 'border-white/10'}`}>
+                          <div className="flex items-center gap-2">
+                            <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 text-[#FFC72C]" />
+                            <span className="font-semibold text-white">Couldn't match automatically</span>
+                          </div>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFC72C] text-[#350e0e]">
+                            {unresolvedItems.length} {unresolvedItems.length === 1 ? 'item' : 'items'}
+                          </span>
+                        </div>
+
+                        <div className="max-h-[130px] overflow-y-auto custom-scrollbar pr-2 space-y-0">
+                          {unresolvedItems.map((item, i) => (
+                            <div key={i} className={`flex justify-between items-center py-3 border-b ${isDark ? 'border-[#4e4f50]/40' : 'border-white/10'}`}>
+                              <span className="text-[#FFC72C] font-semibold">{item.label}</span>
+                              <span className="text-white/70 text-sm">
+                                {item.amount ? `₱${parseFloat(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                                {item.amount ? ' • ' : ''}
+                                qty {item.quantity}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <p className="text-white/50 text-xs mt-3">
+                          Select the matching document below, or contact the registrar's office if unsure.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
