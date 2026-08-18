@@ -200,6 +200,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             }
 
             // Enforce allowed status transitions (see RequestStatusEnum::allowedTransitions).
+            $targetStatus = null;
             if (isset($validated['status_id'])) {
                 $currentStatus = RequestStatusEnum::from((int) $oldStatusId);
                 $targetStatus  = RequestStatusEnum::from((int) $validated['status_id']);
@@ -207,6 +208,21 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                     abort(422, "Transition from {$currentStatus->name} to {$targetStatus->name} is not allowed.");
                 }
             }
+
+            // Work Item #1 — Granular Per-Action Permissions: the FINE
+            // gate. PUT /document-requests/{id} is one endpoint that
+            // handles every status transition, so the coarse route/
+            // policy gate above (DocumentRequestPolicy::update()) can
+            // only confirm the actor has SOME dashboard write action —
+            // it cannot tell "Process" from "Complete" apart, because
+            // that depends on the target status_id, which is only known
+            // here, after the transition itself has been validated as
+            // legal. This is the check that actually stops a Student
+            // Staff account (dashboard: [View, Complete]) from setting
+            // ReadyToClaim/PendingSignature/Forfeited or editing
+            // or_number/receipt_date, even via a direct, manually
+            // crafted API call that never touches the UI.
+            $this->authorizeStatusChange($validated, $targetStatus);
 
             $documentRequest->update($validated);
 
@@ -441,6 +457,87 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         }
 
         abort(403, 'Unauthorized role.');
+    }
+
+    /**
+     * Work Item #1 — Granular Per-Action Permissions: the fine gate for
+     * PUT /document-requests/{id}, called from updateRequest() after
+     * the transition itself has already been validated as legal.
+     *
+     * Resolves which dashboard action(s) this specific call actually
+     * requires (see requiredDashboardActions()) and aborts with 403 if
+     * the acting admin's policy doesn't grant every one of them.
+     *
+     * Reads the actor off Auth::user() rather than taking a parameter —
+     * matches recordStatusHistory()'s existing Auth::id() usage in this
+     * same class, and keeps this method callable from claimRequest()'s
+     * call into updateRequest() without changing either method's
+     * public signature.
+     *
+     * Deliberately permissive for non-admin/non-SystemUser actors
+     * (console commands, the automated shredder's direct DB writes,
+     * etc.) — those either bypass this service entirely or are already
+     * gated by isStaff()/role middleware upstream. SystemUser::
+     * hasModuleAccess() itself already returns true unconditionally for
+     * super admins and for any non-admin role, so in practice this only
+     * ever restricts an ADMIN whose policy is missing the specific
+     * action a given call needs.
+     */
+    private function authorizeStatusChange(array $validated, ?RequestStatusEnum $targetStatus): void
+    {
+        $actor = Auth::user();
+
+        if (!$actor instanceof SystemUser) {
+            return;
+        }
+
+        foreach ($this->requiredDashboardActions($validated, $targetStatus) as $action) {
+            if (!$actor->hasModuleAccess('dashboard', $action)) {
+                abort(403, "Your account's assigned policy does not grant the '{$action}' action on the dashboard module.");
+            }
+        }
+    }
+
+    /**
+     * Which dashboard action(s) this update() call requires, based on
+     * what's actually in $validated — per the Work Item #1 spec:
+     *
+     *   target = Completed                                  -> Complete
+     *   target = ReadyToClaim | PendingSignature | Forfeited -> Process
+     *   or_number / receipt_date changing (any status)       -> Process
+     *
+     * Both checks apply independently and accumulate: a single call
+     * that both completes the request AND edits or_number requires
+     * BOTH 'Complete' and 'Process' — a Student Staff account (which
+     * only ever has 'Complete') is correctly blocked from smuggling a
+     * metadata edit in alongside a status change it's otherwise allowed
+     * to make. A call with no status_id and no or_number/receipt_date
+     * change (i.e. nothing this policy gates) requires nothing here.
+     *
+     * @return array<string> distinct action tokens, possibly empty
+     */
+    private function requiredDashboardActions(array $validated, ?RequestStatusEnum $targetStatus): array
+    {
+        $required = [];
+
+        if ($targetStatus !== null) {
+            $required[] = match ($targetStatus) {
+                RequestStatusEnum::Completed => 'Complete',
+                // ReadyToClaim, PendingSignature, Forfeited all require
+                // Process. Processing/Cancelled are unreachable at this
+                // point (allowedTransitions() already aborted on an
+                // illegal transition before this runs) — Process is
+                // still the safe default for them since it's the more
+                // restrictive of the two dashboard write actions.
+                default => 'Process',
+            };
+        }
+
+        if (array_key_exists('or_number', $validated) || array_key_exists('receipt_date', $validated)) {
+            $required[] = 'Process';
+        }
+
+        return array_values(array_unique($required));
     }
 
     private function recordStatusHistory(DocumentRequest $documentRequest, int $oldStatusId): void
