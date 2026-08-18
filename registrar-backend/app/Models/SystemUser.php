@@ -330,8 +330,24 @@ class SystemUser extends Authenticatable
      * - Admins: true only if their effective policy explicitly grants
      *   the module. Unknown module or no resolvable policy => false
      *   (fail closed, not fail open).
+     *
+     * Backward compatible: called with just $module (the original,
+     * pre-Work-Item-#1 signature), this answers "does this admin have
+     * ANY access to this module at all" — true as long as the granted
+     * array is non-empty, regardless of which specific action tokens
+     * it contains. Every existing call site (routes/api.php's
+     * `module:...` middleware with no action segment, other
+     * EnsureModuleAccess usages, etc.) keeps working unchanged.
+     *
+     * Work Item #1 — Granular Per-Action Permissions: pass $action
+     * (e.g. 'Process', 'Complete', 'Export') to instead require that
+     * SPECIFIC action be present in the granted array. For a module
+     * with no per-action vocabulary (see Policy::MODULE_ACTIONS),
+     * $action is normalized to 'Access' — the only token those modules
+     * ever grant — so passing an unrelated action string for such a
+     * module always resolves to false rather than silently matching.
      */
-    public function hasModuleAccess(string $module): bool
+    public function hasModuleAccess(string $module, ?string $action = null): bool
     {
         if ($this->isSuperAdmin()) {
             return true;
@@ -345,9 +361,26 @@ class SystemUser extends Authenticatable
             return false;
         }
 
-        $granted = $this->effectivePermissions()[$module] ?? null;
+        $granted = $this->effectivePermissions()[$module] ?? [];
 
-        return !empty($granted);
+        if (!is_array($granted) || empty($granted)) {
+            return false;
+        }
+
+        if ($action === null) {
+            return true;
+        }
+
+        // Modules without their own action vocabulary only ever grant
+        // the single 'Access' token — asking hasModuleAccess('profile',
+        // 'Export') should not accidentally match on a stray value, so
+        // normalize against Policy::actionsFor() rather than trusting
+        // the caller's $action verbatim.
+        if (!in_array($action, Policy::actionsFor($module), true)) {
+            return false;
+        }
+
+        return in_array($action, $granted, true);
     }
 
     // -------------------------------------------------------
