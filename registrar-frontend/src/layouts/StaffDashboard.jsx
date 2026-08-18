@@ -18,6 +18,8 @@ import DashboardDropdown from '../components/DashboardDropdown.jsx';
 import { useTheme } from '../context/ThemeContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
 import { useAlertToast } from '../context/AlertToastContext';
+import { useAuth } from '../context/AuthProvider';
+import { hasModuleAction } from '../utils/policy';
 import {
   StatCard,
   Th,
@@ -33,6 +35,7 @@ const RowActionsDropdown = ({
   req,
   viewMode,
   resolvedStatusIds,
+  canProcess = true,
   onViewDetails,
   onGenerateCert,
   onArchive,
@@ -58,7 +61,11 @@ const RowActionsDropdown = ({
     };
   }, [isOpen]);
 
-  const showGenerateCert = !req.isArchived && req.isCertificate && req.statusId === resolvedStatusIds.PENDING;
+  // Work Item #1: Generate Certificate is a prep step toward setting
+  // Ready/Awaiting-Signature — gating it behind Process keeps a
+  // Student Staff account from printing a certificate for a status
+  // change it isn't allowed to make anyway.
+  const showGenerateCert = canProcess && !req.isArchived && req.isCertificate && req.statusId === resolvedStatusIds.PENDING;
   const isUpdating = updatingId === req.id;
 
   return (
@@ -169,6 +176,17 @@ const RowActionsDropdown = ({
 const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim }) => {
   const { isDark } = useTheme();
   const { showError } = useAlertToast();
+  const { user } = useAuth();
+
+  // Work Item #1 — Granular Per-Action Permissions: UX layer only —
+  // the backend's coarse route gate + DocumentRequestService::
+  // updateRequest()'s fine-grained, target-status-dependent check are
+  // the real security boundary (see that file's authorizeStatusChange).
+  // This only ever hides a button a Student Staff account's policy
+  // wouldn't actually be allowed to use, so a direct API call is
+  // rejected server-side even though the UI never showed the option.
+  const canProcess = hasModuleAction(user, 'dashboard', 'Process');
+  const canComplete = hasModuleAction(user, 'dashboard', 'Complete');
 
   const {
     requests,
@@ -565,7 +583,11 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                   <Td center><StatusBadge status={req.statusName} /></Td>
                   <td className={`px-6 py-4 text-sm ${isDark ? 'text-[#e4e6eb]' : 'text-inherit'} w-[320px] min-w-[320px]`}>
                     <div className="flex items-center justify-end gap-2 w-full">
-                      {!req.isArchived && req.statusId === resolvedStatusIds.PENDING && (
+                      {/* Work Item #1: "Awaiting Signature" and "Ready" both set a
+                          Process-only status (PendingSignature / ReadyToClaim) —
+                          hidden entirely when the acting admin's policy lacks
+                          Process, e.g. a Student Staff account. */}
+                      {canProcess && !req.isArchived && req.statusId === resolvedStatusIds.PENDING && (
                         <button
                           disabled={updatingId === req.id}
                           onClick={() => {
@@ -594,7 +616,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                           <span>Awaiting Signature</span>
                         </button>
                       )}
-                      {(!req.isArchived && (req.statusId === resolvedStatusIds.PENDING || req.statusId === resolvedStatusIds.PENDING_SIGNATURE)) && (
+                      {canProcess && (!req.isArchived && (req.statusId === resolvedStatusIds.PENDING || req.statusId === resolvedStatusIds.PENDING_SIGNATURE)) && (
                         <button
                           disabled={updatingId === req.id}
                           onClick={() => {
@@ -620,7 +642,9 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                           <CheckCircleIcon className="w-4 h-4" /> Ready
                         </button>
                       )}
-                      {!req.isArchived && req.statusId === resolvedStatusIds.READY && (
+                      {/* Work Item #1: Done sets Completed — requires the
+                          Complete action, which Student Staff does have. */}
+                      {canComplete && !req.isArchived && req.statusId === resolvedStatusIds.READY && (
                         <button
                           disabled={updatingId === req.id}
                           onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
@@ -634,6 +658,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                         req={req}
                         viewMode={viewMode}
                         resolvedStatusIds={resolvedStatusIds}
+                        canProcess={canProcess}
                         onViewDetails={() => setSelectedRequest(req.rawRequest)}
                         onGenerateCert={() => setCertRequest(req)}
                         onArchive={() => handleArchiveOne(req.id)}

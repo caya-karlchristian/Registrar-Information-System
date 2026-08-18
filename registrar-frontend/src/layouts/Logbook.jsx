@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthProvider';
+import { hasModuleAction } from '../utils/policy';
 import { getAllLogbookData, getDocumentTypes, getCertifications } from '../services/api'; // FE-3 migration: uses getLogbookData() from API; now pages through via getAllLogbookData() since the backend endpoint is paginated
 import {
   formatMinutesDuration,
@@ -33,6 +35,17 @@ const toRows = (raw) => {
 
 const LogbookRecords = () => {
   const { isDark } = useTheme();
+  const { user } = useAuth();
+
+  // Work Item #1 — Granular Per-Action Permissions: documented as a
+  // soft/UI-only gate, not a hard security boundary — the underlying
+  // logbook data is already in the browser once the page is viewable
+  // at all, so hiding the Export button doesn't protect anything the
+  // View permission hasn't already exposed. The backend's
+  // module:logbook,Export check on the export code path exists for
+  // consistency/defense-in-depth, not because export itself discloses
+  // anything View didn't.
+  const canExport = hasModuleAction(user, 'logbook', 'Export');
   const [data, setData] = useState([]);
   const [dbDocTypes, setDbDocTypes] = useState([]);
   const [availableCertifications, setAvailableCertifications] = useState([]);
@@ -263,13 +276,17 @@ const LogbookRecords = () => {
   // Listen for voice command to export documents
   useEffect(() => {
     const handleVoiceExport = () => {
-      if (!loading && !exporting) {
+      // Work Item #1: the voice-command path bypasses the Export
+      // button entirely, so it needs its own canExport check — without
+      // this, a Student Staff account could still trigger an export
+      // by voice even with the button hidden.
+      if (!loading && !exporting && canExport) {
         handleExportDocx();
       }
     };
     window.addEventListener('voice-command-export', handleVoiceExport);
     return () => window.removeEventListener('voice-command-export', handleVoiceExport);
-  }, [loading, exporting]);
+  }, [loading, exporting, canExport]);
 
   // Convert text to Proper Case while preserving roman numerals and hyphenated parts
   const toProperCase = (value = '') => {
@@ -387,21 +404,25 @@ const LogbookRecords = () => {
                 </button>
               </div>
 
-              {/* Export button */}
-              <div className="w-full md:w-60 md:ml-auto shrink-0">
-                <button
-                  data-voice-action="export"
-                  onClick={handleExportDocx}
-                  disabled={loading || exporting || sortedData.length === 0}
-                  className={`w-full flex items-center justify-center px-3 py-3 
-                    rounded-lg text-sm font-black uppercase tracking-wide shadow 
-                    transition-colors bg-[#800000] text-white hover:bg-[#6b0000]
-                    ${isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] hover:bg-[#4e4f50]' : 
-                    'bg-[#800000] text-white hover:bg-[#6b0000]'}`}
-                >
-                  <span>{exporting ? 'Exporting…' : 'Export DOCX'}</span>
-                </button>
-              </div>
+              {/* Export button — Work Item #1: hidden (not just disabled) when
+                  the policy lacks Export, since this is documented as a soft/
+                  UI-only gate rather than a hard boundary. */}
+              {canExport && (
+                <div className="w-full md:w-60 md:ml-auto shrink-0">
+                  <button
+                    data-voice-action="export"
+                    onClick={handleExportDocx}
+                    disabled={loading || exporting || sortedData.length === 0}
+                    className={`w-full flex items-center justify-center px-3 py-3 
+                      rounded-lg text-sm font-black uppercase tracking-wide shadow 
+                      transition-colors bg-[#800000] text-white hover:bg-[#6b0000]
+                      ${isDark ? 'bg-[#3a3b3c] text-[#e4e6eb] hover:bg-[#4e4f50]' : 
+                      'bg-[#800000] text-white hover:bg-[#6b0000]'}`}
+                  >
+                    <span>{exporting ? 'Exporting…' : 'Export DOCX'}</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
