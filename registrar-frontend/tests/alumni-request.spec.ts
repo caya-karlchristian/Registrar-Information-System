@@ -35,7 +35,7 @@ test.describe('Alumni Request Form E2E Tests', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
-          { document_type_id: 1, document_name: 'Transcript of Records', access_id: 1, document_requirements: 'Dummy requirements' },
+          { document_type_id: 1, document_name: 'Transcript of Records', access_id: 3, document_requirements: 'Dummy requirements' },
           { document_type_id: 2, document_name: 'Honorable Dismissal', access_id: 3, document_requirements: 'Dummy requirements' }
         ]),
       });
@@ -95,7 +95,33 @@ test.describe('Alumni Request Form E2E Tests', () => {
       }
     });
 
-    // 7. Mock form submission POST endpoint
+    // 7. Mock the OR-first verify-or step — hit before Documents now (see
+    // useAlumniRequest.js's orStep/docStep reorder). The mutation's onSuccess
+    // reads response.data.suggestions.{documents,certificates,unresolved}
+    // and uses each suggested document_type_id to look up a name from the
+    // already-mocked /api/document-types list above, so this id must
+    // match one of those (2 = 'Honorable Dismissal').
+    await page.route('**/api/document-requests/verify-or', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          valid: true,
+          is_mock: true,
+          suggestions: {
+            documents: [{ document_type_id: 2, number_of_copies: 1 }],
+            certificates: [],
+            unresolved: [
+              { label: 'CAV/Apostille (DFA) - undergraduate', amount: '620.00', quantity: 1 },
+              { label: 'CAV/Apostille (DFA) with Special Certification', amount: '1070.00', quantity: 1 },
+              { label: 'Additional Unresolved Document', amount: '150.00', quantity: 2 }
+            ],
+          },
+        }),
+      });
+    });
+
+    // 8. Mock form submission POST endpoint
     await page.route('**/api/document-requests', async (route) => {
       if (route.request().method() === 'POST') {
         await route.fulfill({
@@ -120,33 +146,52 @@ test.describe('Alumni Request Form E2E Tests', () => {
     // --- STEP 1: TERMS & CONDITIONS ---
     await expect(page.getByText('In compliance with the Data Privacy Act (DPA) of 2012')).toBeVisible();
 
-    // Check agreement and click Next
+    // Attempting to click Next without agreeing to terms should display an error
+    await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.getByText('You must read and agree to the Terms & Conditions to proceed.')).toBeVisible();
+
+    // Check agreement checkbox
     await page.locator('input[name="termsAgreed"]').check();
     await page.getByRole('button', { name: 'Next' }).click();
 
-    // --- STEP 2: ALUMNI REQUEST (Document & Purpose Selection) ---
+    // --- STEP 2: OFFICIAL RECEIPT VERIFICATION ---
+    // Moved ahead of Documents (OR-first wizard reorder) — clicking Next
+    // here calls handleVerifyOr(), which POSTs to verify-or and only
+    // advances on a successful match (mocked above).
+    await page.getByPlaceholder('XXXXXXX').fill('7654321');
+
+    const today = new Date().toISOString().split('T')[0];
+    await page.locator('input[name="dateOfPayment"]').fill(today);
+
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    // --- STEP 3: ALUMNI REQUEST (Document & Purpose Selection) ---
     await expect(page.getByText('Documents Requested')).toBeVisible();
 
-    // Select 'Honorable Dismissal' from multi-select dropdown
-    const docDropdown = page.locator('div:has(> label:has-text("Documents Requested")) input');
-    await docDropdown.click();
-    await page.getByRole('button', { name: 'Honorable Dismissal', exact: true }).click();
-    await page.locator('div:has(> label:has-text("Documents Requested")) .cursor-pointer.pr-1').click(); // Close
+    // 'Honorable Dismissal' should already be selected — auto-filled
+    // from the verify-or suggestion above — so just confirm the
+    // auto-fill banner and the pill are present rather than re-selecting.
+    await expect(page.getByText(/Auto-filled from OR #7654321/)).toBeVisible();
+    await expect(page.getByText('Honorable Dismissal', { exact: true })).toBeVisible();
+
+    // Verify the "Couldn't match automatically" unresolved items box at the bottom
+    await expect(page.getByText("Couldn't match automatically")).toBeVisible();
+    await expect(page.getByText("3 items")).toBeVisible();
+    await expect(page.getByText("CAV/Apostille (DFA) - undergraduate")).toBeVisible();
+    await expect(page.getByText("₱620.00 • qty 1")).toBeVisible();
+    await expect(page.getByText("CAV/Apostille (DFA) with Special Certification")).toBeVisible();
+    await expect(page.getByText("₱1,070.00 • qty 1")).toBeVisible();
+    await expect(page.getByText("Additional Unresolved Document")).toBeVisible();
+    await expect(page.getByText("₱150.00 • qty 2")).toBeVisible();
+    await expect(page.getByText("Select the matching document below, or contact the registrar's office if unsure.")).toBeVisible();
 
     // Select 'Employment' from purpose dropdown
     await page.locator('div:has(> label:has-text("Purpose of Request")) button').click();
     await page.getByRole('button', { name: 'Employment', exact: true }).click();
     await page.getByRole('button', { name: 'Next' }).click();
 
-    // --- STEP 3: PAYMENT AND DOCUMENT DETAILS ---
-    await expect(page.getByRole('heading', { name: 'Payment and Document Details' })).toBeVisible();
-
-    // Fill in OR Number (exactly 7 digits)
-    await page.getByPlaceholder('XXXXXXX').fill('7654321');
-
-    // Fill in Date of Payment (today's date)
-    const today = new Date().toISOString().split('T')[0];
-    await page.locator('input[name="dateOfPayment"]').fill(today);
+    // --- STEP 4: NUMBER OF COPIES & CLAIM TICKET ---
+    await expect(page.getByText('Number of copies per document')).toBeVisible();
 
     // Click Submit
     await page.getByRole('button', { name: 'Submit' }).click();

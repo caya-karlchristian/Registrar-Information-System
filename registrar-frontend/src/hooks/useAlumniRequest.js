@@ -1,15 +1,16 @@
 import { useState, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useReferenceData } from "../context/ReferenceDataContext";
-import { createDocumentRequest } from "../services/api";
+import { createDocumentRequest, verifyOfficialReceipt } from "../services/api";
 import { DOC_TYPE_MAP, CERTIFICATION_MAP } from "../utils/constants";
 import {
   ALUMNI_ACCESS_IDS,
   validateProfileStep,
   validateRequestDetailsStep,
   validateTORStep,
-  validateReceiptStep,
+  getDateDaysAgo,
 } from "../utils/alumniRequestUtils";
+import { getTodayDate } from "../utils/helpers";
 
 export const useAlumniRequest = ({ showProfileStep = false }) => {
   const {
@@ -27,6 +28,17 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   // See RequestForm.jsx's identical claimTicket state — only the two
   // fields ClaimTicket needs, not the whole created request.
   const [claimTicket, setClaimTicket] = useState(null);
+
+  // OR-first wizard: populated once verifyOfficialReceipt() succeeds.
+  // unresolvedItems holds receipt lines the suggester couldn't match to
+  // any document/certificate type — surfaced so they're never silently
+  // dropped. autoFilledNames tags which currently-selected
+  // documents/certifications came from the suggestion (vs. the alumni
+  // picking them manually) purely for the "Auto-filled from OR #..."
+  // badge; it does not gate anything server-side — final submit
+  // re-verifies from scratch regardless of how an item got onto the form.
+  const [unresolvedItems, setUnresolvedItems] = useState([]);
+  const [autoFilledNames, setAutoFilledNames] = useState([]);
 
   const availableDocs = useMemo(() => {
     return documentTypes.filter((doc) => ALUMNI_ACCESS_IDS.includes(doc.access_id));
@@ -112,7 +124,103 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     return doc.toLowerCase().includes("certif");
   });
 
-  const finalStep = showProfileStep ? (hasTOR ? 5 : 4) : (hasTOR ? 4 : 3);
+  // OR-first step ordering (mirrors RequestForm.jsx):
+  //   1: Terms & Conditions
+  //   2 (or 3 with profile): Official Receipt Verification
+  //   3 (or 4 with profile): Alumni Request (Document & Purpose Selection)
+  //   4 (or 5 with profile, only if hasTOR): TOR Requirements
+  //   last: Number of Copies & Claim Ticket
+  const orStep = showProfileStep ? 3 : 2;
+  const docStep = showProfileStep ? 4 : 3;
+  const finalStep = showProfileStep
+    ? (hasTOR ? 6 : 5)
+    : (hasTOR ? 5 : 4);
+
+  // --- OR Verification Mutation ---
+  const verifyOrMutation = useMutation({
+    mutationFn: verifyOfficialReceipt,
+    onSuccess: (response) => {
+      const suggestions = response?.data?.suggestions ?? { documents: [], certificates: [], unresolved: [] };
+
+      const suggestedDocNames = [];
+      const suggestedCertNames = [];
+      const newDocCopies = {};
+      const newCertCopies = {};
+
+      (suggestions.documents || []).forEach((doc) => {
+        // Prefer the name from the live reference-data list (availableDocs)
+        // over whatever the backend echoed back — they should always agree
+        // since both come from the same document_type table, but this
+        // guards against staleness between the two requests, and it's what
+        // documentOptions/MultiSelectDropdown expects to match against.
+        const known = availableDocs.find((d) => d.document_type_id === doc.document_type_id);
+        const name = known?.document_name ?? doc.document_name;
+        if (!name) return;
+        suggestedDocNames.push(name);
+        newDocCopies[name] = doc.number_of_copies || 1;
+      });
+
+      (suggestions.certificates || []).forEach((cert) => {
+        const known = availableCertifications.find((c) => c.certificate_type_id === cert.certificate_type_id);
+        const name = known?.certificate_name ?? cert.certificate_name;
+        if (!name) return;
+        suggestedCertNames.push(name);
+        newCertCopies[name] = cert.number_of_copies || 1;
+      });
+
+      setFormData((prev) => ({
+        ...prev,
+        // Merge rather than replace: if the alumni goes Back and forward
+        // again after manually adding something, a re-verify shouldn't
+        // wipe out a manual pick — everything here is still fully
+        // editable on the next step regardless of how it got added.
+        documentsRequested: Array.from(new Set([...(prev.documentsRequested || []), ...suggestedDocNames])),
+        certification: Array.from(new Set([...(prev.certification || []), ...suggestedCertNames])),
+        documentCopies: { ...prev.documentCopies, ...newDocCopies },
+        certCopies: { ...prev.certCopies, ...newCertCopies },
+      }));
+
+      setAutoFilledNames([...suggestedDocNames, ...suggestedCertNames]);
+      setUnresolvedItems(suggestions.unresolved || []);
+      setErrorMessage("");
+      setCurrentStep((s) => s + 1);
+    },
+    onError: (error) => {
+      console.error("OR verification error:", error.response?.data || error);
+      setErrorMessage(
+        error.response?.data?.message
+        || "We couldn't verify that Official Receipt. Please check the details and try again."
+      );
+    },
+  });
+
+  const handleVerifyOr = () => {
+    if (!(formData.receiptNumber || '').trim()) {
+      setErrorMessage("Please enter the Official Receipt Number.");
+      return;
+    }
+
+    if (!/^\d{7}$/.test((formData.receiptNumber || '').trim())) {
+      setErrorMessage("Official Receipt Number must be exactly 7 digits.");
+      return;
+    }
+
+    if (!formData.dateOfPayment) {
+      setErrorMessage("Please select the date of payment.");
+      return;
+    }
+
+    if (formData.dateOfPayment < getDateDaysAgo(7) || formData.dateOfPayment > getTodayDate()) {
+      setErrorMessage("Date of payment must be within the last 7 days up to today.");
+      return;
+    }
+
+    setErrorMessage("");
+    verifyOrMutation.mutate({
+      or_number: formData.receiptNumber.trim(),
+      receipt_date: formData.dateOfPayment,
+    });
+  };
 
   const nextStep = (e) => {
     if (e) e.preventDefault();
@@ -131,7 +239,17 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
       }
     }
 
-    if (currentStep === (showProfileStep ? 3 : 2)) {
+    // OR-verification step: don't just advance — verify against the
+    // cashier API first (see handleVerifyOr). Advancing on success/failure
+    // is handled entirely inside that function via the mutation's
+    // callbacks, so we return here rather than falling through to the
+    // plain setCurrentStep increment below.
+    if (currentStep === orStep) {
+      handleVerifyOr();
+      return;
+    }
+
+    if (currentStep === docStep) {
       const detailsError = validateRequestDetailsStep(formData, showCertificationDropdown);
       if (detailsError) {
         setErrorMessage(detailsError);
@@ -139,7 +257,9 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
       }
     }
 
-    if (currentStep === (showProfileStep ? 4 : 3) && hasTOR) {
+    // TOR step validation (only present when hasTOR is true)
+    const torStepNum = showProfileStep ? 5 : 4;
+    if (currentStep === torStepNum && hasTOR) {
       const torError = validateTORStep(formData, hasTOR);
       if (torError) {
         setErrorMessage(torError);
@@ -164,9 +284,19 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     if (e) e.preventDefault();
     setErrorMessage("");
 
-    const receiptError = validateReceiptStep(formData);
-    if (receiptError) {
-      setErrorMessage(receiptError);
+    // OR Number / Date of Payment are validated and verified against the
+    // cashier API earlier now (see handleVerifyOr, triggered when leaving
+    // the OR-verification step) — this final step only has copies left
+    // to check before confirming.
+    const hasInvalidDocCopy = formData.documentsRequested
+      .filter((doc) => !doc.toLowerCase().includes("certif"))
+      .some((doc) => {
+        const copies = Number(formData.documentCopies[doc] || 1);
+        return !Number.isInteger(copies) || copies < 1 || copies > 10;
+      });
+
+    if (hasInvalidDocCopy) {
+      setErrorMessage("Number of copies must be between 1 and 10.");
       return;
     }
 
@@ -256,9 +386,13 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     });
     setErrorMessage("");
     mutation.reset();
+    verifyOrMutation.reset();
+    setUnresolvedItems([]);
+    setAutoFilledNames([]);
   };
 
   const isLoading = mutation.isPending;
+  const isVerifyingOr = verifyOrMutation.isPending;
 
   const certificationOptions =
     availableCertifications.length > 0
@@ -275,32 +409,43 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
       ? availableDocs.map((d) => d.document_name)
       : Object.values(DOC_TYPE_MAP);
 
+  // Step labels mirror the RequestForm.jsx ordering:
+  // 1: Terms & Conditions
+  // (optional) 2: Alumni Profile
+  // OR Verification
+  // Alumni Request (Document & Purpose Selection)
+  // (conditional) TOR Requirements
+  // Number of Copies & Claim Ticket
   const stepLabels = showProfileStep
     ? hasTOR
       ? [
           "Terms & Conditions",
           "Alumni Profile",
+          "Official Receipt Verification",
           "Alumni Request",
           "TOR Requirements",
-          "Payment and Document Details",
+          "Number of Copies & Claim Ticket",
         ]
       : [
           "Terms & Conditions",
           "Alumni Profile",
+          "Official Receipt Verification",
           "Alumni Request",
-          "Payment and Document Details",
+          "Number of Copies & Claim Ticket",
         ]
     : hasTOR
     ? [
         "Terms & Conditions",
+        "Official Receipt Verification",
         "Alumni Request",
         "TOR Requirements",
-        "Payment and Document Details",
+        "Number of Copies & Claim Ticket",
       ]
     : [
         "Terms & Conditions",
+        "Official Receipt Verification",
         "Alumni Request",
-        "Payment and Document Details",
+        "Number of Copies & Claim Ticket",
       ];
 
   const totalSteps = stepLabels.length;
@@ -326,6 +471,7 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     handleSubmit,
     handleConfirm,
     isLoading,
+    isVerifyingOr,
     availableDocs,
     availableCertifications,
     certificationOptions,
@@ -337,5 +483,9 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     showCertificationDropdown,
     certificationLabel,
     finalStep,
+    orStep,
+    docStep,
+    unresolvedItems,
+    autoFilledNames,
   };
 };
