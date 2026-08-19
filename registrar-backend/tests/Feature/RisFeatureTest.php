@@ -23,6 +23,11 @@ uses(RefreshDatabase::class);
 function makeUser(int $roleId): SystemUser
 {
     $user = SystemUser::factory()->create(['role_id' => $roleId, 'status' => 'Activated']);
+
+    // See tests/Pest.php::grantFullDashboardAccess() — a plain admin has
+    // zero dashboard access without an attached policy since Work Item #1.
+    grantFullDashboardAccess($user);
+
     Sanctum::actingAs($user);
     return $user;
 }

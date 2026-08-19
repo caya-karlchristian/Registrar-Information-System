@@ -16,6 +16,14 @@ uses(RefreshDatabase::class);
 function claimMakeUser(int $roleId): SystemUser
 {
     $user = SystemUser::factory()->create(['role_id' => $roleId, 'status' => 'Activated']);
+
+    // See tests/Pest.php::grantFullDashboardAccess() — claimRequest()
+    // delegates into updateRequest() targeting Completed, which requires
+    // the dashboard 'Complete' action (the route also gates on
+    // module:dashboard,Complete), and a plain admin has zero dashboard
+    // access without an attached policy since Work Item #1.
+    grantFullDashboardAccess($user);
+
     Sanctum::actingAs($user);
     return $user;
 }
