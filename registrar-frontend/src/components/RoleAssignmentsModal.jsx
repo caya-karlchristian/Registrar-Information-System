@@ -2,26 +2,41 @@ import { useState, useEffect, useCallback } from "react";
 import { XMarkIcon, IdentificationIcon, PlusIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../context/ThemeContext";
 import DropDown from "./DropDown";
-import { getRoleAssignments, grantRoleAssignment, revokeRoleAssignment } from "../services/api";
+import {
+  getRoleAssignments,
+  grantRoleAssignment,
+  revokeRoleAssignment,
+  editRoleAssignmentPolicy,
+} from "../services/api";
 
 /**
- * RoleAssignmentsModal — User Management: "Roles" tab
+ * RoleAssignmentsModal — User Management: "Manage Roles"
  * -----------------------------------------------------
  * Super-Admin-only view of one user's full role_assignments history
  * (GET /role-assignments?user_id=), plus the actions to grant a new,
- * concurrent role (POST /role-assignments) or revoke an existing Active
- * one (POST /role-assignments/{id}/revoke — reason required).
+ * concurrent role (POST /role-assignments), revoke an existing Active
+ * one (POST /role-assignments/{id}/revoke — reason required), and — as
+ * of Work Item #2 — Admin Management Consolidation — edit the policy on
+ * an Active Admin-role assignment in place (PATCH
+ * /role-assignments/{id}/policy), without a revoke/regrant cycle.
  *
- * This is the "student staff" onboarding/offboarding surface: a person
- * can hold more than one Active assignment at once (e.g. Student +
- * a restricted Admin), and revoking one leaves the others untouched —
- * see RoleAssignmentService::grant()/revoke() on the backend.
+ * This is now the ONE place an admin's role + policy is managed from
+ * the UI. The old "Manage Access" modal (PolicyModal, PATCH
+ * /system-users/{id}/policy) has been removed entirely — role_assignments
+ * is the single source of truth, and this modal is its single editing
+ * surface.
+ *
+ * This is also the "student staff" onboarding/offboarding surface: a
+ * person can hold more than one Active assignment at once (e.g. Student
+ * + a restricted Admin), and revoking one leaves the others untouched —
+ * see RoleAssignmentService::grant()/revoke()/editPolicy() on the
+ * backend.
  *
  * Deliberately its own modal rather than a literal in-page tab: this
  * page is a paginated table of many users, so "manage this one user's
- * roles" fits the same per-row-modal pattern already used for Manage
- * Access (PolicyModal) and break-glass (LocalPasswordModal), rather
- * than restructuring the whole page around tabs.
+ * roles" fits the same per-row-modal pattern already used for
+ * break-glass (LocalPasswordModal), rather than restructuring the
+ * whole page around tabs.
  */
 
 // Mirrors SystemUser::ROLE_* — includes Student/Alumni (not just the
@@ -31,6 +46,12 @@ const ROLE_NAME_MAP = { 1: "Student", 2: "Alumni", 3: "Admin", 4: "Super Admin" 
 const ROLE_ID_BY_NAME = { Student: 1, Alumni: 2, Admin: 3, "Super Admin": 4 };
 const GRANTABLE_ROLE_NAMES = ["Student", "Alumni", "Admin", "Super Admin"];
 const ADMIN_ROLE_ID = 3;
+
+// The DropDown component only deals in plain strings, so "detach the
+// policy" (send policy_id: null — see EditRoleAssignmentPolicyRequest,
+// nullable by design) needs an explicit, selectable option rather than
+// an empty/blank value.
+const NO_POLICY_LABEL = "No Policy";
 
 const formatDateTime = (value) => {
   if (!value) return "—";
@@ -80,6 +101,13 @@ const RoleAssignmentsModal = ({
   const [revokeReason, setRevokeReason] = useState("");
   const [revoking, setRevoking] = useState(false);
 
+  // In-place policy edit (Work Item #2) — only ever targets an
+  // Active, Admin-role assignment (see ADMIN_ROLE_ID gating below and
+  // RoleAssignmentService::editPolicy()'s own server-side guard).
+  const [editPolicyTarget, setEditPolicyTarget] = useState(null);
+  const [editPolicyValue, setEditPolicyValue] = useState("");
+  const [editingPolicy, setEditingPolicy] = useState(false);
+
   // user.full_name comes from GrantableUserResource when this modal is
   // opened via GrantRoleUserPicker; the admin_profile shape is what
   // UserManagement.jsx's own table rows already carry. Checking
@@ -111,6 +139,8 @@ const RoleAssignmentsModal = ({
       setGrantForm(EMPTY_GRANT_FORM);
       setRevokeTarget(null);
       setRevokeReason("");
+      setEditPolicyTarget(null);
+      setEditPolicyValue("");
     }
   }, [isOpen, user, fetchAssignments]);
 
@@ -176,6 +206,45 @@ const RoleAssignmentsModal = ({
       setLocalError(err.response?.data?.message || "Failed to revoke role assignment.");
     } finally {
       setRevoking(false);
+    }
+  };
+
+  const handleOpenEditPolicy = (assignment) => {
+    setEditPolicyTarget(assignment);
+    setEditPolicyValue(assignment.policy?.name || NO_POLICY_LABEL);
+    setRevokeTarget(null);
+    setShowGrantForm(false);
+    setLocalError("");
+  };
+
+  const handleConfirmEditPolicy = async () => {
+    if (!editPolicyTarget) return;
+
+    setLocalError("");
+    setEditingPolicy(true);
+    try {
+      const policy = systemPolicies.find((p) => p.name === editPolicyValue);
+      // NO_POLICY_LABEL (or anything that doesn't match a real policy)
+      // maps to null — an explicit detach, not "leave unchanged"; see
+      // EditRoleAssignmentPolicyRequest's nullable rule on the backend.
+      await editRoleAssignmentPolicy(editPolicyTarget.id, policy ? policy.policy_id : null);
+
+      onSuccess(
+        policy
+          ? `Policy updated to "${policy.name}" for ${fullName}.`
+          : `Policy detached for ${fullName}.`
+      );
+      setEditPolicyTarget(null);
+      setEditPolicyValue("");
+      await fetchAssignments();
+    } catch (err) {
+      const message = err.response?.data?.message
+        || err.response?.data?.errors?.policy_id?.[0]
+        || err.response?.data?.errors?.role_id?.[0]
+        || "Failed to update policy.";
+      setLocalError(message);
+    } finally {
+      setEditingPolicy(false);
     }
   };
 
@@ -264,15 +333,32 @@ const RoleAssignmentsModal = ({
                     </div>
 
                     {assignment.status === "Active" && (
-                      <button
-                        type="button"
-                        onClick={() => { setRevokeTarget(assignment); setRevokeReason(""); setLocalError(""); }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0 ${
-                          isDark ? "bg-red-950/30 text-red-400 hover:bg-red-950/50" : "bg-red-100 text-red-700 hover:bg-red-200"
-                        }`}
-                      >
-                        Revoke
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Only Admin-role assignments carry a policy —
+                            matches RoleAssignmentService::editPolicy()'s
+                            server-side guard (Student/Alumni/Super Admin
+                            assignments aren't policy-gated). */}
+                        {assignment.role_id === ADMIN_ROLE_ID && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditPolicy(assignment)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                              isDark ? "bg-[#0f213d] text-[#5c93e6] hover:bg-[#16305a]" : "bg-[#e0f2fe] text-[#0369a1] hover:bg-[#bae6fd]"
+                            }`}
+                          >
+                            Edit Policy
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { setRevokeTarget(assignment); setRevokeReason(""); setEditPolicyTarget(null); setShowGrantForm(false); setLocalError(""); }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                            isDark ? "bg-red-950/30 text-red-400 hover:bg-red-950/50" : "bg-red-100 text-red-700 hover:bg-red-200"
+                          }`}
+                        >
+                          Revoke
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -344,13 +430,58 @@ const RoleAssignmentsModal = ({
           ) : (
             <button
               type="button"
-              onClick={() => { setShowGrantForm(true); setLocalError(""); }}
+              onClick={() => { setShowGrantForm(true); setRevokeTarget(null); setEditPolicyTarget(null); setLocalError(""); }}
               className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border border-dashed transition-colors ${
                 isDark ? "border-[#3e4042] text-[#b0b3b8] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]" : "border-gray-300 text-gray-600 hover:bg-gray-50"
               }`}
             >
               <PlusIcon className="w-4 h-4" /> Grant a role
             </button>
+          )}
+
+          {/* Inline edit-policy panel — Work Item #2. In-place swap on
+              an already-Active Admin grant; no revoke/regrant cycle, so
+              no forced re-login (see RoleAssignmentService::editPolicy()
+              on the backend for why that distinction matters). */}
+          {editPolicyTarget && (
+            <div className={`rounded-xl p-4 border space-y-4 ${isDark ? "border-[#3e4042] bg-[#1c1c1e]" : "border-gray-200 bg-gray-50"}`}>
+              <div>
+                <p className="text-sm font-semibold">Edit policy for {fullName}</p>
+                <p className={`text-xs mt-1 ${isDark ? "text-[#9a9a9a]" : "text-gray-500"}`}>
+                  Takes effect immediately — no re-login required.
+                </p>
+              </div>
+
+              <DropDown
+                label="Policy"
+                name="editPolicy"
+                value={editPolicyValue}
+                onChange={(e) => setEditPolicyValue(e.target.value)}
+                options={[NO_POLICY_LABEL, ...systemPolicies.map((p) => p.name)]}
+                required
+                labelColor={isDark ? "text-[#b0b3b8]" : "text-gray-600"}
+              />
+
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setEditPolicyTarget(null); setEditPolicyValue(""); setLocalError(""); }}
+                  className={`px-4 py-2 text-sm font-semibold transition-colors ${isDark ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-800"}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmEditPolicy}
+                  disabled={editingPolicy}
+                  className={`px-5 py-2 rounded-full text-sm font-bold transition-all shadow disabled:opacity-60 ${
+                    isDark ? "bg-yellow-400 text-black hover:bg-yellow-500" : "bg-pup-dark-maroon text-white hover:bg-[#3a0303]"
+                  }`}
+                >
+                  {editingPolicy ? "Saving..." : "Save Policy"}
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Inline revoke confirmation — matches the reject-reason

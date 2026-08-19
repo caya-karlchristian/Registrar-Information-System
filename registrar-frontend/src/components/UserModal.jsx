@@ -43,10 +43,16 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
         last_name: profile.last_name || "",
         suffix: profile.suffix || "",
         email: editData.email || "",
-        role: ID_TO_ROLE[editData.role_id] || "Admin",
+        // Role is read-only on edit (rendered directly from editData
+        // below, not from `form`) — kept out of the edit payload entirely.
+        // Work Item #2 — Admin Management Consolidation: role_assignments
+        // is now the only place a role change happens (grant/revoke via
+        // RoleAssignmentsModal), never through this form.
+        role: "Admin",
         status: editData.status || "Activated",
-        // Editing an existing user's policy still goes through "Manage
-        // Access" (PolicyModal) — this modal only sets it at creation time.
+        // Policy attachment is create-only — editing an existing admin's
+        // policy now goes through RoleAssignmentsModal's in-place policy
+        // editor (PATCH /role-assignments/{id}/policy), not this form.
         policy: "",
       });
     } else {
@@ -68,7 +74,6 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
         form.last_name !== (profile.last_name || "") ||
         form.suffix !== (profile.suffix || "") ||
         form.email !== (editData.email || "") ||
-        form.role !== (ID_TO_ROLE[editData.role_id] || "Admin") ||
         form.status !== (editData.status || "Activated")
       );
     }
@@ -115,14 +120,16 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
       }
     }
 
-    // Build payload — map role name back to role_id for the API.
-    // Status is never sent on create — the server always sets it to
-    // "Pending Activation" (AdminUserService::create()). On edit it's
-    // still sent, since Activated/Deactivated toggling is a normal part
-    // of managing an already-linked account.
+    // Build payload. Identity fields are common to both, but role_id is
+    // deliberately create-only — Work Item #2 — Admin Management
+    // Consolidation retired role_id from UpdateSystemUserRequest
+    // entirely, so an edit payload must never carry it. Status is
+    // never sent on create — the server always sets it to "Pending
+    // Activation" (AdminUserService::create()) — but is sent on edit,
+    // since Activated/Deactivated toggling is a normal part of managing
+    // an already-linked account.
     const payload = {
       email: form.email,
-      role_id: ROLE_TO_ID[form.role],
       first_name: form.first_name,
       middle_name: form.middle_name || undefined,
       last_name: form.last_name,
@@ -131,14 +138,17 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
 
     if (isEdit) {
       payload.status = form.status;
-    }
+    } else {
+      payload.role_id = ROLE_TO_ID[form.role];
 
-    // Policy attachment only applies to new admins (role_id 3) — super
-    // admins always have full access, and editing an existing user's
-    // policy goes through the separate "Manage Access" flow instead.
-    if (!isEdit && form.role === "Admin" && form.policy) {
-      const policy = systemPolicies.find((p) => p.name === form.policy);
-      if (policy) payload.policy_id = policy.policy_id;
+      // Policy attachment only applies to new admins (role_id 3) — super
+      // admins always have full access, and an existing admin's policy
+      // is now only ever changed via RoleAssignmentsModal's in-place
+      // policy editor, not this form.
+      if (form.role === "Admin" && form.policy) {
+        const policy = systemPolicies.find((p) => p.name === form.policy);
+        if (policy) payload.policy_id = policy.policy_id;
+      }
     }
 
     onSubmit?.(payload, editData?.user_id);
@@ -212,16 +222,33 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
                 </div>
               )}
 
-              {/* Role — always shown. Status is edit-only (above); on
-                  create it's always server-set to "Pending Activation". */}
-              <div className="grid grid-cols-2 gap-3">
-                <DropDown label="Role" name="role" value={form.role}
-                  onChange={handleChange} options={ROLE_OPTIONS} required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
-              </div>
+              {/* Role — editable on create only. On edit it's shown
+                  read-only for context; changing it happens exclusively
+                  through "Manage Roles" (RoleAssignmentsModal) now — see
+                  Work Item #2 — Admin Management Consolidation. */}
+              {isEdit ? (
+                <div>
+                  <span className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                    Role
+                  </span>
+                  <div className={`px-3 py-3 rounded-lg text-sm font-medium border ${isDark ? 'bg-[#1f1f1f] border-[#3e4042] text-[#9a9a9a]' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                    {ID_TO_ROLE[editData?.role_id] || `Role ${editData?.role_id}`}
+                  </div>
+                  <p className={`text-xs mt-1 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
+                    To change this user&apos;s role, use Manage Roles instead.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <DropDown label="Role" name="role" value={form.role}
+                    onChange={handleChange} options={ROLE_OPTIONS} required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
+                </div>
+              )}
 
               {/* Policy attachment — new admins only. Super admins have
-                  full access by default, and existing admins already have
-                  a dedicated "Manage Access" action for this. */}
+                  full access by default, and an existing admin's policy
+                  is now only ever changed via RoleAssignmentsModal's
+                  in-place policy editor. */}
               {!isEdit && form.role === "Admin" && (
                 <div>
                   <DropDown
@@ -233,7 +260,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
                     labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
                   />
                   <p className={`text-xs mt-1 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
-                    Optional — determines which modules this admin can access. Leave blank to attach one later from Manage Access.
+                    Optional — determines which modules this admin can access. Leave blank to attach one later from Manage Roles.
                   </p>
                 </div>
               )}

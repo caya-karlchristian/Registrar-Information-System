@@ -43,11 +43,6 @@ export const createSystemUser = (data)    => api.post("/system-users", data);
 export const updateSystemUser = (id, data)=> api.put(`/system-users/${id}`, data);
 export const deleteSystemUser = (id)      => api.delete(`/system-users/${id}`);
 
-// User Management — Policy Attachment (Super Admin only).
-// Attaching `null` detaches the currently-assigned policy from the admin.
-export const attachUserPolicy = (userId, policyId) =>
-  api.patch(`/system-users/${userId}/policy`, { policy_id: policyId });
-
 // -------------------------------------------------------
 // LOCAL (BREAK-GLASS) AUTH (Super Admin only)
 // -------------------------------------------------------
@@ -96,6 +91,17 @@ export const rejectAccessRequest  = (id, reason)   => api.post(`/access-requests
 export const getRoleAssignments   = (params = {}) => api.get("/role-assignments", { params });
 export const grantRoleAssignment  = (data)         => api.post("/role-assignments", data);
 export const revokeRoleAssignment = (id, reason)   => api.post(`/role-assignments/${id}/revoke`, { reason });
+
+// PATCH /role-assignments/{id}/policy — Work Item #2 — Admin Management
+// Consolidation. Edits the policy on an already-Active Admin
+// role_assignment in place, without a revoke/regrant cycle. This is the
+// ONLY remaining way to change an admin's policy from the UI — it
+// replaces the retired PATCH /system-users/{id}/policy ("Manage
+// Access") endpoint entirely. Sending `null` detaches the policy (see
+// EditRoleAssignmentPolicyRequest — nullable is intentional, fail-closed
+// server-side).
+export const editRoleAssignmentPolicy = (id, policyId) =>
+  api.patch(`/role-assignments/${id}/policy`, { policy_id: policyId });
 
 // GET /role-assignments/search-users?q= — typeahead lookup across ALL
 // roles (student/alumni/admin/super admin), used by GrantRoleUserPicker

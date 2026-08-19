@@ -24,25 +24,28 @@ import {
   updateSystemUser,
   deleteSystemUser,
   getPolicies,
-  attachUserPolicy,
   setLocalPassword
 } from "../services/api";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import { useTheme } from "../context/ThemeContext";
 import { UserTableSkeleton } from '../components/LoadingSkeleton';
-import PolicyModal from "../components/PolicyModal";
 import DashboardDropdown from "../components/DashboardDropdown.jsx";
 import { formatName } from "../utils/formatters";
 
 /**
- * UserManagement — User Management: Policy Attachment
+ * UserManagement — Admin Accounts
  * -----------------------------------------------------
- * "Policy attached" and "Access" columns show each admin's real,
- * server-persisted policy (users.policy_id — see PolicyService and
- * SystemUserController::attachPolicy()). The "Attach policy" modal
- * (PolicyModal) now saves through PATCH /system-users/{id}/policy
- * instead of localStorage.
+ * Work Item #2 — Admin Management Consolidation: role_assignments is
+ * the single source of truth for an admin's role + policy.
+ * users.policy_id (shown read-only in the "Policy attached" column) is
+ * a live read path for the common case of a session that never
+ * switched roles — see RoleAssignmentService::editPolicy()'s docblock
+ * on the backend for why that column still matters — but it is no
+ * longer directly editable from here. The "Manage Access" modal
+ * (PolicyModal / PATCH /system-users/{id}/policy) has been removed
+ * entirely; granting, revoking, and now editing a policy in place all
+ * happen through "Manage Roles" (RoleAssignmentsModal).
  */
 const ROLE_MAP     = { 3: "Admin", 4: "Super Admin" };
 const ROLE_FILTERS = ["All", "Admin", "Super Admin"];
@@ -136,11 +139,6 @@ const UserManagement = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Manage Access states
-  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
-  const [selectedUserForAccess, setSelectedUserForAccess] = useState(null);
-  const [accessSubmitting, setAccessSubmitting] = useState(false);
 
   // Break-Glass (local auth) access states — Super Admin targets only,
   // enforced again server-side by SetLocalPasswordRequest.
@@ -270,42 +268,6 @@ const UserManagement = () => {
     if (safePage > 3 && safePage < totalPages - 2) pages.push(safePage);
     pages.push("...", totalPages - 1, totalPages);
     return [...new Set(pages)];
-  };
-
-  // -------------------------------------------------------
-  // Manage Access action handlers
-  // -------------------------------------------------------
-  const handleOpenAccess = (user) => {
-    setSelectedUserForAccess(user);
-    fetchPolicies();
-    setIsAccessModalOpen(true);
-  };
-
-  const handleSaveAccess = async (selectedPolicyName) => {
-    if (!selectedUserForAccess) return;
-    setAccessSubmitting(true);
-    setErrorMsg("");
-    try {
-      const policy = systemPolicies.find(p => p.name === selectedPolicyName);
-      const { data } = await attachUserPolicy(
-        selectedUserForAccess.user_id,
-        policy ? policy.policy_id : null
-      );
-      // attachPolicy() returns a single UserResource, which Laravel wraps
-      // in a `data` envelope by default — unwrap it (matches the
-      // res.data.data pattern used by fetchUsers/fetchPolicies above).
-      const updatedUser = data.data;
-
-      // Reflect the server response immediately without a full refetch.
-      setUsers(prev => prev.map(u => u.user_id === updatedUser.user_id ? updatedUser : u));
-
-      setSuccessMsg("Policy attached successfully.");
-      setIsAccessModalOpen(false);
-    } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Failed to attach policy.");
-    } finally {
-      setAccessSubmitting(false);
-    }
   };
 
   // -------------------------------------------------------
@@ -478,7 +440,6 @@ const UserManagement = () => {
                   ]}
                 />
               </th>
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Access</th>
               <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Actions</th>
             </tr>
           </thead>
@@ -487,7 +448,7 @@ const UserManagement = () => {
               <UserTableSkeleton isDark={isDark} count={7} />            
             ) : paginated.length === 0 ? (
             <tr>
-                <td colSpan={8} className="py-24">
+                <td colSpan={7} className="py-24">
                   <div className="flex flex-col items-center justify-center">
                     <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
                       <MagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
@@ -545,25 +506,6 @@ const UserManagement = () => {
                       <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(user.status, isDark)}`}>
                         {user.status}
                       </span>
-                    </td>
-                  {/* Access Column */}
-                    <td className="px-6 py-4 text-center">
-                      {isSuperAdmin ? (
-                        <span className={`text-xs font-semibold ${isDark ? 'text-[#8c8a85]' : 'text-gray-400'}`}>
-                          Not editable
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleOpenAccess(user)}
-                          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer whitespace-nowrap ${
-                            isDark 
-                              ? 'border-gray-600 hover:bg-white/10 text-white' 
-                              : 'border-gray-350 hover:bg-gray-50 bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          Manage Access
-                        </button>
-                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 justify-center">
@@ -633,16 +575,6 @@ const UserManagement = () => {
         title="Delete User?"
         message={`This will permanently delete ${deleteTarget?.email}. This action cannot be undone.`}
         type="danger"
-      />
-
-      <PolicyModal
-        isOpen={isAccessModalOpen}
-        onClose={() => setIsAccessModalOpen(false)}
-        onSave={handleSaveAccess}
-        user={selectedUserForAccess}
-        systemPolicies={systemPolicies}
-        currentPolicy={selectedUserForAccess ? getUserPolicy(selectedUserForAccess) : ""}
-        submitting={accessSubmitting}
       />
 
       <LocalPasswordModal
