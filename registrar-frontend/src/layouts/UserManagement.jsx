@@ -46,9 +46,36 @@ import { formatName } from "../utils/formatters";
  * (PolicyModal / PATCH /system-users/{id}/policy) has been removed
  * entirely; granting, revoking, and now editing a policy in place all
  * happen through "Manage Roles" (RoleAssignmentsModal).
+ *
+ * Work Item #3 — Admin Accounts / Student Staff Visibility: this table
+ * now also lists accounts whose BASE identity (users.role_id) is
+ * Student/Alumni but who hold an active Admin-tier role_assignments
+ * grant on top of it — a "student staff" account. Every row therefore
+ * carries two distinct role concepts, both shown explicitly so a
+ * student-staff row is legible at a glance rather than looking like a
+ * data error:
+ *   - base identity   (user.base_role_id / base_role_name)  — who they
+ *     fundamentally are: a Student, Alumnus, Admin, or Super Admin.
+ *   - administrative role granted (user.admin_grant)         — the
+ *     Admin/Super Admin access they hold RIGHT NOW, which may be their
+ *     base identity itself (a classic admin) or a secondary grant on
+ *     top of a Student/Alumni base identity (admin_grant.is_secondary).
+ * See UserResource::resolveAdminGrant() on the backend for exactly how
+ * admin_grant is derived — it intentionally does NOT reuse
+ * user.policy_id, which is meaningless for a secondary grant.
+ *
+ * Only ACTIVE grants are ever included in this list at all (an expired
+ * or revoked-only administrative grant simply drops the row) — see
+ * SystemUserController::index()'s docblock for that design choice.
  */
 const ROLE_MAP     = { 3: "Admin", 4: "Super Admin" };
-const ROLE_FILTERS = ["All", "Admin", "Super Admin"];
+// Work Item #3: "Student Staff" filters on admin_grant.is_secondary
+// (a Student/Alumni base identity holding an administrative grant),
+// kept as its own category distinct from "Admin"/"Super Admin" (which
+// now match only accounts whose administrative grant IS their base
+// identity — i.e. the classic, non-student-staff case) so the three
+// options stay mutually exclusive and each means one specific thing.
+const ROLE_FILTERS = ["All", "Admin", "Super Admin", "Student Staff"];
 const DATE_OPTIONS = ["Newest", "Oldest"];
 const STATUS_FILTERS = ["All", "Activated", "Deactivated", "Pending Activation", "Expired"];
 const PER_PAGE = 7;
@@ -75,6 +102,19 @@ const getRoleBadgeClasses = (roleName, isDark) => {
   }
   return 'bg-[#8B0000]/10 text-[#8B0000] border-[#8B0000]/20';
 };
+
+// Work Item #3 — a neutral, deliberately different palette from
+// getRoleBadgeClasses() above: the Identity badge shows who someone
+// fundamentally IS (Student/Alumni/Admin/Super Admin), while the
+// Admin Role badge (still using getRoleBadgeClasses) shows the
+// administrative access they've been granted — these are visually
+// distinct so a "Student" identity badge next to an "Admin" role badge
+// reads as a student-staff account, not a data inconsistency.
+const getIdentityBadgeClasses = (isDark) => (
+  isDark
+    ? 'bg-[#2f3336] text-[#c7cad1] border-[#4a4d51]'
+    : 'bg-slate-100 text-slate-600 border-slate-200'
+);
 
 const getStatusBadgeClasses = (status, isDark) => {
   const normalized = String(status ?? "").trim().toLowerCase();
@@ -157,12 +197,16 @@ const UserManagement = () => {
   const [systemPolicies, setSystemPolicies] = useState([]);
 
   // -------------------------------------------------------
-  // Policy resolver — reads the real attachment straight off the
-  // user record (user.policy / user.policy_id), no more guessing.
+  // Policy resolver — Work Item #3: reads the policy that actually
+  // applies to this account's ADMINISTRATIVE access (user.admin_grant),
+  // not user.policy/user.policy_id — those reflect users.policy_id,
+  // which is never set for a student-staff account's secondary grant
+  // and would incorrectly show "No policy attached" for one. See
+  // UserResource::resolveAdminGrant() on the backend.
   // -------------------------------------------------------
   const getUserPolicy = useCallback((user) => {
-    if (user.role_id === 4) return "Full Access";
-    return user.policy?.name || "No policy attached";
+    if (user.admin_grant?.role_id === 4) return "Full Access";
+    return user.admin_grant?.policy?.name || "No policy attached";
   }, []);
 
   // -------------------------------------------------------
@@ -200,13 +244,21 @@ const UserManagement = () => {
   // -------------------------------------------------------
   const filtered = users
     .filter((u) => {
-      const roleName = ROLE_MAP[u.role_id] || "";
-      const fullName = [u.admin_profile?.first_name, u.admin_profile?.last_name].filter(Boolean).join(" ");
+      // Work Item #3: admin_grant.role_name drives both the badge and
+      // filtering now, not the raw (base-identity) role_id — for a
+      // student-staff row those are two different roles entirely.
+      const grantRoleName = ROLE_MAP[u.admin_grant?.role_id] || "";
+      const isSecondaryGrant = !!u.admin_grant?.is_secondary;
+      const identityName = u.base_role_name || "";
+      const fullName = formatName(u) || "";
       const matchSearch =
         u.email?.toLowerCase().includes(search.toLowerCase()) ||
-        roleName.toLowerCase().includes(search.toLowerCase()) ||
+        grantRoleName.toLowerCase().includes(search.toLowerCase()) ||
+        identityName.toLowerCase().includes(search.toLowerCase()) ||
         fullName.toLowerCase().includes(search.toLowerCase());
-      const matchRole   = roleFilter   === "All" || roleName  === roleFilter;
+      const matchRole =
+        roleFilter === "All" ||
+        (roleFilter === "Student Staff" ? isSecondaryGrant : (grantRoleName === roleFilter && !isSecondaryGrant));
       const matchStatus = statusFilter === "All" || u.status  === statusFilter;
       return matchSearch && matchRole && matchStatus;
     })
@@ -363,8 +415,13 @@ const UserManagement = () => {
             <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
               <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Name</th>
               <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Email</th>
-              
-              {/* Role Filter dropdown */}
+
+              {/* Work Item #3: base identity — who this account fundamentally
+                  is, separate from the administrative role granted below. */}
+              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Identity</th>
+
+              {/* Role Filter dropdown — filters on the administrative role
+                  GRANTED (admin_grant), not base identity. See ROLE_FILTERS. */}
               <th className="px-4 py-3 text-center">
                 <DashboardDropdown
                   isOpen={roleDropdownOpen}
@@ -373,12 +430,12 @@ const UserManagement = () => {
                   align="center"
                   trigger={
                     <span className={roleFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
-                      Role
+                      Admin Role
                     </span>
                   }
                   sections={[
                     {
-                      title: 'Filter by Role',
+                      title: 'Filter by Admin Role',
                       items: ROLE_FILTERS.map(option => ({
                         label: option,
                         isSelected: roleFilter === option,
@@ -413,7 +470,12 @@ const UserManagement = () => {
                 </button>
               </th>
 
-              {/* Status Filter dropdown */}
+              {/* Account Status Filter dropdown — Work Item #3: labeled
+                  "Account Status" (not just "Status") to be explicit this is
+                  the account's login-eligibility status (Activated/
+                  Deactivated/...), distinct from the administrative grant's
+                  own Active/Expired/Revoked status shown on the Admin Role
+                  badge below. */}
               <th className="px-4 py-3 text-center">
                 <DashboardDropdown
                   isOpen={statusDropdownOpen}
@@ -422,7 +484,7 @@ const UserManagement = () => {
                   align="center"
                   trigger={
                     <span className={statusFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
-                      Status
+                      Account Status
                     </span>
                   }
                   sections={[
@@ -448,7 +510,7 @@ const UserManagement = () => {
               <UserTableSkeleton isDark={isDark} count={7} />            
             ) : paginated.length === 0 ? (
             <tr>
-                <td colSpan={7} className="py-24">
+                <td colSpan={8} className="py-24">
                   <div className="flex flex-col items-center justify-center">
                     <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
                       <MagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
@@ -464,8 +526,19 @@ const UserManagement = () => {
               </tr>            
               ) : (
               paginated.map((user) => {
-                const fullName = formatName(user.admin_profile) || "—";
-                const isSuperAdmin = user.role_id === 4;
+                // Work Item #3: formatName(user) resolves across
+                // admin_profile / student_profile / alumni_profile
+                // automatically (see utils/formatters.js) — needed now
+                // that rows can be a Student or Alumni base identity,
+                // not just an Admin.
+                const fullName = formatName(user) || "—";
+                // Break-glass eligibility is tied to the account's own,
+                // PRIMARY Super Admin identity — mirrors
+                // SetLocalPasswordRequest's server-side check on the
+                // target's raw role_id, not any secondary grant.
+                const isBaseSuperAdmin = user.base_role_id === 4;
+                const grantRoleName = ROLE_MAP[user.admin_grant?.role_id] || `Role ${user.admin_grant?.role_id ?? "—"}`;
+                const isStudentStaff = !!user.admin_grant?.is_secondary;
                 const policy = getUserPolicy(user);
 
                 return (
@@ -476,20 +549,38 @@ const UserManagement = () => {
                     <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
                       {user.email}
                     </td>
+                    {/* Base identity badge — who this account fundamentally
+                        is (Student/Alumni/Admin/Super Admin). */}
                     <td className="px-4 py-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(ROLE_MAP[user.role_id] || `Role ${user.role_id}`, isDark)}`}>
-                        {ROLE_MAP[user.role_id] || `Role ${user.role_id}`}
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap capitalize ${getIdentityBadgeClasses(isDark)}`}>
+                        {user.base_role_name || `Role ${user.base_role_id}`}
                       </span>
                     </td>
-                    {/* Policy attached badge */}
+                    {/* Administrative role granted, with a "Student Staff"
+                        tag when it's a secondary grant on a non-admin base
+                        identity — the core legibility requirement here. */}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(grantRoleName, isDark)}`}>
+                          {grantRoleName}
+                        </span>
+                        {isStudentStaff && (
+                          <span className={`text-[10px] font-semibold uppercase tracking-wide ${isDark ? 'text-yellow-400' : 'text-[#8b0000]'}`}>
+                            Student Staff
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    {/* Policy in effect for the administrative grant above —
+                        NOT the same as base identity, see getUserPolicy(). */}
                     <td className="px-6 py-4 text-center">
-                      {isSuperAdmin ? (
+                      {user.admin_grant?.role_id === 4 ? (
                         <span className={`text-[13px] font-semibold ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
                           Full Access
                         </span>
                       ) : (
                         <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                          user.policy_id
+                          user.admin_grant?.policy
                             ? (isDark ? 'bg-[#0f213d] text-[#5c93e6]' : 'bg-[#e0f2fe] text-[#0369a1]')
                             : (isDark ? 'bg-[#3a3b3c] text-[#b0b3b8]' : 'bg-gray-100 text-gray-500')
                           }`}>
@@ -501,7 +592,9 @@ const UserManagement = () => {
                     <td className={`px-4 py-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                       {formatDate(user.created_at)}
                     </td>
-                    {/* Status */}
+                    {/* Account status — login-eligibility (Activated/
+                        Deactivated/...), intentionally separate from the
+                        Admin Role badge's own grant status above. */}
                     <td className="px-6 py-4 text-center">
                       <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(user.status, isDark)}`}>
                         {user.status}
@@ -509,7 +602,7 @@ const UserManagement = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 justify-center">
-                        {isSuperAdmin && (
+                        {isBaseSuperAdmin && (
                           <button
                             onClick={() => handleOpenLocalAuth(user)}
                             title="Enable break-glass access"
