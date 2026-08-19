@@ -107,10 +107,28 @@ class PolicyService
 
         foreach ($permissions as $module => $actions) {
             $actions = is_array($actions) ? $actions : [];
-            $sanitized[$module] = array_values(array_intersect(
+            $actions = array_values(array_intersect(
                 array_unique($actions),
                 Policy::actionsFor($module)
             ));
+
+            // View-dependency guard: for any module whose action
+            // vocabulary includes 'View' (currently 'dashboard',
+            // 'logbook'), granting any OTHER action implies View — you
+            // can't coherently act on something you're not granted to
+            // see. PolicyManagement.jsx already enforces this
+            // client-side (checking Process/Complete auto-checks View;
+            // unchecking View clears them), but that's UI-only — a raw
+            // POST/PUT /policies call bypassed it, letting a policy
+            // persist as e.g. dashboard => ['Process'] with no View.
+            // Backfilling View here (rather than rejecting the
+            // request) mirrors how the frontend already resolves the
+            // same conflict, so this stays a pure sanitizer.
+            if (!empty($actions) && in_array('View', Policy::actionsFor($module), true) && !in_array('View', $actions, true)) {
+                $actions[] = 'View';
+            }
+
+            $sanitized[$module] = $actions;
         }
 
         return $sanitized;

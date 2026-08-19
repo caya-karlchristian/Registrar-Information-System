@@ -130,10 +130,30 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     //   action gate, not an OR list: claimRequest() can only ever
     //   produce Completed, so there's no ambiguity to resolve later the
     //   way there is for update().
+    // - logbook (this file's dashboard "export the queue as a log"
+    //   view, distinct from the /request-history module below): now
+    //   explicitly 'module:logbook,View' rather than bare
+    //   'module:logbook'. Previously the untagged form meant "any
+    //   logbook access at all" via hasModuleAccess($module) with no
+    //   $action, so a policy granting only Export (no View) still
+    //   passed the gate — incoherent for a GET route. Behaviorally
+    //   identical for every real policy today (PolicyService now backs
+    //   View into any granted logbook action — see sanitizePermissions()
+    //   — so no existing policy can have Export without View), but
+    //   spelling it out here removes the implicit "no action = any
+    //   action" reading for a route that only ever needs View.
+    // - counts: now carries 'module:dashboard,View' alongside role:3,4.
+    //   This endpoint returns per-status counts for the same dashboard
+    //   queue that index/show/logbook already gate — it had no module
+    //   check at all before, which was a gap (an admin with zero
+    //   dashboard access could still see how many requests were in each
+    //   status). Counts are read-only and derived from the same View
+    //   permission as the list itself, so this reuses that action
+    //   rather than inventing a new one.
     Route::prefix('document-requests')->group(function () {
         Route::get('/',                           [DocumentRequestController::class, 'index'])->middleware('module:dashboard,View');
-        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware(['role:3,4', 'module:logbook']);
-        Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware('role:3,4');
+        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware(['role:3,4', 'module:logbook,View']);
+        Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware(['role:3,4', 'module:dashboard,View']);
         Route::post('archive-bulk',                [DocumentRequestController::class, 'archiveBulk'])->middleware('role:3');
         Route::post('restore-bulk',                [DocumentRequestController::class, 'restoreBulk'])->middleware('role:3');
         Route::post('claim',                       [DocumentRequestController::class, 'claim'])->middleware(['role:3', 'module:dashboard,Complete']);
@@ -191,7 +211,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.
-    Route::middleware(['role:3,4', 'module:logbook'])->prefix('request-history')->group(function () {
+    Route::middleware(['role:3,4', 'module:logbook,View'])->prefix('request-history')->group(function () {
         Route::get('/',    [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
     });
