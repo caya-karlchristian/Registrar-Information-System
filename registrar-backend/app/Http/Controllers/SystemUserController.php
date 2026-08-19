@@ -3,23 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\IdpException;
-use App\Exceptions\PolicyException;
-use App\Http\Requests\SystemUser\AttachSystemUserPolicyRequest;
 use App\Http\Requests\SystemUser\StoreSystemUserRequest;
 use App\Http\Requests\SystemUser\UpdateSystemUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\SystemUser;
 use App\Services\AdminUserService;
-use App\Services\PolicyService;
 use Illuminate\Http\Request;
 
 /**
  * System user management controller (admin / superadmin accounts only).
  *
  * Delegates all IdP + DB + audit-log coordination to AdminUserService.
- * Policy attachment (User Management → "Manage Access") is delegated to
- * PolicyService, since it's a distinct concern from the account lifecycle
- * AdminUserService owns.
+ *
+ * Work Item #2 — Admin Management Consolidation: this controller no
+ * longer attaches policies to an account (the retired "Manage Access"
+ * modal's PATCH /system-users/{id}/policy endpoint is gone) and update()
+ * no longer accepts role_id (the retired "Edit User" Role dropdown).
+ * role_assignments (via RoleAssignmentController/RoleAssignmentService)
+ * is now the single place both a policy and a role are ever granted or
+ * changed — see UpdateSystemUserRequest and AdminUserService::update()
+ * for the corresponding validation/handling removal.
  *
  * Validation now lives in App\Http\Requests\SystemUser\* (see rules() in
  * each). Authorization now lives in SystemUserPolicy — the inline
@@ -36,7 +39,6 @@ class SystemUserController extends Controller
 
     public function __construct(
         private AdminUserService $adminUserService,
-        private PolicyService $policyService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -130,35 +132,6 @@ class SystemUserController extends Controller
         // transaction, which drops any previously loaded relations — same
         // reason store() reloads them before building its resource.
         $user->load(['adminProfile', 'policy']);
-
-        return new UserResource($user);
-    }
-
-    // -------------------------------------------------------------------------
-    // PATCH /system-users/{id}/policy
-    //
-    // Attaches (or detaches, when policy_id is null) a permissions policy
-    // to a single admin account. This is the server-side counterpart of
-    // UserManagement.jsx's "Manage Access" → PolicyModal "Attach policy"
-    // flow, which previously only wrote to localStorage.
-    // -------------------------------------------------------------------------
-    public function attachPolicy(AttachSystemUserPolicyRequest $request, $id)
-    {
-        $user = SystemUser::find($id);
-
-        if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
-        }
-
-        $this->authorize('attachPolicy', $user);
-
-        $validated = $request->validated();
-
-        try {
-            $user = $this->policyService->attachToUser($user, $validated['policy_id'] ?? null, $request);
-        } catch (PolicyException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
 
         return new UserResource($user);
     }

@@ -52,6 +52,10 @@ class AuditLog extends Model
     public const ACTION_ROLE_REVOKED    = 'role_revoked';    // explicit revoke (RoleAssignmentService::revoke)
     public const ACTION_ROLE_EXPIRED    = 'role_expired';    // automatic sweep (role-assignments:expire)
     public const ACTION_ROLE_SWITCHED   = 'role_switched';   // session assumed a different held role (Step 3)
+    // Work Item #2 — in-place policy edit on an already-Active Admin
+    // grant (RoleAssignmentService::editPolicy()) — distinct from
+    // ACTION_ROLE_ASSIGNED/REVOKED since no grant/revoke event occurred.
+    public const ACTION_ROLE_POLICY_EDITED = 'role_policy_edited';
     public const ACTION_REQUEST_STATUS_CHANGED = 'request_status_changed';
     public const ACTION_REQUEST_ARCHIVED       = 'request_archived';
     public const ACTION_REQUEST_RESTORED       = 'request_restored';

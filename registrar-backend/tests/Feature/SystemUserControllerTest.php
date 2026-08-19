@@ -307,51 +307,43 @@ test('update fails validation on an invalid status value', function () {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// attachPolicy() — AttachSystemUserPolicyRequest + SystemUserPolicy::attachPolicy
+// Work Item #2 — Admin Management Consolidation regression coverage.
+//
+// PATCH /system-users/{id}/policy ("Manage Access") is retired entirely —
+// see RoleAssignmentControllerTest.php for its replacement,
+// PATCH /role-assignments/{roleAssignment}/policy. The tests below confirm
+// the old route and the old role_id-on-update path are both actually gone,
+// not just unused.
 // ═════════════════════════════════════════════════════════════════════════════
 
-test('attachPolicy fails validation for a nonexistent policy_id', function () {
+test('the retired Manage Access policy-attachment route no longer exists', function () {
     $target = suMakeTarget(SystemUser::ROLE_ADMIN);
-    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
-
-    $this->patchJson("/api/system-users/{$target->user_id}/policy", ['policy_id' => 999])
-         ->assertStatus(422)
-         ->assertJsonValidationErrors(['policy_id']);
-});
-
-test('superadmin can attach a policy to an admin account', function () {
-    $target = suMakeTarget(SystemUser::ROLE_ADMIN);
-    $policy = suMakePolicy();
-    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
-
-    $this->patchJson("/api/system-users/{$target->user_id}/policy", ['policy_id' => $policy->policy_id])
-         ->assertOk()
-         ->assertJsonPath('data.policy_id', $policy->policy_id);
-});
-
-test('attaching a policy to a super-admin target is rejected with a PolicyException message', function () {
-    $target = suMakeTarget(SystemUser::ROLE_SUPER_ADMIN);
-    $policy = suMakePolicy();
-    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
-
-    // Policy target-role check (attachPolicy ability) passes since role 4 is
-    // "manageable" for policy purposes, but PolicyService::attachToUser()
-    // itself rejects non-admin targets — so this 422 comes from the service,
-    // not the FormRequest.
-    $this->patchJson("/api/system-users/{$target->user_id}/policy", ['policy_id' => $policy->policy_id])
-         ->assertStatus(422)
-         ->assertJsonPath('message', 'Policies can only be attached to admin accounts. Super admins have full access by default.');
-});
-
-test('sending policy_id null detaches the current policy', function () {
-    $policy = suMakePolicy();
-    $target = suMakeTarget(SystemUser::ROLE_ADMIN);
-    $target->update(['policy_id' => $policy->policy_id]);
     suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
 
     $this->patchJson("/api/system-users/{$target->user_id}/policy", ['policy_id' => null])
-         ->assertOk()
-         ->assertJsonPath('data.policy_id', null);
+         ->assertStatus(404);
+});
+
+test('update() silently ignores role_id even on a direct API call — Edit User can no longer change roles', function () {
+    // Work Item #2: role changes are exclusively role_assignments' job now
+    // (RoleAssignmentController::store(), which enforces the direction
+    // constraint this endpoint never did). Sending role_id here must have
+    // no effect at all, not even a validation error — the field is simply
+    // not part of this request's contract anymore.
+    $target = suMakeTarget(SystemUser::ROLE_ADMIN);
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $this->putJson("/api/system-users/{$target->user_id}", [
+        'role_id'    => SystemUser::ROLE_SUPER_ADMIN,
+        'first_name' => 'Unchanged',
+    ])->assertOk()
+      ->assertJsonPath('data.role_id', SystemUser::ROLE_ADMIN)
+      ->assertJsonPath('data.first_name', 'Unchanged');
+
+    $this->assertDatabaseHas('users', [
+        'user_id' => $target->user_id,
+        'role_id' => SystemUser::ROLE_ADMIN,
+    ]);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

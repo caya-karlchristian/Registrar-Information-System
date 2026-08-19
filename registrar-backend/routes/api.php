@@ -301,12 +301,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             ->middleware('throttle:5,1,system-users-store')
             ->name('system-users.store');
 
-        Route::patch('system-users/{id}/policy', [SystemUserController::class, 'attachPolicy']);
-
         // User Management — Policy Attachment: reusable admin permission
-        // policies, plus attaching one to a specific admin above.
-        // NOTE: GET (read) is intentionally NOT here — see below. Only
-        // create/edit/delete of a policy is Super-Admin-only.
+        // policies. Work Item #2 — Admin Management Consolidation:
+        // attaching/editing a specific admin's policy no longer happens
+        // here — see PATCH /role-assignments/{roleAssignment}/policy
+        // below, the one remaining place a policy is ever attached to an
+        // account. NOTE: GET (read) is intentionally NOT here — see
+        // below. Only create/edit/delete of a policy itself is
+        // Super-Admin-only.
         Route::post('policies',          [PolicyController::class, 'store']);
         Route::put('policies/{id}',      [PolicyController::class, 'update']);
         Route::delete('policies/{id}',   [PolicyController::class, 'destroy']);
@@ -366,6 +368,13 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             Route::get('/',                          [RoleAssignmentController::class, 'index']);
             Route::post('/',                          [RoleAssignmentController::class, 'store']);
             Route::post('{roleAssignment}/revoke',    [RoleAssignmentController::class, 'revoke']);
+
+            // Work Item #2 — Admin Management Consolidation: edit the
+            // policy on an already-Active Admin grant in place, without
+            // a revoke/regrant cycle. This is now the ONLY endpoint that
+            // writes a policy onto an existing admin account — see
+            // RoleAssignmentService::editPolicy().
+            Route::patch('{roleAssignment}/policy',   [RoleAssignmentController::class, 'editPolicy']);
         });
     });
 });

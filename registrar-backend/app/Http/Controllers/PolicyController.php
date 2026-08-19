@@ -12,9 +12,14 @@ use Illuminate\Http\Request;
 
 /**
  * Manages reusable admin permission policies (superadmin only — see
- * routes/api.php, role:4 group). Attaching a policy to a specific admin
- * is handled by SystemUserController::attachPolicy(), since that action
- * mutates the user, not the policy.
+ * routes/api.php, role:4 group).
+ *
+ * Work Item #2 — Admin Management Consolidation: attaching/editing a
+ * policy on a specific admin account is no longer handled here or by
+ * SystemUserController (the old attachPolicy() endpoint is retired) —
+ * it's now exclusively RoleAssignmentController::editPolicy(), since
+ * role_assignments is the single source of truth for both an admin's
+ * role and their policy.
  */
 class PolicyController extends Controller
 {
