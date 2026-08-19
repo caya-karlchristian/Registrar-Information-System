@@ -80,8 +80,111 @@ class UserResource extends JsonResource
             // this passes, provisioning:expire-stale flips status to
             // 'Expired' (see Console\Commands\ExpireStaleProvisioning).
             'pending_expires_at' => $this->pending_expires_at,
-            'created_at' => $this->created_at,  
+            'created_at' => $this->created_at,
+
+            // -----------------------------------------------------------
+            // Work Item #3 — Admin Accounts / Student Staff Visibility.
+            //
+            // base_role_id/base_role_name are the account's actual,
+            // permanent identity (raw users.role_id) — deliberately NOT
+            // assumedRoleId(), which reflects a SESSION override and is
+            // meaningless when this resource represents someone else's
+            // row in a listing rather than the caller's own account. This
+            // is what the Admin Accounts table shows as "Student" /
+            // "Alumni" for a student-staff row, distinct from the
+            // administrative role granted to them (see admin_grant below).
+            'base_role_id'   => $this->role_id,
+            'base_role_name' => $this->resolveRoleName($this->role_id),
+
+            // The administrative (Admin/Super Admin) access this account
+            // currently holds, wherever it comes from — see
+            // resolveAdminGrant(). Null for a row that has neither an
+            // admin-tier primary role nor an active admin-tier grant (this
+            // resource is still usable for non-admin contexts elsewhere,
+            // e.g. AuthController@me, where admin_grant is simply null for
+            // a plain Student/Alumni session).
+            'admin_grant' => $this->resolveAdminGrant(),
         ];
+    }
+
+    /**
+     * Work Item #3 — resolves "what administrative access does this
+     * account currently hold, and where does its policy actually come
+     * from" — this is NOT the same question as $this->policy_id /
+     * $this->policy above (which reflect the SESSION-assumed role via
+     * assumedPolicyId(), and for a THIRD PARTY'S row being listed here —
+     * no currentAccessToken() on this model instance — fall straight
+     * through to the raw users.policy_id column).
+     *
+     * That raw-column fallback is exactly right for a classic Admin/Super
+     * Admin (their baseline role_assignments row is kept in sync with
+     * users.policy_id by RoleAssignmentService::editPolicy() — see its
+     * docblock), but WRONG for a secondary "student staff" grant: a
+     * Student's users.policy_id is never set (only admin-tier primary
+     * accounts use that column), so the account's real Admin policy would
+     * silently read as "no policy attached" without this method.
+     *
+     * Prefers an actual loaded admin-tier role_assignments row (covers
+     * both a classic admin's live baseline row AND a secondary grant),
+     * and falls back to the raw role_id/policy_id columns only when no
+     * such row is loaded/active — e.g. a Deactivated classic admin whose
+     * baseline row was cascade-revoked by
+     * RoleAssignmentService::revokeAllForUser(). That fallback is what
+     * keeps existing Registrar Staff / Super Admin rows displaying
+     * exactly as they did before this work item.
+     */
+    private function resolveAdminGrant(): ?array
+    {
+        $adminTier = [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN];
+
+        if ($this->relationLoaded('activeRoleAssignments')) {
+            $assignment = $this->activeRoleAssignments
+                ->whereIn('role_id', $adminTier)
+                // A user could in theory hold both an Admin and a Super
+                // Admin active row at once — grant()'s duplicate check is
+                // scoped per role_id, not per tier. Prefer the
+                // higher-privilege one for display if that ever happens.
+                ->sortByDesc('role_id')
+                ->first();
+
+            if ($assignment) {
+                return [
+                    'role_assignment_id' => $assignment->id,
+                    'role_id'            => $assignment->role_id,
+                    'role_name'          => $this->resolveRoleName($assignment->role_id),
+                    // True when this grant sits ON TOP OF a non-admin base
+                    // identity — the actual "student staff" case this
+                    // work item exists to surface.
+                    'is_secondary'       => $assignment->role_id !== $this->role_id,
+                    'policy'             => ($assignment->role_id === SystemUser::ROLE_ADMIN && $assignment->policy)
+                        ? new PolicyResource($assignment->policy)
+                        : null,
+                    'granted_at'         => optional($assignment->granted_at)->toIso8601String(),
+                    'expires_at'         => optional($assignment->expires_at)->toIso8601String(),
+                    // Always 'Active' here — the eager-loaded relation is
+                    // pre-filtered to activeRoleAssignments() — exposed
+                    // anyway so the frontend never has to assume that.
+                    'status'             => $assignment->status,
+                ];
+            }
+        }
+
+        if (in_array($this->role_id, $adminTier, true)) {
+            return [
+                'role_assignment_id' => null,
+                'role_id'            => $this->role_id,
+                'role_name'          => $this->resolveRoleName($this->role_id),
+                'is_secondary'       => false,
+                'policy'             => ($this->role_id === SystemUser::ROLE_ADMIN && $this->policy)
+                    ? new PolicyResource($this->policy)
+                    : null,
+                'granted_at'         => null,
+                'expires_at'         => null,
+                'status'             => null,
+            ];
+        }
+
+        return null;
     }
 
     // -------------------------------------------------------

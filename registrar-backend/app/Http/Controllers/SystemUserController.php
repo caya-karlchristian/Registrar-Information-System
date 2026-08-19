@@ -43,13 +43,67 @@ class SystemUserController extends Controller
 
     // -------------------------------------------------------------------------
     // GET /system-users
+    //
+    // Work Item #3 — Admin Accounts / Student Staff Visibility: this used to
+    // list only accounts whose PRIMARY role (users.role_id) is Admin/Super
+    // Admin. That missed the entire "student staff" case Work Item #2's
+    // role_assignments consolidation was built for — a Student who has been
+    // granted an Admin-tier role_assignment on top of their base identity
+    // never showed up here at all, even though they hold real administrative
+    // access right now.
+    //
+    // A user is included if EITHER:
+    //   1. Their primary role is Admin/Super Admin (unchanged from before —
+    //      this is what keeps existing Registrar Staff / Super Admin rows
+    //      displaying exactly as they did previously, regardless of that
+    //      account's current role_assignments state), OR
+    //   2. They currently hold at least one ACTIVE (not expired, not
+    //      revoked — see SystemUser::activeRoleAssignments()) Admin-tier
+    //      role_assignments row on top of a non-admin base identity.
+    //
+    // An EXPIRED or REVOKED-only administrative grant does not qualify —
+    // that account simply drops back out of this list, the same as it would
+    // have shown no administrative access at all before this grant existed.
+    // This is a deliberate reading of the work item's "Target end state"
+    // wording ("any user with an active ... role_assignments row"); if the
+    // product preference is instead to keep such a row visible but marked
+    // Expired, that's a small follow-up change to this query + the frontend
+    // badge, not a redesign.
+    //
+    // See UserResource::resolveAdminGrant() for how each row's actual
+    // granted role + policy is derived from this — for a secondary grant,
+    // that is NOT the same thing as this account's raw role_id/policy_id.
     // -------------------------------------------------------------------------
     public function index()
     {
         $this->authorize('viewAny', SystemUser::class);
 
-        $users = SystemUser::whereIn('role_id', self::MANAGEABLE_ROLES)
-            ->with(['adminProfile', 'policy'])
+        $adminTier = self::MANAGEABLE_ROLES;
+
+        $users = SystemUser::query()
+            ->where(function ($query) use ($adminTier) {
+                $query->whereIn('role_id', $adminTier)
+                    ->orWhereHas('activeRoleAssignments', function ($q) use ($adminTier) {
+                        $q->whereIn('role_id', $adminTier);
+                    });
+            })
+            ->with([
+                'adminProfile',
+                // Loaded for every row (not just Students/Alumni) so a
+                // "student staff" row's base identity can be displayed —
+                // whenLoaded() in UserResource simply returns null for
+                // rows where the relation doesn't apply.
+                'studentProfile',
+                'alumniProfile',
+                'policy',
+                // Only the administrative rows matter for this listing's
+                // "role granted" / "policy in effect" columns — constrained
+                // to admin-tier here so a student staff account's OWN
+                // baseline Student row doesn't get mixed in.
+                'activeRoleAssignments' => function ($q) use ($adminTier) {
+                    $q->whereIn('role_id', $adminTier)->with('policy');
+                },
+            ])
             ->paginate(20);
 
         return UserResource::collection($users);
