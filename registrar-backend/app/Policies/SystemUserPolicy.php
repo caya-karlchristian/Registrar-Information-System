@@ -60,16 +60,6 @@ class SystemUserPolicy
     }
 
     // -------------------------------------------------------
-    // PATCH /system-users/{id}/policy
-    // Custom ability name — used via $this->authorize('attachPolicy', $target)
-    // -------------------------------------------------------
-    public function attachPolicy(SystemUser $user, SystemUser $target): bool
-    {
-        return $user->role_id === SystemUser::ROLE_SUPER_ADMIN
-            && in_array($target->role_id, self::MANAGEABLE_ROLES);
-    }
-
-    // -------------------------------------------------------
     // DELETE /system-users/{id}
     //
     // NOTE: this intentionally does NOT check for self-delete. The

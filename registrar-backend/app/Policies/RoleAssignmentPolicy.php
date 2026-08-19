@@ -34,4 +34,16 @@ class RoleAssignmentPolicy
     {
         return $user->isSuperAdmin();
     }
+
+    /**
+     * Work Item #2 — Admin Management Consolidation. Editing the policy
+     * on an already-Active grant is authorized the same as granting one
+     * in the first place — it's the same "who gets to decide what an
+     * admin can do" decision, just applied to an existing row instead of
+     * a new one.
+     */
+    public function editPolicy(SystemUser $user, RoleAssignment $assignment): bool
+    {
+        return $user->isSuperAdmin();
+    }
 }

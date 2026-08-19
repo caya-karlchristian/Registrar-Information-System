@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Policy;
 use App\Models\RoleAssignment;
 use App\Models\SystemUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,4 +69,88 @@ test('a Super Admin can revoke another users role assignment', function () {
         ->assertOk();
 
     expect($adminAssignment->fresh()->status)->toBe(RoleAssignment::STATUS_REVOKED);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Work Item #2 — Admin Management Consolidation.
+// PATCH /role-assignments/{roleAssignment}/policy — direct HTTP-layer
+// replacement for the retired PATCH /system-users/{id}/policy.
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('a Super Admin can edit the policy on an Active Admin role assignment in place', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN, 'status' => 'Activated']);
+    $target     = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
+    $newPolicy  = Policy::create(['name' => 'Records Staff', 'permissions' => ['dashboard' => ['Access']]]);
+
+    $assignment = RoleAssignment::create([
+        'user_id'    => $target->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    Sanctum::actingAs($superAdmin);
+
+    $this->patchJson("/api/role-assignments/{$assignment->id}/policy", ['policy_id' => $newPolicy->policy_id])
+        ->assertOk()
+        ->assertJsonPath('policy.policy_id', $newPolicy->policy_id);
+
+    expect($assignment->fresh()->policy_id)->toBe($newPolicy->policy_id);
+});
+
+test('editing the policy on a non-Admin role assignment is rejected', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN, 'status' => 'Activated']);
+    $target     = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT]);
+    $policy     = Policy::create(['name' => 'Records Staff', 'permissions' => ['dashboard' => ['Access']]]);
+
+    $assignment = RoleAssignment::create([
+        'user_id'    => $target->user_id,
+        'role_id'    => SystemUser::ROLE_STUDENT,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    Sanctum::actingAs($superAdmin);
+
+    $this->patchJson("/api/role-assignments/{$assignment->id}/policy", ['policy_id' => $policy->policy_id])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['role_id']);
+});
+
+test('editing the policy fails validation for a nonexistent policy_id', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN, 'status' => 'Activated']);
+    $target     = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
+
+    $assignment = RoleAssignment::create([
+        'user_id'    => $target->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    Sanctum::actingAs($superAdmin);
+
+    $this->patchJson("/api/role-assignments/{$assignment->id}/policy", ['policy_id' => 999])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['policy_id']);
+});
+
+test('a non-Super-Admin cannot edit a role assignment policy', function () {
+    $admin  = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'status' => 'Activated']);
+    $target = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
+    $policy = Policy::create(['name' => 'Records Staff', 'permissions' => ['dashboard' => ['Access']]]);
+
+    $assignment = RoleAssignment::create([
+        'user_id'    => $target->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    // Route middleware 'role:4' rejects this before it ever reaches the
+    // controller/policy — 403, same as any other role:4 group route.
+    $this->patchJson("/api/role-assignments/{$assignment->id}/policy", ['policy_id' => $policy->policy_id])
+        ->assertStatus(403);
 });

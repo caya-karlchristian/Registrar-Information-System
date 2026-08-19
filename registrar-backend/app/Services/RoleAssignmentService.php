@@ -22,6 +22,11 @@ use Illuminate\Validation\ValidationException;
  * Super Admin grants them a second, Admin role_assignment with a
  * restricted policy and a bounded expires_at.
  *
+ * editPolicy() (Work Item #2) is the in-place counterpart to grant()/
+ * revoke(): swapping the policy on an already-Active Admin grant without
+ * needing a full revoke/regrant cycle (and the forced re-login that
+ * revoke() intentionally causes for a real offboarding event).
+ *
  * revoke() is the deterministic "they left" offboarding path — explicit,
  * audited, and immediately session-invalidating (see the token-revocation
  * note on revoke() below). The non-deterministic "they graduated" case
@@ -40,6 +45,15 @@ class RoleAssignmentService
     public function grant(array $validated, Request $request): RoleAssignment
     {
         $targetUser = SystemUser::findOrFail($validated['user_id']);
+
+        // Work Item #2 — direction constraint, enforced server-side (not
+        // just a UI convention a direct API call could bypass). Keyed off
+        // the target's actual PRIMARY role (users.role_id), never the
+        // session-assumed role — a Super Admin previewing as something
+        // else must not change what this check sees for someone else's
+        // account. See assertDirectionAllowed() docblock for the full
+        // reasoning.
+        $this->assertDirectionAllowed($targetUser, (int) $validated['role_id']);
 
         return DB::transaction(function () use ($validated, $targetUser, $request) {
             // Enforced here rather than a DB partial-unique index (MySQL
@@ -128,6 +142,130 @@ class RoleAssignmentService
             ]);
 
             return $assignment;
+        });
+    }
+
+    /**
+     * Work Item #2 — Admin Management Consolidation: enforces a one-way
+     * street between the two "tiers" of role a person can hold.
+     *
+     *   - A base-identity account (Student/Alumni primary role) CAN pick
+     *     up an Admin-tier grant on top — this is the entire "student
+     *     staff" feature the role_assignments table exists for.
+     *   - An account whose PRIMARY role is already Admin-tier
+     *     (Admin/Super Admin) can NEVER be handed a Student/Alumni role
+     *     back through this endpoint. That's not a real-world transition
+     *     (a staff member doesn't "become" a student by being granted a
+     *     role) and silently allowing it would let role_assignments
+     *     disagree with what the account actually is. If a Super Admin's
+     *     employment situation genuinely changes, that's an account
+     *     lifecycle decision (deactivate this account, provision a new
+     *     one under the person's student identity) — not a role grant.
+     *
+     * Deliberately keyed off $targetUser->role_id — the raw, PRIMARY
+     * role column — rather than assumedRoleId() or any role_assignments
+     * row. The primary role is the durable fact about what kind of
+     * account this is; a session-scoped "assumed role" override must
+     * never be able to change what this guard sees for a DIFFERENT
+     * user's account.
+     *
+     * @throws ValidationException
+     */
+    private function assertDirectionAllowed(SystemUser $targetUser, int $grantedRoleId): void
+    {
+        $adminTier = [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN];
+        $baseTier  = [SystemUser::ROLE_STUDENT, SystemUser::ROLE_ALUMNI];
+
+        if (in_array($targetUser->role_id, $adminTier, true) && in_array($grantedRoleId, $baseTier, true)) {
+            throw ValidationException::withMessages([
+                'role_id' => 'This account\'s primary role is Admin-tier (Admin or Super Admin) and cannot be '
+                    . 'handed a Student or Alumni role assignment. Deactivate the account instead if this '
+                    . 'person no longer holds this role.',
+            ]);
+        }
+    }
+
+    /**
+     * Work Item #2 — Admin Management Consolidation: edit the policy on
+     * an already-Active Admin role_assignment IN PLACE, without a
+     * revoke/regrant cycle (which would needlessly force-log-out the
+     * account — see revoke()'s SECURITY note — for what is really just a
+     * permissions change, not an offboarding event).
+     *
+     * Only meaningful for role_id = ROLE_ADMIN — Student/Alumni/Super
+     * Admin assignments don't carry a policy at all (Super Admin bypasses
+     * the policy system entirely; see SystemUser::hasModuleAccess()).
+     *
+     * Mirrors — in the opposite direction — the sync PolicyService::
+     * attachToUser() used to maintain: when $assignment IS the target
+     * user's baseline/primary row (their role_assignments row whose
+     * role_id equals their own users.role_id), this also updates
+     * users.policy_id in the same transaction. That mirror is required,
+     * not cosmetic — SystemUser::assumedPolicyId() only reads a
+     * role_assignments row's own policy_id once a SESSION has explicitly
+     * switched into that role (POST /auth/switch-role); for the common
+     * case of an admin who never switched, it falls straight through to
+     * the raw users.policy_id column. Leaving that column stale after an
+     * in-place edit would silently keep enforcing the OLD policy for
+     * every such session until they happened to switch roles and back.
+     *
+     * A SECONDARY grant (e.g. the Admin side of a "student staff" whose
+     * primary role is Student) has no such mirror — its policy only ever
+     * applies once a session has assumed that specific role_assignment,
+     * which always reads the assignment's own column directly.
+     *
+     * @throws ValidationException
+     */
+    public function editPolicy(RoleAssignment $assignment, ?int $policyId, Request $request): RoleAssignment
+    {
+        if ($assignment->role_id !== SystemUser::ROLE_ADMIN) {
+            throw ValidationException::withMessages([
+                'role_id' => 'Only Admin-role assignments carry a policy. Student, Alumni, and Super Admin '
+                    . 'assignments are not policy-gated.',
+            ]);
+        }
+
+        if ($assignment->status !== RoleAssignment::STATUS_ACTIVE) {
+            throw ValidationException::withMessages([
+                'status' => "This role assignment is '{$assignment->status}' and can no longer be edited. "
+                    . 'Only Active assignments can have their policy changed in place.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($assignment, $policyId, $request) {
+            // Row-lock both the assignment and its owning user for the
+            // duration of the edit — same defense against a concurrent
+            // grant()/revoke()/another editPolicy() race that grant()
+            // itself already applies via lockForUpdate() above.
+            $assignment = RoleAssignment::where('id', $assignment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($assignment->status !== RoleAssignment::STATUS_ACTIVE) {
+                throw ValidationException::withMessages([
+                    'status' => "This role assignment is '{$assignment->status}' and can no longer be edited.",
+                ]);
+            }
+
+            $targetUser = SystemUser::where('user_id', $assignment->user_id)
+                ->lockForUpdate()
+                ->first();
+
+            $assignment->update(['policy_id' => $policyId]);
+
+            if ($targetUser && $targetUser->role_id === SystemUser::ROLE_ADMIN) {
+                $targetUser->update(['policy_id' => $policyId]);
+            }
+
+            $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ROLE_POLICY_EDITED, [
+                'target_user_id'      => $assignment->user_id,
+                'target_email'        => $targetUser?->email,
+                'role_assignment_id'  => $assignment->id,
+                'role_id'             => $assignment->role_id,
+                'policy_id'           => $policyId,
+            ]);
+
+            return $assignment->fresh(['policy']);
         });
     }
 
