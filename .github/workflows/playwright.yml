@@ -25,8 +25,18 @@ jobs:
         node-version: lts/*
     - name: Install dependencies
       run: npm ci
+    - name: Check Ubuntu apt sources
+      working-directory: /
+      run: |
+        echo "=== Ubuntu Version ==="
+        cat /etc/os-release
+
+        echo "=== APT Sources ==="
+        grep -R "azure.archive.ubuntu.com\|archive.ubuntu.com" \
+          /etc/apt/sources.list \
+          /etc/apt/sources.list.d/ 2>/dev/null || true
     - name: Install Playwright Browsers
-      run: npx playwright install
+      run: npx playwright install --with-deps
     - name: Run Playwright tests
       run: npx playwright test
     - uses: actions/upload-artifact@v4
