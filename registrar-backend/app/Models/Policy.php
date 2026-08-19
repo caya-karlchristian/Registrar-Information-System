@@ -35,6 +35,48 @@ class Policy extends Model
     public const MODULE_KEYS = ['dashboard', 'inbox', 'analytics', 'logbook', 'profile', 'access_requests', 'business_calendar'];
 
     /**
+     * Per-module action vocabulary — the single source of truth for
+     * "what actions can be granted on this module" wherever a module
+     * needs finer-grained permissions than the default single-token
+     * 'Access' toggle.
+     *
+     * Any module NOT listed here stays a single-token module: its only
+     * valid permission value is ['Access'] (module-level allow) or []
+     * (deny). Modules listed here instead grant a SUBSET of their
+     * action list, e.g. dashboard => ['View', 'Complete'] for a
+     * Student Staff policy.
+     *
+     * Consumers of this map:
+     *   - SystemUser::hasModuleAccess($module, $action) checks a
+     *     specific action is present in the granted array.
+     *   - PolicyService::sanitizePermissions() drops any token that
+     *     isn't in this module's action list (or, for unlisted
+     *     modules, isn't 'Access') before persisting.
+     *   - PolicyManagement.jsx mirrors this shape via its own
+     *     per-module checkbox groups for Dashboard/Logbook.
+     *
+     * Work Item #1 — Granular Per-Action Permissions. Do not add
+     * 'inbox' here: it is notifications-only and stays a single-token
+     * 'Access' module.
+     */
+    public const MODULE_ACTIONS = [
+        'dashboard' => ['View', 'Process', 'Complete'],
+        'logbook'   => ['View', 'Export'],
+    ];
+
+    /**
+     * The valid action tokens for a given module — its own action list
+     * if it has one (see MODULE_ACTIONS), otherwise the default
+     * single-token 'Access' vocabulary every other module uses.
+     *
+     * @return array<string>
+     */
+    public static function actionsFor(string $module): array
+    {
+        return self::MODULE_ACTIONS[$module] ?? ['Access'];
+    }
+
+    /**
      * The policy new/legacy admin accounts fall back to when they have
      * no policy_id attached (see SystemUser::effectivePermissions()).
      * Must match one of the `is_system` rows seeded in the

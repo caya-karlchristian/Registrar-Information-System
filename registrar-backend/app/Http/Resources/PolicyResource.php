@@ -6,12 +6,23 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class PolicyResource extends JsonResource
 {
+    /**
+     * Fixed at all of Policy::MODULE_KEYS — previously missing
+     * 'access_requests' and 'business_calendar' meant a policy granting
+     * only those two modules showed "No permissions assigned" in the
+     * "Description" column despite genuinely having access, and any
+     * future module added to MODULE_KEYS without a matching entry here
+     * will quietly repeat the same bug. Keeping both lists the same
+     * length/keys is the whole point of this constant existing at all.
+     */
     private const MODULE_LABELS = [
-        'dashboard' => 'Dashboard',
-        'inbox'     => 'Inbox',
-        'analytics' => 'Admin Analytics',
-        'logbook'   => 'Admin Logbook',
-        'profile'   => 'Admin Profile',
+        'dashboard'         => 'Dashboard',
+        'inbox'             => 'Inbox',
+        'analytics'         => 'Admin Analytics',
+        'logbook'           => 'Admin Logbook',
+        'profile'           => 'Admin Profile',
+        'access_requests'   => 'Access Requests',
+        'business_calendar' => 'Business Calendar',
     ];
 
     public function toArray($request): array

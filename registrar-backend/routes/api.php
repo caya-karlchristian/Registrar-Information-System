@@ -110,13 +110,53 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     });
 
     // Document requests
+    //
+    // Work Item #1 — Granular Per-Action Permissions: the module:...
+    // tags below on index/show/update/claim are the COARSE gate only.
+    // - index/show: 'module:dashboard,View' — safe to apply to every
+    //   authenticated role because SystemUser::hasModuleAccess() always
+    //   returns true for non-admins (students/alumni), so this never
+    //   blocks a requester viewing their own requests; it only ever
+    //   restricts an admin whose policy lacks dashboard View entirely.
+    // - update: 'module:dashboard,Process|Complete' — blocks any admin
+    //   with ZERO dashboard write access outright. It cannot by itself
+    //   distinguish "this call sets ReadyToClaim" (needs Process) from
+    //   "this call sets Completed" (needs Complete) — PUT is one
+    //   endpoint for every status transition — so the fine-grained,
+    //   target-status-dependent check lives in
+    //   DocumentRequestService::updateRequest() instead. See that
+    //   file's authorizeStatusChange().
+    // - claim: 'module:dashboard,Complete' — a single, unconditional
+    //   action gate, not an OR list: claimRequest() can only ever
+    //   produce Completed, so there's no ambiguity to resolve later the
+    //   way there is for update().
+    // - logbook (this file's dashboard "export the queue as a log"
+    //   view, distinct from the /request-history module below): now
+    //   explicitly 'module:logbook,View' rather than bare
+    //   'module:logbook'. Previously the untagged form meant "any
+    //   logbook access at all" via hasModuleAccess($module) with no
+    //   $action, so a policy granting only Export (no View) still
+    //   passed the gate — incoherent for a GET route. Behaviorally
+    //   identical for every real policy today (PolicyService now backs
+    //   View into any granted logbook action — see sanitizePermissions()
+    //   — so no existing policy can have Export without View), but
+    //   spelling it out here removes the implicit "no action = any
+    //   action" reading for a route that only ever needs View.
+    // - counts: now carries 'module:dashboard,View' alongside role:3,4.
+    //   This endpoint returns per-status counts for the same dashboard
+    //   queue that index/show/logbook already gate — it had no module
+    //   check at all before, which was a gap (an admin with zero
+    //   dashboard access could still see how many requests were in each
+    //   status). Counts are read-only and derived from the same View
+    //   permission as the list itself, so this reuses that action
+    //   rather than inventing a new one.
     Route::prefix('document-requests')->group(function () {
-        Route::get('/',                           [DocumentRequestController::class, 'index']);
-        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware(['role:3,4', 'module:logbook']);
-        Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware('role:3,4');
+        Route::get('/',                           [DocumentRequestController::class, 'index'])->middleware('module:dashboard,View');
+        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware(['role:3,4', 'module:logbook,View']);
+        Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware(['role:3,4', 'module:dashboard,View']);
         Route::post('archive-bulk',                [DocumentRequestController::class, 'archiveBulk'])->middleware('role:3');
         Route::post('restore-bulk',                [DocumentRequestController::class, 'restoreBulk'])->middleware('role:3');
-        Route::post('claim',                       [DocumentRequestController::class, 'claim'])->middleware('role:3');
+        Route::post('claim',                       [DocumentRequestController::class, 'claim'])->middleware(['role:3', 'module:dashboard,Complete']);
         // Dedicated throttle on top of the group's throttle:60,1 — OR
         // numbers look sequential (see cashier sample data), so this is a
         // soft enumeration surface (probing which numbers return `valid`)
@@ -134,9 +174,9 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         // search-users below — all had the identical collision.
         Route::post('verify-or', [DocumentRequestController::class, 'verifyOfficialReceipt'])
             ->middleware(['role:1,2', 'throttle:10,1,verify-or']);
-        Route::get('{documentRequest}', [DocumentRequestController::class, 'show']);
+        Route::get('{documentRequest}', [DocumentRequestController::class, 'show'])->middleware('module:dashboard,View');
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
-        Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware('role:3');
+        Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware(['role:3', 'module:dashboard,Process|Complete']);
         Route::patch('{documentRequest}/archive', [DocumentRequestController::class, 'archive'])->middleware('role:3');
         Route::patch('{documentRequest}/restore', [DocumentRequestController::class, 'restore'])->middleware('role:3');
         Route::delete('{documentRequest}', [DocumentRequestController::class, 'destroy'])->middleware('role:3');
@@ -171,7 +211,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.
-    Route::middleware(['role:3,4', 'module:logbook'])->prefix('request-history')->group(function () {
+    Route::middleware(['role:3,4', 'module:logbook,View'])->prefix('request-history')->group(function () {
         Route::get('/',    [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
     });

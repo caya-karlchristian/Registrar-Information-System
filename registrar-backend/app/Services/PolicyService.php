@@ -79,16 +79,59 @@ class PolicyService
 
     /**
      * Drop any module key that isn't in Policy::MODULE_KEYS before
-     * persisting. The store()/update() request validation only checks
-     * shape ("is this an array of arrays"), not the key names — this
-     * is what actually keeps `permissions` limited to modules the
-     * EnsureModuleAccess middleware (and the frontend) know how to
-     * enforce, so a typo'd or malicious key can never silently create
-     * an ungated "module".
+     * persisting, then drop any ACTION token within a module that
+     * isn't one that module actually recognizes. The store()/update()
+     * request validation only checks shape ("is this an array of
+     * arrays"), not the key or token names — this is what actually
+     * keeps `permissions` limited to what EnsureModuleAccess (and the
+     * frontend) know how to enforce, so a typo'd/malicious module key
+     * OR action token can never silently create an ungated permission.
+     *
+     * Work Item #1 — Granular Per-Action Permissions: modules listed in
+     * Policy::MODULE_ACTIONS (currently 'dashboard', 'logbook') may
+     * grant any subset of that module's own action list, e.g.
+     * `{"dashboard": ["View", "Complete"]}`. Every other module keeps
+     * the original single-token behavior — its only valid granted
+     * value is `["Access"]`; anything else in that array (a stray
+     * 'Process' typed in by hand via a raw API call, for instance) is
+     * silently dropped rather than persisted. Policy::actionsFor() is
+     * the single source of truth both branches read from, so a module
+     * only ever needs to be added to MODULE_ACTIONS once for both this
+     * sanitizer and SystemUser::hasModuleAccess() to recognize it.
      */
     private function sanitizePermissions(array $permissions): array
     {
-        return array_intersect_key($permissions, array_flip(Policy::MODULE_KEYS));
+        $permissions = array_intersect_key($permissions, array_flip(Policy::MODULE_KEYS));
+
+        $sanitized = [];
+
+        foreach ($permissions as $module => $actions) {
+            $actions = is_array($actions) ? $actions : [];
+            $actions = array_values(array_intersect(
+                array_unique($actions),
+                Policy::actionsFor($module)
+            ));
+
+            // View-dependency guard: for any module whose action
+            // vocabulary includes 'View' (currently 'dashboard',
+            // 'logbook'), granting any OTHER action implies View — you
+            // can't coherently act on something you're not granted to
+            // see. PolicyManagement.jsx already enforces this
+            // client-side (checking Process/Complete auto-checks View;
+            // unchecking View clears them), but that's UI-only — a raw
+            // POST/PUT /policies call bypassed it, letting a policy
+            // persist as e.g. dashboard => ['Process'] with no View.
+            // Backfilling View here (rather than rejecting the
+            // request) mirrors how the frontend already resolves the
+            // same conflict, so this stays a pure sanitizer.
+            if (!empty($actions) && in_array('View', Policy::actionsFor($module), true) && !in_array('View', $actions, true)) {
+                $actions[] = 'View';
+            }
+
+            $sanitized[$module] = $actions;
+        }
+
+        return $sanitized;
     }
 
     /**
