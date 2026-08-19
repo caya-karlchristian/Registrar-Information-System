@@ -93,7 +93,7 @@ test('a Super Admin can edit the policy on an Active Admin role assignment in pl
 
     $this->patchJson("/api/role-assignments/{$assignment->id}/policy", ['policy_id' => $newPolicy->policy_id])
         ->assertOk()
-        ->assertJsonPath('policy.policy_id', $newPolicy->policy_id);
+        ->assertJsonPath('data.policy.policy_id', $newPolicy->policy_id);
 
     expect($assignment->fresh()->policy_id)->toBe($newPolicy->policy_id);
 });
