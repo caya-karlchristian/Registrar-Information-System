@@ -294,7 +294,7 @@ class AnalyticsService
             ->get();
 
         // Staff Performance panel (per-admin Requests Handled / Avg
-        // Processing Time). Two fixes vs. the naive version:
+        // Processing Time). Two correctness fixes vs. the naive version:
         //
         //   1. avg_minutes uses rh.business_minutes, NOT rh.minutes_processed.
         //      minutes_processed is cumulative wall-clock time since the
@@ -326,6 +326,16 @@ class AnalyticsService
         //      transition, so COUNT(*) credited an admin once per step
         //      instead of once per request — a single 4-step request handled
         //      by one admin end-to-end was counted as 4 "requests handled".
+        //
+        // Plan Step 1a — min_minutes / max_minutes / sample_count added here,
+        // mirroring by_document_type above: a bare average hides whether an
+        // admin's "requests handled" were consistently fast or a mix of very
+        // fast and very slow ones. sample_count is COUNT(*) (transitions
+        // averaged), distinct from requests_handled (COUNT(DISTINCT), see
+        // point 2 above) — deliberately different numbers for different
+        // questions ("how many samples went into this average" vs. "how
+        // many requests did this admin handle").
+        //
         // Joins document_request so excludeArchived() has a table to filter
         // on — same gap as by_document_type above: this query had no path
         // to is_archived / deleted_at, so an admin's stats included work
@@ -342,12 +352,67 @@ class AnalyticsService
                 'u.user_id',
                 'u.email',
                 DB::raw("CONCAT(COALESCE(ap.first_name,''), ' ', COALESCE(ap.last_name,'')) as display_name"),
+                DB::raw('ROUND(MIN(rh.business_minutes), 1) as min_minutes'),
                 DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes'),
-                DB::raw('COUNT(DISTINCT rh.request_id) as requests_handled')
+                DB::raw('ROUND(MAX(rh.business_minutes), 1) as max_minutes'),
+                DB::raw('COUNT(*) as sample_count'),
+                DB::raw('COUNT(DISTINCT rh.request_id) as requests_handled'),
+                // Plan Step 1b — distinct calendar days (in the display
+                // timezone, same conversion as everywhere else in this file)
+                // this admin touched at least one request. Used below to
+                // compute a rate metric (requests handled per active day)
+                // instead of a raw count over the whole selected range,
+                // which would make an admin who worked 3 of 30 days look
+                // "slow" purely because most of the range wasn't theirs to
+                // work at all.
+                DB::raw('COUNT(DISTINCT ' . self::dateExpression('rh.changed_at') . ') as active_days')
             )
             ->groupBy('u.user_id', 'u.email', 'ap.first_name', 'ap.last_name')
             ->orderBy('avg_minutes')
             ->get();
+
+        // Plan Step 1c — rework/quality signal. Chosen proxy (per the plan's
+        // open question 1): count of requests each admin touched in-range
+        // that are currently Forfeited (never claimed within the SLA
+        // window), as a fraction of the requests they handled. This is a
+        // signal, not a verdict — forfeiture is frequently outside staff
+        // control (a student simply never returns) — so it's surfaced as a
+        // rate alongside the other metrics rather than as a standalone
+        // "quality score." The plan's alternative proxy ("re-touched after
+        // leaving their hands") would need a self-join across ordered
+        // history rows per request and is left as a follow-up if this proxy
+        // turns out to be too noisy in practice.
+        $forfeitedCounts = $this->excludeArchived(
+            DB::table('request_history as rh')
+                ->join('document_request as dr', 'rh.request_id', '=', 'dr.request_id')
+                ->whereBetween('rh.changed_at', [$from, $to])
+                ->whereNotNull('rh.changed_by')
+                ->where('dr.status_id', RequestStatusEnum::Forfeited->value),
+            'dr'
+        )
+            ->select('rh.changed_by as user_id', DB::raw('COUNT(DISTINCT rh.request_id) as forfeited_count'))
+            ->groupBy('rh.changed_by')
+            ->get()
+            ->keyBy('user_id');
+
+        // Post-aggregate ratios (rate-per-active-day, forfeit rate) are
+        // computed here in PHP rather than as SQL expressions — they're
+        // simple divisions of two already-aggregated columns, and doing it
+        // here avoids a driver-specific "safe divide by zero" SQL
+        // expression for what's a two-line null check in PHP.
+        $byAdmin = $byAdmin->map(function ($row) use ($forfeitedCounts) {
+            $row->requests_per_active_day = $row->active_days > 0
+                ? round($row->requests_handled / $row->active_days, 1)
+                : null;
+
+            $forfeited = (int) ($forfeitedCounts[$row->user_id]->forfeited_count ?? 0);
+            $row->forfeited_count = $forfeited;
+            $row->forfeit_rate = $row->requests_handled > 0
+                ? round(($forfeited / $row->requests_handled) * 100, 1)
+                : 0.0;
+
+            return $row;
+        });
 
         return [
             'by_document_type' => $byDocType,
@@ -523,11 +588,18 @@ class AnalyticsService
         $byPurpose      = $this->byPurpose($range);
 
         // Strip admin user_id and email from processing stats — keep only
-        // display_name and performance numbers.
+        // display_name and performance numbers. Includes the Step 1a–1c
+        // metrics (min/max spread, rate-per-active-day, forfeit rate) so
+        // the narrative can speak to workload and outcomes, not just a
+        // single "fastest admin" average.
         $adminPerf = collect($processingTime['by_admin'])->map(fn ($a) => [
-            'name'             => trim($a->display_name) ?: 'Unknown',
-            'avg_minutes'      => $a->avg_minutes,
-            'requests_handled' => $a->requests_handled,
+            'name'                    => trim($a->display_name) ?: 'Unknown',
+            'avg_minutes'             => $a->avg_minutes,
+            'min_minutes'             => $a->min_minutes,
+            'max_minutes'             => $a->max_minutes,
+            'requests_handled'        => $a->requests_handled,
+            'requests_per_active_day' => $a->requests_per_active_day,
+            'forfeit_rate'            => $a->forfeit_rate,
         ])->values()->all();
 
         // Peak hours — only top 5 busiest to keep payload compact
@@ -559,6 +631,26 @@ class AnalyticsService
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Return a SQL expression that formats a datetime column as 'YYYY-MM-DD'
+     * in the display timezone. Used to count an admin's distinct active
+     * working days (Step 1b) — the same local-timezone conversion as
+     * monthExpression()/hourExpression() above, truncated to day instead of
+     * month/hour, so a transition made at 11:30 PM local time is bucketed
+     * onto the correct calendar day rather than the UTC one.
+     */
+    private static function dateExpression(string $column): string
+    {
+        $driver = DB::connection()->getDriverName();
+        $local  = self::localExpression($column, $driver);
+
+        return match ($driver) {
+            'sqlite' => "date({$local})",
+            'pgsql'  => "to_char({$local}, 'YYYY-MM-DD')",
+            default  => "DATE_FORMAT({$local}, '%Y-%m-%d')",  // MySQL / MariaDB
+        };
+    }
 
     /**
      * Return a SQL expression that formats a datetime column as 'YYYY-MM'.
