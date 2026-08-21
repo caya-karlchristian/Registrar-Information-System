@@ -19,6 +19,12 @@ const GRADS = {
   alumni: "from-[#11998e] to-[#38ef7d]",
 };
 const LABELS = { admin: "Admin", super_admin: "Super Admin", student: "Student", alumni: "Alumni" };
+const DESCRIPTIONS = {
+  student: "Student Role",
+  alumni: "Alumni Role",
+  admin: "Registrar Staff",
+  super_admin: "System Administrator",
+};
 
 const AccessControlPage = () => {
   const navigate = useNavigate();
@@ -44,7 +50,7 @@ const AccessControlPage = () => {
       return {
         role_id: assignment.role_id,
         label: LABELS[roleName] || roleName || "Unknown",
-        description: assignment.policy?.name || (roleName === "student" ? "Student Member" : "Account role"),
+        description: assignment.policy?.name || DESCRIPTIONS[roleName] || "Account Role",
         icon: ICONS[roleName] || UserIcon,
         grad: GRADS[roleName] || "from-gray-500 to-gray-700",
       };

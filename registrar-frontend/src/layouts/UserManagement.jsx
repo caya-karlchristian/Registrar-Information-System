@@ -192,6 +192,7 @@ const UserManagement = () => {
   // own fetch/grant/revoke lifecycle.
   const [selectedUserForRoles, setSelectedUserForRoles] = useState(null);
   const [isGrantPickerOpen, setIsGrantPickerOpen] = useState(false);
+  const [openedFromPicker, setOpenedFromPicker] = useState(false);
 
   // Policies come from the backend now (policies table via GET /policies).
   const [systemPolicies, setSystemPolicies] = useState([]);
@@ -274,7 +275,7 @@ const UserManagement = () => {
 
   const handleFilterChange = () => setCurrentPage(1);
 
-    // -------------------------------------------------------
+  // -------------------------------------------------------
   // Create / Update
   // -------------------------------------------------------
   const handleSubmit = async (formData, userId) => {
@@ -411,224 +412,230 @@ const UserManagement = () => {
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-190 text-sm">
-          <thead>
-            <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Name</th>
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Email</th>
+            <thead>
+              <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Name</th>
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Email</th>
 
-              {/* Work Item #3: base identity — who this account fundamentally
+                {/* Work Item #3: base identity — who this account fundamentally
                   is, separate from the administrative role granted below. */}
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Identity</th>
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Identity</th>
 
-              {/* Role Filter dropdown — filters on the administrative role
+                {/* Role Filter dropdown — filters on the administrative role
                   GRANTED (admin_grant), not base identity. See ROLE_FILTERS. */}
-              <th className="px-4 py-3 text-center">
-                <DashboardDropdown
-                  isOpen={roleDropdownOpen}
-                  setIsOpen={setRoleDropdownOpen}
-                  dropdownRef={roleDropdownRef}
-                  align="center"
-                  trigger={
-                    <span className={roleFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
-                      Admin Role
-                    </span>
-                  }
-                  sections={[
-                    {
-                      title: 'Filter by Admin Role',
-                      items: ROLE_FILTERS.map(option => ({
-                        label: option,
-                        isSelected: roleFilter === option,
-                        onClick: () => {
-                          setRoleFilter(option);
-                          handleFilterChange();
-                        }
-                      }))
+                <th className="px-4 py-3 text-center">
+                  <DashboardDropdown
+                    isOpen={roleDropdownOpen}
+                    setIsOpen={setRoleDropdownOpen}
+                    dropdownRef={roleDropdownRef}
+                    align="center"
+                    trigger={
+                      <span className={roleFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
+                        Admin Role
+                      </span>
                     }
-                  ]}
-                />
-              </th>
+                    sections={[
+                      {
+                        title: 'Filter by Admin Role',
+                        items: ROLE_FILTERS.map(option => ({
+                          label: option,
+                          isSelected: roleFilter === option,
+                          onClick: () => {
+                            setRoleFilter(option);
+                            handleFilterChange();
+                          }
+                        }))
+                      }
+                    ]}
+                  />
+                </th>
 
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Policy attached</th>
-              
-              {/* Joined Date Sort header */}
-              <th className="px-4 py-3 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDateOrder(prev => prev === 'Newest' ? 'Oldest' : 'Newest');
-                    handleFilterChange();
-                  }}
-                  className={`flex items-center justify-center gap-1 mx-auto text-xs uppercase font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}
-                >
-                  <span>Joined Date</span>
-                  {dateOrder === 'Newest' ? (
-                    <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
-                  ) : (
-                    <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" />
-                  )}
-                </button>
-              </th>
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Policy attached</th>
 
-              {/* Account Status Filter dropdown — Work Item #3: labeled
+                {/* Joined Date Sort header */}
+                <th className="px-4 py-3 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDateOrder(prev => prev === 'Newest' ? 'Oldest' : 'Newest');
+                      handleFilterChange();
+                    }}
+                    className={`flex items-center justify-center gap-1 mx-auto text-xs uppercase font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}
+                  >
+                    <span>Joined Date</span>
+                    {dateOrder === 'Newest' ? (
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
+                    ) : (
+                      <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" />
+                    )}
+                  </button>
+                </th>
+
+                {/* Account Status Filter dropdown — Work Item #3: labeled
                   "Account Status" (not just "Status") to be explicit this is
                   the account's login-eligibility status (Activated/
                   Deactivated/...), distinct from the administrative grant's
                   own Active/Expired/Revoked status shown on the Admin Role
                   badge below. */}
-              <th className="px-4 py-3 text-center">
-                <DashboardDropdown
-                  isOpen={statusDropdownOpen}
-                  setIsOpen={setStatusDropdownOpen}
-                  dropdownRef={statusDropdownRef}
-                  align="center"
-                  trigger={
-                    <span className={statusFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
-                      Account Status
-                    </span>
-                  }
-                  sections={[
-                    {
-                      title: 'Filter by Status',
-                      items: STATUS_FILTERS.map(option => ({
-                        label: option,
-                        isSelected: statusFilter === option,
-                        onClick: () => {
-                          setStatusFilter(option);
-                          handleFilterChange();
-                        }
-                      }))
-                    }
-                  ]}
-                />
-              </th>
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <UserTableSkeleton isDark={isDark} count={7} />            
-            ) : paginated.length === 0 ? (
-            <tr>
-                <td colSpan={8} className="py-24">
-                  <div className="flex flex-col items-center justify-center">
-                    <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
-                      <MagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
-                    </div>
-                    <h3 className={`text-base font-bold mb-1 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
-                      No Records Found
-                    </h3>
-                    <p className={`text-xs text-center max-w-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                      No data matches your current search or filter criteria.
-                    </p>
-                  </div>
-                </td>
-              </tr>            
-              ) : (
-              paginated.map((user) => {
-                // Work Item #3: formatName(user) resolves across
-                // admin_profile / student_profile / alumni_profile
-                // automatically (see utils/formatters.js) — needed now
-                // that rows can be a Student or Alumni base identity,
-                // not just an Admin.
-                const fullName = formatName(user) || "—";
-                // Break-glass eligibility is tied to the account's own,
-                // PRIMARY Super Admin identity — mirrors
-                // SetLocalPasswordRequest's server-side check on the
-                // target's raw role_id, not any secondary grant.
-                const isBaseSuperAdmin = user.base_role_id === 4;
-                const grantRoleName = ROLE_MAP[user.admin_grant?.role_id] || `Role ${user.admin_grant?.role_id ?? "—"}`;
-                const isStudentStaff = !!user.admin_grant?.is_secondary;
-                const policy = getUserPolicy(user);
-
-                return (
-                  <tr key={user.user_id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
-                    <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
-                      {fullName}
-                    </td>
-                    <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
-                      {user.email}
-                    </td>
-                    {/* Base identity badge — who this account fundamentally
-                        is (Student/Alumni/Admin/Super Admin). */}
-                    <td className="px-4 py-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap capitalize ${getIdentityBadgeClasses(isDark)}`}>
-                        {user.base_role_name || `Role ${user.base_role_id}`}
+                <th className="px-4 py-3 text-center">
+                  <DashboardDropdown
+                    isOpen={statusDropdownOpen}
+                    setIsOpen={setStatusDropdownOpen}
+                    dropdownRef={statusDropdownRef}
+                    align="center"
+                    trigger={
+                      <span className={statusFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
+                        Account Status
                       </span>
-                    </td>
-                    {/* Administrative role granted, with a "Student Staff"
+                    }
+                    sections={[
+                      {
+                        title: 'Filter by Status',
+                        items: STATUS_FILTERS.map(option => ({
+                          label: option,
+                          isSelected: statusFilter === option,
+                          onClick: () => {
+                            setStatusFilter(option);
+                            handleFilterChange();
+                          }
+                        }))
+                      }
+                    ]}
+                  />
+                </th>
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <UserTableSkeleton isDark={isDark} count={7} />
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-24">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
+                        <MagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
+                      </div>
+                      <h3 className={`text-base font-bold mb-1 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                        No Records Found
+                      </h3>
+                      <p className={`text-xs text-center max-w-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                        No data matches your current search or filter criteria.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((user) => {
+                  // Work Item #3: formatName(user) resolves across
+                  // admin_profile / student_profile / alumni_profile
+                  // automatically (see utils/formatters.js) — needed now
+                  // that rows can be a Student or Alumni base identity,
+                  // not just an Admin.
+                  const fullName = formatName(user) || "—";
+                  // Break-glass eligibility is tied to the account's own,
+                  // PRIMARY Super Admin identity — mirrors
+                  // SetLocalPasswordRequest's server-side check on the
+                  // target's raw role_id, not any secondary grant.
+                  const isBaseSuperAdmin = user.base_role_id === 4;
+                  const grantRoleName = ROLE_MAP[user.admin_grant?.role_id] || `Role ${user.admin_grant?.role_id ?? "—"}`;
+                  const isStudentStaff = !!user.admin_grant?.is_secondary;
+                  const policy = getUserPolicy(user);
+
+                  return (
+                    <tr key={user.user_id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
+                      <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                        {fullName}
+                      </td>
+                      <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                        {user.email}
+                      </td>
+                      {/* Base identity badge — who this account fundamentally
+                        is (Student/Alumni/Admin/Super Admin). */}
+                      <td className="px-4 py-3">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap capitalize ${getIdentityBadgeClasses(isDark)}`}>
+                          {user.base_role_name || `Role ${user.base_role_id}`}
+                        </span>
+                      </td>
+                      {/* Administrative role granted, with a "Student Staff"
                         tag when it's a secondary grant on a non-admin base
                         identity — the core legibility requirement here. */}
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col items-center gap-1">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(grantRoleName, isDark)}`}>
-                          {grantRoleName}
-                        </span>
-                        {isStudentStaff && (
-                          <span className={`text-[10px] font-semibold uppercase tracking-wide ${isDark ? 'text-yellow-400' : 'text-[#8b0000]'}`}>
-                            Student Staff
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(grantRoleName, isDark)}`}>
+                            {grantRoleName}
+                          </span>
+                          {isStudentStaff && (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap ${
+                              isDark
+                                ? 'bg-[#8B0000]/20 text-[#ffb3b3] border-[#8B0000]/30'
+                                : 'bg-[#8B0000]/10 text-[#8B0000] border-[#8B0000]/20'
+                            }`}>
+                              Student Staff
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {/* Policy in effect for the administrative grant above —
+                        NOT the same as base identity, see getUserPolicy(). */}
+                      <td className="px-6 py-4 text-center">
+                        {user.admin_grant?.role_id === 4 ? (
+                          <span className={`text-[13px] font-semibold ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                            Full Access
+                          </span>
+                        ) : (
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${user.admin_grant?.policy
+                              ? (isDark ? 'bg-[#0f213d] text-[#5c93e6] border-[#1e3a66]' : 'bg-[#e0f2fe] text-[#0369a1] border-[#bae6fd]')
+                              : (isDark ? 'bg-[#3a3b3c] text-[#b0b3b8] border-[#4e4f50]' : 'bg-gray-100 text-gray-500 border-gray-200')
+                            }`}>
+                            {policy}
                           </span>
                         )}
-                      </div>
-                    </td>
-                    {/* Policy in effect for the administrative grant above —
-                        NOT the same as base identity, see getUserPolicy(). */}
-                    <td className="px-6 py-4 text-center">
-                      {user.admin_grant?.role_id === 4 ? (
-                        <span className={`text-[13px] font-semibold ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                          Full Access
-                        </span>
-                      ) : (
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                          user.admin_grant?.policy
-                            ? (isDark ? 'bg-[#0f213d] text-[#5c93e6]' : 'bg-[#e0f2fe] text-[#0369a1]')
-                            : (isDark ? 'bg-[#3a3b3c] text-[#b0b3b8]' : 'bg-gray-100 text-gray-500')
-                          }`}>
-                            {policy}
-                       </span>
-                      )}
-                    </td>
-                    {/* Joined Date */}
-                    <td className={`px-4 py-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                      {formatDate(user.created_at)}
-                    </td>
-                    {/* Account status — login-eligibility (Activated/
+                      </td>
+                      {/* Joined Date */}
+                      <td className={`px-4 py-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                        {formatDate(user.created_at)}
+                      </td>
+                      {/* Account status — login-eligibility (Activated/
                         Deactivated/...), intentionally separate from the
                         Admin Role badge's own grant status above. */}
-                    <td className="px-6 py-4 text-center">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(user.status, isDark)}`}>
-                        {user.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 justify-center">
-                        {isBaseSuperAdmin && (
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(user.status, isDark)}`}>
+                          {user.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 justify-center">
+                          {isBaseSuperAdmin && (
+                            <button
+                              onClick={() => handleOpenLocalAuth(user)}
+                              title="Enable break-glass access"
+                              className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
+                              <KeyIcon className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleOpenLocalAuth(user)}
-                            title="Enable break-glass access"
+                            onClick={() => {
+                              setSelectedUserForRoles(user);
+                              setOpenedFromPicker(false);
+                            }}
+                            title="Manage roles"
                             className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
-                            <KeyIcon className="w-4 h-4" />
+                            <IdentificationIcon className="w-4 h-4" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => setSelectedUserForRoles(user)}
-                          title="Manage roles"
-                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
-                          <IdentificationIcon className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => { setEditUser(user); setIsModalOpen(true); }}
-                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
-                          <PencilSquareIcon className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                          <button onClick={() => { setEditUser(user); setIsModalOpen(true); }}
+                            className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
+                            <PencilSquareIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Pagination */}
         <div className={`flex items-center justify-center gap-1 px-4 py-4 border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
@@ -680,7 +687,18 @@ const UserManagement = () => {
 
       <RoleAssignmentsModal
         isOpen={!!selectedUserForRoles}
-        onClose={() => setSelectedUserForRoles(null)}
+        onClose={() => {
+          setSelectedUserForRoles(null);
+          setOpenedFromPicker(false);
+        }}
+        onBack={
+          openedFromPicker
+            ? () => {
+              setSelectedUserForRoles(null);
+              setIsGrantPickerOpen(true);
+            }
+            : undefined
+        }
         user={selectedUserForRoles}
         systemPolicies={systemPolicies}
         onSuccess={setSuccessMsg}
@@ -693,17 +711,18 @@ const UserManagement = () => {
         onSelect={(pickedUser) => {
           setIsGrantPickerOpen(false);
           setSelectedUserForRoles(pickedUser);
+          setOpenedFromPicker(true);
         }}
       />
 
-      <SuccessToast 
-        message={successMsg} 
-        onClose={() => setSuccessMsg("")} 
+      <SuccessToast
+        message={successMsg}
+        onClose={() => setSuccessMsg("")}
       />
 
-      <ErrorToast 
-        message={errorMsg} 
-        onClose={() => setErrorMsg("")} 
+      <ErrorToast
+        message={errorMsg}
+        onClose={() => setErrorMsg("")}
       />
     </div>
   );
