@@ -64,8 +64,10 @@ export const formatName = (input, options = {}) => {
   const target =
     input.student_profile ||
     input.alumni_profile ||
+    input.admin_profile ||
     input.user?.student_profile ||
     input.user?.alumni_profile ||
+    input.user?.admin_profile ||
     input;
 
   const first = target.first_name || target.first_name_input || target.firstName || target.target_first_name || "";
