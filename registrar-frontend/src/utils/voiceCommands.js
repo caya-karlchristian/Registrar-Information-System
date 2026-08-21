@@ -114,8 +114,38 @@ export const VOICE_COMMANDS = [
     type: "navigate",
     target: "users",
     phrases: [
+      "go to user management", "open user management", "user management",
       "go to admin management", "open admin management", "admin management",
-      "admin directory", "manage users", "accounts"
+      "admin directory", "manage users", "manage accounts", "manage staff",
+      "users", "accounts",
+    ],
+  },
+  {
+    id: "navigate-access-requests",
+    type: "navigate",
+    target: "access-requests",
+    phrases: [
+      "go to access requests", "open access requests", "access requests",
+      "permission requests", "role requests", "request access",
+    ],
+  },
+  {
+    id: "navigate-business-calendar",
+    type: "navigate",
+    target: "business-calendar",
+    phrases: [
+      "go to business calendar", "open business calendar", "business calendar",
+      "calendar management", "manage calendar", "holiday calendar",
+      "academic calendar", "calendar",
+    ],
+  },
+  {
+    id: "navigate-access-control",
+    type: "navigate",
+    target: "access-control",
+    phrases: [
+      "switch role", "switch roles", "change role", "switch account",
+      "access control", "role switcher", "choose role",
     ],
   },
   {
@@ -160,7 +190,7 @@ export const VOICE_COMMANDS = [
     action: "logout",
     phrases: ["log out", "logout", "sign out", "log me out"],
   },
-{
+  {
     id: "action-theme-dark",
     type: "action",
     action: "dark-mode",
@@ -242,16 +272,19 @@ const ROLE_ROUTE_MAP = {
     logbook: "logbook",
     profile: "profile",
     contact: "contact",
+    "access-requests": "access-requests",
+    "business-calendar": "business-calendar",
   },
   [ROLES.SUPER_ADMIN]: {
-    dashboard: "",
+    dashboard: "user",
     inbox: "inbox",
     users: "user",
     documents: "documents",
-    certificates: "certificates",
+    certificates: "documents",
     reports: "report",
     settings: "settings",
     contact: "contact",
+    "business-calendar": "business-calendar",
   },
 };
 
@@ -264,6 +297,10 @@ const ROLE_ROUTE_MAP = {
  *                         target doesn't exist for the given role.
  */
 export function resolveVoiceRoute(target, roleName) {
+  if (target === "access-control") {
+    return "/access-control";
+  }
+
   const base = ROLE_HOME[roleName];
   const routesForRole = ROLE_ROUTE_MAP[roleName];
   if (!base || !routesForRole || !(target in routesForRole)) return null;

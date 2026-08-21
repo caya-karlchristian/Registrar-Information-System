@@ -64,7 +64,7 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     noRequests: false,
     doneRequest: false,
     receiptNumber: "",
-    dateOfPayment: "",
+    dateOfPayment: getTodayDate(),
     documentCopies: {},
     certCopies: {},
   });
@@ -380,7 +380,7 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
       noRequests: false,
       doneRequest: false,
       receiptNumber: "",
-      dateOfPayment: "",
+      dateOfPayment: getTodayDate(),
       documentCopies: {},
       certCopies: {},
     });
