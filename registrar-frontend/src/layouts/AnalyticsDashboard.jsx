@@ -355,8 +355,8 @@ const AnalyticsDashboard = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
                       <XAxis dataKey="document_name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: isDark ? '#b0b3b8' : '#64748b' }} />
                       <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                      <Tooltip content={(props) => <CustomTooltip {...props} isDark={isDark} unit="Requests" />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }} />
-                      <Bar dataKey="total_requests" radius={[10, 10, 0, 0]}>
+                      <Tooltip content={(props) => <CustomTooltip {...props} isDark={isDark} unit="Documents" />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }} />
+                      <Bar dataKey="total_documents" radius={[10, 10, 0, 0]}>
                         {docTypeData.slice(0, 6).map((_, i) => (
                           <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
                         ))}

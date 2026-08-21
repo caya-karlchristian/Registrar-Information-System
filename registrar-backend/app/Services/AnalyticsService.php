@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Enums\RequestStatusEnum;
 use App\Models\DocumentRequest;
-use App\Models\RequestHistory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -16,6 +15,40 @@ use Illuminate\Support\Facades\Schema;
  */
 class AnalyticsService
 {
+    // -------------------------------------------------------------------------
+    // Archive / soft-delete exclusion
+    // -------------------------------------------------------------------------
+
+    /**
+     * Apply the "active requests only" predicate to a raw query builder
+     * touching document_request (directly or via join).
+     *
+     * DocumentRequest registers two automatic exclusion mechanisms —
+     * ExcludeArchivedScope (is_archived = false) and Laravel's SoftDeletes
+     * (deleted_at IS NULL) — but both are Eloquent global scopes, so they
+     * only apply to queries built through the DocumentRequest model.
+     * Every query in this service that goes through DB::table(...) instead
+     * (for JOIN/aggregate shapes Eloquent can't express as cleanly) bypasses
+     * both scopes entirely, silently letting archived/deleted requests back
+     * into aggregate reports.
+     *
+     * Centralised here — once, near the data — rather than repeating
+     * ->where('is_archived', false)->whereNull('deleted_at') at every call
+     * site, which is the exact copy-paste-dependent pattern that let this
+     * gap exist in the first place. is_archived is indexed (dr_is_archived_idx,
+     * see migration 2026_07_13_000000_add_archiving_to_document_request), so
+     * this is a cheap, indexed filter, not a new table scan.
+     *
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @param  string  $alias  Table/alias document_request was joined as.
+     */
+    private function excludeArchived(\Illuminate\Database\Query\Builder $query, string $alias = 'document_request'): \Illuminate\Database\Query\Builder
+    {
+        return $query
+            ->where("{$alias}.is_archived", false)
+            ->whereNull("{$alias}.deleted_at");
+    }
+
     // -------------------------------------------------------------------------
     // Overview KPIs
     // -------------------------------------------------------------------------
@@ -48,9 +81,21 @@ class AnalyticsService
         $completed = (int) $counts->completed;
         $forfeited = (int) $counts->forfeited;
 
-        $avgProcessing = RequestHistory::whereBetween('changed_at', [$from, $to])
-            ->whereNotNull('minutes_processed')
-            ->avg('minutes_processed');
+        // Raw DB::table() query (not RequestHistory::), since averaging
+        // needs a join back to document_request to reach is_archived /
+        // deleted_at at all — request_history carries neither column
+        // itself. Uses business_minutes (calendar-aware, per-segment
+        // duration), not minutes_processed (cumulative wall-clock time
+        // since requested_at, re-counted on every status change) — see
+        // processingTime()'s doc block for the full explanation of why
+        // these two columns aren't interchangeable.
+        $avgProcessing = $this->excludeArchived(
+            DB::table('request_history as rh')
+                ->join('document_request as dr', 'rh.request_id', '=', 'dr.request_id')
+                ->whereBetween('rh.changed_at', [$from, $to])
+                ->whereNotNull('rh.business_minutes'),
+            'dr'
+        )->avg('rh.business_minutes');
 
         // Previous period comparison
         $periodLength = $from->diffInSeconds($to);
@@ -124,39 +169,60 @@ class AnalyticsService
     {
         [$from, $to] = $range;
 
-        // Single JOIN query — processing time included directly
-        $rows = DB::table('request_document as rd')
-            ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
-            ->join('document_request as dr', 'rd.request_id', '=', 'dr.request_id')
-            ->leftJoin(
-                DB::raw('(
-                    SELECT rd2.document_type_id,
-                           ROUND(AVG(rh.minutes_processed), 1) as avg_minutes
-                    FROM   request_history rh
-                    JOIN   request_document rd2 ON rh.request_id = rd2.request_id
-                    WHERE  rh.minutes_processed IS NOT NULL
-                    GROUP  BY rd2.document_type_id
-                ) as pt'),
-                'pt.document_type_id',
-                '=',
-                'dt.document_type_id'
+        // Processing-time-per-document-type subquery, built with the query
+        // builder (rather than a hand-written DB::raw string) so the date
+        // range and archive exclusion can be bound/applied the same way as
+        // everywhere else instead of living outside the query builder's
+        // reach. Two bugs fixed here vs. the previous version:
+        //   1. business_minutes, not minutes_processed — see processingTime()
+        //      for the full explanation of why these differ.
+        //   2. This subquery previously had no whereBetween('changed_at', ...)
+        //      at all, so avg_processing_min silently ignored the selected
+        //      date range and always computed an all-time average regardless
+        //      of whether "Today," "This Month," or "This Year" was picked.
+        $processingTimeByType = $this->excludeArchived(
+            DB::table('request_history as rh')
+                ->join('request_document as rd2', 'rh.request_id', '=', 'rd2.request_id')
+                ->join('document_request as dr2', 'rh.request_id', '=', 'dr2.request_id')
+                ->whereBetween('rh.changed_at', [$from, $to])
+                ->whereNotNull('rh.business_minutes'),
+            'dr2'
+        )
+            ->select(
+                'rd2.document_type_id',
+                DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes')
             )
-            ->whereBetween('dr.requested_at', [$from, $to])
+            ->groupBy('rd2.document_type_id');
+
+        $rows = $this->excludeArchived(
+            DB::table('request_document as rd')
+                ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+                ->join('document_request as dr', 'rd.request_id', '=', 'dr.request_id')
+                ->leftJoinSub($processingTimeByType, 'pt', 'pt.document_type_id', '=', 'dt.document_type_id')
+                ->whereBetween('dr.requested_at', [$from, $to]),
+            'dr'
+        )
             ->select(
                 'dt.document_type_id',
                 'dt.document_name',
-                DB::raw('COUNT(rd.request_document_id) as total_requests'),
+                // Renamed from total_requests: this counts request_document
+                // line items, not distinct requests — a request with 2
+                // document types is counted once per type here. That's
+                // legitimate (each type was genuinely requested), but the
+                // old name invited "why doesn't this match Total Requests"
+                // confusion against overview()'s distinct-request count.
+                DB::raw('COUNT(rd.request_document_id) as total_documents'),
                 DB::raw('SUM(rd.number_of_copies) as total_copies'),
                 'pt.avg_minutes as avg_processing_min'
             )
             ->groupBy('dt.document_type_id', 'dt.document_name', 'pt.avg_minutes')
-            ->orderByDesc('total_requests')
+            ->orderByDesc('total_documents')
             ->get();
 
         return $rows->map(fn ($row) => [
             'document_type_id'   => $row->document_type_id,
             'document_name'      => $row->document_name,
-            'total_requests'     => (int) $row->total_requests,
+            'total_documents'    => (int) $row->total_documents,
             'total_copies'       => (int) $row->total_copies,
             'avg_processing_min' => $row->avg_processing_min,
         ])->all();
@@ -170,9 +236,11 @@ class AnalyticsService
     {
         [$from, $to] = $range;
 
-        return DB::table('document_request as dr')
+        $query = DB::table('document_request as dr')
             ->join('request_status as rs', 'dr.status_id', '=', 'rs.status_id')
-            ->whereBetween('dr.requested_at', [$from, $to])
+            ->whereBetween('dr.requested_at', [$from, $to]);
+
+        return $this->excludeArchived($query, 'dr')
             ->select(
                 'rs.status_id',
                 'rs.status_name',
@@ -197,17 +265,28 @@ class AnalyticsService
     {
         [$from, $to] = $range;
 
-        $byDocType = DB::table('request_history as rh')
+        // Uses business_minutes, not minutes_processed — same reasoning as
+        // by_admin below: minutes_processed is cumulative wall-clock time
+        // since requested_at (re-counted on every transition), while
+        // business_minutes is the calendar-aware, per-segment duration.
+        // Also joins document_request so excludeArchived() has a table to
+        // filter on — this query previously had no path to is_archived /
+        // deleted_at at all, so archived/deleted requests' processing times
+        // silently skewed the "Processing Time" chart.
+        $byDocTypeQuery = DB::table('request_history as rh')
             ->join('request_document as rd', 'rh.request_id', '=', 'rd.request_id')
             ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+            ->join('document_request as dr', 'rh.request_id', '=', 'dr.request_id')
             ->whereBetween('rh.changed_at', [$from, $to])
-            ->whereNotNull('rh.minutes_processed')
+            ->whereNotNull('rh.business_minutes');
+
+        $byDocType = $this->excludeArchived($byDocTypeQuery, 'dr')
             ->select(
                 'dt.document_type_id',
                 'dt.document_name',
-                DB::raw('ROUND(MIN(rh.minutes_processed), 1) as min_minutes'),
-                DB::raw('ROUND(AVG(rh.minutes_processed), 1) as avg_minutes'),
-                DB::raw('ROUND(MAX(rh.minutes_processed), 1) as max_minutes'),
+                DB::raw('ROUND(MIN(rh.business_minutes), 1) as min_minutes'),
+                DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes'),
+                DB::raw('ROUND(MAX(rh.business_minutes), 1) as max_minutes'),
                 DB::raw('COUNT(*) as sample_count')
             )
             ->groupBy('dt.document_type_id', 'dt.document_name')
@@ -247,11 +326,18 @@ class AnalyticsService
         //      transition, so COUNT(*) credited an admin once per step
         //      instead of once per request — a single 4-step request handled
         //      by one admin end-to-end was counted as 4 "requests handled".
-        $byAdmin = DB::table('request_history as rh')
+        // Joins document_request so excludeArchived() has a table to filter
+        // on — same gap as by_document_type above: this query had no path
+        // to is_archived / deleted_at, so an admin's stats included work
+        // done on requests that are now archived or soft-deleted.
+        $byAdminQuery = DB::table('request_history as rh')
             ->join('users as u', 'rh.changed_by', '=', 'u.user_id')
             ->leftJoin('admin_profile as ap', 'u.user_id', '=', 'ap.user_id')
+            ->join('document_request as dr', 'rh.request_id', '=', 'dr.request_id')
             ->whereBetween('rh.changed_at', [$from, $to])
-            ->whereNotNull('rh.business_minutes')
+            ->whereNotNull('rh.business_minutes');
+
+        $byAdmin = $this->excludeArchived($byAdminQuery, 'dr')
             ->select(
                 'u.user_id',
                 'u.email',
@@ -302,12 +388,19 @@ class AnalyticsService
     {
         [$from, $to] = $range;
 
-        $registrarTime = DB::table('request_history as rh')
+        // Both queries below join document_request so excludeArchived() has
+        // a table to filter on — neither had a path to is_archived /
+        // deleted_at previously, so SLA turnaround stats included segments
+        // from requests that are now archived or soft-deleted.
+        $registrarTimeQuery = DB::table('request_history as rh')
             ->join('request_document as rd', 'rh.request_id', '=', 'rd.request_id')
             ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+            ->join('document_request as dr', 'rh.request_id', '=', 'dr.request_id')
             ->where('rh.old_status_id', RequestStatusEnum::Processing->value)
             ->whereBetween('rh.changed_at', [$from, $to])
-            ->whereNotNull('rh.business_minutes')
+            ->whereNotNull('rh.business_minutes');
+
+        $registrarTime = $this->excludeArchived($registrarTimeQuery, 'dr')
             ->select(
                 'dt.document_type_id',
                 'dt.document_name',
@@ -320,12 +413,15 @@ class AnalyticsService
             ->orderBy('avg_minutes')
             ->get();
 
-        $signatureTime = DB::table('request_history as rh')
+        $signatureTimeQuery = DB::table('request_history as rh')
             ->join('request_document as rd', 'rh.request_id', '=', 'rd.request_id')
             ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+            ->join('document_request as dr', 'rh.request_id', '=', 'dr.request_id')
             ->where('rh.old_status_id', RequestStatusEnum::PendingSignature->value)
             ->whereBetween('rh.changed_at', [$from, $to])
-            ->whereNotNull('rh.business_minutes')
+            ->whereNotNull('rh.business_minutes');
+
+        $signatureTime = $this->excludeArchived($signatureTimeQuery, 'dr')
             ->select(
                 'dt.document_type_id',
                 'dt.document_name',
@@ -381,9 +477,11 @@ class AnalyticsService
     {
         [$from, $to] = $range;
 
-        return DB::table('document_request as dr')
+        $query = DB::table('document_request as dr')
             ->join('request_purpose as rp', 'dr.request_purpose_id', '=', 'rp.request_purpose_id')
-            ->whereBetween('dr.requested_at', [$from, $to])
+            ->whereBetween('dr.requested_at', [$from, $to]);
+
+        return $this->excludeArchived($query, 'dr')
             ->select(
                 'rp.request_purpose_id',
                 'rp.purpose_name',

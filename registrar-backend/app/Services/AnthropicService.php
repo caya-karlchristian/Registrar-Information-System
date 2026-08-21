@@ -193,7 +193,10 @@ class AnthropicService
         $topDoc = ! empty($docs)
             ? ($docs[0]['document_name'] ?? 'Unknown')
             : null;
-        $topDocCount = ! empty($docs) ? ($docs[0]['total_requests'] ?? 0) : 0;
+        // total_documents (not total_requests): AnalyticsService::byDocumentType()
+        // counts request_document line items, so a request with 2 document
+        // types contributes to 2 types' counts here.
+        $topDocCount = ! empty($docs) ? ($docs[0]['total_documents'] ?? 0) : 0;
         $topDocPct   = $total > 0 && $topDocCount > 0
             ? round(($topDocCount / $total) * 100)
             : 0;
@@ -244,7 +247,7 @@ class AnthropicService
             : "";
 
         $p4 = $topDoc
-            ? "{$topDoc} remained the most requested document type, accounting for {$topDocPct}% of all requests ({$topDocCount} total). "
+            ? "{$topDoc} remained the most requested document type, accounting for {$topDocPct}% of all documents requested ({$topDocCount} total). "
               . "Ensuring adequate staffing and template availability for this document type will have the highest impact on overall turnaround time."
             : "";
 
