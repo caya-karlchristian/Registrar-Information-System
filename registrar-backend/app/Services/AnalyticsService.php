@@ -214,17 +214,50 @@ class AnalyticsService
             ->orderBy('avg_minutes')
             ->get();
 
+        // Staff Performance panel (per-admin Requests Handled / Avg
+        // Processing Time). Two fixes vs. the naive version:
+        //
+        //   1. avg_minutes uses rh.business_minutes, NOT rh.minutes_processed.
+        //      minutes_processed is cumulative wall-clock time since the
+        //      request's original requested_at, recomputed on every single
+        //      transition (see DocumentRequestService::recordStatusHistory's
+        //      doc block) — so a request that sat untouched for days before
+        //      an admin finally moved it gets that entire wait attributed to
+        //      that admin, like a relay runner timed for the whole race
+        //      instead of just their leg. business_minutes is the additive,
+        //      per-segment duration (time since the *previous* status change,
+        //      or since requested_at for the first transition) already
+        //      computed and stored for this exact purpose — no new column or
+        //      backfill needed, it just wasn't being read here yet.
+        //
+        //      business_minutes is also calendar-aware (office hours only,
+        //      excludes weekends/holidays), which is what we want for a
+        //      staff performance number: it doesn't penalize an admin for a
+        //      request sitting overnight, only for time they actually held
+        //      it during business hours.
+        //
+        //      whereNotNull('rh.business_minutes') below also takes care of
+        //      "reset old records": business_minutes was added as a nullable
+        //      column and is NULL on any history row written before that
+        //      migration, so those rows simply drop out of this average
+        //      instead of polluting it with the old cumulative numbers.
+        //
+        //   2. requests_handled counts COUNT(DISTINCT rh.request_id), not
+        //      COUNT(*). Every request logs one history row per status
+        //      transition, so COUNT(*) credited an admin once per step
+        //      instead of once per request — a single 4-step request handled
+        //      by one admin end-to-end was counted as 4 "requests handled".
         $byAdmin = DB::table('request_history as rh')
             ->join('users as u', 'rh.changed_by', '=', 'u.user_id')
             ->leftJoin('admin_profile as ap', 'u.user_id', '=', 'ap.user_id')
             ->whereBetween('rh.changed_at', [$from, $to])
-            ->whereNotNull('rh.minutes_processed')
+            ->whereNotNull('rh.business_minutes')
             ->select(
                 'u.user_id',
                 'u.email',
                 DB::raw("CONCAT(COALESCE(ap.first_name,''), ' ', COALESCE(ap.last_name,'')) as display_name"),
-                DB::raw('ROUND(AVG(rh.minutes_processed), 1) as avg_minutes'),
-                DB::raw('COUNT(*) as requests_handled')
+                DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes'),
+                DB::raw('COUNT(DISTINCT rh.request_id) as requests_handled')
             )
             ->groupBy('u.user_id', 'u.email', 'ap.first_name', 'ap.last_name')
             ->orderBy('avg_minutes')
