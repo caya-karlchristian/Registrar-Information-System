@@ -43,6 +43,23 @@ const DOC_COLORS  = ['#800000','#A52A2A','#D2691E','#E9967A','#C04000','#B03000'
 const PIE_COLORS  = ['#800000','#FFC72C','#A52A2A','#E9967A','#D2691E'];
 const HOUR_COLOR  = '#800000';
 
+/**
+ * Sorts Staff Performance rows by an arbitrary numeric column, nulls last
+ * regardless of direction (a null rate/forfeit-rate isn't "0", it's "not
+ * enough data" and shouldn't visually rank as the best or worst).
+ */
+const sortStaffRows = (rows, { key, dir }) => {
+  const sign = dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const av = a[key];
+    const bv = b[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return (av - bv) * sign;
+  });
+};
+
 // ─── Component ────────────────────────────────────────────────────────────
 
 const AnalyticsDashboard = () => {
@@ -63,6 +80,13 @@ const AnalyticsDashboard = () => {
   const [processingData, setProcessingData] = useState({ by_document_type: [], by_admin: [] });
   const [peakHoursData, setPeakHoursData]   = useState([]);
   const [purposeData, setPurposeData]       = useState([]);
+
+  // Staff Performance table sort — defaults to Avg Processing Time (asc),
+  // matching the backend's default order, but any column header can be
+  // clicked to re-sort. Keeps "fastest average" from being the only lens
+  // on staff performance now that Min/Max, Rate, and Forfeit Rate are
+  // available side by side.
+  const [staffSort, setStaffSort] = useState({ key: 'avg_minutes', dir: 'asc' });
 
   // AI report state
   const [aiNarrative, setAiNarrative]   = useState(null);
@@ -355,8 +379,8 @@ const AnalyticsDashboard = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#3e4042' : '#f1f5f9'} />
                       <XAxis dataKey="document_name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: isDark ? '#b0b3b8' : '#64748b' }} />
                       <YAxis tick={{ fontSize: 11, fill: isDark ? '#b0b3b8' : '#64748b' }} axisLine={false} tickLine={false} />
-                      <Tooltip content={(props) => <CustomTooltip {...props} isDark={isDark} unit="Requests" />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }} />
-                      <Bar dataKey="total_requests" radius={[10, 10, 0, 0]}>
+                      <Tooltip content={(props) => <CustomTooltip {...props} isDark={isDark} unit="Documents" />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }} />
+                      <Bar dataKey="total_documents" radius={[10, 10, 0, 0]}>
                         {docTypeData.slice(0, 6).map((_, i) => (
                           <Cell key={i} fill={DOC_COLORS[i % DOC_COLORS.length]} />
                         ))}
@@ -473,26 +497,41 @@ const AnalyticsDashboard = () => {
       {/* ── 5. ADMIN PROCESSING LEADERBOARD ── */}
       {(processingData.by_admin ?? []).length > 0 && (
         <div className={`border p-6 rounded-4xl shadow-sm ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
-          <ChartHeader title="Staff Performance" sub="Average Processing Time per Admin" isDark={isDark} />
+          <ChartHeader title="Staff Performance" sub="Click a column to sort — speed is one signal among several" isDark={isDark} />
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className={`text-left text-[10px] font-black uppercase tracking-widest border-b ${isDark ? 'text-[#9a9a9a] border-[#3e4042]' : 'text-slate-400 border-slate-100'}`}>
                   <th className="pb-3 pr-6">Staff Member</th>
-                  <th className="pb-3 pr-6 text-right">Requests Handled</th>
-                  <th className="pb-3 text-right">Avg Processing Time</th>
+                  <SortableTh label="Requests" sortKey="requests_handled" staffSort={staffSort} setStaffSort={setStaffSort} isDark={isDark} />
+                  <SortableTh label="Rate / Active Day" sortKey="requests_per_active_day" staffSort={staffSort} setStaffSort={setStaffSort} isDark={isDark} />
+                  <SortableTh label="Min / Max" sortKey="min_minutes" staffSort={staffSort} setStaffSort={setStaffSort} isDark={isDark} />
+                  <SortableTh label="Avg Processing Time" sortKey="avg_minutes" staffSort={staffSort} setStaffSort={setStaffSort} isDark={isDark} />
+                  <SortableTh label="Forfeit Rate" sortKey="forfeit_rate" staffSort={staffSort} setStaffSort={setStaffSort} isDark={isDark} />
                 </tr>
               </thead>
               <tbody>
-                {(processingData.by_admin ?? []).map((row, i) => (
+                {sortStaffRows(processingData.by_admin ?? [], staffSort).map((row, i) => (
                   <tr key={row.user_id ?? i} className={`border-b transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#3a3b3c]' : 'border-slate-50 hover:bg-slate-50'}`}>
                     <td className={`py-3 pr-6 font-bold ${isDark ? 'text-[#e4e6eb]' : 'text-slate-700'}`}>
                       {row.display_name?.trim() || row.email || 'Unknown'}
                     </td>
                     <td className={`py-3 pr-6 text-right font-bold ${isDark ? 'text-[#b0b3b8]' : 'text-slate-500'}`}>
                       {row.requests_handled}
+                      <span className={`block text-[10px] font-normal ${isDark ? 'text-[#8a8d91]' : 'text-slate-400'}`}>
+                        {row.sample_count} sample{row.sample_count === 1 ? '' : 's'}
+                      </span>
                     </td>
-                    <td className="py-3 text-right">
+                    <td className={`py-3 pr-6 text-right font-bold ${isDark ? 'text-[#b0b3b8]' : 'text-slate-500'}`}>
+                      {row.requests_per_active_day != null ? `${row.requests_per_active_day}/day` : '—'}
+                      <span className={`block text-[10px] font-normal ${isDark ? 'text-[#8a8d91]' : 'text-slate-400'}`}>
+                        {row.active_days} active day{row.active_days === 1 ? '' : 's'}
+                      </span>
+                    </td>
+                    <td className={`py-3 pr-6 text-right font-bold ${isDark ? 'text-[#b0b3b8]' : 'text-slate-500'}`}>
+                      {row.min_minutes}–{row.max_minutes} min
+                    </td>
+                    <td className="py-3 pr-6 text-right">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
                         row.avg_minutes <= 30
                           ? 'bg-emerald-100 text-emerald-700'
@@ -501,6 +540,21 @@ const AnalyticsDashboard = () => {
                           : 'bg-red-100 text-red-700'
                       }`}>
                         {row.avg_minutes} min
+                      </span>
+                    </td>
+                    <td className="py-3 text-right">
+                      {/*
+                        Rework/quality signal (Step 1c) — count of requests
+                        this admin touched that ended up Forfeited, as a
+                        percentage of what they handled. Deliberately a
+                        neutral gray badge, not red/amber/green like the
+                        speed badge above: forfeiture is frequently outside
+                        staff control (a student simply never returns), so
+                        this is presented as a data point to investigate,
+                        not a performance verdict.
+                      */}
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-black ${isDark ? 'bg-[#3a3b3c] text-[#b0b3b8]' : 'bg-slate-100 text-slate-500'}`}>
+                        {row.forfeit_rate}%
                       </span>
                     </td>
                   </tr>
@@ -581,6 +635,32 @@ const ChartHeader = ({ title, sub, isDark }) => (
     <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>{sub}</p>
   </div>
 );
+
+/**
+ * Clickable table header cell for the Staff Performance table. Clicking a
+ * column that's already the active sort flips direction; clicking a new
+ * column sorts by it ascending. `align` mirrors the corresponding <td>'s
+ * text alignment so the sort caret lines up with the values it sorts.
+ */
+const SortableTh = ({ label, sortKey, staffSort, setStaffSort, isDark, align = 'right' }) => {
+  const active = staffSort.key === sortKey;
+  return (
+    <th
+      className={`pb-3 pr-6 select-none cursor-pointer ${align === 'right' ? 'text-right' : 'text-left'}`}
+      onClick={() => setStaffSort((prev) =>
+        prev.key === sortKey
+          ? { key: sortKey, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+          : { key: sortKey, dir: 'asc' }
+      )}
+      title={`Sort by ${label}`}
+    >
+      <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''} ${active ? (isDark ? 'text-[#e4e6eb]' : 'text-[#800000]') : ''}`}>
+        {label}
+        <span className="text-[9px]">{active ? (staffSort.dir === 'asc' ? '▲' : '▼') : ''}</span>
+      </span>
+    </th>
+  );
+};
 
 const StatCard = ({ title, value, trend, status, icon, lightColor, iconColor, isDark }) => {
   const chip = {
