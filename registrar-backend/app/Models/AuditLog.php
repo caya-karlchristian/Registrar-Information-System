@@ -59,6 +59,12 @@ class AuditLog extends Model
     public const ACTION_REQUEST_STATUS_CHANGED = 'request_status_changed';
     public const ACTION_REQUEST_ARCHIVED       = 'request_archived';
     public const ACTION_REQUEST_RESTORED       = 'request_restored';
+    // BUG FIX (RIS-PROCESS-BUGS #2 — "Non-Functional Delete Button"):
+    // new action for DocumentRequestController::destroy(), which now
+    // performs a real (soft) delete instead of a forceDelete() that could
+    // never succeed against request_document/request_history's FK
+    // constraints — see that method's docblock for the full reasoning.
+    public const ACTION_REQUEST_DELETED        = 'request_deleted';
 
     // Document / certificate type management — archiving
     public const ACTION_DOCUMENT_TYPE_ARCHIVED    = 'document_type_archived';

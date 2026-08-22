@@ -405,6 +405,39 @@ class SystemUser extends Authenticatable
             // Admin/Super Admin don't have student profiles
             // Load admin-specific relations here when needed
             $this->load(['adminProfile', 'policy']);
+
+            // BUG FIX (RIS-PROCESS-BUGS #10 — "Incorrect User Name Display
+            // for Assigned Student Staff Role"):
+            //
+            // isAdmin()/isSuperAdmin() above read the session's ASSUMED
+            // role (assumedRoleId()), not the account's actual identity.
+            // A "student staff" account — base role_id = Student, assumed
+            // into an Admin role_assignments grant via POST
+            // /auth/switch-role — lands in this branch too, but
+            // RoleAssignmentService::grant() never creates an AdminProfile
+            // row for a secondary grant like this (it only ever writes to
+            // role_assignments). adminProfile then loads as null, and
+            // UserResource's first_name/last_name (whenLoaded('adminProfile'))
+            // come back empty — which is what the frontend was papering
+            // over with a hardcoded "guest" placeholder.
+            //
+            // The person's real name already exists — it's on their
+            // underlying Student (or Alumni) profile, which is what
+            // "Admin (Student Staff)" actually means: an administrative
+            // grant layered on top of an existing identity, not a new
+            // one. So when the account's BASE role_id differs from the
+            // assumed admin role, also load that base identity's profile,
+            // giving UserResource::resolveDisplayName() something correct
+            // to fall back to instead of nothing. Classic Admin/Super
+            // Admin accounts (role_id already Admin/Super Admin) take the
+            // early-return path below unchanged — this extra load only
+            // runs for the secondary-grant case.
+            if ($this->role_id === self::ROLE_STUDENT) {
+                $this->load(['studentProfile']);
+            } elseif ($this->role_id === self::ROLE_ALUMNI) {
+                $this->load(['alumniProfile']);
+            }
+
             return;
         }
     }
