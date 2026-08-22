@@ -9,7 +9,9 @@ use App\Models\SystemUser;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Contracts\NotificationServiceInterface;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Encapsulates all business logic for document requests.
@@ -137,7 +139,21 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      */
     public function updateRequest(DocumentRequest $documentRequest, array $validated): DocumentRequest
     {
-        return DB::transaction(function () use ($documentRequest, $validated) {
+        // BUG FIX (RIS-PROCESS-BUGS #9 — "Omission of Completed Documents
+        // in Staff Performance Analytics"): every analytics endpoint
+        // (AnalyticsController) is cached for 10 minutes under the
+        // "analytics" cache tag, so a document that just got marked
+        // Completed (or moved through any other status) doesn't show up
+        // in the Staff Performance / overview / volume charts until that
+        // cache entry naturally expires — which reads as "the dashboard
+        // omitted it" if you check within that window. $statusChanged is
+        // set inside the transaction below and read after it commits, so
+        // the flush below only fires once per actual status transition,
+        // and only after that transition is durably committed (never for
+        // a transaction that later rolls back).
+        $statusChanged = false;
+
+        $documentRequest = DB::transaction(function () use ($documentRequest, $validated, &$statusChanged) {
             // Re-fetch with a row-level lock so concurrent admin updates
             // cannot race: the second request will block here until the
             // first transaction commits, then re-read the committed state.
@@ -229,6 +245,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             if (isset($validated['status_id']) && (int) $validated['status_id'] !== (int) $oldStatusId) {
                 $this->recordStatusHistory($documentRequest, $oldStatusId);
                 $this->notifyOwnerOfStatusChange($documentRequest);
+                $statusChanged = true;
             }
 
             if (
@@ -245,6 +262,48 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
             return $documentRequest;
         }); // end DB::transaction
+
+        // See BUG FIX comment above updateRequest()'s signature. Runs
+        // AFTER the transaction has committed — never inside it, so a
+        // Redis hiccup can't roll back an otherwise-successful status
+        // change, and so a transaction that ends up rolling back never
+        // triggers a needless flush.
+        if ($statusChanged) {
+            $this->flushAnalyticsCache();
+        }
+
+        return $documentRequest;
+    }
+
+    /**
+     * Invalidates every cached analytics response (AnalyticsController,
+     * 10-minute TTL) so a status change is reflected on the next request
+     * instead of waiting out the cache window. See updateRequest()'s
+     * BUG FIX comment (RIS-PROCESS-BUGS #9) for why this exists.
+     *
+     * Cache::tags() requires a taggable store (Redis — see
+     * AnalyticsController's docblock; it does NOT work with the "file"
+     * driver). Guarded with an instanceof check plus a try/catch so a
+     * misconfigured or momentarily-unavailable cache backend degrades to
+     * "analytics are stale for up to 10 minutes, as before" rather than
+     * failing the document-status update itself — the cache is a
+     * performance optimization, not a source of truth, so it must never
+     * be allowed to break the actual business transaction it's
+     * piggybacking on.
+     */
+    private function flushAnalyticsCache(): void
+    {
+        try {
+            $store = Cache::getStore();
+
+            if ($store instanceof \Illuminate\Cache\TaggableStore) {
+                Cache::tags(['analytics'])->flush();
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to flush analytics cache after a document request status change.', [
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 
     // -------------------------------------------------------------------------
