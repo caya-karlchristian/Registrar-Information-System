@@ -30,6 +30,7 @@ import ReportManagement from './layouts/ReportManagement.jsx';
 import SystemSettings from './layouts/SystemSettings.jsx';
 import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
 import BusinessCalendarManagement from './layouts/BusinessCalendarManagement.jsx';
+import SuperAdminAnalyticsDashboard from './layouts/SuperAdminAnalyticsDashboard.jsx';
 
 // Auth
 import { ROLES, useAuth } from './context/AuthProvider';
@@ -175,6 +176,7 @@ const App = () => {
                 <Route index element={<Navigate to="/super-admin/user" replace />} />
                 <Route path="contact" element={<RegistrarContact />} />
                 <Route path="user" element={<UserManagementPage />} />
+                <Route path="system-analytics" element={<SuperAdminAnalyticsDashboard />} />
                 <Route path="documents" element={<DocumentAndCertificateManagement />} />
                 <Route path="certificates" element={<Navigate to="../documents" replace />} />
                 <Route path="report" element={<ReportManagement />} />

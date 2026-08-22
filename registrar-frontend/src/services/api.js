@@ -314,6 +314,20 @@ export const postAnalyticsAiReport     = (params = {}) => api.post("/analytics/a
 export const postAnalyticsAiQuery      = (body  = {}) => api.post("/analytics/ai-query",  body);
 
 // -------------------------------------------------------
+// SYSTEM ANALYTICS (Super Admin only) — Phase 2 of the Analytics &
+// Audit Log Revamp plan. Separate from ANALYTICS above: that group is
+// scoped to a single Registrar's request queue (volume, processing
+// time, staff performance); this group answers "is the system itself
+// healthy" (roster state, delegated-access throughput, cross-system
+// verification health). System-wide volume/trend intentionally reuses
+// getAnalyticsOverview()/getAnalyticsVolumeTrend() above rather than a
+// separate endpoint — Super Admin already has access to those.
+// -------------------------------------------------------
+export const getAdminRosterHealth         = ()             => api.get("/system-analytics/admin-roster-health");
+export const getAccessRequestThroughput   = (params = {}) => api.get("/system-analytics/access-request-throughput", { params });
+export const getCashierVerificationHealth = (params = {}) => api.get("/system-analytics/cashier-verification-health", { params });
+
+// -------------------------------------------------------
 // ANNOUNCEMENTS (read: all authenticated | write: Super Admin)
 // -------------------------------------------------------
 export const getAnnouncements  = (page = 1, perPage = 4) =>

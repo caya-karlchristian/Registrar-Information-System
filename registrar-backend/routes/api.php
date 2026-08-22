@@ -28,6 +28,7 @@ use App\Http\Controllers\SignatoryController;
 use App\Http\Controllers\BusinessHoursController;
 use App\Http\Controllers\CalendarExceptionController;
 use App\Http\Controllers\CalendarOverrideController;
+use App\Http\Controllers\SuperAdminAnalyticsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -315,6 +316,21 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
 
         Route::get('audit-logs',         [AuditLogController::class, 'index']);
         Route::get('audit-logs/filters', [AuditLogController::class, 'filters']);
+
+        // Phase 2 — SuperAdmin Analytics Dashboard (system-level, not
+        // scoped to a single Registrar's request queue — see
+        // SuperAdminAnalyticsController's class docblock for how this
+        // differs from /analytics above). Named throttle segment
+        // ('system-analytics') so this group's counter doesn't get
+        // folded into the outer role:4 group's throttle:60,1 — see the
+        // verify-or route's comment elsewhere in this file for why an
+        // unnamed throttle stacked under an outer group shares its
+        // counter instead of getting its own bucket.
+        Route::prefix('system-analytics')->middleware('throttle:60,1,system-analytics')->group(function () {
+            Route::get('admin-roster-health',        [SuperAdminAnalyticsController::class, 'adminRosterHealth']);
+            Route::get('access-request-throughput',  [SuperAdminAnalyticsController::class, 'accessRequestThroughput']);
+            Route::get('cashier-verification-health', [SuperAdminAnalyticsController::class, 'cashierVerificationHealth']);
+        });
         Route::post('announcements',                      [AnnouncementController::class, 'store']);
         Route::put('announcements/{announcement}',        [AnnouncementController::class, 'update']);
         Route::delete('announcements/{announcement}',     [AnnouncementController::class, 'destroy']);
