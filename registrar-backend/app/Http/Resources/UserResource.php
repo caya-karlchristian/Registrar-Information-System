@@ -43,10 +43,24 @@ class UserResource extends JsonResource
             // (e.g. the account-settings form after a save) can read
             // data.first_name directly instead of reaching into
             // data.admin_profile — only present when adminProfile is loaded.
+            // Deliberately UNCHANGED (still adminProfile-only, not the
+            // fallback-aware resolveDisplayName() below): this is the
+            // shape the admin-profile EDIT form reads/writes, and editing
+            // a student-staff account's own Student name through the
+            // Admin Profile form would be editing the wrong table.
             'first_name'  => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->first_name),
             'middle_name' => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->middle_name),
             'last_name'   => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->last_name),
             'suffix'      => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->suffix),
+
+            // BUG FIX (RIS-PROCESS-BUGS #10 — "Incorrect User Name Display
+            // for Assigned Student Staff Role"): a resolved, always-present
+            // display name for read-only UI (dashboard header, admin
+            // logbook "acted by" column, etc.) to render instead of a
+            // hardcoded "guest" fallback. See resolveDisplayName() below
+            // and SystemUser::loadIdentityRelations() for why adminProfile
+            // alone isn't enough for a secondary (student-staff) grant.
+            'display_name' => $this->resolveDisplayName(),
 
             // Policy attachment — admin-only. Super admins always have
             // full access and never carry a policy_id (see RoleMiddleware).
@@ -185,6 +199,56 @@ class UserResource extends JsonResource
         }
 
         return null;
+    }
+
+    /**
+     * BUG FIX (RIS-PROCESS-BUGS #10 — "Incorrect User Name Display for
+     * Assigned Student Staff Role").
+     *
+     * Resolves the best available human name for this account, checking
+     * each identity profile in priority order and falling through to the
+     * next one whenever the higher-priority relation isn't loaded or has
+     * no name recorded — rather than assuming "the assumed role is Admin,
+     * so adminProfile is the only place a name could be," which is what
+     * produced the "guest" placeholder in the first place (see
+     * SystemUser::loadIdentityRelations() docblock).
+     *
+     *   1. adminProfile  — correct for a classic Admin/Super Admin, and
+     *      for a secondary grant IF an admin profile happens to exist.
+     *   2. studentProfile — the real name for a "student staff" account
+     *      (base role Student, secondary Admin grant) — the exact case
+     *      from the bug report (juan@gmail.com).
+     *   3. alumniProfile  — same idea for a future alumni-staff grant.
+     *
+     * Returns null (never a hardcoded placeholder like "guest") if none
+     * of the above are loaded/populated, so the frontend can render its
+     * own empty state deliberately rather than being handed fabricated
+     * data.
+     */
+    private function resolveDisplayName(): ?string
+    {
+        $profile = null;
+
+        if ($this->relationLoaded('adminProfile') && $this->adminProfile) {
+            $profile = $this->adminProfile;
+        } elseif ($this->relationLoaded('studentProfile') && $this->studentProfile) {
+            $profile = $this->studentProfile;
+        } elseif ($this->relationLoaded('alumniProfile') && $this->alumniProfile) {
+            $profile = $this->alumniProfile;
+        }
+
+        if (!$profile || !$profile->first_name) {
+            return null;
+        }
+
+        $parts = array_filter([
+            $profile->first_name,
+            $profile->middle_name,
+            $profile->last_name,
+            $profile->suffix,
+        ]);
+
+        return implode(' ', $parts);
     }
 
     // -------------------------------------------------------

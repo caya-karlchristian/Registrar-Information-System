@@ -81,15 +81,28 @@ Schedule::command('provisioning:expire-stale')
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
 
-// Sweeps role_assignments past expires_at -> Expired, and force-logs
-// out the affected account. Scheduled after provisioning:expire-stale
-// (08:15) for the same non-collision reasoning that placed 08:15
-// after ShredExpiredRequests/SendUnclaimedReminders (08:00/08:05) —
-// see ExpireRoleAssignments' docblock for why this exists (primarily:
-// it's the only offboarding mechanism for scenarios RIS has no live
-// signal for, e.g. graduation).
+// BUG FIX (RIS-PROCESS-BUGS #5 — "Role Status Remains 'Active' Past
+// Expiration Date and Time"):
+//
+// This was previously ->dailyAt('08:20'), so an expired role assignment's
+// Sanctum tokens stayed alive — and its audit-log/ROLE_EXPIRED entry stayed
+// unwritten — for up to ~24h after expires_at elapsed. The *display* half
+// of this bug (the Manage Roles modal showing a stale "Active" badge) is
+// fixed independently and immediately via RoleAssignment::effectiveStatus()
+// / RoleAssignmentResource (no longer depends on this job's cadence at
+// all). This schedule change addresses the other half: how long an
+// expired grant's actual SESSION (Sanctum tokens) and audit trail lag
+// behind reality.
+//
+// Hourly (not, say, every minute) is a deliberate balance: expires_at
+// values in practice are set to day/term boundaries, not second-level
+// precision, so sub-hour freshness has no real-world payoff here, while
+// hourly keeps the query cheap (indexed, typically an empty or tiny result
+// set — see RoleAssignment::scopeDueToExpire()) and keeps this job well
+// clear of the other 08:xx jobs' overlap window. withoutOverlapping()
+// still guards against a slow run stacking with the next tick.
 Schedule::command('role-assignments:expire')
-    ->dailyAt('08:20')
+    ->hourly()
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));

@@ -48,6 +48,7 @@ function seedAnalyticsFixtures(): array
         ['document_type_id' => 1],
         [
             'document_name'           => 'Transcript of Records',
+            'document_description'    => 'Regression fixture document type.',
             'document_process_period' => '3-5 business days',
         ]
     );
