@@ -1,8 +1,9 @@
 import { Outlet } from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import Navigation from '../components/Navigation.jsx';
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { FolderLoadingOverlay } from '../components/LoadingSkeleton.jsx';
 
 const AlumniPage = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -38,7 +39,9 @@ const AlumniPage = () => {
   
           <main className={`flex-1 w-full overflow-y-auto p-4 lg:p-8 lg:ml-72 transition-all duration-300 ease-in-out ${isDark ? 'bg-[#18191a]' : 'bg-[#F5F5F5]'}`}>
             <div className="max-w-7xl mx-auto">
-              <Outlet />
+              <Suspense fallback={<FolderLoadingOverlay isDark={isDark} message="Loading section..." />}>
+                <Outlet />
+              </Suspense>
             </div>
           </main>
         </div>
