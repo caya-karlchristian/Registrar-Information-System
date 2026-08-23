@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   MagnifyingGlassIcon,
   ShieldExclamationIcon,
 } from "@heroicons/react/24/outline";
@@ -80,12 +82,140 @@ const getReasonBadgeClasses = (reason, isDark) => {
   return 'bg-gray-50 text-gray-500 border-gray-200';
 };
 
+// Phase 4 — Cashier Verification Failure Diagnostics. Small status badge
+// shared by the "final result" pill and the enrichment status pill inside
+// the expandable detail row. Kept muted (no red) even for a failure —
+// this is diagnostic data for staff, not an alarm.
+const getStatusBadgeClasses = (status, isDark) => {
+  const s = String(status || "").trim().toLowerCase();
+
+  if (s === "approved" || s === "complete") {
+    if (isDark) return "bg-green-950/40 text-green-400 border-green-800/50";
+    return "bg-green-50 text-green-700 border-green-200";
+  }
+
+  if (s === "failed") {
+    if (isDark) return "bg-orange-950/40 text-orange-400 border-orange-800/50";
+    return "bg-orange-50 text-orange-700 border-orange-200";
+  }
+
+  // not_found / rejected / pending / anything else — neutral
+  if (isDark) return "bg-[#2a2a2f] text-[#b0b3b8] border-[#3e4042]";
+  return "bg-gray-100 text-gray-600 border-gray-200";
+};
+
 const formatLabel = (str) => {
   if (!str) return "";
   return str
     .split("_")
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+};
+
+// -------------------------------------------------------
+// Phase 4 — Cashier Verification Failure Diagnostics.
+//
+// Renders the expanded detail panel for a single cashier_verification
+// audit log row: every name-candidate attempt RIS tried against the
+// Cashier System, the final result, and — only on a genuine failure —
+// the OGOS/alumni-system snapshot fetched asynchronously afterward.
+//
+// Surfaced as raw data (on-file name vs. each candidate tried), never an
+// auto-generated "fault" verdict — name matching is inherently fuzzy
+// (see NameMatcher's docblock on the backend). Staff read this and
+// decide for themselves, the same way they would after querying OGOS by
+// hand — this panel just saves them that manual step.
+// -------------------------------------------------------
+const CashierVerificationDetail = ({ log, isDark }) => {
+  const meta = log.metadata || {};
+  const attempts = Array.isArray(meta.attempts) ? meta.attempts : [];
+  const enrichment = log.enrichment;
+
+  const labelClass = isDark ? 'text-[#9a9a9a]' : 'text-gray-500';
+  const valueClass = isDark ? 'text-[#e4e6eb]' : 'text-gray-800';
+  const cardClass = `rounded-lg border p-3 ${isDark ? 'bg-[#1c1c1f] border-[#3e4042]' : 'bg-white border-gray-200'}`;
+
+  return (
+    <div className="flex flex-col gap-4 max-w-3xl">
+      {/* Summary line */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`text-xs font-semibold ${labelClass}`}>OR #</span>
+        <span className={`text-sm font-mono ${valueClass}`}>{meta.or_number ?? '—'}</span>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(meta.final_approved ? 'approved' : 'rejected', isDark)}`}>
+          {meta.final_approved ? 'Approved' : 'Rejected'}
+        </span>
+        {meta.is_mock && (
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${isDark ? 'bg-[#2a2a2f] text-[#9a9a9a] border-[#3e4042]' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+            Mock mode
+          </span>
+        )}
+      </div>
+
+      {/* Name candidates tried against the Cashier System */}
+      {attempts.length > 0 && (
+        <div>
+          <p className={`text-xs font-semibold mb-2 ${labelClass}`}>Name candidates tried</p>
+          <div className="flex flex-col gap-1.5">
+            {attempts.map((attempt, i) => (
+              <div key={i} className={`flex items-center justify-between gap-3 text-xs px-3 py-2 rounded-lg border ${isDark ? 'bg-[#1c1c1f] border-[#3e4042]' : 'bg-white border-gray-200'}`}>
+                <span className={valueClass}>{attempt.name || '—'}</span>
+                <span className={`px-2 py-0.5 rounded-full font-bold border whitespace-nowrap ${getStatusBadgeClasses(attempt.valid ? 'approved' : 'rejected', isDark)}`}>
+                  {attempt.valid ? 'Matched' : (attempt.reason ? formatLabel(attempt.reason) : 'No match')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Enrichment — only shown for a genuine failure, matches the
+          backend's own gating (only NOT_FOUND, non-mock attempts ever
+          get a job dispatched — see verifyReceiptAgainstCashier()). */}
+      {!meta.final_approved && !meta.is_mock && (
+        <div>
+          <p className={`text-xs font-semibold mb-2 ${labelClass}`}>On-file record</p>
+
+          {!enrichment ? (
+            <div className={`${cardClass} text-xs ${labelClass}`}>
+              Looking this up in the background — check back in a moment.
+            </div>
+          ) : enrichment.enrichment_status === 'complete' ? (
+            <div className={cardClass}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-xs font-medium ${labelClass}`}>
+                  On file in {enrichment.source_system === 'ogos' ? 'OGOS' : 'the Alumni System'}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses('complete', isDark)}`}>
+                  Snapshot retrieved
+                </span>
+              </div>
+              <p className={`text-sm ${valueClass}`}>
+                {[
+                  enrichment.on_file_snapshot?.last_name,
+                  enrichment.on_file_snapshot?.first_name,
+                  enrichment.on_file_snapshot?.middle_name,
+                  enrichment.on_file_snapshot?.suffix,
+                ].filter(Boolean).join(', ') || '—'}
+              </p>
+              {(enrichment.on_file_snapshot?.student_number || enrichment.on_file_snapshot?.stud_number) && (
+                <p className={`text-xs mt-1 ${labelClass}`}>
+                  Student No. {enrichment.on_file_snapshot?.student_number || enrichment.on_file_snapshot?.stud_number}
+                </p>
+              )}
+            </div>
+          ) : enrichment.enrichment_status === 'not_found' ? (
+            <div className={`${cardClass} text-xs ${labelClass}`}>
+              No matching record found in {enrichment.source_system === 'ogos' ? 'OGOS' : 'the Alumni System'} for this account.
+            </div>
+          ) : (
+            <div className={`${cardClass} text-xs ${labelClass}`}>
+              Couldn't retrieve a snapshot{enrichment.failure_reason ? ` (${formatLabel(enrichment.failure_reason)})` : ''}. This can be re-checked later from the audit trail.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const ReportManagement = () => {
@@ -112,6 +242,11 @@ const ReportManagement = () => {
 
   const [roleOptions, setRoleOptions]     = useState(["All"]);
   const [actionOptions, setActionOptions] = useState(["All"]);
+
+  // Phase 4 — which cashier_verification row (by id) has its detail panel
+  // open, if any. Only one at a time, matching the plan's "small, quiet
+  // list" intent — this isn't a dashboard.
+  const [expandedLogId, setExpandedLogId] = useState(null);
 
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
@@ -387,6 +522,7 @@ const ReportManagement = () => {
                       />
                     </th>
                     <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Browser</th>
+                    <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Details</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -394,7 +530,7 @@ const ReportManagement = () => {
                     <ReportTableSkeleton isDark={isDark} count={10} />
                   ) : logs.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-20">
+                      <td colSpan={6} className="py-20">
                         <div className="flex flex-col items-center justify-center">
                           <div className={`w-16 h-16 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/50' : 'bg-gray-100'}`}>
                             <MagnifyingGlassIcon className={`w-8 h-8 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
@@ -409,8 +545,16 @@ const ReportManagement = () => {
                       </td>
                     </tr>
                   ) : (
-                    logs.map((log) => (
-                      <tr key={log.id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
+                    logs.map((log) => {
+                      // Phase 4 — only cashier_verification rows have a
+                      // detail panel to expand. Every other action keeps
+                      // the exact same 5-column row it always had.
+                      const isCashierVerification = log.action_key === 'cashier_verification';
+                      const isExpanded = expandedLogId === log.id;
+
+                      return (
+                      <Fragment key={log.id}>
+                      <tr className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
 
                         <td className={`px-4 py-3 text-xs whitespace-nowrap ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
                           {log.date} {log.time}
@@ -432,8 +576,35 @@ const ReportManagement = () => {
 
                         <td className={`px-4 py-3 text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{log.browser ?? "—"}</td>
 
+                        <td className="px-4 py-3">
+                          {isCashierVerification ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                              className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-colors ${isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f] hover:text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'}`}
+                            >
+                              {isExpanded ? (
+                                <>Hide <ChevronUpIcon className="w-3.5 h-3.5" /></>
+                              ) : (
+                                <>View <ChevronDownIcon className="w-3.5 h-3.5" /></>
+                              )}
+                            </button>
+                          ) : (
+                            <span className={isDark ? 'text-[#5a5a5f]' : 'text-gray-300'}>—</span>
+                          )}
+                        </td>
+
                       </tr>
-                    ))
+                      {isCashierVerification && isExpanded && (
+                        <tr className={isDark ? 'bg-[#232326]' : 'bg-gray-50/60'}>
+                          <td colSpan={6} className="px-6 py-4 text-left">
+                            <CashierVerificationDetail log={log} isDark={isDark} />
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
+                      );
+                    })
                   )}
                 </tbody>
                 </table>

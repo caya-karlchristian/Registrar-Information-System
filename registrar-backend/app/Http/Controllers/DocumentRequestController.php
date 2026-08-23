@@ -19,6 +19,7 @@ use App\Services\CashierService;
 use App\Services\CashierDocumentMatcher;
 use App\Services\CashierDocumentSuggester;
 use App\Services\NameMatcher;
+use App\Jobs\EnrichCashierFailureJob;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -412,7 +413,7 @@ class DocumentRequestController extends Controller
 
         $isMockAttempt = $verification['data']['_mock'] ?? false;
 
-        $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
+        $auditEntry = $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
             'or_number'      => $orNumber,
             'attempts'       => $attemptsLog,
             'matched_name'   => $verification['valid'] ? $matchedName : null,
@@ -422,6 +423,25 @@ class DocumentRequestController extends Controller
 
         if (!$verification['valid']) {
             $reason = $verification['reason'] ?? 'NOT_FOUND';
+
+            // Phase 4a — Cashier Verification Failure Diagnostics.
+            // Only worth enriching on a real lookup miss (NOT_FOUND):
+            // API_ERROR is the Cashier System's own availability, not a
+            // data mismatch, and mock mode (no CASHIER_API_KEY configured)
+            // never produces NOT_FOUND to begin with — see
+            // CashierService::mockResponse(), which always returns valid.
+            // Dispatched (queued, not inline) so this student's failed
+            // submission is never delayed by a call made purely for the
+            // registrar's later benefit.
+            if ($reason === 'NOT_FOUND' && !$isMockAttempt) {
+                EnrichCashierFailureJob::dispatch(
+                    sourceAuditLogId: $auditEntry->id,
+                    actorUserId:      $user->user_id,
+                    orNumber:         $orNumber,
+                    ipAddress:        $request->ip(),
+                    userAgent:        $request->userAgent(),
+                );
+            }
 
             $message = match ($reason) {
                 'NOT_FOUND' => 'The OR number could not be found. Please check your Official Receipt and try again.',

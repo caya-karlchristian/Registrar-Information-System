@@ -108,6 +108,29 @@ class AuditLog extends Model
     // currently does not (see 2026-08-11 incident notes).
     public const ACTION_CASHIER_VERIFICATION = 'cashier_verification';
 
+    // Phase 4 — Cashier Verification Failure Diagnostics
+    // (EnrichCashierFailureJob, AuditLogger::logForSystem).
+    //
+    // A DELIBERATELY SEPARATE row from the ACTION_CASHIER_VERIFICATION
+    // entry it enriches — never a mutation of that entry. AuditLog::booted()
+    // below hard-blocks updates/deletes on every row (tamper-evident,
+    // append-only by design), and the hash chain's own guarantee only
+    // covers what AuditLogger::computeHash() feeds it (action/user_id/
+    // target_user_id/target_email/created_at — see that class), so
+    // reopening a row to stuff enrichment data into its metadata after
+    // the fact would work mechanically but would undermine the exact
+    // "written once, never touched again" guarantee this table exists to
+    // provide. Instead, the enrichment is its own append-only row, linked
+    // back to the original via metadata.source_audit_log_id — the audit
+    // trail for one failed OR verification is a short, honest sequence of
+    // rows instead of one row that quietly changed shape after the fact.
+    //
+    // Fired asynchronously (queued job) only when a cashier verification
+    // fails with reason NOT_FOUND — never on API_ERROR, since that's the
+    // Cashier System's own availability, not a name/OR mismatch worth
+    // cross-checking against OGOS/the alumni system.
+    public const ACTION_CASHIER_VERIFICATION_ENRICHED = 'cashier_verification_enriched';
+
     // Unmatched cashier receipt labels — admin resolution (see
     // UnmatchedCashierItem, CashierDocumentSuggester)
     public const ACTION_UNMATCHED_CASHIER_ITEM_RESOLVED  = 'unmatched_cashier_item_resolved';
