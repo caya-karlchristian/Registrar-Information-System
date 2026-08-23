@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
@@ -12,13 +13,29 @@ class AuditLogController extends Controller
     // GET /audit-logs
     //
     // Supports:
-    //   ?search=juan          → searches email
+    //   ?search=juan          → matches ANY of: actor email, role,
+    //                           action (raw or human-readable), target
+    //                           user's email, browser
     //   ?role=admin           → filter by role_name
     //   ?action=login         → filter by action
     //   ?browser=Chrome       → filter by browser
+    //   ?from=2026-08-01      → created_at >= start of this date in
+    //                           the display timezone (Asia/Manila)
+    //   ?to=2026-08-20        → created_at <= end of this date in
+    //                           the display timezone (Asia/Manila) —
+    //                           i.e. the ENTIRE day is included, not
+    //                           just up to 00:00
     //   ?per_page=20          → pagination (default 20)
     //
-    // Example: GET /audit-logs?role=admin&action=login&per_page=50
+    // Example: GET /audit-logs?role=admin&action=login&from=2026-08-01&to=2026-08-20&per_page=50
+    //
+    // Timezone note: created_at is stored in UTC (config('app.timezone')).
+    // `from`/`to` are calendar dates in the university's local timezone
+    // (config('app.display_timezone'), Asia/Manila) — a Super Admin typing
+    // "Aug 20" means the Manila calendar day, not the UTC one, which can
+    // differ by up to 8 hours at the boundaries. See resolveDateBoundary()
+    // below for how that's converted into a UTC instant for comparison
+    // against the stored column.
     //
     // Phase 4 — cashier_verification_enriched rows are deliberately
     // excluded from this listing (see the WHERE below). They're a
@@ -38,9 +55,29 @@ class AuditLogController extends Controller
             ->where('action', '!=', AuditLog::ACTION_CASHIER_VERIFICATION_ENRICHED)
             ->orderByDesc('created_at');
 
-        // Search by email
-        if ($search = $request->query('search')) {
-            $query->where('email', 'like', '%' . $search . '%');
+        // Search across every field a Super Admin would plausibly type
+        // into a single search box: actor email, role, action, target
+        // user's email, and browser. A single free-text box that only
+        // matched email was surprising — typing an admin's role or the
+        // browser they used returned nothing even though that data is
+        // right there in the table.
+        //
+        // `action` is matched two ways: the raw stored value (e.g.
+        // 'admin_created') and a space-normalized version (spaces →
+        // underscores, e.g. typing "Admin Created" still matches),
+        // since the column stores snake_case but the UI displays the
+        // human-readable label.
+        if ($search = trim((string) $request->query('search', ''))) {
+            $actionSearch = str_replace(' ', '_', $search);
+
+            $query->where(function ($q) use ($search, $actionSearch) {
+                $q->where('email', 'like', "%{$search}%")
+                  ->orWhere('role_name', 'like', "%{$search}%")
+                  ->orWhere('action', 'like', "%{$search}%")
+                  ->orWhere('action', 'like', "%{$actionSearch}%")
+                  ->orWhere('target_email', 'like', "%{$search}%")
+                  ->orWhere('browser', 'like', "%{$search}%");
+            });
         }
 
         // Filter by role
@@ -58,6 +95,23 @@ class AuditLogController extends Controller
             $query->where('browser', $browser);
         }
 
+        // Date range — from/to are Manila calendar dates, converted to
+        // the equivalent UTC instant boundaries before comparing against
+        // the UTC-stored created_at column. See resolveDateBoundary().
+        if ($from = $request->query('from')) {
+            $fromUtc = $this->resolveDateBoundary($from, startOfDay: true);
+            if ($fromUtc) {
+                $query->where('created_at', '>=', $fromUtc);
+            }
+        }
+
+        if ($to = $request->query('to')) {
+            $toUtc = $this->resolveDateBoundary($to, startOfDay: false);
+            if ($toUtc) {
+                $query->where('created_at', '<=', $toUtc);
+            }
+        }
+
         $perPage = min((int) $request->query('per_page', 20), 100);
 
         $logs = $query->paginate($perPage);
@@ -73,6 +127,39 @@ class AuditLogController extends Controller
                 'total'        => $logs->total(),
             ],
         ]);
+    }
+
+    // -------------------------------------------------------
+    // Convert a 'YYYY-MM-DD' calendar date, interpreted in the display
+    // timezone (Asia/Manila), into the equivalent UTC instant at either
+    // the start or end of that day — so a range filter compares apples
+    // to apples against the UTC-stored created_at column.
+    //
+    // Why not whereDate('created_at', $date) or CONVERT_TZ in SQL: this
+    // resolves the boundary ONCE in PHP and compares the raw UTC column
+    // directly, so it stays a plain indexed range comparison (sargable)
+    // on every driver (MySQL/SQLite/Postgres) without depending on the
+    // DB's timezone tables being loaded — same reasoning as
+    // AnalyticsService's own display-timezone conversion, just applied
+    // to a range boundary instead of a per-row GROUP BY bucket.
+    //
+    // Returns null (filter silently skipped) on unparseable input rather
+    // than throwing — a malformed date query param shouldn't 500 the
+    // whole audit log page.
+    // -------------------------------------------------------
+    private function resolveDateBoundary(string $date, bool $startOfDay): ?Carbon
+    {
+        $displayTimezone = config('app.display_timezone', 'Asia/Manila');
+
+        try {
+            $local = Carbon::parse($date, $displayTimezone);
+        } catch (\Exception $e) {
+            return null;
+        }
+
+        $local = $startOfDay ? $local->startOfDay() : $local->endOfDay();
+
+        return $local->setTimezone('UTC');
     }
 
     // -------------------------------------------------------
@@ -148,6 +235,13 @@ class AuditLogController extends Controller
     {
         $isCashierVerification = $log->action === AuditLog::ACTION_CASHIER_VERIFICATION;
 
+        // created_at is stored in UTC; convert to the display timezone
+        // (Asia/Manila) before formatting so the timestamp shown to a
+        // Super Admin matches the local wall-clock time the action
+        // actually happened at, not the UTC one.
+        $localTimestamp = $log->created_at->copy()
+            ->setTimezone(config('app.display_timezone', 'Asia/Manila'));
+
         return [
             'id'         => $log->id,
             'user'       => $log->email,
@@ -156,8 +250,8 @@ class AuditLogController extends Controller
             'action_key' => $log->action,
             'browser'    => $log->browser ?? 'Unknown',
             'ip_address' => $log->ip_address,
-            'date'       => $log->created_at->format('Y-m-d'),
-            'time'       => $log->created_at->format('H:i:s'),
+            'date'       => $localTimestamp->format('Y-m-d'),
+            'time'       => $localTimestamp->format('H:i:s'),
             'metadata'   => $isCashierVerification ? $log->metadata : null,
             'enrichment' => $isCashierVerification
                 ? $this->formatEnrichment($enrichmentByCashierLogId->get($log->id))

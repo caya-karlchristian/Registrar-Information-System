@@ -84,14 +84,23 @@ class SecurityEventController extends Controller
     // -------------------------------------------------------
     private function format(SecurityEvent $event): array
     {
+        // created_at is stored in UTC; convert to the display timezone
+        // (Asia/Manila) before formatting — same fix as
+        // AuditLogController::format(), applied here too since this tab
+        // sits right next to the Audit Log tab on the same screen and
+        // showing UTC on one and local time on the other would just be
+        // a different flavor of the same "our times are wrong" bug.
+        $localTimestamp = $event->created_at->copy()
+            ->setTimezone(config('app.display_timezone', 'Asia/Manila'));
+
         return [
             'id'         => $event->security_event_id,
             'email'      => $event->email ?? 'Unknown',
             'event_type' => $this->formatLabel($event->event_type),
             'reason'     => $event->reason ? $this->formatLabel($event->reason) : null,
             'ip_address' => $event->ip_address,
-            'date'       => $event->created_at->format('Y-m-d'),
-            'time'       => $event->created_at->format('H:i:s'),
+            'date'       => $localTimestamp->format('Y-m-d'),
+            'time'       => $localTimestamp->format('H:i:s'),
         ];
     }
 
