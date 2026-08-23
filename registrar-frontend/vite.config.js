@@ -29,5 +29,19 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-data': ['@tanstack/react-query', 'axios'],
+            'vendor-charts': ['recharts'],
+            'vendor-export': ['docx', 'exceljs', 'file-saver'],
+            'vendor-scanner-qr': ['jsqr', 'qrcode.react', 'html-to-image'],
+            'vendor-realtime': ['laravel-echo', 'pusher-js'],
+          },
+        },
+      },
+    },
   }
 })

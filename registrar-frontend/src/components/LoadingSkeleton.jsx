@@ -1,4 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import loading1 from "../assets/Loading 1.png";
+import loading2 from "../assets/Loading 2.png";
+import loading3 from "../assets/Loading 3.png";
+
+const FOLDER_IMGS = [loading1, loading2, loading3];
+const FOLDER_TRANSFORMS = [
+  "translate(56px, 0px)",
+  "translate(28px, 28px)",
+  "translate(0px, 56px)",
+];
 
 export const DelayedSkeleton = ({ children }) => {
   const [visible, setVisible] = useState(false);
@@ -471,10 +481,175 @@ export const AccessRequestsSkeleton = ({ isDark }) => {
   );
 };
 
-export default function LoadingSkeleton({ isDark, variant = 'chart' }) {
+export const PageSkeleton = ({ isDark }) => {
+  const bg = isDark ? 'bg-[#3a3b3c]/60' : 'bg-slate-200/60';
+  const bgDim = isDark ? 'bg-[#2f3133]/40' : 'bg-slate-100/40';
+  const border = isDark ? 'border-[#3e4042]/50' : 'border-slate-200/50';
+
+  return (
+    <div className="min-h-[calc(100vh-120px)] w-full p-4 sm:p-6 md:p-8 animate-pulse bg-transparent">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-dashed border-slate-300/40 dark:border-[#3e4042]/40">
+          <div className="space-y-2">
+            <div className={`h-8 w-48 sm:w-64 rounded-xl ${bg}`} />
+            <div className={`h-4 w-72 sm:w-96 rounded-lg ${bgDim}`} />
+          </div>
+          <div className="flex gap-3">
+            <div className={`h-10 w-28 rounded-xl ${bgDim}`} />
+            <div className={`h-10 w-32 rounded-xl ${bg}`} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className={`p-6 rounded-3xl border ${border} bg-transparent space-y-4`}>
+            <div className={`h-5 w-32 rounded-lg ${bg}`} />
+            <div className={`h-10 w-24 rounded-xl ${bgDim}`} />
+            <div className={`h-3 w-full rounded-full ${bgDim}`} />
+          </div>
+          <div className={`p-6 rounded-3xl border ${border} bg-transparent space-y-4`}>
+            <div className={`h-5 w-32 rounded-lg ${bg}`} />
+            <div className={`h-10 w-24 rounded-xl ${bgDim}`} />
+            <div className={`h-3 w-full rounded-full ${bgDim}`} />
+          </div>
+          <div className={`p-6 rounded-3xl border ${border} bg-transparent space-y-4`}>
+            <div className={`h-5 w-32 rounded-lg ${bg}`} />
+            <div className={`h-10 w-24 rounded-xl ${bgDim}`} />
+            <div className={`h-3 w-full rounded-full ${bgDim}`} />
+          </div>
+        </div>
+
+        <div className={`p-6 sm:p-8 rounded-3xl border ${border} bg-transparent space-y-5`}>
+          <div className={`h-6 w-40 rounded-lg ${bg}`} />
+          <div className="space-y-3">
+            <div className={`h-4 w-full rounded-lg ${bgDim}`} />
+            <div className={`h-4 w-5/6 rounded-lg ${bgDim}`} />
+            <div className={`h-4 w-4/6 rounded-lg ${bgDim}`} />
+          </div>
+          <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className={`h-24 rounded-2xl ${bgDim}`} />
+            <div className={`h-24 rounded-2xl ${bgDim}`} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const FolderLoadingOverlay = ({ isDark, message = "Loading...", fullScreen = true }) => {
+  const r0 = useRef(null);
+  const r1 = useRef(null);
+  const r2 = useRef(null);
+  const refs = useRef([r0, r1, r2]);
+  const timers = useRef([]);
+  const chars = message.split("");
+
+  const clearAll = useCallback(() => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+  }, []);
+
+  const after = useCallback((ms, fn) => {
+    const id = setTimeout(fn, ms);
+    timers.current.push(id);
+  }, []);
+
+  const runCycle = useCallback(() => {
+    const els = refs.current.map(r => r.current);
+    if (els.some(el => !el)) return;
+
+    const FADE  = 400; // fade transition duration
+    const GAP   = 250; // stagger between each folder
+    const HOLD  = 500; // pause while all invisible
+    const CYCLE = (FADE + GAP) * 3 + HOLD + (FADE + GAP) * 3 + 600;
+
+    // FADE OUT: front (index 2) → mid (index 1) → back (index 0)
+    [2, 1, 0].forEach((elIdx, order) => {
+      after((FADE + GAP) * order, () => {
+        const el = els[elIdx];
+        if (!el) return;
+        el.style.transition = `opacity ${FADE}ms ease`;
+        el.style.opacity = "0";
+      });
+    });
+
+    // FADE IN: back (index 0) → mid (index 1) → front (index 2)
+    const inStart = (FADE + GAP) * 3 + HOLD;
+    [0, 1, 2].forEach((elIdx, order) => {
+      after(inStart + (FADE + GAP) * order, () => {
+        const el = els[elIdx];
+        if (!el) return;
+        el.style.transition = `opacity ${FADE}ms ease`;
+        el.style.opacity = "1";
+      });
+    });
+
+    // Loop
+    after(CYCLE, runCycle);
+  }, [after]);
+
+  useEffect(() => {
+    const rs = refs.current;
+    rs.forEach((r, i) => {
+      if (!r.current) return;
+      r.current.style.transition = "none";
+      r.current.style.transform  = FOLDER_TRANSFORMS[i];
+      r.current.style.zIndex     = String(i + 1);
+      r.current.style.opacity    = "1";
+    });
+
+    runCycle();
+    return () => clearAll();
+  }, [runCycle, clearAll]);
+
+  return (
+    <div
+      className={`${
+        fullScreen ? 'fixed inset-0 z-50' : 'min-h-[60vh] w-full'
+      } flex flex-col items-center justify-center px-4 transition-all duration-300 bg-transparent`}
+    >
+      <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 text-center max-w-[90vw]">
+        <div className="relative h-44 w-44 sm:h-52 sm:w-52">
+          {FOLDER_IMGS.map((src, i) => (
+            <img
+              key={i}
+              ref={refs.current[i]}
+              src={src}
+              alt={`Loading folder ${i + 1}`}
+              className="absolute top-0 left-0 w-32 sm:w-36 drop-shadow-[0_14px_22px_rgba(0,0,0,0.18)]"
+              style={{
+                willChange: "opacity",
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+                transform: FOLDER_TRANSFORMS[i],
+                zIndex: i + 1,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-0.5 max-w-full">
+          {chars.map((char, i) => (
+            <span
+              key={i}
+              className={`font-bold text-[10px] sm:text-xs uppercase tracking-widest inline-block ${
+                isDark ? 'text-[#e4e6eb]' : 'text-[#800000]'
+              }`}
+            >
+              {char === " " ? "\u00A0" : char}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function LoadingSkeleton({ isDark, variant = 'chart', message = "Loading..." }) {
   if (variant === 'stat') return <StatCardSkeleton isDark={isDark} />;
   if (variant === 'logbook') return <LogbookSkeleton isDark={isDark} />;
   if (variant === 'policy') return <PolicyTableSkeleton isDark={isDark} />;
   if (variant === 'access-request') return <AccessRequestsSkeleton isDark={isDark} />;
+  if (variant === 'page') return <PageSkeleton isDark={isDark} />;
+  if (variant === 'folder' || variant === 'overlay') return <FolderLoadingOverlay isDark={isDark} message={message} />;
   return <ChartCardSkeleton isDark={isDark} />;
 }
