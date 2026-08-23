@@ -273,14 +273,6 @@ const ReportManagement = () => {
   const [activeTab, setActiveTab] = useState('audit'); // 'audit' | 'security'
 
   // ── Audit Log state ──────────────────────────────────────────────────
-  const [search, setSearch]             = useState("");
-  const [roleFilter, setRoleFilter]     = useState("All");
-  const [actionFilter, setActionFilter] = useState("All");
-  const [currentPage, setCurrentPage]   = useState(1);
-  const [logs, setLogs]                 = useState([]);
-  const [totalPages, setTotalPages]     = useState(1);
-  const [loading, setLoading]           = useState(false);
-  const [errorMsg, setErrorMsg]         = useState("");
   const [search, setSearch]                   = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roleFilter, setRoleFilter]           = useState("All");
@@ -447,8 +439,8 @@ const ReportManagement = () => {
   }, [seSearch, seEventTypeFilter, seReasonFilter, seCurrentPage]);
 
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    if (activeTab === 'security') fetchSecurityEvents();
+  }, [fetchSecurityEvents, activeTab]);
 
   // Reset to page 1 when filters change
   const handleFilterChange = () => setCurrentPage(1);
@@ -758,6 +750,7 @@ const ReportManagement = () => {
                       ]}
                     />
                   </th>
+                  <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Details</th>
                 </tr>
               </thead>
               <tbody>
@@ -765,7 +758,7 @@ const ReportManagement = () => {
                   <ReportTableSkeleton isDark={isDark} count={PER_PAGE} />
                 ) : logs.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-20">
+                    <td colSpan={6} className="py-20">
                       <div className="flex flex-col items-center justify-center">
                         <div className={`w-16 h-16 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/50' : 'bg-gray-100'}`}>
                           <MagnifyingGlassIcon className={`w-8 h-8 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
@@ -781,61 +774,72 @@ const ReportManagement = () => {
                     </td>
                   </tr>
                 ) : (
-                  logs.map((log) => (
-                    <tr key={log.id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
-                      <td className={`px-4 py-3 text-xs whitespace-nowrap ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                        {log.date} {log.time}
-                      </td>
+                  logs.map((log) => {
+                    // Only cashier_verification rows ever have an
+                    // expandable detail panel. Branch on action_key (the
+                    // raw, stable constant from the backend), never on
+                    // the formatted `action` label — see
+                    // AuditLogController::format()'s own comment on why.
+                    const isCashierVerification = log.action_key === 'cashier_verification';
+                    const isExpanded = isCashierVerification && expandedLogId === log.id;
 
-                            <td className={`px-4 py-3 font-medium ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
-                        {log.user}
-                      </td>
-
-                            <td className="px-4 py-3">
-                              <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(log.role, isDark)}`}>
-                                {formatLabel(log.role)}
-                              </span>
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getActionBadgeClasses(log.action, isDark)}`}>
-                                {formatLabel(log.action)}
-                              </span>
-                            </td>
-
-                            <td className={`px-4 py-3 text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                        {log.browser ?? "—"}
-                      </td>
-                        <td className="px-4 py-3">
-                          {isCashierVerification ? (
-                            <button
-                              type="button"
-                              onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                              className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-colors ${isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f] hover:text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'}`}
-                            >
-                              {isExpanded ? (
-                                <>Hide <ChevronUpIcon className="w-3.5 h-3.5" /></>
-                              ) : (
-                                <>View <ChevronDownIcon className="w-3.5 h-3.5" /></>
-                              )}
-                            </button>
-                          ) : (
-                            <span className={isDark ? 'text-[#5a5a5f]' : 'text-gray-300'}>—</span>
-                          )}
-                        </td>
-
-                      </tr>
-                      {isCashierVerification && isExpanded && (
-                        <tr className={isDark ? 'bg-[#232326]' : 'bg-gray-50/60'}>
-                          <td colSpan={6} className="px-6 py-4 text-left">
-                            <CashierVerificationDetail log={log} isDark={isDark} />
+                    return (
+                      <Fragment key={log.id}>
+                        <tr className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
+                          <td className={`px-4 py-3 text-xs whitespace-nowrap ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                            {log.date} {log.time}
                           </td>
-                            </tr>
-                      )}
+
+                          <td className={`px-4 py-3 font-medium ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                            {log.user}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(log.role, isDark)}`}>
+                              {formatLabel(log.role)}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getActionBadgeClasses(log.action, isDark)}`}>
+                              {formatLabel(log.action)}
+                            </span>
+                          </td>
+
+                          <td className={`px-4 py-3 text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                            {log.browser ?? "—"}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {isCashierVerification ? (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                                className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-colors ${isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f] hover:text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'}`}
+                              >
+                                {isExpanded ? (
+                                  <>Hide <ChevronUpIcon className="w-3.5 h-3.5" /></>
+                                ) : (
+                                  <>View <ChevronDownIcon className="w-3.5 h-3.5" /></>
+                                )}
+                              </button>
+                            ) : (
+                              <span className={isDark ? 'text-[#5a5a5f]' : 'text-gray-300'}>—</span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr className={isDark ? 'bg-[#232326]' : 'bg-gray-50/60'}>
+                            <td colSpan={6} className="px-6 py-4 text-left">
+                              <CashierVerificationDetail log={log} isDark={isDark} />
+                            </td>
+                          </tr>
+                        )}
                       </Fragment>
-                          );
-                    })
-                      )}
+                    );
+                  })
+                )}
                     </tbody>
                   </table>
                 </div>

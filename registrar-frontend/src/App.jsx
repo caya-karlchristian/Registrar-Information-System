@@ -1,38 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-// Pages (role shells)
-import StudentPage from './pages/StudentPage.jsx';
-import AlumniPage from './pages/AlumniPage.jsx';
-import StaffPage from './pages/StaffPage.jsx';
-import SuperAdminPage from './pages/SuperAdminPage.jsx';
-
-// Layouts
-import RequestForm from './layouts/RequestForm.jsx';
-import DocumentLists from './layouts/DocumentLists.jsx';
-import StudentDashboard from './layouts/StudentDashboard.jsx';
-import FAQPage from './layouts/FAQs.jsx';
-import AlumniRequest from './layouts/AlumniRequest.jsx';
-import AlumniDocumentList from './layouts/AlumniDocumentList.jsx';
-import AnalyticsDashboard from './layouts/AnalyticsDashboard.jsx';
-import StaffDashboardPage from './pages/StaffDashboardPage.jsx';
-import Logbook from './layouts/Logbook.jsx';
-import WalkInRequest from './layouts/WalkInRequest.jsx';
-import ProfilePage from './layouts/ProfilePage.jsx';
-import RegistrarContact from './layouts/RegistrarContact.jsx';
-import MainPage from './layouts/MainPage.jsx';
-import InboxCenter from './layouts/InboxCenter.jsx';
-import RequestAccessPage from './pages/RequestAccessPage.jsx';
-
-// Super Admin layouts
-import UserManagementPage from './pages/UserManagementPage.jsx';
-import DocumentAndCertificateManagement from './pages/DocumentAndCertificateManagement.jsx';
-import ReportManagement from './layouts/ReportManagement.jsx';
-import SystemSettings from './layouts/SystemSettings.jsx';
-import CertificateTemplateManagement from './layouts/CertificateTemplateManagement.jsx';
-import BusinessCalendarManagement from './layouts/BusinessCalendarManagement.jsx';
-import SuperAdminAnalyticsDashboard from './layouts/SuperAdminAnalyticsDashboard.jsx';
-
 // Auth
 import { ROLES, useAuth } from './context/AuthProvider';
 import { useTheme } from './context/ThemeContext';
@@ -81,6 +49,7 @@ const InboxCenter = lazy(() => import('./layouts/InboxCenter.jsx'));
 const ReportManagement = lazy(() => import('./layouts/ReportManagement.jsx'));
 const SystemSettings = lazy(() => import('./layouts/SystemSettings.jsx'));
 const BusinessCalendarManagement = lazy(() => import('./layouts/BusinessCalendarManagement.jsx'));
+const SuperAdminAnalyticsDashboard = lazy(() => import('./layouts/SuperAdminAnalyticsDashboard.jsx'));
 
 const StaffIndexRedirect = () => {
   const { user, loading } = useAuth();
@@ -203,10 +172,10 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   >
-                <Route index element={<Navigate to="/super-admin/user" replace />} />
+                    <Route index element={<Navigate to="/super-admin/user" replace />} />
                     <Route path="contact" element={<RegistrarContact />} />
                     <Route path="user" element={<UserManagementPage />} />
-                <Route path="system-analytics" element={<SuperAdminAnalyticsDashboard />} />
+                    <Route path="system-analytics" element={<SuperAdminAnalyticsDashboard />} />
                     <Route path="documents" element={<DocumentAndCertificateManagement />} />
                     <Route path="certificates" element={<Navigate to="../documents" replace />} />
                     <Route path="report" element={<ReportManagement />} />
