@@ -59,6 +59,7 @@ class LocalAuthController extends Controller
             $user = $this->localAuth->attempt(
                 $request->input('email'),
                 $request->input('password'),
+                $request,
             );
         } catch (\RuntimeException $e) {
             $statusCode = $e->getCode() ?: 401;
@@ -96,16 +97,17 @@ class LocalAuthController extends Controller
             ],
         );
 
-        // NOTE: failed-attempt alerting (e.g. N failed local-login attempts
-        // in a short window) is a follow-up, not built here. Route-level
-        // throttling already exists on POST /api/auth/local-login
-        // (see routes/api.php) as a separate brute-force mitigation, and
-        // LocalAuthService::attempt() already Log::warning()s every failed
-        // attempt for after-the-fact auditing — but there's currently no
-        // place that turns a burst of those warnings into a live alert.
-        // Wiring that up would need its own rate/threshold tracking
-        // (e.g. cache-backed counters or a dedicated table) rather than
-        // reusing this success-path notification call.
+        // Failed-attempt alerting (Phase 3e — CLOSED, previously a
+        // deferred follow-up here): every failed branch inside
+        // LocalAuthService::attempt() now writes a security_events row
+        // via SecurityEventLogger, and that same call checks whether N
+        // failures have landed against this email within the configured
+        // window (config/security_events.php), firing a
+        // 'security_alert_failed_login_burst' notification to Admin +
+        // Super Admin the first time the threshold is crossed. Route-level
+        // throttling (throttle:10,1 on this endpoint) remains a separate,
+        // complementary brute-force mitigation — it slows an attacker
+        // down; SecurityEventLogger is what makes a burst visible.
 
         return response()
             ->json(['user' => new UserResource($user)])
@@ -147,7 +149,7 @@ class LocalAuthController extends Controller
     }
 
     // -----------------------------------------------------------------------
-    // GET /api/auth/local-auth-status  (superadmin only)
+    // GET /api/auth/local-auth-status   (superadmin only)
     // -----------------------------------------------------------------------
     public function status(Request $request)
     {

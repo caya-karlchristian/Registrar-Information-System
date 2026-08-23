@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-// Auth & Guards (Synchronous for fast route evaluation and zero flicker)
+// Auth
 import { ROLES, useAuth } from './context/AuthProvider';
 import { useTheme } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -49,6 +49,7 @@ const InboxCenter = lazy(() => import('./layouts/InboxCenter.jsx'));
 const ReportManagement = lazy(() => import('./layouts/ReportManagement.jsx'));
 const SystemSettings = lazy(() => import('./layouts/SystemSettings.jsx'));
 const BusinessCalendarManagement = lazy(() => import('./layouts/BusinessCalendarManagement.jsx'));
+const SuperAdminAnalyticsDashboard = lazy(() => import('./layouts/SuperAdminAnalyticsDashboard.jsx'));
 
 const StaffIndexRedirect = () => {
   const { user, loading } = useAuth();
@@ -171,9 +172,10 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   >
-                <Route index element={<Navigate to="/super-admin/user" replace />} />
+                    <Route index element={<Navigate to="/super-admin/user" replace />} />
                     <Route path="contact" element={<RegistrarContact />} />
                     <Route path="user" element={<UserManagementPage />} />
+                    <Route path="system-analytics" element={<SuperAdminAnalyticsDashboard />} />
                     <Route path="documents" element={<DocumentAndCertificateManagement />} />
                     <Route path="certificates" element={<Navigate to="../documents" replace />} />
                     <Route path="report" element={<ReportManagement />} />

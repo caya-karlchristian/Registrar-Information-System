@@ -19,7 +19,10 @@ use App\Services\CashierService;
 use App\Services\CashierDocumentMatcher;
 use App\Services\CashierDocumentSuggester;
 use App\Services\NameMatcher;
+use App\Jobs\EnrichCashierFailureJob;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Document request HTTP controller.
@@ -412,7 +415,7 @@ class DocumentRequestController extends Controller
 
         $isMockAttempt = $verification['data']['_mock'] ?? false;
 
-        $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
+        $auditEntry = $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
             'or_number'      => $orNumber,
             'attempts'       => $attemptsLog,
             'matched_name'   => $verification['valid'] ? $matchedName : null,
@@ -422,6 +425,48 @@ class DocumentRequestController extends Controller
 
         if (!$verification['valid']) {
             $reason = $verification['reason'] ?? 'NOT_FOUND';
+
+            // Phase 4a — Cashier Verification Failure Diagnostics.
+            // Only worth enriching on a real lookup miss (NOT_FOUND):
+            // API_ERROR is the Cashier System's own availability, not a
+            // data mismatch, and mock mode (no CASHIER_API_KEY configured)
+            // never produces NOT_FOUND to begin with — see
+            // CashierService::mockResponse(), which always returns valid.
+            // Dispatched (queued, not inline) so this student's failed
+            // submission is never delayed by a call made purely for the
+            // registrar's later benefit.
+            //
+            // Wrapped in try/catch: on QUEUE_CONNECTION=database/redis
+            // (production) dispatch() only enqueues and this is a no-op
+            // fast path. But on QUEUE_CONNECTION=sync (phpunit.xml, and
+            // often local dev), Laravel's SyncQueue runs the job INLINE,
+            // in this same request, and — after calling the job's own
+            // failed() hook — RE-THROWS whatever the job threw (e.g. an
+            // OGOS auth failure). Without this catch, that exception
+            // propagates straight out of this method and turns the
+            // primary "OR not found" outcome below into an uncaught 500,
+            // even though the actual document-request logic already
+            // finished correctly. A best-effort background diagnostic
+            // must never be able to take down the user-facing response
+            // it was only ever meant to enrich, regardless of which
+            // queue driver happens to be configured.
+            if ($reason === 'NOT_FOUND' && !$isMockAttempt) {
+                try {
+                    EnrichCashierFailureJob::dispatch(
+                        sourceAuditLogId: $auditEntry->id,
+                        actorUserId:      $user->user_id,
+                        orNumber:         $orNumber,
+                        ipAddress:        $request->ip(),
+                        userAgent:        $request->userAgent(),
+                    );
+                } catch (Throwable $e) {
+                    Log::warning('EnrichCashierFailureJob dispatch failed; continuing without enrichment', [
+                        'source_audit_log_id' => $auditEntry->id,
+                        'or_number'            => $orNumber,
+                        'message'              => $e->getMessage(),
+                    ]);
+                }
+            }
 
             $message = match ($reason) {
                 'NOT_FOUND' => 'The OR number could not be found. Please check your Official Receipt and try again.',

@@ -73,6 +73,7 @@ const ROLE_CONFIG = {
     profileLabel: (user) => user?.email,
     items: [
       { name: 'Admin Management', to: 'user', icon: Squares2X2Icon },
+      { name: 'System Analytics', to: 'system-analytics', icon: ChartBarSquareIcon },
       { name: 'Document Management', to: 'documents', icon: TableCellsIcon },
       { name: 'Audit Trail', to: 'report', icon: UserCircleIcon },
       { name: 'Announcement Management', to: 'settings', icon: Cog6ToothIcon },

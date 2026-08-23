@@ -8,6 +8,7 @@ use App\Contracts\NotificationServiceInterface;
 use App\Models\NotificationType;
 use App\Observers\NotificationTypeObserver;
 use App\Services\AuditLogger;
+use App\Services\SecurityEventLogger;
 use App\Services\Alumni\AlumniSystemClient;
 use App\Services\Alumni\FakeAlumniSystemClient;
 use App\Services\DocumentRequestService;
@@ -50,6 +51,12 @@ class AppServiceProvider extends ServiceProvider
         // AuditLogger is a concrete class — no interface needed.
         // Singleton so the same instance is reused within a request.
         $this->app->singleton(AuditLogger::class);
+
+        // SecurityEventLogger (Phase 3) — same reasoning as AuditLogger
+        // above: concrete class, no interface needed, singleton so the
+        // same instance (and any request-scoped state it may accrue) is
+        // reused within a request.
+        $this->app->singleton(SecurityEventLogger::class);
     }
 
     /**
