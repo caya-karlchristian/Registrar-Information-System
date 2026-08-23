@@ -13,6 +13,7 @@ import qrCode from "../assets/qrcode.png";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 import ClaimTicket from '../components/ClaimTicket.jsx';
 import OfficeHoursNotice from '../components/OfficeHoursNotice.jsx';
+import { useFormDraft } from '../hooks/useFormDraft';
 import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useMutation } from '@tanstack/react-query';
@@ -120,6 +121,15 @@ const RequestForm = ({ showProfileStep = false }) => {
     dateOfPayment: getTodayDate(),
     documentCopies: {},
     certCopies: {},
+  });
+
+  const { clearDraft } = useFormDraft({
+    storageKey: 'student_request_draft',
+    formData,
+    setFormData,
+    currentStep,
+    setCurrentStep,
+    isSubmitted,
   });
 
   const handleInputChange = (e) => {
@@ -348,6 +358,7 @@ const RequestForm = ({ showProfileStep = false }) => {
         uuid: response?.data?.uuid ?? null,
         claimCode: response?.data?.claim_code ?? null,
       });
+      clearDraft();
       setIsSubmitted(true);
     },
     onError: (error) => {
@@ -400,6 +411,7 @@ const RequestForm = ({ showProfileStep = false }) => {
   const isVerifyingOr = verifyOrMutation.isPending;
 
   const handleConfirm = () => {
+    clearDraft();
     setIsSubmitted(false);
     setCurrentStep(1);
     setFormData({
