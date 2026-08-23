@@ -26,6 +26,14 @@ class SuperAdminAnalyticsController extends Controller
 {
     private const CACHE_TTL_MINUTES = 10;
 
+    // Shorter TTL specifically for adminRosterHealth() — it's documented
+    // as a "live" snapshot (see that method's docblock), which sits
+    // awkwardly next to a 10-minute cache. 2 minutes keeps repeated
+    // dashboard loads cheap without the endpoint's own docs contradicting
+    // its behavior; the other two panels are trend/throughput numbers
+    // where a 10-minute lag is unremarkable.
+    private const ROSTER_CACHE_TTL_MINUTES = 2;
+
     public function __construct(
         private SuperAdminAnalyticsService $superAdminAnalytics,
     ) {}
@@ -90,7 +98,7 @@ class SuperAdminAnalyticsController extends Controller
         return response()->json(
             Cache::tags(['analytics'])->remember(
                 'system-analytics:admin-roster-health',
-                now()->addMinutes(self::CACHE_TTL_MINUTES),
+                now()->addMinutes(self::ROSTER_CACHE_TTL_MINUTES),
                 fn () => $this->superAdminAnalytics->adminRosterHealth(),
             )
         );

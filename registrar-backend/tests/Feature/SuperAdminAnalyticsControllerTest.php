@@ -7,9 +7,22 @@ use App\Models\RoleAssignment;
 use App\Models\SystemUser;
 use App\Models\UnmatchedCashierItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
+
+// SuperAdminAnalyticsController caches every panel (see its class
+// docblock — Redis in production, the 'array' driver in testing). The
+// 'array' store lives in memory for the lifetime of the PHP process, and
+// Pest runs every test in this file in the same process — RefreshDatabase
+// rolls back the database between tests, but does nothing to that cache.
+// Without this, whichever test hits a given endpoint+params combination
+// FIRST permanently "wins" that cache entry for every later test in the
+// file, regardless of what data that later test actually seeded. Flushing
+// the 'analytics' tag before each test keeps this file's tests isolated
+// from each other the same way the DB transaction already does.
+beforeEach(fn () => Cache::tags(['analytics'])->flush());
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,11 +55,18 @@ function saWriteAuditLog(string $action, array $overrides = []): AuditLog
  * create() directly) — this mirrors that same pattern with sensible
  * defaults for throughput-metric tests, which only care about status/
  * created_at/reviewed_at, not the target-identity fields.
+ *
+ * Deliberately creates a fresh `requested_by` SystemUser on every call
+ * rather than memoizing one in a `static` local — RefreshDatabase rolls
+ * back the DB after each test, but a PHP `static` variable would keep
+ * pointing at the now-rolled-back row's id in the next test (Pest runs
+ * every test in this file in one process), producing a foreign-key
+ * violation on insert. One extra factory call per access request is
+ * cheap; a flaky FK error chasing a stale in-memory reference is not.
  */
 function saAccessRequest(array $overrides = []): AccessRequest
 {
-    static $submitter = null;
-    $submitter ??= SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
+    $submitter = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
 
     return AccessRequest::create(array_merge([
         'requested_by'      => $submitter->user_id,
@@ -230,8 +250,14 @@ test('approval_rate is computed from fulfilled vs rejected, not the unused Appro
     expect($response->json('total'))->toBe(6);
     expect($response->json('fulfilled'))->toBe(3);
     expect($response->json('rejected'))->toBe(1);
-    // 3 / (3 + 1) = 75%
-    expect($response->json('approval_rate'))->toBe(75.0);
+    // 3 / (3 + 1) = 75%. Compared with toEqual (loose ==), not toBe
+    // (strict ===): PHP's json_encode() drops the trailing .0 from a
+    // whole-number float unless JSON_PRESERVE_ZERO_FRACTION is set, which
+    // Laravel's response()->json() doesn't set by default — so this
+    // decodes back as the int 75, not the float 75.0. match_rate's 66.7
+    // assertion elsewhere in this file doesn't hit this, since it isn't a
+    // whole number.
+    expect($response->json('approval_rate'))->toEqual(75.0);
 });
 
 test('avg_time_to_review_hours is null when nothing has been reviewed yet', function () {
