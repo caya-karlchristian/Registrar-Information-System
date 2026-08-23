@@ -4,12 +4,14 @@ import {
   FaceSmileIcon,
   EnvelopeIcon,
   InformationCircleIcon,
+  VideoCameraIcon,
 } from '@heroicons/react/24/outline';
 import VoiceSearchInput from '../components/VoiceSearchInput.jsx';
 import { useTheme } from '../context/ThemeContext';
 
 const categories = [
   "All",
+  "How-To Video Guides",
   "System Overview",
   "System Usage",
   "Security & Privacy",
@@ -19,6 +21,26 @@ const categories = [
 ];
 
 const faqData = [
+  {
+    id: 1,
+    question: "How do PUP students request documents? (Video Guide)",
+    answer: "Active PUP Taguig students can sign in through the PUP ONE PORTAL, choose their desired document, specify the purpose and number of copies, and track their request status in real-time.",
+    category: "How-To Video Guides",
+    role: "Student",
+    link: "https://youtu.be/xXkECQzkhJs?si=ejcO8xggLHaOjHMW",
+    linkLabel: "Watch Student Video Tutorial on YouTube",
+    embedUrl: "https://www.youtube.com/embed/xXkECQzkhJs",
+  },
+  {
+    id: 2,
+    question: "How do PUP alumni request documents? (Video Guide)",
+    answer: "PUP Taguig alumni can log in or register for an alumni account, browse available records (such as TOR, Diploma, and Certifications), submit transaction receipts, and track fulfillment online.",
+    category: "How-To Video Guides",
+    role: "Alumni",
+    link: "https://youtu.be/SJo6prU2u24?si=-VzwO2pONrlSj0vl",
+    linkLabel: "Watch Alumni Video Tutorial on YouTube",
+    embedUrl: "https://www.youtube.com/embed/SJo6prU2u24",
+  },
   {
     id: 13,
     question: "What is the Registrar Information System (RIS)?",
@@ -92,6 +114,7 @@ const FAQPage = () => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [openId, setOpenId] = useState(null);
+  const [videoRoleTab, setVideoRoleTab] = useState('all'); // 'all' | 'student' | 'alumni'
 
   const filteredFAQs = faqData.filter(({ category, question, answer }) => {
     const matchesCategory = activeCategory === 'All' || category === activeCategory;
@@ -207,46 +230,86 @@ const FAQPage = () => {
             </div>
 
             {filteredFAQs.length > 0 ? (
-              filteredFAQs.map(({ id, question, answer, category }) => (
-                <div
-                  key={id}
-                  className={`group border rounded-2xl overflow-hidden transition-all duration-300 ${
-                    openId === id
-                      ? (isDark ? 'border-[#800000] shadow-xl ring-1 ring-[#800000]/10 bg-[#242526]' : 'border-[#800000] shadow-xl ring-1 ring-[#800000]/10')
-                      : (isDark ? 'border-[#3e4042] bg-[#242526] hover:border-[#4e4f50] shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300 shadow-sm')
-                  }`}
-                >
-                  <button
-                    onClick={() => toggleAccordion(id)}
-                    className={`w-full flex justify-between items-center p-6 text-left focus:outline-none transition-colors ${
-                      openId === id ? (isDark ? 'bg-[#3a3b3c]/60' : 'bg-red-50/50') : (isDark ? 'bg-[#242526]' : 'bg-white')
+              filteredFAQs.map((faq) => {
+                const { id, question, answer, category, link, linkLabel, embedUrl } = faq;
+                return (
+                  <div
+                    key={id}
+                    className={`group border rounded-2xl overflow-hidden transition-all duration-300 ${
+                      openId === id
+                        ? (isDark ? 'border-[#800000] shadow-xl ring-1 ring-[#800000]/10 bg-[#242526]' : 'border-[#800000] shadow-xl ring-1 ring-[#800000]/10')
+                        : (isDark ? 'border-[#3e4042] bg-[#242526] hover:border-[#4e4f50] shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300 shadow-sm')
                     }`}
                   >
-                    <span className={`text-lg font-bold pr-4 ${isDark ? 'text-white' : 'text-[#800000]'}`}>
-                      {question}
-                    </span>
-                    <span className={`shrink-0 p-2 rounded-full transition-all duration-300 ${
-                      openId === id
-                        ? 'bg-[#800000] text-white rotate-180'
-                        : (isDark ? 'bg-[#2b2c2d] text-[#b0b3b8] group-hover:bg-[#333435]' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200')
-                    }`}>
-                      <ChevronDownIcon className="w-5 h-5" />
-                    </span>
-                  </button>
+                    <button
+                      onClick={() => toggleAccordion(id)}
+                      className={`w-full flex justify-between items-center p-6 text-left focus:outline-none transition-colors ${
+                        openId === id ? (isDark ? 'bg-[#3a3b3c]/60' : 'bg-red-50/50') : (isDark ? 'bg-[#242526]' : 'bg-white')
+                      }`}
+                    >
+                      <span className={`text-lg font-bold pr-4 ${isDark ? 'text-white' : 'text-[#800000]'}`}>
+                        {question}
+                      </span>
+                      <span className={`shrink-0 p-2 rounded-full transition-all duration-300 ${
+                        openId === id
+                          ? 'bg-[#800000] text-white rotate-180'
+                          : (isDark ? 'bg-[#2b2c2d] text-[#b0b3b8] group-hover:bg-[#333435]' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200')
+                      }`}>
+                        <ChevronDownIcon className="w-5 h-5" />
+                      </span>
+                    </button>
 
-                  <div className={`transition-all duration-500 ease-in-out overflow-hidden ${
-                    openId === id ? 'max-h-125 opacity-100' : 'max-h-0 opacity-0'
-                  }`}>
-                    <div className="px-6 pb-8 pt-2">
-                      <div className={`h-px mb-6 ${isDark ? 'bg-white/6' : 'bg-gray-100'}`} />
-                      <p className={`${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} text-lg leading-relaxed`}>{answer}</p>
-                      <div className={`mt-6 inline-flex items-center px-3 py-1 rounded-md ${isDark ? 'bg-[#1a1b1e] text-[#b0b3b8]' : 'bg-gray-100 text-gray-500'} text-xs font-bold uppercase tracking-widest`}>
-                        {category}
+                    <div className={`transition-all duration-500 ease-in-out overflow-hidden ${
+                      openId === id ? 'max-h-160 opacity-100' : 'max-h-0 opacity-0'
+                    }`}>
+                      <div className="px-6 pb-8 pt-2">
+                        <div className={`h-px mb-6 ${isDark ? 'bg-white/6' : 'bg-gray-100'}`} />
+                        <p className={`${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} text-base leading-relaxed`}>{answer}</p>
+                        
+                        {/* Video Player inside Accordion if available */}
+                        {embedUrl && (
+                          <div className="relative w-full max-w-lg rounded-xl overflow-hidden shadow-md bg-black mt-4 mb-4 border border-gray-300/30" style={{ aspectRatio: '16 / 9' }}>
+                            <iframe
+                              src={embedUrl}
+                              title={question}
+                              className="absolute inset-0 w-full h-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              loading="lazy"
+                            />
+                          </div>
+                        )}
+
+                        {/* Direct Link in the FAQ */}
+                        {link && (
+                          <div className="mt-4 pt-3 border-t border-gray-200/20 flex items-center justify-between flex-wrap gap-2">
+                            <a
+                              href={link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer ${
+                                isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#eebc48]' : 'bg-[#800000] hover:bg-[#660000] text-white'
+                              }`}
+                            >
+                              <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+                              </svg>
+                              <span>{linkLabel || 'Watch on YouTube'}</span>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                              </svg>
+                            </a>
+                          </div>
+                        )}
+
+                        <div className={`mt-5 inline-flex items-center px-3 py-1 rounded-md ${isDark ? 'bg-[#1a1b1e] text-[#b0b3b8]' : 'bg-gray-100 text-gray-500'} text-xs font-bold uppercase tracking-widest`}>
+                          {category}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className={`${isDark ? 'text-center py-24 bg-[#242526] rounded-3xl border border-dashed border-[#3e4042]' : 'text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300'}`}>
                 <div className={`${isDark ? 'bg-[#1a1b1e] w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4' : 'bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4'}`}>
