@@ -103,13 +103,17 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
     const missingFields = [];
     if (!form.first_name.trim()) missingFields.push("First Name");
     if (!form.last_name.trim()) missingFields.push("Last Name");
-
-    if (!isEdit) {
-      if (!form.email.trim()) missingFields.push("Email");
-    }
+    if (!form.email.trim()) missingFields.push("Email");
 
     if (missingFields.length > 0) {
       setLocalError(`Please fill in all required fields: ${missingFields.join(", ")}.`);
+      return;
+    }
+
+    const email = form.email.trim();
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      setLocalError("Please enter a valid email address.");
       return;
     }
 
@@ -191,77 +195,62 @@ const UserModal = ({ isOpen, onClose, onSubmit, editData = null, submitting = fa
           <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0">
             <div className={`px-6 py-6 space-y-4 flex-1 overflow-y-auto ${isDark ? 'text-[#e4e6eb]' : ''}`}>
 
-              {/* Name Fields (First, Last, Middle, Suffix) */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              {/* Name Fields (First, Middle, Last) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <InputGroup label="First Name" name="first_name" value={form.first_name}
                   onChange={handleChange} placeholder="e.g. Juan" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
-                <InputGroup label="Last Name" name="last_name" value={form.last_name}
-                  onChange={handleChange} placeholder="e.g. dela Cruz" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
                 <InputGroup label="Middle Name" name="middle_name" value={form.middle_name}
                   onChange={handleChange} placeholder="e.g. Santos" labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
-                <InputGroup label="Suffix" name="suffix" value={form.suffix}
-                  onChange={handleChange} placeholder="e.g. Jr., Sr." labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
+                <InputGroup label="Last Name" name="last_name" value={form.last_name}
+                  onChange={handleChange} placeholder="e.g. dela Cruz" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
               </div>
 
-              {/* Email — create only shows the plain email field; edit
-                  shows email alongside Status (the only field on the edit
-                  form that toggles an already-linked account live/inactive). */}
-              {!isEdit && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-                  <InputGroup label="Email" name="email" type="email" value={form.email}
-                    onChange={handleChange} placeholder="e.g. juan@pup.edu.ph" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
-                </div>
-              )}
+              {/* Suffix & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                <InputGroup label="Suffix" name="suffix" value={form.suffix}
+                  onChange={handleChange} placeholder="e.g. Jr., Sr." labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
+                <InputGroup label="Email" name="email" type="email" value={form.email}
+                  onChange={handleChange} placeholder="e.g. juan@pup.edu.ph" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
+              </div>
 
-              {isEdit && (
+              {/* Role & Attach Policy (Create Mode) / Role & Status (Edit Mode) */}
+              {isEdit ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-                  <InputGroup label="Email" name="email" type="email" value={form.email}
-                    onChange={handleChange} placeholder="e.g. juan@pup.edu.ph" required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
+                  <div>
+                    <span className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
+                      Role
+                    </span>
+                    <div className={`px-3 py-3 rounded-lg text-sm font-medium border ${isDark ? 'bg-[#1f1f1f] border-[#3e4042] text-[#9a9a9a]' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                      {ID_TO_ROLE[editData?.role_id] || `Role ${editData?.role_id}`}
+                    </div>
+                    <p className={`text-xs mt-1 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
+                      To change this user&apos;s role, use Manage Roles instead.
+                    </p>
+                  </div>
                   <DropDown label="Status" name="status" value={form.status}
                     onChange={handleChange} options={STATUS_OPTIONS} required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
                 </div>
-              )}
-
-              {/* Role — editable on create only. On edit it's shown
-                  read-only for context; changing it happens exclusively
-                  through "Manage Roles" (RoleAssignmentsModal) now — see
-                  Work Item #2 — Admin Management Consolidation. */}
-              {isEdit ? (
-                <div>
-                  <span className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
-                    Role
-                  </span>
-                  <div className={`px-3 py-3 rounded-lg text-sm font-medium border ${isDark ? 'bg-[#1f1f1f] border-[#3e4042] text-[#9a9a9a]' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
-                    {ID_TO_ROLE[editData?.role_id] || `Role ${editData?.role_id}`}
-                  </div>
-                  <p className={`text-xs mt-1 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
-                    To change this user&apos;s role, use Manage Roles instead.
-                  </p>
-                </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                   <DropDown label="Role" name="role" value={form.role}
                     onChange={handleChange} options={ROLE_OPTIONS} required labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'} />
-                </div>
-              )}
-
-              {/* Policy attachment — new admins only. Super admins have
-                  full access by default, and an existing admin's policy
-                  is now only ever changed via RoleAssignmentsModal's
-                  in-place policy editor. */}
-              {!isEdit && form.role === "Admin" && (
-                <div>
-                  <DropDown
-                    label="Attach Policy"
-                    name="policy"
-                    value={form.policy}
-                    onChange={handleChange}
-                    options={systemPolicies.map((p) => p.name)}
-                    labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
-                  />
-                  <p className={`text-xs mt-1 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
-                    Optional — determines which modules this admin can access. Leave blank to attach one later from Manage Roles.
-                  </p>
+                  {form.role === "Admin" ? (
+                    <div>
+                      <DropDown
+                        label="Attach Policy"
+                        name="policy"
+                        value={form.policy}
+                        onChange={handleChange}
+                        options={systemPolicies.map((p) => p.name)}
+                        labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
+                      />
+                      <p className={`text-xs mt-1 ${isDark ? 'text-[#9a9a9a]' : 'text-gray-400'}`}>
+                        Optional — determines which modules this admin can access. Leave blank to attach one later from Manage Roles.
+                      </p>
+                    </div>
+                  ) : (
+                    <div />
+                  )}
                 </div>
               )}
 

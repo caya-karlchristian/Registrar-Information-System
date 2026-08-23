@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useReferenceData } from "../context/ReferenceDataContext";
 import { createDocumentRequest, verifyOfficialReceipt } from "../services/api";
 import { DOC_TYPE_MAP, CERTIFICATION_MAP } from "../utils/constants";
+import { useFormDraft } from "./useFormDraft";
 import {
   ALUMNI_ACCESS_IDS,
   validateProfileStep,
@@ -67,6 +68,15 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     dateOfPayment: getTodayDate(),
     documentCopies: {},
     certCopies: {},
+  });
+
+  const { clearDraft } = useFormDraft({
+    storageKey: 'alumni_request_draft',
+    formData,
+    setFormData,
+    currentStep,
+    setCurrentStep,
+    isSubmitted,
   });
 
   const handleInputChange = (e) => {
@@ -310,6 +320,7 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
         uuid: response?.data?.uuid ?? null,
         claimCode: response?.data?.claim_code ?? null,
       });
+      clearDraft();
       setIsSubmitted(true);
     },
     onError: (error) => {
@@ -364,6 +375,7 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   };
 
   const handleConfirm = () => {
+    clearDraft();
     setIsSubmitted(false);
     setCurrentStep(1);
     setFormData({

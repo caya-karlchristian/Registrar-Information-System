@@ -24,19 +24,19 @@ import StaffPage from './pages/StaffPage.jsx';
 import SuperAdminPage from './pages/SuperAdminPage.jsx';
 import MainPage from './layouts/MainPage.jsx';
 import UserManagementPage from './pages/UserManagementPage.jsx';
+import StaffDashboardPage from './pages/StaffDashboardPage.jsx';
+import StudentDashboard from './layouts/StudentDashboard.jsx';
 
 // Lazy-loaded Direct Pages
 const ForbiddenPage = lazy(() => import('./components/ForbiddenPage'));
 const SsoCallbackPage = lazy(() => import('./pages/SsoCallbackPage.jsx'));
 const AccessControlPage = lazy(() => import('./pages/AccessControlPage.jsx'));
-const StaffDashboardPage = lazy(() => import('./pages/StaffDashboardPage.jsx'));
 const RequestAccessPage = lazy(() => import('./pages/RequestAccessPage.jsx'));
 const DocumentAndCertificateManagement = lazy(() => import('./pages/DocumentAndCertificateManagement.jsx'));
 
 // Lazy-loaded Layouts
 const RequestForm = lazy(() => import('./layouts/RequestForm.jsx'));
 const DocumentLists = lazy(() => import('./layouts/DocumentLists.jsx'));
-const StudentDashboard = lazy(() => import('./layouts/StudentDashboard.jsx'));
 const FAQPage = lazy(() => import('./layouts/FAQs.jsx'));
 const AlumniRequest = lazy(() => import('./layouts/AlumniRequest.jsx'));
 const AlumniDocumentList = lazy(() => import('./layouts/AlumniDocumentList.jsx'));

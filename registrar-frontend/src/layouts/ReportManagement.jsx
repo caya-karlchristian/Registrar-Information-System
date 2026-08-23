@@ -964,7 +964,6 @@ const ReportManagement = () => {
                         ]}
                       />
                     </th>
-                    <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>IP Address</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -972,7 +971,7 @@ const ReportManagement = () => {
                     <ReportTableSkeleton isDark={isDark} count={10} />
                   ) : seEvents.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-20">
+                      <td colSpan={4} className="py-20">
                         <div className="flex flex-col items-center justify-center">
                           <div className={`w-16 h-16 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/50' : 'bg-gray-100'}`}>
                             <ShieldExclamationIcon className={`w-8 h-8 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
@@ -1011,8 +1010,6 @@ const ReportManagement = () => {
                             <span className={`text-xs ${isDark ? 'text-[#6b6b6b]' : 'text-gray-400'}`}>—</span>
                           )}
                         </td>
-
-                        <td className={`px-4 py-3 text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{ev.ip_address ?? "—"}</td>
 
                       </tr>
                     ))
