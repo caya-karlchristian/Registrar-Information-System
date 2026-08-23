@@ -29,6 +29,7 @@ use App\Http\Controllers\BusinessHoursController;
 use App\Http\Controllers\CalendarExceptionController;
 use App\Http\Controllers\CalendarOverrideController;
 use App\Http\Controllers\SuperAdminAnalyticsController;
+use App\Http\Controllers\SecurityEventController;
 
 /*
 |--------------------------------------------------------------------------
@@ -316,6 +317,17 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
 
         Route::get('audit-logs',         [AuditLogController::class, 'index']);
         Route::get('audit-logs/filters', [AuditLogController::class, 'filters']);
+
+        // Phase 3 — Audit Log Revamp: RIS-Only Security Events. Deliberately
+        // a separate table/controller from audit-logs above, not folded
+        // into it — see the plan doc's "Trade-off" section and
+        // create_security_events_table migration's docblock for the full
+        // reasoning (different volume, different retention, different
+        // consumer). Read-only: writes happen internally via
+        // SecurityEventLogger from LocalAuthService/AuthController, never
+        // through this controller.
+        Route::get('security-events',         [SecurityEventController::class, 'index']);
+        Route::get('security-events/filters', [SecurityEventController::class, 'filters']);
 
         // Phase 2 — SuperAdmin Analytics Dashboard (system-level, not
         // scoped to a single Registrar's request queue — see

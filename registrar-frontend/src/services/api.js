@@ -301,6 +301,15 @@ export const getAuditLogs       = (params = {}) => api.get("/audit-logs", { para
 export const getAuditLogFilters = ()             => api.get("/audit-logs/filters");
 
 // -------------------------------------------------------
+// SECURITY EVENTS (Super Admin only) — Phase 3
+// Same call shape as the audit log functions above; the two endpoints
+// share the frontend Audit Trail page's table/pagination via a tab toggle
+// (see ReportManagement.jsx).
+// -------------------------------------------------------
+export const getSecurityEvents       = (params = {}) => api.get("/security-events", { params });
+export const getSecurityEventFilters = ()             => api.get("/security-events/filters");
+
+// -------------------------------------------------------
 // ANALYTICS (Admin + Super Admin)
 // -------------------------------------------------------
 export const getAnalyticsOverview      = (params = {}) => api.get("/analytics/overview",          { params });

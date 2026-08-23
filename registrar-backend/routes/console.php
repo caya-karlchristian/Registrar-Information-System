@@ -149,3 +149,23 @@ Schedule::command('break-glass:test')
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+/*
+|--------------------------------------------------------------------------
+| Scheduled Commands — Security Events Retention (Phase 3h)
+|--------------------------------------------------------------------------
+|
+| Daily: prune security_events rows older than
+| config('security_events.retention_days'). Deliberately independent of
+| audit:verify above — audit_logs stays permanent/untouched; only this
+| operational/security-signal table is pruned. Given the same 08:xx
+| slot as the other daily hygiene jobs; 08:25 keeps it clear of every
+| other job's window above.
+|--------------------------------------------------------------------------
+*/
+
+Schedule::command('security-events:prune')
+    ->dailyAt('08:25')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));

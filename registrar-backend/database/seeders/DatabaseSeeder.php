@@ -510,6 +510,21 @@ class DatabaseSeeder extends Seeder
                 'audience'             => NotificationAudienceEnum::SuperAdmin->value,
                 'is_active'            => 1,
             ],
+            [
+                // Phase 3e — fires when SecurityEventLogger sees N failed
+                // local-auth attempts against one email within the
+                // configured window (config/security_events.php). Sent via
+                // sendToAllExcept([STUDENT, ALUMNI], ...) — same audience
+                // as notification_type_id 20 (local_auth_login_used) —
+                // since a burst of failed break-glass attempts is exactly
+                // as relevant to Admin + Super Admin as a successful one.
+                'notification_type_id' => 23,
+                'trigger_event'        => 'security_alert_failed_login_burst',
+                'title'                => 'Repeated Failed Login Attempts',
+                'message_template'     => ':attempt_count failed local-auth attempts for :email in the last :window_minutes minutes — verify this was expected.',
+                'audience'             => NotificationAudienceEnum::SuperAdmin->value,
+                'is_active'            => 1,
+            ],
         ];
 
         foreach ($rows as $row) {
