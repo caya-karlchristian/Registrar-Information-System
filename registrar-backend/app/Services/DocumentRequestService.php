@@ -351,50 +351,6 @@ class DocumentRequestService implements DocumentRequestServiceInterface
     }
 
     // -------------------------------------------------------------------------
-    // Claim (QR scan / manual claim_code)
-    // -------------------------------------------------------------------------
-
-    /**
-     * @param array{uuid?: string, claim_code?: string} $credential exactly
-     *        one key set — enforced by ClaimDocumentRequestRequest before
-     *        this is ever called.
-     */
-    public function claimRequest(array $credential): DocumentRequest
-    {
-        // Plain lookup, no lock here on purpose: updateRequest() below
-        // re-fetches by request_id under lockForUpdate() and re-validates
-        // everything (archived, transition-allowed) against the committed
-        // state at that point. Locking twice on two different query shapes
-        // (by uuid/claim_code here, by request_id there) would only add
-        // deadlock surface for no extra safety.
-        //
-        // The default ExcludeArchivedScope applies here same as any other
-        // query, so an archived request's code/uuid simply won't match —
-        // consistent with archived requests being read-only everywhere else.
-        $documentRequest = DocumentRequest::query()
-            ->when(isset($credential['uuid']), fn ($q) => $q->where('uuid', $credential['uuid']))
-            ->when(isset($credential['claim_code']), fn ($q) => $q->where('claim_code', $credential['claim_code']))
-            ->first();
-
-        if (!$documentRequest) {
-            // Deliberately generic — doesn't reveal whether a uuid or
-            // claim_code was the invalid part of the payload.
-            abort(404, 'No matching request found for that code.');
-        }
-
-        // Reuses the exact same guarded path a manual admin status change
-        // goes through: row lock, "archived is read-only", and
-        // allowedTransitions() — which only permits ReadyToClaim →
-        // Completed. That means a request that's still Processing, or
-        // one that was already Completed by an earlier scan, is rejected
-        // here with the same clear 422 updateRequest() already produces,
-        // with no extra logic needed to distinguish those cases.
-        return $this->updateRequest($documentRequest, [
-            'status_id' => RequestStatusEnum::Completed->value,
-        ]);
-    }
-
-    // -------------------------------------------------------------------------
     // Archive / Restore
     // -------------------------------------------------------------------------
     //
