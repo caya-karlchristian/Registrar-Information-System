@@ -91,7 +91,9 @@ const RequestForm = ({ showProfileStep = false }) => {
   };
 
   const availableDocs = useMemo(() => {
-    return documentTypes.filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id));
+    return documentTypes
+      .filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id))
+      .filter(doc => !doc.document_name.toLowerCase().startsWith("certif"));
   }, [documentTypes]);
 
   const availableCertifications = useMemo(() => {
@@ -144,14 +146,19 @@ const RequestForm = ({ showProfileStep = false }) => {
     // cashier API earlier now (see handleVerifyOr, triggered when leaving
     // the OR-verification step) — this final step only has copies left
     // to check before confirming.
-    const hasInvalidDocCopy = formData.documentsRequested
+    const hasInvalidDocCopy = (formData.documentsRequested || [])
       .filter((doc) => !doc.toLowerCase().includes("certif"))
       .some((doc) => {
-        const copies = Number(formData.documentCopies[doc] || 1);
+        const copies = Number(formData.documentCopies?.[doc] || 1);
         return !Number.isInteger(copies) || copies < 1 || copies > 10;
       });
 
-    if (hasInvalidDocCopy) {
+    const hasInvalidCertCopy = (formData.certification || []).some((cert) => {
+      const copies = Number(formData.certCopies?.[cert] || 1);
+      return !Number.isInteger(copies) || copies < 1 || copies > 10;
+    });
+
+    if (hasInvalidDocCopy || hasInvalidCertCopy) {
       setErrorMessage("Number of copies must be between 1 and 10.");
       return;
     }
@@ -324,19 +331,19 @@ const RequestForm = ({ showProfileStep = false }) => {
       return;
     }
 
-    if (currentStep === docStep && formData.documentsRequested.length === 0) {
-      setErrorMessage("Please select at least one document to proceed.");
-      return;
-    }
+    if (currentStep === docStep) {
+      if (
+        (!formData.documentsRequested || formData.documentsRequested.length === 0) &&
+        (!formData.certification || formData.certification.length === 0)
+      ) {
+        setErrorMessage("Please select at least one document or certification to proceed.");
+        return;
+      }
 
-    if (currentStep === docStep && formData.purposeOfRequest.length === 0) {
-      setErrorMessage("Please select a purpose for your request.");
-      return;
-    }
-
-    if (currentStep === docStep && showCertificationDropdown && formData.certification.length === 0) {
-      setErrorMessage("Please specify the certification type.");
-      return;
+      if (!formData.purposeOfRequest || formData.purposeOfRequest.length === 0) {
+        setErrorMessage("Please select a purpose for your request.");
+        return;
+      }
     }
 
     if (currentStep < finalStep) setCurrentStep((s) => s + 1);
@@ -500,6 +507,16 @@ const RequestForm = ({ showProfileStep = false }) => {
       return acc;
     }, {});
   }, [availableDocs]);
+
+  const certByName = useMemo(() => {
+    return availableCertifications.reduce((acc, cert) => {
+      acc[cert.certificate_name] = {
+        ...cert,
+        requirementsParsed: parseRequirements(cert.certificate_requirements),
+      };
+      return acc;
+    }, {});
+  }, [availableCertifications]);
 
   return (
     <>
@@ -747,24 +764,23 @@ const RequestForm = ({ showProfileStep = false }) => {
                       </div>
                     )}
 
-                    <MultiSelectDropdown
-                      name="documentsRequested"
-                      label="Documents Requested"
-                      required
-                      options={documentOptions}
-                      selectedValues={formData.documentsRequested}
-                      onChange={handleInputChange}
-                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <MultiSelectDropdown
+                        name="documentsRequested"
+                        label="Documents"
+                        options={documentOptions}
+                        selectedValues={formData.documentsRequested}
+                        onChange={handleInputChange}
+                      />
 
-                    {showCertificationDropdown && (
                       <MultiSelectDropdown
                         name="certification"
-                        label="For Certification, please specify"
+                        label="Certifications"
+                        options={certificationOptions}
                         selectedValues={formData.certification}
                         onChange={handleInputChange}
-                        options={certificationOptions}
                       />
-                    )}
+                    </div>
 
                     <DropdownGroup
                       name="purposeOfRequest"
@@ -817,15 +833,15 @@ const RequestForm = ({ showProfileStep = false }) => {
                   <div className="space-y-6 animate-fadeIn -mt-1">
                     <div className={`p-4 rounded-lg border -mb-1 ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
                       <h3 className="text-[#eebc48] font-bold mb-3 uppercase text-sm tracking-wide">
-                        Number of copies per document
+                        Number of copies per document / certificate
                       </h3>
-                      <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
+                      <div className="space-y-3 max-h-36 overflow-y-auto pr-2 custom-scrollbar">
                         {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => (
-                          <div key={index} className="flex items-center justify-between gap-4">
+                          <div key={`doc-copy-${index}`} className="flex items-center justify-between gap-4">
                             <label className="text-white text-sm flex-1">
                               {doc}
                             </label>
-                            <div className="w-24 ">
+                            <div className="w-24">
                               <input
                                 type="number"
                                 min="1"
@@ -850,10 +866,12 @@ const RequestForm = ({ showProfileStep = false }) => {
                             </div>
                           </div>
                         ))}
-                        {showCertificationDropdown && formData.certification.length > 0 &&
+                        {formData.certification.length > 0 &&
                           formData.certification.map((certName, index) => (
-                            <div key={index} className="flex items-center justify-between gap-4">
-                              <label className="text-white text-sm flex-1">CERTIFICATION (<span className="text-[#FFC72C]">{certName}</span>)</label>
+                            <div key={`cert-copy-${index}`} className="flex items-center justify-between gap-4">
+                              <label className="text-white text-sm flex-1">
+                                {certName} <span className="text-[#FFC72C] text-xs font-semibold">(Certificate)</span>
+                              </label>
                               <div className="w-24">
                                 <input
                                   type="number"
@@ -877,19 +895,53 @@ const RequestForm = ({ showProfileStep = false }) => {
                     </div>
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
-                        {formData.documentsRequested.map((doc, index) => {
+                        {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => {
                           const docData = docByName[doc];
                           const requirements = docData?.requirementsParsed ?? [];
 
                           return (
                             <div
-                              key={index}
+                              key={`doc-req-${index}`}
                               className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'}`}
                             >
                               <div className="flex items-center gap-2 mb-3">
                                 <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
                                 <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
                                   {doc}
+                                </h3>
+                              </div>
+
+                              <ul className="flex flex-col gap-1.5 pl-1">
+                                {requirements.length > 0 ? (
+                                  requirements.map((req, i) => (
+                                    <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
+                                      <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
+                                      <span className="flex-1 min-w-0 whitespace-normal break-normal max-w-full">
+                                        {req}
+                                      </span>
+                                    </li>
+                                  ))
+                                ) : (
+                                  <li className="text-xs text-white/35 italic">No requirements available</li>
+                                )}
+                              </ul>
+                            </div>
+                          );
+                        })}
+
+                        {formData.certification.map((certName, index) => {
+                          const certData = certByName[certName];
+                          const requirements = certData?.requirementsParsed ?? [];
+
+                          return (
+                            <div
+                              key={`cert-req-${index}`}
+                              className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'}`}
+                            >
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
+                                <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
+                                  {certName} <span className="text-white/60 font-normal normal-case">(Certificate)</span>
                                 </h3>
                               </div>
 

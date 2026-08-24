@@ -42,13 +42,13 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
     isLoading,
     isVerifyingOr,
     availableDocs,
+    availableCertifications,
     certificationOptions,
     purposeOptions,
     documentOptions,
     stepLabels,
     totalSteps,
     hasTOR,
-    showCertificationDropdown,
     finalStep,
     orStep,
     docStep,
@@ -341,31 +341,30 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                         ? 'bg-[#3a3b3c] border-[#4e4f50] text-[#e4e6eb]'
                         : 'bg-white/10 border-white/20 text-white'
                     }`}>
-                      <InformationCircleIcon className="w-5 h-5 flex-shrink-0 text-white/80 mt-0.5" />
+                      <InformationCircleIcon className="w-5 h-5 shrink-0 text-white/80 mt-0.5" />
                       <div className="leading-relaxed">
                         Auto-filled from <span className="text-[#FFC72C] font-semibold">OR #{formData.receiptNumber}</span> — we pre-selected the documents that match your receipt. Uncheck anything wrong, or add more below.
                       </div>
                     </div>
                   )}
 
-                  <MultiSelectDropdown
-                    name="documentsRequested"
-                    label="Documents Requested (You may select multiple)"
-                    required
-                    options={documentOptions}
-                    selectedValues={formData.documentsRequested}
-                    onChange={handleInputChange}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <MultiSelectDropdown
+                      name="documentsRequested"
+                      label="Documents"
+                      options={documentOptions}
+                      selectedValues={formData.documentsRequested}
+                      onChange={handleInputChange}
+                    />
 
-                  {showCertificationDropdown && (
                     <MultiSelectDropdown
                       name="certification"
-                      label="For Certification, please specify"
+                      label="Certifications"
+                      options={certificationOptions}
                       selectedValues={formData.certification}
                       onChange={handleInputChange}
-                      options={certificationOptions}
                     />
-                  )}
+                  </div>
 
                   <DropdownGroup
                     name="purposeOfRequest"
@@ -384,7 +383,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                     }`}>
                       <div className={`flex items-center justify-between pb-3 border-b ${isDark ? 'border-[#4e4f50]/40' : 'border-white/10'}`}>
                         <div className="flex items-center gap-2">
-                          <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 text-[#FFC72C]" />
+                          <ExclamationTriangleIcon className="w-5 h-5 shrink-0 text-[#FFC72C]" />
                           <span className="font-semibold text-white">Couldn't match automatically</span>
                         </div>
                         <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFC72C] text-[#350e0e]">
@@ -392,7 +391,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                         </span>
                       </div>
 
-                      <div className="max-h-[130px] overflow-y-auto custom-scrollbar pr-2 space-y-0">
+                      <div className="max-h-32.5 overflow-y-auto custom-scrollbar pr-2 space-y-0">
                         {unresolvedItems.map((item, i) => (
                           <div key={i} className={`flex justify-between items-center py-3 border-b ${isDark ? 'border-[#4e4f50]/40' : 'border-white/10'}`}>
                             <span className="text-[#FFC72C] font-semibold">{item.label}</span>
@@ -448,15 +447,15 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                 <div className="space-y-6 animate-fadeIn -mt-1">
                   <div className={`p-4 rounded-lg border -mb-1 ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
                     <h3 className="text-[#eebc48] font-bold mb-3 uppercase text-sm tracking-wide">
-                      Number of copies per document
+                      Number of copies per document / certificate
                     </h3>
-                    <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-3 max-h-36 overflow-y-auto pr-2 custom-scrollbar">
                       {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif"))
                         .length > 0 &&
                         formData.documentsRequested
                           .filter((doc) => !doc.toLowerCase().includes("certif"))
                           .map((doc, index) => (
-                            <div key={index} className="flex items-center justify-between gap-4">
+                            <div key={`doc-copy-${index}`} className="flex items-center justify-between gap-4">
                               <label className="text-white text-sm flex-1">{doc}</label>
                               <div className="w-24">
                                 <input
@@ -492,12 +491,11 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                               </div>
                             </div>
                           ))}
-                      {showCertificationDropdown &&
-                        formData.certification.length > 0 &&
+                      {formData.certification.length > 0 &&
                         formData.certification.map((certName, index) => (
-                          <div key={index} className="flex items-center justify-between gap-4">
+                          <div key={`cert-copy-${index}`} className="flex items-center justify-between gap-4">
                             <label className="text-white text-sm flex-1">
-                              CERTIFICATION (<span className="text-[#FFC72C]">{certName}</span>)
+                              {certName} <span className="text-[#FFC72C] text-xs font-semibold">(Certificate)</span>
                             </label>
                             <div className="w-24">
                               <input
@@ -533,7 +531,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                       className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'
                         }`}
                     >
-                      {formData.documentsRequested.map((doc, index) => {
+                      {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => {
                         const docData = availableDocs.find((d) => d.document_name === doc);
                         const requirements = docData?.document_requirements
                           ? Array.isArray(docData.document_requirements)
@@ -546,7 +544,7 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
 
                         return (
                           <div
-                            key={index}
+                            key={`doc-req-${index}`}
                             className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'
                               }`}
                           >
@@ -554,6 +552,53 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                               <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
                               <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
                                 {doc}
+                              </h3>
+                            </div>
+
+                            <ul className="flex flex-col gap-1.5 pl-1">
+                              {requirements.length > 0 ? (
+                                requirements.map((req, i) => (
+                                  <li
+                                    key={i}
+                                    className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0"
+                                  >
+                                    <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
+                                    <span className="flex-1 min-w-0 whitespace-normal break-normal max-w-full">
+                                      {req}
+                                    </span>
+                                  </li>
+                                ))
+                              ) : (
+                                <li className="text-xs text-white/35 italic">
+                                  No requirements available
+                                </li>
+                              )}
+                            </ul>
+                          </div>
+                        );
+                      })}
+
+                      {formData.certification.map((certName, index) => {
+                        const certData = availableCertifications?.find((c) => c.certificate_name === certName);
+                        const requirements = certData?.certificate_requirements
+                          ? Array.isArray(certData.certificate_requirements)
+                            ? certData.certificate_requirements
+                            : certData.certificate_requirements
+                              .split("\n")
+                              .map((r) => r.trim().replace(/,$/, ""))
+                              .filter(Boolean)
+                          : [];
+
+                        return (
+                          <div
+                            key={`cert-req-${index}`}
+                            className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'
+                              }`}
+                          >
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
+                              <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
+                                {certName} <span className="text-white/60 font-normal normal-case">(Certificate)</span>
                               </h3>
                             </div>
 

@@ -42,8 +42,11 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   const [autoFilledNames, setAutoFilledNames] = useState([]);
 
   const availableDocs = useMemo(() => {
-    return documentTypes.filter((doc) => ALUMNI_ACCESS_IDS.includes(doc.access_id));
+    return documentTypes
+      .filter((doc) => ALUMNI_ACCESS_IDS.includes(doc.access_id))
+      .filter((doc) => !doc.document_name.toLowerCase().startsWith("certif"));
   }, [documentTypes]);
+
 
   const availableCertifications = useMemo(() => {
     return certifications.filter((cert) => ALUMNI_ACCESS_IDS.includes(cert.access_id));
@@ -260,7 +263,7 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     }
 
     if (currentStep === docStep) {
-      const detailsError = validateRequestDetailsStep(formData, showCertificationDropdown);
+      const detailsError = validateRequestDetailsStep(formData);
       if (detailsError) {
         setErrorMessage(detailsError);
         return;
@@ -298,14 +301,19 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     // cashier API earlier now (see handleVerifyOr, triggered when leaving
     // the OR-verification step) — this final step only has copies left
     // to check before confirming.
-    const hasInvalidDocCopy = formData.documentsRequested
+    const hasInvalidDocCopy = (formData.documentsRequested || [])
       .filter((doc) => !doc.toLowerCase().includes("certif"))
       .some((doc) => {
-        const copies = Number(formData.documentCopies[doc] || 1);
+        const copies = Number(formData.documentCopies?.[doc] || 1);
         return !Number.isInteger(copies) || copies < 1 || copies > 10;
       });
 
-    if (hasInvalidDocCopy) {
+    const hasInvalidCertCopy = (formData.certification || []).some((cert) => {
+      const copies = Number(formData.certCopies?.[cert] || 1);
+      return !Number.isInteger(copies) || copies < 1 || copies > 10;
+    });
+
+    if (hasInvalidDocCopy || hasInvalidCertCopy) {
       setErrorMessage("Number of copies must be between 1 and 10.");
       return;
     }

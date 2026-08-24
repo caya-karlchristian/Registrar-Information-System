@@ -166,7 +166,8 @@ test.describe('Alumni Request Form E2E Tests', () => {
     await page.getByRole('button', { name: 'Next' }).click();
 
     // --- STEP 3: ALUMNI REQUEST (Document & Purpose Selection) ---
-    await expect(page.getByText('Documents Requested')).toBeVisible();
+    await expect(page.getByText('Documents', { exact: true })).toBeVisible();
+    await expect(page.getByText('Certifications', { exact: true })).toBeVisible();
 
     // 'Honorable Dismissal' should already be selected — auto-filled
     // from the verify-or suggestion above — so just confirm the
@@ -191,7 +192,7 @@ test.describe('Alumni Request Form E2E Tests', () => {
     await page.getByRole('button', { name: 'Next' }).click();
 
     // --- STEP 4: NUMBER OF COPIES & CLAIM TICKET ---
-    await expect(page.getByText('Number of copies per document')).toBeVisible();
+    await expect(page.getByText('Number of copies per document / certificate')).toBeVisible();
 
     // Click Submit
     await page.getByRole('button', { name: 'Submit' }).click();
