@@ -13,9 +13,11 @@ import qrCode from "../assets/qrcode.png";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 import ClaimTicket from '../components/ClaimTicket.jsx';
 import OfficeHoursNotice from '../components/OfficeHoursNotice.jsx';
+import { useFormDraft } from '../hooks/useFormDraft';
 import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useMutation } from '@tanstack/react-query';
+import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
 const STUDENT_ACCESS_IDS = [1, 3];
 
@@ -89,7 +91,9 @@ const RequestForm = ({ showProfileStep = false }) => {
   };
 
   const availableDocs = useMemo(() => {
-    return documentTypes.filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id));
+    return documentTypes
+      .filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id))
+      .filter(doc => !doc.document_name.toLowerCase().startsWith("certif"));
   }, [documentTypes]);
 
   const availableCertifications = useMemo(() => {
@@ -116,9 +120,18 @@ const RequestForm = ({ showProfileStep = false }) => {
     purposeOfRequest: "",
     certification: [],
     receiptNumber: "",
-    dateOfPayment: "",
+    dateOfPayment: getTodayDate(),
     documentCopies: {},
     certCopies: {},
+  });
+
+  const { clearDraft } = useFormDraft({
+    storageKey: 'student_request_draft',
+    formData,
+    setFormData,
+    currentStep,
+    setCurrentStep,
+    isSubmitted,
   });
 
   const handleInputChange = (e) => {
@@ -133,14 +146,19 @@ const RequestForm = ({ showProfileStep = false }) => {
     // cashier API earlier now (see handleVerifyOr, triggered when leaving
     // the OR-verification step) — this final step only has copies left
     // to check before confirming.
-    const hasInvalidDocCopy = formData.documentsRequested
+    const hasInvalidDocCopy = (formData.documentsRequested || [])
       .filter((doc) => !doc.toLowerCase().includes("certif"))
       .some((doc) => {
-        const copies = Number(formData.documentCopies[doc] || 1);
+        const copies = Number(formData.documentCopies?.[doc] || 1);
         return !Number.isInteger(copies) || copies < 1 || copies > 10;
       });
 
-    if (hasInvalidDocCopy) {
+    const hasInvalidCertCopy = (formData.certification || []).some((cert) => {
+      const copies = Number(formData.certCopies?.[cert] || 1);
+      return !Number.isInteger(copies) || copies < 1 || copies > 10;
+    });
+
+    if (hasInvalidDocCopy || hasInvalidCertCopy) {
       setErrorMessage("Number of copies must be between 1 and 10.");
       return;
     }
@@ -313,19 +331,19 @@ const RequestForm = ({ showProfileStep = false }) => {
       return;
     }
 
-    if (currentStep === docStep && formData.documentsRequested.length === 0) {
-      setErrorMessage("Please select at least one document to proceed.");
-      return;
-    }
+    if (currentStep === docStep) {
+      if (
+        (!formData.documentsRequested || formData.documentsRequested.length === 0) &&
+        (!formData.certification || formData.certification.length === 0)
+      ) {
+        setErrorMessage("Please select at least one document or certification to proceed.");
+        return;
+      }
 
-    if (currentStep === docStep && formData.purposeOfRequest.length === 0) {
-      setErrorMessage("Please select a purpose for your request.");
-      return;
-    }
-
-    if (currentStep === docStep && showCertificationDropdown && formData.certification.length === 0) {
-      setErrorMessage("Please specify the certification type.");
-      return;
+      if (!formData.purposeOfRequest || formData.purposeOfRequest.length === 0) {
+        setErrorMessage("Please select a purpose for your request.");
+        return;
+      }
     }
 
     if (currentStep < finalStep) setCurrentStep((s) => s + 1);
@@ -347,6 +365,7 @@ const RequestForm = ({ showProfileStep = false }) => {
         uuid: response?.data?.uuid ?? null,
         claimCode: response?.data?.claim_code ?? null,
       });
+      clearDraft();
       setIsSubmitted(true);
     },
     onError: (error) => {
@@ -399,6 +418,7 @@ const RequestForm = ({ showProfileStep = false }) => {
   const isVerifyingOr = verifyOrMutation.isPending;
 
   const handleConfirm = () => {
+    clearDraft();
     setIsSubmitted(false);
     setCurrentStep(1);
     setFormData({
@@ -413,7 +433,7 @@ const RequestForm = ({ showProfileStep = false }) => {
       purposeOfRequest: "",
       certification: [],
       receiptNumber: "",
-      dateOfPayment: "",
+      dateOfPayment: getTodayDate(),
       documentCopies: {},
       certCopies: {},
     });
@@ -487,6 +507,16 @@ const RequestForm = ({ showProfileStep = false }) => {
       return acc;
     }, {});
   }, [availableDocs]);
+
+  const certByName = useMemo(() => {
+    return availableCertifications.reduce((acc, cert) => {
+      acc[cert.certificate_name] = {
+        ...cert,
+        requirementsParsed: parseRequirements(cert.certificate_requirements),
+      };
+      return acc;
+    }, {});
+  }, [availableCertifications]);
 
   return (
     <>
@@ -722,45 +752,35 @@ const RequestForm = ({ showProfileStep = false }) => {
                 {currentStep === docStep && (
                   <div className="space-y-6 animate-fadeIn">
                     {autoFilledNames.length > 0 && (
-                      <div className={`p-3 rounded-lg border text-xs ${isDark ? 'bg-[#2d3a2d] border-green-800 text-green-200' : 'bg-green-50 border-green-200 text-green-800'}`}>
-                        <strong>Auto-filled from OR #{formData.receiptNumber}</strong> — we pre-selected the
-                        document(s)/certification(s) that match your receipt. Uncheck anything that's
-                        wrong, or add more below.
+                      <div className={`flex items-start gap-3 p-4 rounded-xl border text-sm transition-all ${
+                        isDark
+                          ? 'bg-[#3a3b3c] border-[#4e4f50] text-[#e4e6eb]'
+                          : 'bg-white/10 border-white/20 text-white'
+                      }`}>
+                        <InformationCircleIcon className="w-5 h-5 shrink-0 text-white/80 mt-0.5" />
+                        <div className="leading-relaxed">
+                          Auto-filled from <span className="text-[#FFC72C] font-semibold">OR #{formData.receiptNumber}</span> — we pre-selected the documents that match your receipt. Uncheck anything wrong, or add more below.
+                        </div>
                       </div>
                     )}
 
-                    {unresolvedItems.length > 0 && (
-                      <div className={`p-3 rounded-lg border text-xs space-y-1 ${isDark ? 'bg-[#3a2f1a] border-yellow-800 text-yellow-200' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
-                        <strong>We found these on your receipt but couldn't match them automatically:</strong>
-                        <ul className="list-disc list-inside">
-                          {unresolvedItems.map((item, i) => (
-                            <li key={i}>
-                              {item.label}{item.amount ? ` — ₱${item.amount}` : ''} (qty {item.quantity})
-                            </li>
-                          ))}
-                        </ul>
-                        <p>Please select the matching document below, or contact the registrar's office if unsure.</p>
-                      </div>
-                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <MultiSelectDropdown
+                        name="documentsRequested"
+                        label="Documents"
+                        options={documentOptions}
+                        selectedValues={formData.documentsRequested}
+                        onChange={handleInputChange}
+                      />
 
-                    <MultiSelectDropdown
-                      name="documentsRequested"
-                      label="Documents Requested"
-                      required
-                      options={documentOptions}
-                      selectedValues={formData.documentsRequested}
-                      onChange={handleInputChange}
-                    />
-
-                    {showCertificationDropdown && (
                       <MultiSelectDropdown
                         name="certification"
-                        label="For Certification, please specify"
+                        label="Certifications"
+                        options={certificationOptions}
                         selectedValues={formData.certification}
                         onChange={handleInputChange}
-                        options={certificationOptions}
                       />
-                    )}
+                    </div>
 
                     <DropdownGroup
                       name="purposeOfRequest"
@@ -770,6 +790,41 @@ const RequestForm = ({ showProfileStep = false }) => {
                       required
                       options={purposeOptions}
                     />
+
+                    {unresolvedItems.length > 0 && (
+                      <div className={`p-4 rounded-xl border text-sm transition-all ${
+                        isDark
+                          ? 'bg-[#3a3b3c]/50 border-[#FFC72C]/30'
+                          : 'bg-white/5 border-[#FFC72C]/30'
+                      }`}>
+                        <div className={`flex items-center justify-between pb-3 border-b ${isDark ? 'border-[#4e4f50]/40' : 'border-white/10'}`}>
+                          <div className="flex items-center gap-2">
+                            <ExclamationTriangleIcon className="w-5 h-5 shrink-0 text-[#FFC72C]" />
+                            <span className="font-semibold text-white">Couldn't match automatically</span>
+                          </div>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFC72C] text-[#350e0e]">
+                            {unresolvedItems.length} {unresolvedItems.length === 1 ? 'item' : 'items'}
+                          </span>
+                        </div>
+
+                        <div className="max-h-32.5 overflow-y-auto custom-scrollbar pr-2 space-y-0">
+                          {unresolvedItems.map((item, i) => (
+                            <div key={i} className={`flex justify-between items-center py-3 border-b ${isDark ? 'border-[#4e4f50]/40' : 'border-white/10'}`}>
+                              <span className="text-[#FFC72C] font-semibold">{item.label}</span>
+                              <span className="text-white/70 text-sm">
+                                {item.amount ? `₱${parseFloat(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
+                                {item.amount ? ' • ' : ''}
+                                qty {item.quantity}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <p className="text-white/50 text-xs mt-3">
+                          Select the matching document below, or contact the registrar's office if unsure.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -778,15 +833,15 @@ const RequestForm = ({ showProfileStep = false }) => {
                   <div className="space-y-6 animate-fadeIn -mt-1">
                     <div className={`p-4 rounded-lg border -mb-1 ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
                       <h3 className="text-[#eebc48] font-bold mb-3 uppercase text-sm tracking-wide">
-                        Number of copies per document
+                        Number of copies per document / certificate
                       </h3>
-                      <div className="space-y-3 max-h-23 overflow-y-auto pr-2 custom-scrollbar">
+                      <div className="space-y-3 max-h-36 overflow-y-auto pr-2 custom-scrollbar">
                         {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => (
-                          <div key={index} className="flex items-center justify-between gap-4">
+                          <div key={`doc-copy-${index}`} className="flex items-center justify-between gap-4">
                             <label className="text-white text-sm flex-1">
                               {doc}
                             </label>
-                            <div className="w-24 ">
+                            <div className="w-24">
                               <input
                                 type="number"
                                 min="1"
@@ -811,10 +866,12 @@ const RequestForm = ({ showProfileStep = false }) => {
                             </div>
                           </div>
                         ))}
-                        {showCertificationDropdown && formData.certification.length > 0 &&
+                        {formData.certification.length > 0 &&
                           formData.certification.map((certName, index) => (
-                            <div key={index} className="flex items-center justify-between gap-4">
-                              <label className="text-white text-sm flex-1">CERTIFICATION (<span className="text-[#FFC72C]">{certName}</span>)</label>
+                            <div key={`cert-copy-${index}`} className="flex items-center justify-between gap-4">
+                              <label className="text-white text-sm flex-1">
+                                {certName} <span className="text-[#FFC72C] text-xs font-semibold">(Certificate)</span>
+                              </label>
                               <div className="w-24">
                                 <input
                                   type="number"
@@ -838,19 +895,53 @@ const RequestForm = ({ showProfileStep = false }) => {
                     </div>
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
-                        {formData.documentsRequested.map((doc, index) => {
+                        {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => {
                           const docData = docByName[doc];
                           const requirements = docData?.requirementsParsed ?? [];
 
                           return (
                             <div
-                              key={index}
+                              key={`doc-req-${index}`}
                               className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'}`}
                             >
                               <div className="flex items-center gap-2 mb-3">
                                 <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
                                 <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
                                   {doc}
+                                </h3>
+                              </div>
+
+                              <ul className="flex flex-col gap-1.5 pl-1">
+                                {requirements.length > 0 ? (
+                                  requirements.map((req, i) => (
+                                    <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
+                                      <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
+                                      <span className="flex-1 min-w-0 whitespace-normal break-normal max-w-full">
+                                        {req}
+                                      </span>
+                                    </li>
+                                  ))
+                                ) : (
+                                  <li className="text-xs text-white/35 italic">No requirements available</li>
+                                )}
+                              </ul>
+                            </div>
+                          );
+                        })}
+
+                        {formData.certification.map((certName, index) => {
+                          const certData = certByName[certName];
+                          const requirements = certData?.requirementsParsed ?? [];
+
+                          return (
+                            <div
+                              key={`cert-req-${index}`}
+                              className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'}`}
+                            >
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
+                                <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
+                                  {certName} <span className="text-white/60 font-normal normal-case">(Certificate)</span>
                                 </h3>
                               </div>
 

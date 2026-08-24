@@ -101,6 +101,241 @@ test('rejects granting a role the user already actively holds', function () {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Work Item #2 — Admin Management Consolidation:
+// grant() direction-constraint validation
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('allows granting an Admin-tier role to a base-identity (Student) account', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $student    = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT]);
+    $policy     = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
+
+    $assignment = app(RoleAssignmentService::class)->grant([
+        'user_id'   => $student->user_id,
+        'role_id'   => SystemUser::ROLE_ADMIN,
+        'policy_id' => $policy->policy_id,
+    ], roleAssignmentTestRequest($superAdmin));
+
+    expect($assignment->role_id)->toBe(SystemUser::ROLE_ADMIN);
+});
+
+test('allows granting an Admin-tier role to a base-identity (Alumni) account', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $alumni     = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ALUMNI]);
+    $policy     = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
+
+    $assignment = app(RoleAssignmentService::class)->grant([
+        'user_id'   => $alumni->user_id,
+        'role_id'   => SystemUser::ROLE_SUPER_ADMIN,
+    ], roleAssignmentTestRequest($superAdmin));
+
+    expect($assignment->role_id)->toBe(SystemUser::ROLE_SUPER_ADMIN);
+});
+
+test('rejects granting a Student role to an account whose primary role is Admin', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $admin      = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
+
+    $service = app(RoleAssignmentService::class);
+
+    expect(fn () => $service->grant([
+        'user_id' => $admin->user_id,
+        'role_id' => SystemUser::ROLE_STUDENT,
+    ], roleAssignmentTestRequest($superAdmin)))->toThrow(ValidationException::class);
+
+    expect(RoleAssignment::where('user_id', $admin->user_id)->where('role_id', SystemUser::ROLE_STUDENT)->exists())
+        ->toBeFalse();
+});
+
+test('rejects granting an Alumni role to an account whose primary role is Super Admin', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $target     = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+
+    $service = app(RoleAssignmentService::class);
+
+    expect(fn () => $service->grant([
+        'user_id' => $target->user_id,
+        'role_id' => SystemUser::ROLE_ALUMNI,
+    ], roleAssignmentTestRequest($superAdmin)))->toThrow(ValidationException::class);
+});
+
+test('direction constraint is keyed off the raw primary role_id, not an assumed/switched role', function () {
+    // Regression guard: even if some future code path resolves a
+    // session-assumed role for the ACTOR making the grant call, the
+    // constraint here must still be evaluated against the TARGET's own
+    // raw users.role_id — never anything session/assumption-based.
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $admin      = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
+
+    expect($admin->role_id)->toBe(SystemUser::ROLE_ADMIN);
+
+    expect(fn () => app(RoleAssignmentService::class)->grant([
+        'user_id' => $admin->user_id,
+        'role_id' => SystemUser::ROLE_ALUMNI,
+    ], roleAssignmentTestRequest($superAdmin)))->toThrow(ValidationException::class);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Work Item #2 — Admin Management Consolidation:
+// RoleAssignmentService::editPolicy() — in-place policy edit, no
+// revoke/regrant cycle. Direct replacement for the retired
+// PolicyService::attachToUser().
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('editPolicy() updates the assignment and, for a baseline row, the mirrored users.policy_id', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $oldPolicy  = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
+    $newPolicy  = Policy::create(['name' => 'Records Staff', 'permissions' => ['dashboard' => ['Access'], 'inbox' => ['Access']]]);
+
+    $admin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'policy_id' => $oldPolicy->policy_id]);
+
+    // The baseline row every admin now gets (see
+    // UserProvisioningService::ensureBaselineRoleAssignment()) — its
+    // role_id matches the user's own primary role_id.
+    $baseline = RoleAssignment::create([
+        'user_id'    => $admin->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'policy_id'  => $oldPolicy->policy_id,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    $updated = app(RoleAssignmentService::class)->editPolicy(
+        $baseline,
+        $newPolicy->policy_id,
+        roleAssignmentTestRequest($superAdmin)
+    );
+
+    expect($updated->policy_id)->toBe($newPolicy->policy_id);
+    expect($admin->fresh()->policy_id)->toBe($newPolicy->policy_id);
+
+    $this->assertDatabaseHas('audit_logs', [
+        'action'         => AuditLog::ACTION_ROLE_POLICY_EDITED,
+        'target_user_id' => $admin->user_id,
+    ]);
+});
+
+test('editPolicy() detaching a policy (null) also clears the mirrored users.policy_id for a baseline row', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $policy     = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
+    $admin      = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'policy_id' => $policy->policy_id]);
+
+    $baseline = RoleAssignment::create([
+        'user_id'    => $admin->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'policy_id'  => $policy->policy_id,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    app(RoleAssignmentService::class)->editPolicy($baseline, null, roleAssignmentTestRequest($superAdmin));
+
+    expect($baseline->fresh()->policy_id)->toBeNull();
+    expect($admin->fresh()->policy_id)->toBeNull();
+});
+
+test('editPolicy() on a secondary (student-staff) grant does not touch the users primary policy_id', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $oldPolicy  = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
+    $newPolicy  = Policy::create(['name' => 'Records Staff', 'permissions' => ['dashboard' => ['Access']]]);
+
+    // Primary role is Student — users.policy_id is not meaningful for this
+    // account at all. The Admin grant below is a SECONDARY, concurrent
+    // role (the "student staff" case), not this user's baseline row.
+    $studentStaff = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'policy_id' => null]);
+
+    $secondaryGrant = RoleAssignment::create([
+        'user_id'    => $studentStaff->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'policy_id'  => $oldPolicy->policy_id,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_by' => $superAdmin->user_id,
+        'granted_at' => now(),
+    ]);
+
+    app(RoleAssignmentService::class)->editPolicy($secondaryGrant, $newPolicy->policy_id, roleAssignmentTestRequest($superAdmin));
+
+    expect($secondaryGrant->fresh()->policy_id)->toBe($newPolicy->policy_id);
+    // users.policy_id must stay untouched — this grant isn't the user's
+    // baseline/primary row (their primary role is Student, not Admin).
+    expect($studentStaff->fresh()->policy_id)->toBeNull();
+});
+
+test('editPolicy() rejects a non-Admin assignment', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $student    = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT]);
+    $policy     = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
+
+    $studentAssignment = RoleAssignment::create([
+        'user_id'    => $student->user_id,
+        'role_id'    => SystemUser::ROLE_STUDENT,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    $service = app(RoleAssignmentService::class);
+
+    expect(fn () => $service->editPolicy(
+        $studentAssignment,
+        $policy->policy_id,
+        roleAssignmentTestRequest($superAdmin)
+    ))->toThrow(ValidationException::class);
+});
+
+test('editPolicy() rejects editing a Revoked assignment', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $policy     = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
+    $admin      = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);
+
+    $revoked = RoleAssignment::create([
+        'user_id'    => $admin->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'policy_id'  => $policy->policy_id,
+        'status'     => RoleAssignment::STATUS_REVOKED,
+        'granted_at' => now(),
+        'revoked_at' => now(),
+    ]);
+
+    $service = app(RoleAssignmentService::class);
+
+    expect(fn () => $service->editPolicy(
+        $revoked,
+        $policy->policy_id,
+        roleAssignmentTestRequest($superAdmin)
+    ))->toThrow(ValidationException::class);
+});
+
+test('editPolicy() does not touch another users role_assignments row or policy_id', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $oldPolicy  = Policy::create(['name' => 'Front Desk', 'permissions' => ['dashboard' => ['Access']]]);
+    $newPolicy  = Policy::create(['name' => 'Records Staff', 'permissions' => ['dashboard' => ['Access']]]);
+
+    $admin      = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'policy_id' => $oldPolicy->policy_id]);
+    $otherAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN, 'policy_id' => $oldPolicy->policy_id]);
+
+    $baseline = RoleAssignment::create([
+        'user_id'    => $admin->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'policy_id'  => $oldPolicy->policy_id,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    $otherBaseline = RoleAssignment::create([
+        'user_id'    => $otherAdmin->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'policy_id'  => $oldPolicy->policy_id,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    app(RoleAssignmentService::class)->editPolicy($baseline, $newPolicy->policy_id, roleAssignmentTestRequest($superAdmin));
+
+    expect($otherBaseline->fresh()->policy_id)->toBe($oldPolicy->policy_id);
+    expect($otherAdmin->fresh()->policy_id)->toBe($oldPolicy->policy_id);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // RoleAssignmentService::revoke()  — explicit "they left" offboarding
 // ═════════════════════════════════════════════════════════════════════════════
 

@@ -52,9 +52,19 @@ class AuditLog extends Model
     public const ACTION_ROLE_REVOKED    = 'role_revoked';    // explicit revoke (RoleAssignmentService::revoke)
     public const ACTION_ROLE_EXPIRED    = 'role_expired';    // automatic sweep (role-assignments:expire)
     public const ACTION_ROLE_SWITCHED   = 'role_switched';   // session assumed a different held role (Step 3)
+    // Work Item #2 — in-place policy edit on an already-Active Admin
+    // grant (RoleAssignmentService::editPolicy()) — distinct from
+    // ACTION_ROLE_ASSIGNED/REVOKED since no grant/revoke event occurred.
+    public const ACTION_ROLE_POLICY_EDITED = 'role_policy_edited';
     public const ACTION_REQUEST_STATUS_CHANGED = 'request_status_changed';
     public const ACTION_REQUEST_ARCHIVED       = 'request_archived';
     public const ACTION_REQUEST_RESTORED       = 'request_restored';
+    // BUG FIX (RIS-PROCESS-BUGS #2 — "Non-Functional Delete Button"):
+    // new action for DocumentRequestController::destroy(), which now
+    // performs a real (soft) delete instead of a forceDelete() that could
+    // never succeed against request_document/request_history's FK
+    // constraints — see that method's docblock for the full reasoning.
+    public const ACTION_REQUEST_DELETED        = 'request_deleted';
 
     // Document / certificate type management — archiving
     public const ACTION_DOCUMENT_TYPE_ARCHIVED    = 'document_type_archived';
@@ -97,6 +107,29 @@ class AuditLog extends Model
     // one, so this survives container recreation the way storage/logs
     // currently does not (see 2026-08-11 incident notes).
     public const ACTION_CASHIER_VERIFICATION = 'cashier_verification';
+
+    // Phase 4 — Cashier Verification Failure Diagnostics
+    // (EnrichCashierFailureJob, AuditLogger::logForSystem).
+    //
+    // A DELIBERATELY SEPARATE row from the ACTION_CASHIER_VERIFICATION
+    // entry it enriches — never a mutation of that entry. AuditLog::booted()
+    // below hard-blocks updates/deletes on every row (tamper-evident,
+    // append-only by design), and the hash chain's own guarantee only
+    // covers what AuditLogger::computeHash() feeds it (action/user_id/
+    // target_user_id/target_email/created_at — see that class), so
+    // reopening a row to stuff enrichment data into its metadata after
+    // the fact would work mechanically but would undermine the exact
+    // "written once, never touched again" guarantee this table exists to
+    // provide. Instead, the enrichment is its own append-only row, linked
+    // back to the original via metadata.source_audit_log_id — the audit
+    // trail for one failed OR verification is a short, honest sequence of
+    // rows instead of one row that quietly changed shape after the fact.
+    //
+    // Fired asynchronously (queued job) only when a cashier verification
+    // fails with reason NOT_FOUND — never on API_ERROR, since that's the
+    // Cashier System's own availability, not a name/OR mismatch worth
+    // cross-checking against OGOS/the alumni system.
+    public const ACTION_CASHIER_VERIFICATION_ENRICHED = 'cashier_verification_enriched';
 
     // Unmatched cashier receipt labels — admin resolution (see
     // UnmatchedCashierItem, CashierDocumentSuggester)

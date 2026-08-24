@@ -2,6 +2,7 @@
 
 use App\Models\AuditLog;
 use App\Models\Policy;
+use App\Models\RoleAssignment;
 use App\Models\SystemUser;
 use App\Services\Sso\IdpClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -307,51 +308,43 @@ test('update fails validation on an invalid status value', function () {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// attachPolicy() — AttachSystemUserPolicyRequest + SystemUserPolicy::attachPolicy
+// Work Item #2 — Admin Management Consolidation regression coverage.
+//
+// PATCH /system-users/{id}/policy ("Manage Access") is retired entirely —
+// see RoleAssignmentControllerTest.php for its replacement,
+// PATCH /role-assignments/{roleAssignment}/policy. The tests below confirm
+// the old route and the old role_id-on-update path are both actually gone,
+// not just unused.
 // ═════════════════════════════════════════════════════════════════════════════
 
-test('attachPolicy fails validation for a nonexistent policy_id', function () {
+test('the retired Manage Access policy-attachment route no longer exists', function () {
     $target = suMakeTarget(SystemUser::ROLE_ADMIN);
-    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
-
-    $this->patchJson("/api/system-users/{$target->user_id}/policy", ['policy_id' => 999])
-         ->assertStatus(422)
-         ->assertJsonValidationErrors(['policy_id']);
-});
-
-test('superadmin can attach a policy to an admin account', function () {
-    $target = suMakeTarget(SystemUser::ROLE_ADMIN);
-    $policy = suMakePolicy();
-    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
-
-    $this->patchJson("/api/system-users/{$target->user_id}/policy", ['policy_id' => $policy->policy_id])
-         ->assertOk()
-         ->assertJsonPath('data.policy_id', $policy->policy_id);
-});
-
-test('attaching a policy to a super-admin target is rejected with a PolicyException message', function () {
-    $target = suMakeTarget(SystemUser::ROLE_SUPER_ADMIN);
-    $policy = suMakePolicy();
-    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
-
-    // Policy target-role check (attachPolicy ability) passes since role 4 is
-    // "manageable" for policy purposes, but PolicyService::attachToUser()
-    // itself rejects non-admin targets — so this 422 comes from the service,
-    // not the FormRequest.
-    $this->patchJson("/api/system-users/{$target->user_id}/policy", ['policy_id' => $policy->policy_id])
-         ->assertStatus(422)
-         ->assertJsonPath('message', 'Policies can only be attached to admin accounts. Super admins have full access by default.');
-});
-
-test('sending policy_id null detaches the current policy', function () {
-    $policy = suMakePolicy();
-    $target = suMakeTarget(SystemUser::ROLE_ADMIN);
-    $target->update(['policy_id' => $policy->policy_id]);
     suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
 
     $this->patchJson("/api/system-users/{$target->user_id}/policy", ['policy_id' => null])
-         ->assertOk()
-         ->assertJsonPath('data.policy_id', null);
+         ->assertStatus(404);
+});
+
+test('update() silently ignores role_id even on a direct API call — Edit User can no longer change roles', function () {
+    // Work Item #2: role changes are exclusively role_assignments' job now
+    // (RoleAssignmentController::store(), which enforces the direction
+    // constraint this endpoint never did). Sending role_id here must have
+    // no effect at all, not even a validation error — the field is simply
+    // not part of this request's contract anymore.
+    $target = suMakeTarget(SystemUser::ROLE_ADMIN);
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $this->putJson("/api/system-users/{$target->user_id}", [
+        'role_id'    => SystemUser::ROLE_SUPER_ADMIN,
+        'first_name' => 'Unchanged',
+    ])->assertOk()
+      ->assertJsonPath('data.role_id', SystemUser::ROLE_ADMIN)
+      ->assertJsonPath('data.first_name', 'Unchanged');
+
+    $this->assertDatabaseHas('users', [
+        'user_id' => $target->user_id,
+        'role_id' => SystemUser::ROLE_ADMIN,
+    ]);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -390,3 +383,214 @@ test('superadmin can delete another admin account', function () {
 // (QueryException 23000) relies on the DB enforcing a foreign key back to
 // `users`. Same SQLite limitation noted in CertificationTypeControllerTest —
 // not exercised here, needs a MySQL-backed run.
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Work Item #3 — Admin Accounts / Student Staff Visibility.
+// index() now also surfaces accounts with an active administrative
+// role_assignments grant on top of a non-admin base identity.
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('a student with an active Student Staff grant appears in Admin Accounts', function () {
+    $student = suMakeTarget(SystemUser::ROLE_STUDENT);
+    $policy  = suMakePolicy(['name' => 'Records Staff']);
+
+    RoleAssignment::create([
+        'user_id'    => $student->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'policy_id'  => $policy->policy_id,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $response = $this->getJson('/api/system-users')->assertOk();
+
+    $row = collect($response->json('data'))->firstWhere('user_id', $student->user_id);
+
+    expect($row)->not->toBeNull();
+    expect($row['base_role_id'])->toBe(SystemUser::ROLE_STUDENT);
+    expect($row['base_role_name'])->toBe('student');
+    expect($row['admin_grant']['role_id'])->toBe(SystemUser::ROLE_ADMIN);
+    expect($row['admin_grant']['is_secondary'])->toBeTrue();
+    expect($row['admin_grant']['policy']['policy_id'])->toBe($policy->policy_id);
+});
+
+test('a student with an expired Student Staff grant does not appear in Admin Accounts', function () {
+    $student = suMakeTarget(SystemUser::ROLE_STUDENT);
+
+    RoleAssignment::create([
+        'user_id'    => $student->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now()->subDays(30),
+        'expires_at' => now()->subDay(), // in the past — not "currently active"
+    ]);
+
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $response = $this->getJson('/api/system-users')->assertOk();
+
+    $row = collect($response->json('data'))->firstWhere('user_id', $student->user_id);
+
+    expect($row)->toBeNull();
+});
+
+test('a student with a revoked Student Staff grant does not appear in Admin Accounts', function () {
+    $student = suMakeTarget(SystemUser::ROLE_STUDENT);
+
+    RoleAssignment::create([
+        'user_id'           => $student->user_id,
+        'role_id'           => SystemUser::ROLE_ADMIN,
+        'status'            => RoleAssignment::STATUS_REVOKED,
+        'granted_at'        => now()->subDays(10),
+        'revoked_at'        => now(),
+        'revocation_reason' => 'testing',
+    ]);
+
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $response = $this->getJson('/api/system-users')->assertOk();
+
+    $row = collect($response->json('data'))->firstWhere('user_id', $student->user_id);
+
+    expect($row)->toBeNull();
+});
+
+test('a student with no administrative grant at all does not appear in Admin Accounts', function () {
+    suMakeTarget(SystemUser::ROLE_STUDENT);
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $response = $this->getJson('/api/system-users')->assertOk();
+
+    $roleIds = collect($response->json('data'))->pluck('base_role_id');
+
+    expect($roleIds->every(fn ($r) => in_array($r, [SystemUser::ROLE_STUDENT, SystemUser::ROLE_ALUMNI], true)))
+        ->toBeFalse(); // i.e. nothing with a base-tier role_id made it in at all
+});
+
+test('an existing admin account with a live baseline role_assignment displays unchanged', function () {
+    $admin  = suMakeTarget(SystemUser::ROLE_ADMIN);
+    $policy = suMakePolicy(['name' => 'Front Desk']);
+    $admin->update(['policy_id' => $policy->policy_id]);
+
+    RoleAssignment::create([
+        'user_id'    => $admin->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'policy_id'  => $policy->policy_id,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $response = $this->getJson('/api/system-users')->assertOk();
+    $row = collect($response->json('data'))->firstWhere('user_id', $admin->user_id);
+
+    expect($row['base_role_id'])->toBe(SystemUser::ROLE_ADMIN);
+    expect($row['admin_grant']['is_secondary'])->toBeFalse();
+    expect($row['admin_grant']['policy']['policy_id'])->toBe($policy->policy_id);
+});
+
+test('a deactivated admin whose baseline role_assignment was cascade-revoked still displays via the raw columns', function () {
+    $admin  = suMakeTarget(SystemUser::ROLE_ADMIN);
+    $policy = suMakePolicy(['name' => 'Front Desk']);
+    $admin->update(['policy_id' => $policy->policy_id, 'status' => 'Deactivated']);
+
+    // No Active role_assignments row at all — simulates
+    // RoleAssignmentService::revokeAllForUser() having already run.
+    RoleAssignment::create([
+        'user_id'           => $admin->user_id,
+        'role_id'           => SystemUser::ROLE_ADMIN,
+        'policy_id'         => $policy->policy_id,
+        'status'            => RoleAssignment::STATUS_REVOKED,
+        'granted_at'        => now()->subDays(5),
+        'revoked_at'        => now(),
+        'revocation_reason' => 'Account deactivated.',
+    ]);
+
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $response = $this->getJson('/api/system-users')->assertOk();
+    $row = collect($response->json('data'))->firstWhere('user_id', $admin->user_id);
+
+    // Still listed — this is the "existing rows unaffected" guarantee.
+    expect($row)->not->toBeNull();
+    expect($row['status'])->toBe('Deactivated');
+    // Falls back to the raw columns since there's no live Active row.
+    expect($row['admin_grant']['role_assignment_id'])->toBeNull();
+    expect($row['admin_grant']['policy']['policy_id'])->toBe($policy->policy_id);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Work Item #3 — SystemUserPolicy::view()/update() extended so a newly-listed
+// student-staff row is actually usable, not just visible.
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('superadmin can view a student staff account', function () {
+    $student = suMakeTarget(SystemUser::ROLE_STUDENT);
+
+    RoleAssignment::create([
+        'user_id'    => $student->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $this->getJson("/api/system-users/{$student->user_id}")
+         ->assertOk()
+         ->assertJsonPath('data.user_id', $student->user_id)
+         ->assertJsonPath('data.base_role_name', 'student');
+});
+
+test('superadmin can update the Status of a student staff account', function () {
+    $student = suMakeTarget(SystemUser::ROLE_STUDENT);
+
+    RoleAssignment::create([
+        'user_id'    => $student->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    $this->putJson("/api/system-users/{$student->user_id}", ['status' => 'Deactivated'])
+         ->assertOk()
+         ->assertJsonPath('data.status', 'Deactivated');
+});
+
+test('a student with no administrative grant still cannot be viewed via system-users', function () {
+    $student = suMakeTarget(SystemUser::ROLE_STUDENT);
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    // Unchanged pre-#3 behavior — this policy is still not a general
+    // student/alumni lookup endpoint.
+    $this->getJson("/api/system-users/{$student->user_id}")
+         ->assertStatus(403)
+         ->assertJson(['message' => 'This action is unauthorized.']);
+});
+
+test('a student staff account cannot be deleted via DELETE /system-users', function () {
+    $student = suMakeTarget(SystemUser::ROLE_STUDENT);
+
+    RoleAssignment::create([
+        'user_id'    => $student->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'status'     => RoleAssignment::STATUS_ACTIVE,
+        'granted_at' => now(),
+    ]);
+
+    suMakeUser(SystemUser::ROLE_SUPER_ADMIN);
+
+    // delete() was deliberately NOT extended — see SystemUserPolicy::delete()
+    // docblock. A student staff account's ADMIN grant is revoked via Manage
+    // Roles; the account itself is not deletable from this screen.
+    $this->deleteJson("/api/system-users/{$student->user_id}")
+         ->assertStatus(403)
+         ->assertJson(['message' => 'This action is unauthorized.']);
+
+    $this->assertDatabaseHas('users', ['user_id' => $student->user_id]);
+});

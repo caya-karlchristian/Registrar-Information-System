@@ -19,7 +19,10 @@ use App\Services\CashierService;
 use App\Services\CashierDocumentMatcher;
 use App\Services\CashierDocumentSuggester;
 use App\Services\NameMatcher;
+use App\Jobs\EnrichCashierFailureJob;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Document request HTTP controller.
@@ -412,7 +415,7 @@ class DocumentRequestController extends Controller
 
         $isMockAttempt = $verification['data']['_mock'] ?? false;
 
-        $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
+        $auditEntry = $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
             'or_number'      => $orNumber,
             'attempts'       => $attemptsLog,
             'matched_name'   => $verification['valid'] ? $matchedName : null,
@@ -422,6 +425,48 @@ class DocumentRequestController extends Controller
 
         if (!$verification['valid']) {
             $reason = $verification['reason'] ?? 'NOT_FOUND';
+
+            // Phase 4a — Cashier Verification Failure Diagnostics.
+            // Only worth enriching on a real lookup miss (NOT_FOUND):
+            // API_ERROR is the Cashier System's own availability, not a
+            // data mismatch, and mock mode (no CASHIER_API_KEY configured)
+            // never produces NOT_FOUND to begin with — see
+            // CashierService::mockResponse(), which always returns valid.
+            // Dispatched (queued, not inline) so this student's failed
+            // submission is never delayed by a call made purely for the
+            // registrar's later benefit.
+            //
+            // Wrapped in try/catch: on QUEUE_CONNECTION=database/redis
+            // (production) dispatch() only enqueues and this is a no-op
+            // fast path. But on QUEUE_CONNECTION=sync (phpunit.xml, and
+            // often local dev), Laravel's SyncQueue runs the job INLINE,
+            // in this same request, and — after calling the job's own
+            // failed() hook — RE-THROWS whatever the job threw (e.g. an
+            // OGOS auth failure). Without this catch, that exception
+            // propagates straight out of this method and turns the
+            // primary "OR not found" outcome below into an uncaught 500,
+            // even though the actual document-request logic already
+            // finished correctly. A best-effort background diagnostic
+            // must never be able to take down the user-facing response
+            // it was only ever meant to enrich, regardless of which
+            // queue driver happens to be configured.
+            if ($reason === 'NOT_FOUND' && !$isMockAttempt) {
+                try {
+                    EnrichCashierFailureJob::dispatch(
+                        sourceAuditLogId: $auditEntry->id,
+                        actorUserId:      $user->user_id,
+                        orNumber:         $orNumber,
+                        ipAddress:        $request->ip(),
+                        userAgent:        $request->userAgent(),
+                    );
+                } catch (Throwable $e) {
+                    Log::warning('EnrichCashierFailureJob dispatch failed; continuing without enrichment', [
+                        'source_audit_log_id' => $auditEntry->id,
+                        'or_number'            => $orNumber,
+                        'message'              => $e->getMessage(),
+                    ]);
+                }
+            }
 
             $message = match ($reason) {
                 'NOT_FOUND' => 'The OR number could not be found. Please check your Official Receipt and try again.',
@@ -476,27 +521,63 @@ class DocumentRequestController extends Controller
 
     // -------------------------------------------------------------------------
     // DELETE /document-requests/{documentRequest}
+    //
+    // BUG FIX (RIS-PROCESS-BUGS #2 — "Non-Functional Delete Button")
+    // ---------------------------------------------------------------------
+    // Root cause: this previously called forceDelete(), a genuine hard
+    // delete. request_document (request_document_ibfk_1) and
+    // request_history (request_history_ibfk_1) both have a foreign key to
+    // document_request with NO onDelete cascade — MySQL's default is
+    // RESTRICT — and every real request has at least one request_document
+    // row (the document actually being requested) plus request_history
+    // rows from its own status transitions. So the FK check in the old
+    // try/catch below was tripping on essentially every request that
+    // exists, and the button could only ever "succeed" on a request with
+    // no documents and no history — which isn't a real request. That's
+    // why the button looked "non-functional": the code was correct, the
+    // action it performed was just unreachable in practice.
+    //
+    // Fix: perform a real SOFT delete (DocumentRequest::delete(), via the
+    // SoftDeletes trait already declared on the model) instead of a hard
+    // forceDelete(). This is the industry-standard pattern for a "delete"
+    // action in a system that also maintains an audit trail — it:
+    //   - actually succeeds, unconditionally, without touching child rows
+    //     or the FK constraints protecting them;
+    //   - immediately removes the request from index()'s default listing
+    //     (SoftDeletes' global scope excludes deleted_at IS NOT NULL rows
+    //     automatically, same as every other Eloquent query on this model);
+    //   - preserves request_document/request_history/notifications intact
+    //     for audit/compliance purposes, consistent with this codebase's
+    //     existing append-only conventions elsewhere (AuditLog, the
+    //     is_archived reversible-archive pattern above) rather than
+    //     permanently destroying a registrar record and its history;
+    //   - is trivially reversible at the DB level if a delete turns out to
+    //     have been a mistake (no built-in "undelete" route is added here,
+    //     since the report only asked for delete to work — add one the
+    //     same way restore() undoes archive() if that's needed later).
+    //
+    // A genuine permanent purge (forceDelete) is intentionally NOT wired
+    // up to this endpoint. If a true hard-delete capability is needed
+    // later (e.g. a Super-Admin-only "purge" action), it should be a
+    // separate, more tightly-scoped endpoint — silently swapping in a
+    // real hard delete here would let this button destroy processing
+    // history for a request that's already gone through the registrar
+    // workflow, which is a data-integrity/compliance regression, not a
+    // fix.
     // -------------------------------------------------------------------------
     public function destroy(DocumentRequest $documentRequest)
     {
         $this->authorize('delete', $documentRequest);
 
-        try {
-            // forceDelete(), not delete(): the model uses SoftDeletes, so a
-            // plain delete() would only stamp deleted_at and leave the row
-            // in place — this endpoint is a permanent delete, distinct from
-            // the separate is_archived/archive() mechanism above.
-            $documentRequest->forceDelete();
-        } catch (\Illuminate\Database\QueryException $e) {
-            // MySQL error 1451 — FK constraint violation
-            if ($e->getCode() === '23000') {
-                return response()->json([
-                    'message' => 'Cannot delete a request that still has associated documents, history, or notifications.',
-                ], 409);
-            }
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+        $requestId = $documentRequest->request_id;
 
-            throw $e;
-        }
+        $documentRequest->delete();
+
+        $this->auditLogger->log(request(), $actor, AuditLog::ACTION_REQUEST_DELETED, [
+            'request_id' => $requestId,
+        ]);
 
         return response()->json(['message' => 'Request deleted successfully'], 200);
     }

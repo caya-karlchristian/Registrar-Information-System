@@ -12,13 +12,22 @@ use Illuminate\Contracts\Validation\Validator as ValidatorContract;
  * There is no {documentRequest} route parameter here — unlike update(),
  * the whole point of this endpoint is that staff arrive with a QR scan
  * or a typed claim_code, not a known request_id. So, same reasoning as
- * BulkRequestIdsRequest: authorize() checks the actor's role directly
- * rather than going through a per-instance policy call.
+ * BulkRequestIdsRequest: authorize() goes through a class-based policy
+ * call (no model instance to check ownership/state against) rather
+ * than an instance-based one.
  *
  * Exactly one of uuid / claim_code must be present — never both, never
  * neither. uuid comes from a successful QR scan (the frontend decodes
  * the QR client-side and sends the raw uuid string). claim_code comes
  * from the manual-entry fallback field on the same staff screen.
+ *
+ * Work Item #1 — Granular Per-Action Permissions: this used to inline
+ * `$actor->isStaff()` directly. Now delegates to
+ * DocumentRequestPolicy::claim(), which additionally requires the
+ * 'Complete' dashboard action — a Student Staff account (which has
+ * Complete) still passes here, but claimRequest() ultimately runs
+ * through DocumentRequestService::updateRequest()'s own fine-grained
+ * check too, so the requirement is enforced at both layers.
  */
 class ClaimDocumentRequestRequest extends FormRequest
 {
@@ -26,7 +35,11 @@ class ClaimDocumentRequestRequest extends FormRequest
     {
         $actor = $this->user();
 
-        return $actor instanceof SystemUser && $actor->isStaff();
+        if (!$actor instanceof SystemUser) {
+            return false;
+        }
+
+        return $actor->can('claim', \App\Models\DocumentRequest::class);
     }
 
     public function rules(): array

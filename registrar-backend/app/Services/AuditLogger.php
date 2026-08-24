@@ -66,6 +66,64 @@ class AuditLogger
         string     $action,
         array      $metadata = []
     ): AuditLog {
+        return $this->writeEntry(
+            user:       $user,
+            action:     $action,
+            metadata:   $metadata,
+            browser:    $this->parseBrowser($request->userAgent()),
+            ipAddress:  $request->ip(),
+        );
+    }
+
+    /**
+     * Same tamper-evident write path as log(), for callers with no live
+     * HTTP Request to read IP/user-agent from — namely queued jobs
+     * (e.g. EnrichCashierFailureJob, dispatched from a controller action
+     * but executed later on a worker, well outside that request's
+     * lifecycle).
+     *
+     * Deliberately NOT a second, parallel hash-chain implementation:
+     * both this and log() delegate to the same writeEntry() below, so
+     * there is exactly one place that ever computes a chained hash or
+     * inserts into audit_logs. A caller dispatching a job should capture
+     * $request->ip() / $request->userAgent() at dispatch time (while the
+     * request is still live) and pass the raw strings through the job's
+     * constructor — see EnrichCashierFailureJob — rather than attempting
+     * to serialize/reuse the Request object itself.
+     *
+     * $userAgent is the RAW user-agent string (not yet parsed) so the
+     * browser label is derived identically to the live-request path.
+     */
+    public function logForSystem(
+        SystemUser $user,
+        string     $action,
+        array      $metadata = [],
+        ?string    $ipAddress = null,
+        ?string    $userAgent = null,
+    ): AuditLog {
+        return $this->writeEntry(
+            user:      $user,
+            action:    $action,
+            metadata:  $metadata,
+            browser:   $this->parseBrowser($userAgent),
+            ipAddress: $ipAddress,
+        );
+    }
+
+    /**
+     * Single source of truth for writing a chained audit_logs row —
+     * both log() (live Request) and logForSystem() (queued jobs) funnel
+     * through here so the hash-chain algorithm, the row-lock-then-insert
+     * transaction, and the target_user_id/target_email extraction can
+     * never drift between the two entry points.
+     */
+    private function writeEntry(
+        SystemUser $user,
+        string     $action,
+        array      $metadata,
+        ?string    $browser,
+        ?string    $ipAddress,
+    ): AuditLog {
         $targetUserId = $metadata['target_user_id'] ?? null;
         $targetEmail  = $metadata['target_email'] ?? null;
         unset($metadata['target_user_id'], $metadata['target_email']);
@@ -73,7 +131,7 @@ class AuditLogger
         $createdAt = now();
 
         return DB::transaction(function () use (
-            $user, $action, $metadata, $targetUserId, $targetEmail, $createdAt, $request
+            $user, $action, $metadata, $targetUserId, $targetEmail, $createdAt, $browser, $ipAddress
         ) {
             $prevHash = $this->lockAndFetchLastHash();
 
@@ -92,8 +150,8 @@ class AuditLogger
                 'target_user_id' => $targetUserId,
                 'target_email'   => $targetEmail,
                 'action'         => $action,
-                'browser'        => $this->parseBrowser($request->userAgent()),
-                'ip_address'     => $request->ip(),
+                'browser'        => $browser,
+                'ip_address'     => $ipAddress,
                 'metadata'       => !empty($metadata) ? $metadata : null,
                 'prev_hash'      => $prevHash,
                 'hash'           => $hash,

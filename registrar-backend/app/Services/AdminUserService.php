@@ -37,6 +37,17 @@ use Illuminate\Support\Facades\Log;
  * identity, so they keep talking to the IdP directly via the
  * authenticated getSuperAdminToken() path.
  *
+ * Work Item #2 — Admin Management Consolidation: update() deliberately
+ * never reads/writes role_id, even if a direct API call includes it in
+ * $validated (UpdateSystemUserRequest no longer declares a rule for it,
+ * so it's stripped before reaching here — this is defense-in-depth on
+ * top of that, not the only guard). A user's role is exclusively managed
+ * through role_assignments now (RoleAssignmentService::grant()/revoke()),
+ * which — unlike a plain column update — enforces the Student/Alumni <->
+ * Admin/Super-Admin direction constraint. Letting this method silently
+ * accept role_id would reopen exactly the bypass that constraint exists
+ * to close.
+ *
  * OCMS sync: profile changes are pushed to the OCMS hub AFTER a
  * successful local update. An OCMS failure logs a warning but does
  * NOT rollback the local change.
@@ -147,10 +158,11 @@ class AdminUserService
         // thrown — mirrors the existing OcmsAdminService::pushProfileToOcms()
         // pattern used just below for profile pushes.
         $user = DB::transaction(function () use ($user, $validated) {
+            // NOTE: role_id is intentionally never read from $validated
+            // here — see the class docblock above.
             $userFields = array_filter([
                 'email'    => $validated['email']    ?? null,
                 'password' => isset($validated['password']) ? Hash::make($validated['password']) : null,
-                'role_id'  => $validated['role_id']  ?? null,
                 'status'   => $validated['status']   ?? null,
             ], fn ($v) => !is_null($v));
 

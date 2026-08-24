@@ -32,7 +32,7 @@ import { MODULE_KEYS, hasModuleAccess } from "../utils/policy";
 const ROLE_CONFIG = {
   student: {
     profileKey: 'student_profile',
-    profileLabel: (user) => user?.academic_record?.student_number || 'No Student Number',
+    profileLabel: (user) => user?.academic_record?.student_number || user?.email || 'Student',
     items: [
       { name: 'Dashboard', to: 'home', icon: Squares2X2Icon },
       { name: 'Inbox', to: 'inbox', icon: InboxIcon },
@@ -44,7 +44,7 @@ const ROLE_CONFIG = {
   },
   alumni: {
     profileKey: 'alumni_profile',
-    profileLabel: (user) => user?.email,
+    profileLabel: (user) => user?.email || 'Alumni',
     items: [
       { name: 'Dashboard', to: 'home', icon: Squares2X2Icon },
       { name: 'Inbox', to: 'inbox', icon: InboxIcon },
@@ -73,6 +73,7 @@ const ROLE_CONFIG = {
     profileLabel: (user) => user?.email,
     items: [
       { name: 'Admin Management', to: 'user', icon: Squares2X2Icon },
+      { name: 'System Analytics', to: 'system-analytics', icon: ChartBarSquareIcon },
       { name: 'Document Management', to: 'documents', icon: TableCellsIcon },
       { name: 'Audit Trail', to: 'report', icon: UserCircleIcon },
       { name: 'Announcement Management', to: 'settings', icon: Cog6ToothIcon },
@@ -115,13 +116,19 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
       alumni: 'from-[#11998e] to-[#38ef7d]',
     };
     const LABELS = { admin: 'Admin', super_admin: 'Super Admin', student: 'Student', alumni: 'Alumni' };
+    const DESCRIPTIONS = {
+      student: 'Student Role',
+      alumni: 'Alumni Role',
+      admin: 'Registrar Staff',
+      super_admin: 'System Administrator',
+    };
 
     return (roleAssignments || []).map((assignment) => {
       const roleName = ROLE_ID_TO_NAME?.[assignment.role_id];
       return {
         role_id: assignment.role_id,
         label: LABELS[roleName] || roleName || 'Unknown',
-        description: assignment.policy?.name || (roleName === 'student' ? 'Student Member' : 'Account role'),
+        description: assignment.policy?.name || DESCRIPTIONS[roleName] || 'Account Role',
         icon: ICONS[roleName] || UserIcon,
         grad: GRADS[roleName] || 'from-gray-500 to-gray-700',
       };
@@ -165,6 +172,18 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
   }, [isCollapsed]);
 
   useEffect(() => {
+    const handleSetCollapsed = (event) => {
+      if (typeof event?.detail === 'boolean') {
+        setIsCollapsed(event.detail);
+      } else {
+        setIsCollapsed(true);
+      }
+    };
+    window.addEventListener('collapse-sidebar', handleSetCollapsed);
+    return () => window.removeEventListener('collapse-sidebar', handleSetCollapsed);
+  }, []);
+
+  useEffect(() => {
     const headerElement = document.querySelector('header');
     if (!headerElement) return;
 
@@ -191,23 +210,62 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
 
   const fullName = useMemo(() => {
     if (role === 'superAdmin') return 'SUPER ADMIN';
-    if (profile?.first_name || profile?.last_name) {
-      return `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+
+    const p =
+      (profile?.first_name || profile?.last_name) ? profile :
+      (user?.admin_profile?.first_name || user?.admin_profile?.last_name) ? user.admin_profile :
+      (user?.student_profile?.first_name || user?.student_profile?.last_name) ? user.student_profile :
+      (user?.alumni_profile?.first_name || user?.alumni_profile?.last_name) ? user.alumni_profile :
+      null;
+
+    if (p) {
+      const name = [p.first_name, p.last_name, p.suffix]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (name) return name;
     }
-    return 'Guest';
-  }, [profile, role]);
+
+    if (user?.first_name || user?.last_name) {
+      const name = [user.first_name, user.last_name, user.suffix]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      if (name) return name;
+    }
+
+    if (role === 'staff') {
+      return user?.policy?.name || 'Staff';
+    }
+
+    if (role === 'student') {
+      return 'Student';
+    }
+
+    if (role === 'alumni') {
+      return 'Alumni';
+    }
+
+    return user?.policy?.name || 'Student';
+  }, [profile, role, user]);
 
   const initials = useMemo(() => {
     if (role === 'superAdmin') return 'SA';
-    if (profile?.first_name) {
-      const parts = profile.first_name.trim().split(/\s+/);
-      if (parts.length > 1) {
-        return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
-      }
-      return parts[0].charAt(0).toUpperCase();
+
+    const getInitialsFrom = (name) => {
+      if (!name) return null;
+      const parts = name.trim().split(/\s+/);
+      return parts.length > 1
+        ? (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
+        : parts[0].charAt(0).toUpperCase();
+    };
+
+    if (fullName) {
+      return getInitialsFrom(fullName);
     }
-    return 'G';
-  }, [profile, role]);
+
+    return role === 'student' ? 'S' : role === 'alumni' ? 'A' : 'SS';
+  }, [fullName, role]);
 
   const handleLogoutClick = () => {
     setModal({
@@ -259,7 +317,7 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                 >
                   <div className="flex flex-col text-left">
                     <span className="text-sm uppercase tracking-wider">{fullName}</span>
-                    <span className="text-[11px] font-semibold opacity-85">{config.profileLabel(user) || 'Guest'}</span>
+                    <span className="text-[11px] font-semibold opacity-85">{config.profileLabel(user) || user?.email}</span>
                   </div>
                   <ChevronDownIcon className={`h-5 w-5 ${isDark ? 'text-[#b0b3b8]' : 'text-white/85'}`} />
                 </button>
@@ -354,7 +412,7 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                     <h2 className={`font-black text-sm leading-tight uppercase truncate ${isDark ? 'text-[#e4e6eb]' : 'text-pup-maroon'}`}>
                       {fullName}
                     </h2>
-                    <span className={`text-[10px] font-semibold truncate ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{config.profileLabel(user) || 'Guest'}</span>
+                    <span className={`text-[10px] font-semibold truncate ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{config.profileLabel(user) || user?.email}</span>
                   </div>
                 )}
               </div>
@@ -449,7 +507,7 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                 <div>
                   <h2 className="font-bold text-base uppercase tracking-wide">Switch Role</h2>
                   <p className={`text-[10px] ${isDark ? 'text-[#b0b3b8]' : 'text-white/60'}`}>
-                    {user?.email || 'teamtech4ward.ris2027@gmail.com'}
+                    {user?.email || ''}
                   </p>
                 </div>
               </div>

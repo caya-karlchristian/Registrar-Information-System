@@ -43,11 +43,6 @@ export const createSystemUser = (data)    => api.post("/system-users", data);
 export const updateSystemUser = (id, data)=> api.put(`/system-users/${id}`, data);
 export const deleteSystemUser = (id)      => api.delete(`/system-users/${id}`);
 
-// User Management — Policy Attachment (Super Admin only).
-// Attaching `null` detaches the currently-assigned policy from the admin.
-export const attachUserPolicy = (userId, policyId) =>
-  api.patch(`/system-users/${userId}/policy`, { policy_id: policyId });
-
 // -------------------------------------------------------
 // LOCAL (BREAK-GLASS) AUTH (Super Admin only)
 // -------------------------------------------------------
@@ -96,6 +91,17 @@ export const rejectAccessRequest  = (id, reason)   => api.post(`/access-requests
 export const getRoleAssignments   = (params = {}) => api.get("/role-assignments", { params });
 export const grantRoleAssignment  = (data)         => api.post("/role-assignments", data);
 export const revokeRoleAssignment = (id, reason)   => api.post(`/role-assignments/${id}/revoke`, { reason });
+
+// PATCH /role-assignments/{id}/policy — Work Item #2 — Admin Management
+// Consolidation. Edits the policy on an already-Active Admin
+// role_assignment in place, without a revoke/regrant cycle. This is the
+// ONLY remaining way to change an admin's policy from the UI — it
+// replaces the retired PATCH /system-users/{id}/policy ("Manage
+// Access") endpoint entirely. Sending `null` detaches the policy (see
+// EditRoleAssignmentPolicyRequest — nullable is intentional, fail-closed
+// server-side).
+export const editRoleAssignmentPolicy = (id, policyId) =>
+  api.patch(`/role-assignments/${id}/policy`, { policy_id: policyId });
 
 // GET /role-assignments/search-users?q= — typeahead lookup across ALL
 // roles (student/alumni/admin/super admin), used by GrantRoleUserPicker
@@ -295,6 +301,15 @@ export const getAuditLogs       = (params = {}) => api.get("/audit-logs", { para
 export const getAuditLogFilters = ()             => api.get("/audit-logs/filters");
 
 // -------------------------------------------------------
+// SECURITY EVENTS (Super Admin only) — Phase 3
+// Same call shape as the audit log functions above; the two endpoints
+// share the frontend Audit Trail page's table/pagination via a tab toggle
+// (see ReportManagement.jsx).
+// -------------------------------------------------------
+export const getSecurityEvents       = (params = {}) => api.get("/security-events", { params });
+export const getSecurityEventFilters = ()             => api.get("/security-events/filters");
+
+// -------------------------------------------------------
 // ANALYTICS (Admin + Super Admin)
 // -------------------------------------------------------
 export const getAnalyticsOverview      = (params = {}) => api.get("/analytics/overview",          { params });
@@ -306,6 +321,20 @@ export const getAnalyticsPeakHours     = (params = {}) => api.get("/analytics/pe
 export const getAnalyticsByPurpose     = (params = {}) => api.get("/analytics/by-purpose",         { params });
 export const postAnalyticsAiReport     = (params = {}) => api.post("/analytics/ai-report", {},     { params });
 export const postAnalyticsAiQuery      = (body  = {}) => api.post("/analytics/ai-query",  body);
+
+// -------------------------------------------------------
+// SYSTEM ANALYTICS (Super Admin only) — Phase 2 of the Analytics &
+// Audit Log Revamp plan. Separate from ANALYTICS above: that group is
+// scoped to a single Registrar's request queue (volume, processing
+// time, staff performance); this group answers "is the system itself
+// healthy" (roster state, delegated-access throughput, cross-system
+// verification health). System-wide volume/trend intentionally reuses
+// getAnalyticsOverview()/getAnalyticsVolumeTrend() above rather than a
+// separate endpoint — Super Admin already has access to those.
+// -------------------------------------------------------
+export const getAdminRosterHealth         = ()             => api.get("/system-analytics/admin-roster-health");
+export const getAccessRequestThroughput   = (params = {}) => api.get("/system-analytics/access-request-throughput", { params });
+export const getCashierVerificationHealth = (params = {}) => api.get("/system-analytics/cashier-verification-health", { params });
 
 // -------------------------------------------------------
 // ANNOUNCEMENTS (read: all authenticated | write: Super Admin)

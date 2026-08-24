@@ -31,7 +31,16 @@ class UpdateSystemUserRequest extends FormRequest
         return [
             'email'       => 'sometimes|email|unique:users,email,' . $userId . ',user_id',
             'password'    => ['sometimes', Password::min(8)->mixedCase()->numbers()],
-            'role_id'     => 'sometimes|integer|in:3,4',
+            // Work Item #2 — Admin Management Consolidation: role_id is
+            // deliberately NOT a rule here anymore. "Edit User" no longer
+            // changes a role — that is exclusively role_assignments'
+            // job now (grant/revoke via RoleAssignmentController), which
+            // also enforces the Student/Alumni <-> Admin/Super-Admin
+            // direction constraint that this endpoint never did. Even if
+            // a caller sends role_id in the request body, it is silently
+            // stripped by validated() below and never reaches
+            // AdminUserService::update() — see that method's docblock.
+            //
             // Pending Activation / Expired are included so a Super Admin can
             // manually correct a record — e.g. re-open an Expired invite
             // back to Pending Activation, or hand-activate someone whose

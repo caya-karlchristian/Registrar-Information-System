@@ -43,10 +43,24 @@ class UserResource extends JsonResource
             // (e.g. the account-settings form after a save) can read
             // data.first_name directly instead of reaching into
             // data.admin_profile — only present when adminProfile is loaded.
+            // Deliberately UNCHANGED (still adminProfile-only, not the
+            // fallback-aware resolveDisplayName() below): this is the
+            // shape the admin-profile EDIT form reads/writes, and editing
+            // a student-staff account's own Student name through the
+            // Admin Profile form would be editing the wrong table.
             'first_name'  => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->first_name),
             'middle_name' => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->middle_name),
             'last_name'   => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->last_name),
             'suffix'      => $this->whenLoaded('adminProfile', fn () => $this->adminProfile?->suffix),
+
+            // BUG FIX (RIS-PROCESS-BUGS #10 — "Incorrect User Name Display
+            // for Assigned Student Staff Role"): a resolved, always-present
+            // display name for read-only UI (dashboard header, admin
+            // logbook "acted by" column, etc.) to render instead of a
+            // hardcoded "guest" fallback. See resolveDisplayName() below
+            // and SystemUser::loadIdentityRelations() for why adminProfile
+            // alone isn't enough for a secondary (student-staff) grant.
+            'display_name' => $this->resolveDisplayName(),
 
             // Policy attachment — admin-only. Super admins always have
             // full access and never carry a policy_id (see RoleMiddleware).
@@ -80,8 +94,161 @@ class UserResource extends JsonResource
             // this passes, provisioning:expire-stale flips status to
             // 'Expired' (see Console\Commands\ExpireStaleProvisioning).
             'pending_expires_at' => $this->pending_expires_at,
-            'created_at' => $this->created_at,  
+            'created_at' => $this->created_at,
+
+            // -----------------------------------------------------------
+            // Work Item #3 — Admin Accounts / Student Staff Visibility.
+            //
+            // base_role_id/base_role_name are the account's actual,
+            // permanent identity (raw users.role_id) — deliberately NOT
+            // assumedRoleId(), which reflects a SESSION override and is
+            // meaningless when this resource represents someone else's
+            // row in a listing rather than the caller's own account. This
+            // is what the Admin Accounts table shows as "Student" /
+            // "Alumni" for a student-staff row, distinct from the
+            // administrative role granted to them (see admin_grant below).
+            'base_role_id'   => $this->role_id,
+            'base_role_name' => $this->resolveRoleName($this->role_id),
+
+            // The administrative (Admin/Super Admin) access this account
+            // currently holds, wherever it comes from — see
+            // resolveAdminGrant(). Null for a row that has neither an
+            // admin-tier primary role nor an active admin-tier grant (this
+            // resource is still usable for non-admin contexts elsewhere,
+            // e.g. AuthController@me, where admin_grant is simply null for
+            // a plain Student/Alumni session).
+            'admin_grant' => $this->resolveAdminGrant(),
         ];
+    }
+
+    /**
+     * Work Item #3 — resolves "what administrative access does this
+     * account currently hold, and where does its policy actually come
+     * from" — this is NOT the same question as $this->policy_id /
+     * $this->policy above (which reflect the SESSION-assumed role via
+     * assumedPolicyId(), and for a THIRD PARTY'S row being listed here —
+     * no currentAccessToken() on this model instance — fall straight
+     * through to the raw users.policy_id column).
+     *
+     * That raw-column fallback is exactly right for a classic Admin/Super
+     * Admin (their baseline role_assignments row is kept in sync with
+     * users.policy_id by RoleAssignmentService::editPolicy() — see its
+     * docblock), but WRONG for a secondary "student staff" grant: a
+     * Student's users.policy_id is never set (only admin-tier primary
+     * accounts use that column), so the account's real Admin policy would
+     * silently read as "no policy attached" without this method.
+     *
+     * Prefers an actual loaded admin-tier role_assignments row (covers
+     * both a classic admin's live baseline row AND a secondary grant),
+     * and falls back to the raw role_id/policy_id columns only when no
+     * such row is loaded/active — e.g. a Deactivated classic admin whose
+     * baseline row was cascade-revoked by
+     * RoleAssignmentService::revokeAllForUser(). That fallback is what
+     * keeps existing Registrar Staff / Super Admin rows displaying
+     * exactly as they did before this work item.
+     */
+    private function resolveAdminGrant(): ?array
+    {
+        $adminTier = [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN];
+
+        if ($this->relationLoaded('activeRoleAssignments')) {
+            $assignment = $this->activeRoleAssignments
+                ->whereIn('role_id', $adminTier)
+                // A user could in theory hold both an Admin and a Super
+                // Admin active row at once — grant()'s duplicate check is
+                // scoped per role_id, not per tier. Prefer the
+                // higher-privilege one for display if that ever happens.
+                ->sortByDesc('role_id')
+                ->first();
+
+            if ($assignment) {
+                return [
+                    'role_assignment_id' => $assignment->id,
+                    'role_id'            => $assignment->role_id,
+                    'role_name'          => $this->resolveRoleName($assignment->role_id),
+                    // True when this grant sits ON TOP OF a non-admin base
+                    // identity — the actual "student staff" case this
+                    // work item exists to surface.
+                    'is_secondary'       => $assignment->role_id !== $this->role_id,
+                    'policy'             => ($assignment->role_id === SystemUser::ROLE_ADMIN && $assignment->policy)
+                        ? new PolicyResource($assignment->policy)
+                        : null,
+                    'granted_at'         => optional($assignment->granted_at)->toIso8601String(),
+                    'expires_at'         => optional($assignment->expires_at)->toIso8601String(),
+                    // Always 'Active' here — the eager-loaded relation is
+                    // pre-filtered to activeRoleAssignments() — exposed
+                    // anyway so the frontend never has to assume that.
+                    'status'             => $assignment->status,
+                ];
+            }
+        }
+
+        if (in_array($this->role_id, $adminTier, true)) {
+            return [
+                'role_assignment_id' => null,
+                'role_id'            => $this->role_id,
+                'role_name'          => $this->resolveRoleName($this->role_id),
+                'is_secondary'       => false,
+                'policy'             => ($this->role_id === SystemUser::ROLE_ADMIN && $this->policy)
+                    ? new PolicyResource($this->policy)
+                    : null,
+                'granted_at'         => null,
+                'expires_at'         => null,
+                'status'             => null,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * BUG FIX (RIS-PROCESS-BUGS #10 — "Incorrect User Name Display for
+     * Assigned Student Staff Role").
+     *
+     * Resolves the best available human name for this account, checking
+     * each identity profile in priority order and falling through to the
+     * next one whenever the higher-priority relation isn't loaded or has
+     * no name recorded — rather than assuming "the assumed role is Admin,
+     * so adminProfile is the only place a name could be," which is what
+     * produced the "guest" placeholder in the first place (see
+     * SystemUser::loadIdentityRelations() docblock).
+     *
+     *   1. adminProfile  — correct for a classic Admin/Super Admin, and
+     *      for a secondary grant IF an admin profile happens to exist.
+     *   2. studentProfile — the real name for a "student staff" account
+     *      (base role Student, secondary Admin grant) — the exact case
+     *      from the bug report (juan@gmail.com).
+     *   3. alumniProfile  — same idea for a future alumni-staff grant.
+     *
+     * Returns null (never a hardcoded placeholder like "guest") if none
+     * of the above are loaded/populated, so the frontend can render its
+     * own empty state deliberately rather than being handed fabricated
+     * data.
+     */
+    private function resolveDisplayName(): ?string
+    {
+        $profile = null;
+
+        if ($this->relationLoaded('adminProfile') && $this->adminProfile) {
+            $profile = $this->adminProfile;
+        } elseif ($this->relationLoaded('studentProfile') && $this->studentProfile) {
+            $profile = $this->studentProfile;
+        } elseif ($this->relationLoaded('alumniProfile') && $this->alumniProfile) {
+            $profile = $this->alumniProfile;
+        }
+
+        if (!$profile || !$profile->first_name) {
+            return null;
+        }
+
+        $parts = array_filter([
+            $profile->first_name,
+            $profile->middle_name,
+            $profile->last_name,
+            $profile->suffix,
+        ]);
+
+        return implode(' ', $parts);
     }
 
     // -------------------------------------------------------

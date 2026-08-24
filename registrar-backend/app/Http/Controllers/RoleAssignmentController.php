@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RoleAssignment\EditRoleAssignmentPolicyRequest;
 use App\Http\Requests\RoleAssignment\RevokeRoleAssignmentRequest;
 use App\Http\Requests\RoleAssignment\SearchGrantableUsersRequest;
 use App\Http\Requests\RoleAssignment\StoreRoleAssignmentRequest;
@@ -113,6 +114,29 @@ class RoleAssignmentController extends Controller
         $roleAssignment = $this->roleAssignmentService->revoke(
             $roleAssignment,
             $request->validated('reason'),
+            $request
+        );
+
+        return new RoleAssignmentResource($roleAssignment);
+    }
+
+    /**
+     * PATCH /role-assignments/{roleAssignment}/policy
+     * Super Admin only. Work Item #2 — Admin Management Consolidation:
+     * this is the ONLY remaining way to change an admin's policy from
+     * the UI. It replaces the retired PATCH /system-users/{id}/policy
+     * ("Manage Access") endpoint, and edits the grant in place rather
+     * than requiring a revoke/regrant cycle — see
+     * RoleAssignmentService::editPolicy() for why that matters (no
+     * forced re-login for what is just a permissions change).
+     */
+    public function editPolicy(RoleAssignment $roleAssignment, EditRoleAssignmentPolicyRequest $request)
+    {
+        $this->authorize('editPolicy', $roleAssignment);
+
+        $roleAssignment = $this->roleAssignmentService->editPolicy(
+            $roleAssignment,
+            $request->validated('policy_id'),
             $request
         );
 

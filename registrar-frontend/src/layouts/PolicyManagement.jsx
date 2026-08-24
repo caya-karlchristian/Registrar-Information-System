@@ -12,7 +12,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "../context/ThemeContext";
 import {
-  PlusIcon,
   XMarkIcon,
   ShieldCheckIcon,
   ChevronUpIcon,
@@ -20,13 +19,21 @@ import {
 } from "@heroicons/react/24/outline";
 import DashboardDropdown from "../components/DashboardDropdown";
 import { getSystemUsers, getPolicies, createPolicy, updatePolicy, deletePolicy } from "../services/api";
-import MultiSelection from "../components/MultiSelection";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { PolicyTableSkeleton } from "../components/LoadingSkeleton";
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
+import { MODULE_ACTIONS } from "../utils/policy";
+import CreatePolicyModal from "../components/CreatePolicyModal";
 
+// Full module list — used for the "Filter by Module Access" dropdown
+// (permissionFilter), the Assigned Admins summary, and the labels
+// helper below. Includes Dashboard/Admin Logbook: filtering by module
+// access only ever needs "is this module granted at all" (a non-empty
+// permissions[module] array), which is true regardless of whether that
+// module is single-token or granular — see baseFiltered's permission
+// filter further down, which is unaffected by this change.
 const MODULE_OPTIONS = [
   "Dashboard",
   "Inbox",
@@ -36,6 +43,16 @@ const MODULE_OPTIONS = [
   "Access Requests",
   "Business Calendar"
 ];
+
+// Work Item #1 — Granular Per-Action Permissions: Dashboard and Admin
+// Logbook are no longer simple on/off toggles in the create/edit
+// modal — each gets its own per-action checkbox group (see the
+// Dashboard/Logbook cards in the modal below) instead of appearing in
+// the single MultiSelection "Select a module" list. This is that
+// list with both removed.
+const SINGLE_TOKEN_MODULE_OPTIONS = MODULE_OPTIONS.filter(
+  (label) => label !== "Dashboard" && label !== "Admin Logbook"
+);
 
 const LABEL_TO_KEY = {
   "Dashboard": "dashboard",
@@ -56,6 +73,7 @@ const KEY_TO_LABEL = {
   "access_requests": "Access Requests",
   "business_calendar": "Business Calendar"
 };
+
 
 const PolicyManagement = () => {
   const { isDark } = useTheme();
@@ -85,6 +103,12 @@ const PolicyManagement = () => {
   // Form fields
   const [policyName, setPolicyName] = useState("");
   const [selectedModuleValues, setSelectedModuleValues] = useState([]);
+  // Work Item #1 — Granular Per-Action Permissions: Dashboard/Logbook
+  // are tracked separately from selectedModuleValues since each is a
+  // subset of named actions (see MODULE_ACTIONS), not a single on/off
+  // toggle.
+  const [dashboardActions, setDashboardActions] = useState([]);
+  const [logbookActions, setLogbookActions] = useState([]);
 
   // Admin list modal
   const [isAdminListOpen, setIsAdminListOpen] = useState(false);
@@ -147,20 +171,57 @@ const PolicyManagement = () => {
     return users.filter(user => user.role_id === 3 && user.policy_id === policy.policy_id);
   }, [users]);
 
-  // Generate rawPermissions object from selected module labels
-  const buildPermissions = (selectedLabels) => {
+  // Generate rawPermissions object from selected module labels plus
+  // the granular dashboard/logbook action selections.
+  const buildPermissions = (selectedLabels, dashboardVal, logbookVal) => {
     const raw = {};
     Object.entries(LABEL_TO_KEY).forEach(([label, key]) => {
+      if (key === "dashboard" || key === "logbook") return; // set explicitly below
       raw[key] = selectedLabels.includes(label) ? ["Access"] : [];
     });
+    raw.dashboard = dashboardVal;
+    raw.logbook = logbookVal;
     return raw;
+  };
+
+  // Work Item #1 — Granular Per-Action Permissions: toggling Process or
+  // Complete implies View (can't act on a queue you can't see), and
+  // unchecking View clears whichever of Process/Complete were set —
+  // neither one makes sense without it. Mirrors the same logic on the
+  // Logbook side for Export.
+  const toggleDashboardAction = (action) => {
+    setDashboardActions((prev) => {
+      if (prev.includes(action)) {
+        return action === "View" ? [] : prev.filter((a) => a !== action);
+      }
+      const next = [...prev, action];
+      if ((action === "Process" || action === "Complete") && !next.includes("View")) {
+        next.push("View");
+      }
+      return next;
+    });
+  };
+
+  const toggleLogbookAction = (action) => {
+    setLogbookActions((prev) => {
+      if (prev.includes(action)) {
+        return action === "View" ? [] : prev.filter((a) => a !== action);
+      }
+      const next = [...prev, action];
+      if (action === "Export" && !next.includes("View")) {
+        next.push("View");
+      }
+      return next;
+    });
   };
 
   const handleOpenCreate = () => {
     setIsEditMode(false);
     setPolicyName("");
     setSelectedModuleValues([]);
-    setInitialFormState({ name: "", modules: [] });
+    setDashboardActions([]);
+    setLogbookActions([]);
+    setInitialFormState({ name: "", modules: [], dashboardActions: [], logbookActions: [] });
     setIsModalOpen(true);
   };
 
@@ -170,18 +231,39 @@ const PolicyManagement = () => {
     const p = policies[index];
     const initialName = p.name;
 
-    // Map permissions object back to selectedModuleValues
+    // Map permissions object back to selectedModuleValues — dashboard
+    // and logbook are handled separately below since they're
+    // action-array modules, not single on/off toggles.
     const labels = [];
     Object.entries(p.permissions || {}).forEach(([key, val]) => {
+      if (key === 'dashboard' || key === 'logbook') return;
       if (key !== 'student_staff_switch' && val && val.length > 0) {
         const label = KEY_TO_LABEL[key];
         if (label) labels.push(label);
       }
     });
 
+    // Defensive filter against MODULE_ACTIONS: drops any stale/unknown
+    // token (e.g. a legacy "Access" left over pre-migration, or a
+    // typo'd value from a raw API call) rather than rendering it as a
+    // checked box for an action that doesn't exist.
+    const dashboardVal = Array.isArray(p.permissions?.dashboard)
+      ? p.permissions.dashboard.filter((a) => MODULE_ACTIONS.dashboard.includes(a))
+      : [];
+    const logbookVal = Array.isArray(p.permissions?.logbook)
+      ? p.permissions.logbook.filter((a) => MODULE_ACTIONS.logbook.includes(a))
+      : [];
+
     setPolicyName(initialName);
     setSelectedModuleValues(labels);
-    setInitialFormState({ name: initialName, modules: labels });
+    setDashboardActions(dashboardVal);
+    setLogbookActions(logbookVal);
+    setInitialFormState({
+      name: initialName,
+      modules: labels,
+      dashboardActions: dashboardVal,
+      logbookActions: logbookVal,
+    });
     setIsModalOpen(true);
   };
 
@@ -191,7 +273,13 @@ const PolicyManagement = () => {
     const modulesChanged =
       selectedModuleValues.length !== initialFormState.modules.length ||
       !selectedModuleValues.every(val => initialFormState.modules.includes(val));
-    return nameChanged || modulesChanged;
+    const dashboardChanged =
+      dashboardActions.length !== initialFormState.dashboardActions.length ||
+      !dashboardActions.every((a) => initialFormState.dashboardActions.includes(a));
+    const logbookChanged =
+      logbookActions.length !== initialFormState.logbookActions.length ||
+      !logbookActions.every((a) => initialFormState.logbookActions.includes(a));
+    return nameChanged || modulesChanged || dashboardChanged || logbookChanged;
   };
 
   const handleCloseModal = () => {
@@ -262,7 +350,10 @@ const PolicyManagement = () => {
       return;
     }
 
-    if (selectedModuleValues.length === 0) {
+    const hasAnySelection =
+      selectedModuleValues.length > 0 || dashboardActions.length > 0 || logbookActions.length > 0;
+
+    if (!hasAnySelection) {
       setErrorMsg("Please select at least one module.");
       return;
     }
@@ -272,7 +363,7 @@ const PolicyManagement = () => {
       return;
     }
 
-    const permissions = buildPermissions(selectedModuleValues);
+    const permissions = buildPermissions(selectedModuleValues, dashboardActions, logbookActions);
     setSubmitting(true);
 
     try {
@@ -617,99 +708,22 @@ const PolicyManagement = () => {
       </div>
 
       {/* Create / Edit Policy Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`}
-            onClick={handleCloseModal}
-          />
-          <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl mx-auto flex flex-col overflow-visible ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
-
-            {/* Header */}
-            <div className={`px-6 py-5 flex items-center justify-between rounded-t-2xl shrink-0 ${isDark ? 'bg-[#2a2a2f] border-b border-[#3e4042]' : 'bg-pup-dark-maroon text-white'}`}>
-              <div>
-                <h2 className="text-white font-bold text-lg uppercase tracking-wide">
-                  {isEditMode ? "Edit Policy" : "Create Policy"}
-                </h2>
-                <p className={`text-xs mt-0.5 ${isDark ? 'text-[#b0b3b8]' : 'text-white/60'}`}>
-                  Define a reusable set of module permissions, then attach it to any admin
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleCloseModal}
-                className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white cursor-pointer"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="h-1 w-full shrink-0 bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
-
-            <form onSubmit={handleSavePolicy} noValidate className="flex flex-col overflow-visible">
-              <div className="p-6 space-y-5 overflow-visible">
-                {/* Policy Name */}
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-[#b0b3b8]' : 'text-gray-655'} mb-1.5`}>
-                    Policy Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={policyName}
-                    onChange={(e) => setPolicyName(e.target.value)}
-                    placeholder="e.g. Registrar Frontliner"
-                    className={`w-full px-4 py-2.5 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 ${isDark
-                        ? 'bg-[#1f1f1f] text-[#e4e6eb] placeholder-[#9a9a9a] focus:ring-[#FFD700] border border-[#3e4042]'
-                        : 'bg-white text-gray-700 placeholder-gray-400 focus:ring-[#FFC72C] border border-gray-300'
-                      }`}
-                  />
-                </div>
-
-                {/* Single module selection card with MultiSelectDropdown */}
-                <div className={`p-4 rounded-xl border flex flex-col relative overflow-visible ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200'
-                  }`}>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Select a module</span>
-                  </div>
-
-                  <div className="mt-1 relative overflow-visible">
-                    <MultiSelection
-                      name="policy-modules"
-                      label=""
-                      options={MODULE_OPTIONS}
-                      selectedValues={selectedModuleValues}
-                      onChange={(e) => setSelectedModuleValues(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className={`px-6 pb-6 pt-4 flex items-center justify-end gap-3 border-t shrink-0 rounded-b-2xl ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${isDark
-                      ? 'bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]'
-                      : 'bg-pup-dark-maroon text-white hover:bg-[#3a0303]'
-                    }`}
-                >
-                  {submitting ? "Saving..." : (isEditMode ? "Save Changes" : "Save Policy")}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <CreatePolicyModal
+        isOpen={isModalOpen}
+        isEditMode={isEditMode}
+        submitting={submitting}
+        policyName={policyName}
+        setPolicyName={setPolicyName}
+        selectedModuleValues={selectedModuleValues}
+        setSelectedModuleValues={setSelectedModuleValues}
+        dashboardActions={dashboardActions}
+        logbookActions={logbookActions}
+        toggleDashboardAction={toggleDashboardAction}
+        toggleLogbookAction={toggleLogbookAction}
+        onClose={handleCloseModal}
+        onSubmit={handleSavePolicy}
+        singleTokenModuleOptions={SINGLE_TOKEN_MODULE_OPTIONS}
+      />
 
       {/* Admin Assignment Details Modal */}
       {isAdminListOpen && selectedPolicyForAdmins && (

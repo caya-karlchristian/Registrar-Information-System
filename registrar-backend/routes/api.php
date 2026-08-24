@@ -28,6 +28,8 @@ use App\Http\Controllers\SignatoryController;
 use App\Http\Controllers\BusinessHoursController;
 use App\Http\Controllers\CalendarExceptionController;
 use App\Http\Controllers\CalendarOverrideController;
+use App\Http\Controllers\SuperAdminAnalyticsController;
+use App\Http\Controllers\SecurityEventController;
 
 /*
 |--------------------------------------------------------------------------
@@ -110,13 +112,53 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     });
 
     // Document requests
+    //
+    // Work Item #1 — Granular Per-Action Permissions: the module:...
+    // tags below on index/show/update/claim are the COARSE gate only.
+    // - index/show: 'module:dashboard,View' — safe to apply to every
+    //   authenticated role because SystemUser::hasModuleAccess() always
+    //   returns true for non-admins (students/alumni), so this never
+    //   blocks a requester viewing their own requests; it only ever
+    //   restricts an admin whose policy lacks dashboard View entirely.
+    // - update: 'module:dashboard,Process|Complete' — blocks any admin
+    //   with ZERO dashboard write access outright. It cannot by itself
+    //   distinguish "this call sets ReadyToClaim" (needs Process) from
+    //   "this call sets Completed" (needs Complete) — PUT is one
+    //   endpoint for every status transition — so the fine-grained,
+    //   target-status-dependent check lives in
+    //   DocumentRequestService::updateRequest() instead. See that
+    //   file's authorizeStatusChange().
+    // - claim: 'module:dashboard,Complete' — a single, unconditional
+    //   action gate, not an OR list: claimRequest() can only ever
+    //   produce Completed, so there's no ambiguity to resolve later the
+    //   way there is for update().
+    // - logbook (this file's dashboard "export the queue as a log"
+    //   view, distinct from the /request-history module below): now
+    //   explicitly 'module:logbook,View' rather than bare
+    //   'module:logbook'. Previously the untagged form meant "any
+    //   logbook access at all" via hasModuleAccess($module) with no
+    //   $action, so a policy granting only Export (no View) still
+    //   passed the gate — incoherent for a GET route. Behaviorally
+    //   identical for every real policy today (PolicyService now backs
+    //   View into any granted logbook action — see sanitizePermissions()
+    //   — so no existing policy can have Export without View), but
+    //   spelling it out here removes the implicit "no action = any
+    //   action" reading for a route that only ever needs View.
+    // - counts: now carries 'module:dashboard,View' alongside role:3,4.
+    //   This endpoint returns per-status counts for the same dashboard
+    //   queue that index/show/logbook already gate — it had no module
+    //   check at all before, which was a gap (an admin with zero
+    //   dashboard access could still see how many requests were in each
+    //   status). Counts are read-only and derived from the same View
+    //   permission as the list itself, so this reuses that action
+    //   rather than inventing a new one.
     Route::prefix('document-requests')->group(function () {
-        Route::get('/',                           [DocumentRequestController::class, 'index']);
-        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware(['role:3,4', 'module:logbook']);
-        Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware('role:3,4');
+        Route::get('/',                           [DocumentRequestController::class, 'index'])->middleware('module:dashboard,View');
+        Route::get('logbook',                     [DocumentRequestController::class, 'logbook'])->middleware(['role:3,4', 'module:logbook,View']);
+        Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware(['role:3,4', 'module:dashboard,View']);
         Route::post('archive-bulk',                [DocumentRequestController::class, 'archiveBulk'])->middleware('role:3');
         Route::post('restore-bulk',                [DocumentRequestController::class, 'restoreBulk'])->middleware('role:3');
-        Route::post('claim',                       [DocumentRequestController::class, 'claim'])->middleware('role:3');
+        Route::post('claim',                       [DocumentRequestController::class, 'claim'])->middleware(['role:3', 'module:dashboard,Complete']);
         // Dedicated throttle on top of the group's throttle:60,1 — OR
         // numbers look sequential (see cashier sample data), so this is a
         // soft enumeration surface (probing which numbers return `valid`)
@@ -134,9 +176,9 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         // search-users below — all had the identical collision.
         Route::post('verify-or', [DocumentRequestController::class, 'verifyOfficialReceipt'])
             ->middleware(['role:1,2', 'throttle:10,1,verify-or']);
-        Route::get('{documentRequest}', [DocumentRequestController::class, 'show']);
+        Route::get('{documentRequest}', [DocumentRequestController::class, 'show'])->middleware('module:dashboard,View');
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
-        Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware('role:3');
+        Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware(['role:3', 'module:dashboard,Process|Complete']);
         Route::patch('{documentRequest}/archive', [DocumentRequestController::class, 'archive'])->middleware('role:3');
         Route::patch('{documentRequest}/restore', [DocumentRequestController::class, 'restore'])->middleware('role:3');
         Route::delete('{documentRequest}', [DocumentRequestController::class, 'destroy'])->middleware('role:3');
@@ -171,7 +213,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.
-    Route::middleware(['role:3,4', 'module:logbook'])->prefix('request-history')->group(function () {
+    Route::middleware(['role:3,4', 'module:logbook,View'])->prefix('request-history')->group(function () {
         Route::get('/',    [RequestHistoryController::class, 'index']);
         Route::get('{id}', [RequestHistoryController::class, 'show']);
     });
@@ -261,18 +303,46 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             ->middleware('throttle:5,1,system-users-store')
             ->name('system-users.store');
 
-        Route::patch('system-users/{id}/policy', [SystemUserController::class, 'attachPolicy']);
-
         // User Management — Policy Attachment: reusable admin permission
-        // policies, plus attaching one to a specific admin above.
-        // NOTE: GET (read) is intentionally NOT here — see below. Only
-        // create/edit/delete of a policy is Super-Admin-only.
+        // policies. Work Item #2 — Admin Management Consolidation:
+        // attaching/editing a specific admin's policy no longer happens
+        // here — see PATCH /role-assignments/{roleAssignment}/policy
+        // below, the one remaining place a policy is ever attached to an
+        // account. NOTE: GET (read) is intentionally NOT here — see
+        // below. Only create/edit/delete of a policy itself is
+        // Super-Admin-only.
         Route::post('policies',          [PolicyController::class, 'store']);
         Route::put('policies/{id}',      [PolicyController::class, 'update']);
         Route::delete('policies/{id}',   [PolicyController::class, 'destroy']);
 
         Route::get('audit-logs',         [AuditLogController::class, 'index']);
         Route::get('audit-logs/filters', [AuditLogController::class, 'filters']);
+
+        // Phase 3 — Audit Log Revamp: RIS-Only Security Events. Deliberately
+        // a separate table/controller from audit-logs above, not folded
+        // into it — see the plan doc's "Trade-off" section and
+        // create_security_events_table migration's docblock for the full
+        // reasoning (different volume, different retention, different
+        // consumer). Read-only: writes happen internally via
+        // SecurityEventLogger from LocalAuthService/AuthController, never
+        // through this controller.
+        Route::get('security-events',         [SecurityEventController::class, 'index']);
+        Route::get('security-events/filters', [SecurityEventController::class, 'filters']);
+
+        // Phase 2 — SuperAdmin Analytics Dashboard (system-level, not
+        // scoped to a single Registrar's request queue — see
+        // SuperAdminAnalyticsController's class docblock for how this
+        // differs from /analytics above). Named throttle segment
+        // ('system-analytics') so this group's counter doesn't get
+        // folded into the outer role:4 group's throttle:60,1 — see the
+        // verify-or route's comment elsewhere in this file for why an
+        // unnamed throttle stacked under an outer group shares its
+        // counter instead of getting its own bucket.
+        Route::prefix('system-analytics')->middleware('throttle:60,1,system-analytics')->group(function () {
+            Route::get('admin-roster-health',        [SuperAdminAnalyticsController::class, 'adminRosterHealth']);
+            Route::get('access-request-throughput',  [SuperAdminAnalyticsController::class, 'accessRequestThroughput']);
+            Route::get('cashier-verification-health', [SuperAdminAnalyticsController::class, 'cashierVerificationHealth']);
+        });
         Route::post('announcements',                      [AnnouncementController::class, 'store']);
         Route::put('announcements/{announcement}',        [AnnouncementController::class, 'update']);
         Route::delete('announcements/{announcement}',     [AnnouncementController::class, 'destroy']);
@@ -326,6 +396,13 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             Route::get('/',                          [RoleAssignmentController::class, 'index']);
             Route::post('/',                          [RoleAssignmentController::class, 'store']);
             Route::post('{roleAssignment}/revoke',    [RoleAssignmentController::class, 'revoke']);
+
+            // Work Item #2 — Admin Management Consolidation: edit the
+            // policy on an already-Active Admin grant in place, without
+            // a revoke/regrant cycle. This is now the ONLY endpoint that
+            // writes a policy onto an existing admin account — see
+            // RoleAssignmentService::editPolicy().
+            Route::patch('{roleAssignment}/policy',   [RoleAssignmentController::class, 'editPolicy']);
         });
     });
 });

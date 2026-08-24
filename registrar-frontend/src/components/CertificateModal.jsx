@@ -47,19 +47,6 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   }, []);
 
   useEffect(() => {
-    const headerElement = document.querySelector('header');
-    if (!headerElement) return;
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        setHeaderHeight(entry.target.offsetHeight);
-      }
-    });
-    resizeObserver.observe(headerElement);
-    return () => resizeObserver.disconnect();
-  }, []);
-
-  useEffect(() => {
     const t = setTimeout(() => setVisible(true), 10);
     const openingTimer = setTimeout(() => setOpening(false), 600);
     return () => {
@@ -70,6 +57,8 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
+    // Automatically collapse sidebar when Certificate Modal opens
+    window.dispatchEvent(new CustomEvent('collapse-sidebar', { detail: true }));
     return () => { document.body.style.overflow = ''; };
   }, []);
 

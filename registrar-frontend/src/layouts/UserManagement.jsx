@@ -24,28 +24,58 @@ import {
   updateSystemUser,
   deleteSystemUser,
   getPolicies,
-  attachUserPolicy,
   setLocalPassword
 } from "../services/api";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import { useTheme } from "../context/ThemeContext";
 import { UserTableSkeleton } from '../components/LoadingSkeleton';
-import PolicyModal from "../components/PolicyModal";
 import DashboardDropdown from "../components/DashboardDropdown.jsx";
 import { formatName } from "../utils/formatters";
 
 /**
- * UserManagement — User Management: Policy Attachment
+ * UserManagement — Admin Accounts
  * -----------------------------------------------------
- * "Policy attached" and "Access" columns show each admin's real,
- * server-persisted policy (users.policy_id — see PolicyService and
- * SystemUserController::attachPolicy()). The "Attach policy" modal
- * (PolicyModal) now saves through PATCH /system-users/{id}/policy
- * instead of localStorage.
+ * Work Item #2 — Admin Management Consolidation: role_assignments is
+ * the single source of truth for an admin's role + policy.
+ * users.policy_id (shown read-only in the "Policy attached" column) is
+ * a live read path for the common case of a session that never
+ * switched roles — see RoleAssignmentService::editPolicy()'s docblock
+ * on the backend for why that column still matters — but it is no
+ * longer directly editable from here. The "Manage Access" modal
+ * (PolicyModal / PATCH /system-users/{id}/policy) has been removed
+ * entirely; granting, revoking, and now editing a policy in place all
+ * happen through "Manage Roles" (RoleAssignmentsModal).
+ *
+ * Work Item #3 — Admin Accounts / Student Staff Visibility: this table
+ * now also lists accounts whose BASE identity (users.role_id) is
+ * Student/Alumni but who hold an active Admin-tier role_assignments
+ * grant on top of it — a "student staff" account. Every row therefore
+ * carries two distinct role concepts, both shown explicitly so a
+ * student-staff row is legible at a glance rather than looking like a
+ * data error:
+ *   - base identity   (user.base_role_id / base_role_name)  — who they
+ *     fundamentally are: a Student, Alumnus, Admin, or Super Admin.
+ *   - administrative role granted (user.admin_grant)         — the
+ *     Admin/Super Admin access they hold RIGHT NOW, which may be their
+ *     base identity itself (a classic admin) or a secondary grant on
+ *     top of a Student/Alumni base identity (admin_grant.is_secondary).
+ * See UserResource::resolveAdminGrant() on the backend for exactly how
+ * admin_grant is derived — it intentionally does NOT reuse
+ * user.policy_id, which is meaningless for a secondary grant.
+ *
+ * Only ACTIVE grants are ever included in this list at all (an expired
+ * or revoked-only administrative grant simply drops the row) — see
+ * SystemUserController::index()'s docblock for that design choice.
  */
 const ROLE_MAP     = { 3: "Admin", 4: "Super Admin" };
-const ROLE_FILTERS = ["All", "Admin", "Super Admin"];
+// Work Item #3: "Student Staff" filters on admin_grant.is_secondary
+// (a Student/Alumni base identity holding an administrative grant),
+// kept as its own category distinct from "Admin"/"Super Admin" (which
+// now match only accounts whose administrative grant IS their base
+// identity — i.e. the classic, non-student-staff case) so the three
+// options stay mutually exclusive and each means one specific thing.
+const ROLE_FILTERS = ["All", "Admin", "Super Admin", "Student Staff"];
 const DATE_OPTIONS = ["Newest", "Oldest"];
 const STATUS_FILTERS = ["All", "Activated", "Deactivated", "Pending Activation", "Expired"];
 const PER_PAGE = 7;
@@ -72,6 +102,19 @@ const getRoleBadgeClasses = (roleName, isDark) => {
   }
   return 'bg-[#8B0000]/10 text-[#8B0000] border-[#8B0000]/20';
 };
+
+// Work Item #3 — a neutral, deliberately different palette from
+// getRoleBadgeClasses() above: the Identity badge shows who someone
+// fundamentally IS (Student/Alumni/Admin/Super Admin), while the
+// Admin Role badge (still using getRoleBadgeClasses) shows the
+// administrative access they've been granted — these are visually
+// distinct so a "Student" identity badge next to an "Admin" role badge
+// reads as a student-staff account, not a data inconsistency.
+const getIdentityBadgeClasses = (isDark) => (
+  isDark
+    ? 'bg-[#2f3336] text-[#c7cad1] border-[#4a4d51]'
+    : 'bg-slate-100 text-slate-600 border-slate-200'
+);
 
 const getStatusBadgeClasses = (status, isDark) => {
   const normalized = String(status ?? "").trim().toLowerCase();
@@ -137,11 +180,6 @@ const UserManagement = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Manage Access states
-  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
-  const [selectedUserForAccess, setSelectedUserForAccess] = useState(null);
-  const [accessSubmitting, setAccessSubmitting] = useState(false);
-
   // Break-Glass (local auth) access states — Super Admin targets only,
   // enforced again server-side by SetLocalPasswordRequest.
   const [isLocalPasswordModalOpen, setIsLocalPasswordModalOpen] = useState(false);
@@ -154,17 +192,22 @@ const UserManagement = () => {
   // own fetch/grant/revoke lifecycle.
   const [selectedUserForRoles, setSelectedUserForRoles] = useState(null);
   const [isGrantPickerOpen, setIsGrantPickerOpen] = useState(false);
+  const [openedFromPicker, setOpenedFromPicker] = useState(false);
 
   // Policies come from the backend now (policies table via GET /policies).
   const [systemPolicies, setSystemPolicies] = useState([]);
 
   // -------------------------------------------------------
-  // Policy resolver — reads the real attachment straight off the
-  // user record (user.policy / user.policy_id), no more guessing.
+  // Policy resolver — Work Item #3: reads the policy that actually
+  // applies to this account's ADMINISTRATIVE access (user.admin_grant),
+  // not user.policy/user.policy_id — those reflect users.policy_id,
+  // which is never set for a student-staff account's secondary grant
+  // and would incorrectly show "No policy attached" for one. See
+  // UserResource::resolveAdminGrant() on the backend.
   // -------------------------------------------------------
   const getUserPolicy = useCallback((user) => {
-    if (user.role_id === 4) return "Full Access";
-    return user.policy?.name || "No policy attached";
+    if (user.admin_grant?.role_id === 4) return "Full Access";
+    return user.admin_grant?.policy?.name || "No policy attached";
   }, []);
 
   // -------------------------------------------------------
@@ -202,13 +245,21 @@ const UserManagement = () => {
   // -------------------------------------------------------
   const filtered = users
     .filter((u) => {
-      const roleName = ROLE_MAP[u.role_id] || "";
-      const fullName = [u.admin_profile?.first_name, u.admin_profile?.last_name].filter(Boolean).join(" ");
+      // Work Item #3: admin_grant.role_name drives both the badge and
+      // filtering now, not the raw (base-identity) role_id — for a
+      // student-staff row those are two different roles entirely.
+      const grantRoleName = ROLE_MAP[u.admin_grant?.role_id] || "";
+      const isSecondaryGrant = !!u.admin_grant?.is_secondary;
+      const identityName = u.base_role_name || "";
+      const fullName = formatName(u) || "";
       const matchSearch =
         u.email?.toLowerCase().includes(search.toLowerCase()) ||
-        roleName.toLowerCase().includes(search.toLowerCase()) ||
+        grantRoleName.toLowerCase().includes(search.toLowerCase()) ||
+        identityName.toLowerCase().includes(search.toLowerCase()) ||
         fullName.toLowerCase().includes(search.toLowerCase());
-      const matchRole   = roleFilter   === "All" || roleName  === roleFilter;
+      const matchRole =
+        roleFilter === "All" ||
+        (roleFilter === "Student Staff" ? isSecondaryGrant : (grantRoleName === roleFilter && !isSecondaryGrant));
       const matchStatus = statusFilter === "All" || u.status  === statusFilter;
       return matchSearch && matchRole && matchStatus;
     })
@@ -224,7 +275,7 @@ const UserManagement = () => {
 
   const handleFilterChange = () => setCurrentPage(1);
 
-    // -------------------------------------------------------
+  // -------------------------------------------------------
   // Create / Update
   // -------------------------------------------------------
   const handleSubmit = async (formData, userId) => {
@@ -270,42 +321,6 @@ const UserManagement = () => {
     if (safePage > 3 && safePage < totalPages - 2) pages.push(safePage);
     pages.push("...", totalPages - 1, totalPages);
     return [...new Set(pages)];
-  };
-
-  // -------------------------------------------------------
-  // Manage Access action handlers
-  // -------------------------------------------------------
-  const handleOpenAccess = (user) => {
-    setSelectedUserForAccess(user);
-    fetchPolicies();
-    setIsAccessModalOpen(true);
-  };
-
-  const handleSaveAccess = async (selectedPolicyName) => {
-    if (!selectedUserForAccess) return;
-    setAccessSubmitting(true);
-    setErrorMsg("");
-    try {
-      const policy = systemPolicies.find(p => p.name === selectedPolicyName);
-      const { data } = await attachUserPolicy(
-        selectedUserForAccess.user_id,
-        policy ? policy.policy_id : null
-      );
-      // attachPolicy() returns a single UserResource, which Laravel wraps
-      // in a `data` envelope by default — unwrap it (matches the
-      // res.data.data pattern used by fetchUsers/fetchPolicies above).
-      const updatedUser = data.data;
-
-      // Reflect the server response immediately without a full refetch.
-      setUsers(prev => prev.map(u => u.user_id === updatedUser.user_id ? updatedUser : u));
-
-      setSuccessMsg("Policy attached successfully.");
-      setIsAccessModalOpen(false);
-    } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Failed to attach policy.");
-    } finally {
-      setAccessSubmitting(false);
-    }
   };
 
   // -------------------------------------------------------
@@ -397,203 +412,230 @@ const UserManagement = () => {
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-190 text-sm">
-          <thead>
-            <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Name</th>
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Email</th>
-              
-              {/* Role Filter dropdown */}
-              <th className="px-4 py-3 text-center">
-                <DashboardDropdown
-                  isOpen={roleDropdownOpen}
-                  setIsOpen={setRoleDropdownOpen}
-                  dropdownRef={roleDropdownRef}
-                  align="center"
-                  trigger={
-                    <span className={roleFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
-                      Role
-                    </span>
-                  }
-                  sections={[
-                    {
-                      title: 'Filter by Role',
-                      items: ROLE_FILTERS.map(option => ({
-                        label: option,
-                        isSelected: roleFilter === option,
-                        onClick: () => {
-                          setRoleFilter(option);
-                          handleFilterChange();
-                        }
-                      }))
-                    }
-                  ]}
-                />
-              </th>
+            <thead>
+              <tr className={isDark ? 'border-b border-[#3e4042]' : 'border-b border-gray-100'}>
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Name</th>
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Email</th>
 
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Policy attached</th>
-              
-              {/* Joined Date Sort header */}
-              <th className="px-4 py-3 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDateOrder(prev => prev === 'Newest' ? 'Oldest' : 'Newest');
-                    handleFilterChange();
-                  }}
-                  className={`flex items-center justify-center gap-1 mx-auto text-xs uppercase font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}
-                >
-                  <span>Joined Date</span>
-                  {dateOrder === 'Newest' ? (
-                    <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
-                  ) : (
-                    <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" />
-                  )}
-                </button>
-              </th>
+                {/* Work Item #3: base identity — who this account fundamentally
+                  is, separate from the administrative role granted below. */}
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Identity</th>
 
-              {/* Status Filter dropdown */}
-              <th className="px-4 py-3 text-center">
-                <DashboardDropdown
-                  isOpen={statusDropdownOpen}
-                  setIsOpen={setStatusDropdownOpen}
-                  dropdownRef={statusDropdownRef}
-                  align="center"
-                  trigger={
-                    <span className={statusFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
-                      Status
-                    </span>
-                  }
-                  sections={[
-                    {
-                      title: 'Filter by Status',
-                      items: STATUS_FILTERS.map(option => ({
-                        label: option,
-                        isSelected: statusFilter === option,
-                        onClick: () => {
-                          setStatusFilter(option);
-                          handleFilterChange();
-                        }
-                      }))
-                    }
-                  ]}
-                />
-              </th>
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Access</th>
-              <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <UserTableSkeleton isDark={isDark} count={7} />            
-            ) : paginated.length === 0 ? (
-            <tr>
-                <td colSpan={8} className="py-24">
-                  <div className="flex flex-col items-center justify-center">
-                    <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
-                      <MagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
-                    </div>
-                    <h3 className={`text-base font-bold mb-1 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
-                      No Records Found
-                    </h3>
-                    <p className={`text-xs text-center max-w-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                      No data matches your current search or filter criteria.
-                    </p>
-                  </div>
-                </td>
-              </tr>            
-              ) : (
-              paginated.map((user) => {
-                const fullName = formatName(user.admin_profile) || "—";
-                const isSuperAdmin = user.role_id === 4;
-                const policy = getUserPolicy(user);
-
-                return (
-                  <tr key={user.user_id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
-                    <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
-                      {fullName}
-                    </td>
-                    <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
-                      {user.email}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(ROLE_MAP[user.role_id] || `Role ${user.role_id}`, isDark)}`}>
-                        {ROLE_MAP[user.role_id] || `Role ${user.role_id}`}
+                {/* Role Filter dropdown — filters on the administrative role
+                  GRANTED (admin_grant), not base identity. See ROLE_FILTERS. */}
+                <th className="px-4 py-3 text-center">
+                  <DashboardDropdown
+                    isOpen={roleDropdownOpen}
+                    setIsOpen={setRoleDropdownOpen}
+                    dropdownRef={roleDropdownRef}
+                    align="center"
+                    trigger={
+                      <span className={roleFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
+                        Admin Role
                       </span>
-                    </td>
-                    {/* Policy attached badge */}
-                    <td className="px-6 py-4 text-center">
-                      {isSuperAdmin ? (
-                        <span className={`text-[13px] font-semibold ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                          Full Access
-                        </span>
-                      ) : (
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
-                          user.policy_id
-                            ? (isDark ? 'bg-[#0f213d] text-[#5c93e6]' : 'bg-[#e0f2fe] text-[#0369a1]')
-                            : (isDark ? 'bg-[#3a3b3c] text-[#b0b3b8]' : 'bg-gray-100 text-gray-500')
-                          }`}>
-                            {policy}
-                       </span>
-                      )}
-                    </td>
-                    {/* Joined Date */}
-                    <td className={`px-4 py-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                      {formatDate(user.created_at)}
-                    </td>
-                    {/* Status */}
-                    <td className="px-6 py-4 text-center">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(user.status, isDark)}`}>
-                        {user.status}
+                    }
+                    sections={[
+                      {
+                        title: 'Filter by Admin Role',
+                        items: ROLE_FILTERS.map(option => ({
+                          label: option,
+                          isSelected: roleFilter === option,
+                          onClick: () => {
+                            setRoleFilter(option);
+                            handleFilterChange();
+                          }
+                        }))
+                      }
+                    ]}
+                  />
+                </th>
+
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Policy attached</th>
+
+                {/* Joined Date Sort header */}
+                <th className="px-4 py-3 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDateOrder(prev => prev === 'Newest' ? 'Oldest' : 'Newest');
+                      handleFilterChange();
+                    }}
+                    className={`flex items-center justify-center gap-1 mx-auto text-xs uppercase font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}
+                  >
+                    <span>Joined Date</span>
+                    {dateOrder === 'Newest' ? (
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
+                    ) : (
+                      <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" />
+                    )}
+                  </button>
+                </th>
+
+                {/* Account Status Filter dropdown — Work Item #3: labeled
+                  "Account Status" (not just "Status") to be explicit this is
+                  the account's login-eligibility status (Activated/
+                  Deactivated/...), distinct from the administrative grant's
+                  own Active/Expired/Revoked status shown on the Admin Role
+                  badge below. */}
+                <th className="px-4 py-3 text-center">
+                  <DashboardDropdown
+                    isOpen={statusDropdownOpen}
+                    setIsOpen={setStatusDropdownOpen}
+                    dropdownRef={statusDropdownRef}
+                    align="center"
+                    trigger={
+                      <span className={statusFilter !== 'All' ? (isDark ? 'text-yellow-400' : 'text-[#8b0000]') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
+                        Account Status
                       </span>
-                    </td>
-                  {/* Access Column */}
-                    <td className="px-6 py-4 text-center">
-                      {isSuperAdmin ? (
-                        <span className={`text-xs font-semibold ${isDark ? 'text-[#8c8a85]' : 'text-gray-400'}`}>
-                          Not editable
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleOpenAccess(user)}
-                          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer whitespace-nowrap ${
-                            isDark 
-                              ? 'border-gray-600 hover:bg-white/10 text-white' 
-                              : 'border-gray-350 hover:bg-gray-50 bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          Manage Access
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 justify-center">
-                        {isSuperAdmin && (
-                          <button
-                            onClick={() => handleOpenLocalAuth(user)}
-                            title="Enable break-glass access"
-                            className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
-                            <KeyIcon className="w-4 h-4" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setSelectedUserForRoles(user)}
-                          title="Manage roles"
-                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
-                          <IdentificationIcon className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => { setEditUser(user); setIsModalOpen(true); }}
-                          className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
-                          <PencilSquareIcon className="w-4 h-4" />
-                        </button>
+                    }
+                    sections={[
+                      {
+                        title: 'Filter by Status',
+                        items: STATUS_FILTERS.map(option => ({
+                          label: option,
+                          isSelected: statusFilter === option,
+                          onClick: () => {
+                            setStatusFilter(option);
+                            handleFilterChange();
+                          }
+                        }))
+                      }
+                    ]}
+                  />
+                </th>
+                <th className={`px-4 py-3 text-center font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <UserTableSkeleton isDark={isDark} count={7} />
+              ) : paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-24">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className={`w-20 h-20 mb-4 flex items-center justify-center rounded-full ${isDark ? 'bg-[#3a3b3c]/40' : 'bg-gray-100'}`}>
+                        <MagnifyingGlassIcon className={`w-10 h-10 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
                       </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                      <h3 className={`text-base font-bold mb-1 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                        No Records Found
+                      </h3>
+                      <p className={`text-xs text-center max-w-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                        No data matches your current search or filter criteria.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((user) => {
+                  // Work Item #3: formatName(user) resolves across
+                  // admin_profile / student_profile / alumni_profile
+                  // automatically (see utils/formatters.js) — needed now
+                  // that rows can be a Student or Alumni base identity,
+                  // not just an Admin.
+                  const fullName = formatName(user) || "—";
+                  // Break-glass eligibility is tied to the account's own,
+                  // PRIMARY Super Admin identity — mirrors
+                  // SetLocalPasswordRequest's server-side check on the
+                  // target's raw role_id, not any secondary grant.
+                  const isBaseSuperAdmin = user.base_role_id === 4;
+                  const grantRoleName = ROLE_MAP[user.admin_grant?.role_id] || `Role ${user.admin_grant?.role_id ?? "—"}`;
+                  const isStudentStaff = !!user.admin_grant?.is_secondary;
+                  const policy = getUserPolicy(user);
+
+                  return (
+                    <tr key={user.user_id} className={`border-b text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-50 hover:bg-gray-50'}`}>
+                      <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                        {fullName}
+                      </td>
+                      <td className={`px-4 py-3 ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                        {user.email}
+                      </td>
+                      {/* Base identity badge — who this account fundamentally
+                        is (Student/Alumni/Admin/Super Admin). */}
+                      <td className="px-4 py-3">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap capitalize ${getIdentityBadgeClasses(isDark)}`}>
+                          {user.base_role_name || `Role ${user.base_role_id}`}
+                        </span>
+                      </td>
+                      {/* Administrative role granted, with a "Student Staff"
+                        tag when it's a secondary grant on a non-admin base
+                        identity — the core legibility requirement here. */}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(grantRoleName, isDark)}`}>
+                            {grantRoleName}
+                          </span>
+                          {isStudentStaff && (
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap ${
+                              isDark
+                                ? 'bg-[#8B0000]/20 text-[#ffb3b3] border-[#8B0000]/30'
+                                : 'bg-[#8B0000]/10 text-[#8B0000] border-[#8B0000]/20'
+                            }`}>
+                              Student Staff
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {/* Policy in effect for the administrative grant above —
+                        NOT the same as base identity, see getUserPolicy(). */}
+                      <td className="px-6 py-4 text-center">
+                        {user.admin_grant?.role_id === 4 ? (
+                          <span className={`text-[13px] font-semibold ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                            Full Access
+                          </span>
+                        ) : (
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${user.admin_grant?.policy
+                              ? (isDark ? 'bg-[#0f213d] text-[#5c93e6] border-[#1e3a66]' : 'bg-[#e0f2fe] text-[#0369a1] border-[#bae6fd]')
+                              : (isDark ? 'bg-[#3a3b3c] text-[#b0b3b8] border-[#4e4f50]' : 'bg-gray-100 text-gray-500 border-gray-200')
+                            }`}>
+                            {policy}
+                          </span>
+                        )}
+                      </td>
+                      {/* Joined Date */}
+                      <td className={`px-4 py-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                        {formatDate(user.created_at)}
+                      </td>
+                      {/* Account status — login-eligibility (Activated/
+                        Deactivated/...), intentionally separate from the
+                        Admin Role badge's own grant status above. */}
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusBadgeClasses(user.status, isDark)}`}>
+                          {user.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 justify-center">
+                          {isBaseSuperAdmin && (
+                            <button
+                              onClick={() => handleOpenLocalAuth(user)}
+                              title="Enable break-glass access"
+                              className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
+                              <KeyIcon className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedUserForRoles(user);
+                              setOpenedFromPicker(false);
+                            }}
+                            title="Manage roles"
+                            className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
+                            <IdentificationIcon className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => { setEditUser(user); setIsModalOpen(true); }}
+                            className={`p-1 transition-colors ${isDark ? 'text-[#9a9a9a] hover:text-white' : 'text-gray-400 hover:text-pup-dark-maroon'}`}>
+                            <PencilSquareIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Pagination */}
         <div className={`flex items-center justify-center gap-1 px-4 py-4 border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
@@ -635,16 +677,6 @@ const UserManagement = () => {
         type="danger"
       />
 
-      <PolicyModal
-        isOpen={isAccessModalOpen}
-        onClose={() => setIsAccessModalOpen(false)}
-        onSave={handleSaveAccess}
-        user={selectedUserForAccess}
-        systemPolicies={systemPolicies}
-        currentPolicy={selectedUserForAccess ? getUserPolicy(selectedUserForAccess) : ""}
-        submitting={accessSubmitting}
-      />
-
       <LocalPasswordModal
         isOpen={isLocalPasswordModalOpen}
         onClose={() => { setIsLocalPasswordModalOpen(false); setSelectedUserForLocalAuth(null); }}
@@ -655,7 +687,18 @@ const UserManagement = () => {
 
       <RoleAssignmentsModal
         isOpen={!!selectedUserForRoles}
-        onClose={() => setSelectedUserForRoles(null)}
+        onClose={() => {
+          setSelectedUserForRoles(null);
+          setOpenedFromPicker(false);
+        }}
+        onBack={
+          openedFromPicker
+            ? () => {
+              setSelectedUserForRoles(null);
+              setIsGrantPickerOpen(true);
+            }
+            : undefined
+        }
         user={selectedUserForRoles}
         systemPolicies={systemPolicies}
         onSuccess={setSuccessMsg}
@@ -668,17 +711,18 @@ const UserManagement = () => {
         onSelect={(pickedUser) => {
           setIsGrantPickerOpen(false);
           setSelectedUserForRoles(pickedUser);
+          setOpenedFromPicker(true);
         }}
       />
 
-      <SuccessToast 
-        message={successMsg} 
-        onClose={() => setSuccessMsg("")} 
+      <SuccessToast
+        message={successMsg}
+        onClose={() => setSuccessMsg("")}
       />
 
-      <ErrorToast 
-        message={errorMsg} 
-        onClose={() => setErrorMsg("")} 
+      <ErrorToast
+        message={errorMsg}
+        onClose={() => setErrorMsg("")}
       />
     </div>
   );

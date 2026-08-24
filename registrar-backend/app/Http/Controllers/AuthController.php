@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Services\AuditLogger;
 use App\Services\LocalAuthService;
 use App\Services\RoleAssignmentService;
+use App\Services\SecurityEventLogger;
 use App\Services\Sso\SsoAuthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,9 @@ use Illuminate\Support\Facades\Log;
  *   2. If the IDP is unreachable (IdpUnavailableException), automatically
  *      retry with LocalAuthService and tag the response with
  *      X-Auth-Method: local so the frontend can show an advisory banner.
+ *      This is also recorded to security_events (Phase 3d) — the IDP has
+ *      no way to log "I was down" itself, so RIS is the only place this
+ *      event can ever be captured.
  *   3. If the IDP rejects the credentials (wrong password), return 401
  *      immediately — do NOT fall through to local auth (would allow IDP
  *      password bypass).
@@ -40,6 +44,7 @@ class AuthController extends Controller
         private LocalAuthService $localAuth,
         private AuditLogger     $auditLogger,
         private RoleAssignmentService $roleAssignmentService,
+        private SecurityEventLogger $securityEvents,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -90,6 +95,13 @@ class AuthController extends Controller
                 'email' => $email,
                 'error' => $e->getMessage(),
             ]);
+
+            // Phase 3d: this can ONLY ever be known RIS-side — the IDP has
+            // no way to log "I was down" itself. Recorded regardless of
+            // whether the local-auth fallback below then succeeds or
+            // fails, since "the IDP was unreachable" is the event of
+            // interest here, independent of the fallback's outcome.
+            $this->securityEvents->recordIdpUnreachable($email, $request, $e->getMessage());
         } catch (IdpException $e) {
             // IDP responded but rejected the credentials — do NOT fall back.
             return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 401);
@@ -100,7 +112,7 @@ class AuthController extends Controller
 
         // ── Step 2: IDP was unreachable — try local auth ─────────────────────
         try {
-            $user = $this->localAuth->attempt($email, $password);
+            $user = $this->localAuth->attempt($email, $password, $request);
         } catch (\RuntimeException $e) {
             $code = $e->getCode() ?: 401;
             return response()->json([

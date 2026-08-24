@@ -3,23 +3,26 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\IdpException;
-use App\Exceptions\PolicyException;
-use App\Http\Requests\SystemUser\AttachSystemUserPolicyRequest;
 use App\Http\Requests\SystemUser\StoreSystemUserRequest;
 use App\Http\Requests\SystemUser\UpdateSystemUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\SystemUser;
 use App\Services\AdminUserService;
-use App\Services\PolicyService;
 use Illuminate\Http\Request;
 
 /**
  * System user management controller (admin / superadmin accounts only).
  *
  * Delegates all IdP + DB + audit-log coordination to AdminUserService.
- * Policy attachment (User Management → "Manage Access") is delegated to
- * PolicyService, since it's a distinct concern from the account lifecycle
- * AdminUserService owns.
+ *
+ * Work Item #2 — Admin Management Consolidation: this controller no
+ * longer attaches policies to an account (the retired "Manage Access"
+ * modal's PATCH /system-users/{id}/policy endpoint is gone) and update()
+ * no longer accepts role_id (the retired "Edit User" Role dropdown).
+ * role_assignments (via RoleAssignmentController/RoleAssignmentService)
+ * is now the single place both a policy and a role are ever granted or
+ * changed — see UpdateSystemUserRequest and AdminUserService::update()
+ * for the corresponding validation/handling removal.
  *
  * Validation now lives in App\Http\Requests\SystemUser\* (see rules() in
  * each). Authorization now lives in SystemUserPolicy — the inline
@@ -36,18 +39,71 @@ class SystemUserController extends Controller
 
     public function __construct(
         private AdminUserService $adminUserService,
-        private PolicyService $policyService,
     ) {}
 
     // -------------------------------------------------------------------------
     // GET /system-users
+    //
+    // Work Item #3 — Admin Accounts / Student Staff Visibility: this used to
+    // list only accounts whose PRIMARY role (users.role_id) is Admin/Super
+    // Admin. That missed the entire "student staff" case Work Item #2's
+    // role_assignments consolidation was built for — a Student who has been
+    // granted an Admin-tier role_assignment on top of their base identity
+    // never showed up here at all, even though they hold real administrative
+    // access right now.
+    //
+    // A user is included if EITHER:
+    //   1. Their primary role is Admin/Super Admin (unchanged from before —
+    //      this is what keeps existing Registrar Staff / Super Admin rows
+    //      displaying exactly as they did previously, regardless of that
+    //      account's current role_assignments state), OR
+    //   2. They currently hold at least one ACTIVE (not expired, not
+    //      revoked — see SystemUser::activeRoleAssignments()) Admin-tier
+    //      role_assignments row on top of a non-admin base identity.
+    //
+    // An EXPIRED or REVOKED-only administrative grant does not qualify —
+    // that account simply drops back out of this list, the same as it would
+    // have shown no administrative access at all before this grant existed.
+    // This is a deliberate reading of the work item's "Target end state"
+    // wording ("any user with an active ... role_assignments row"); if the
+    // product preference is instead to keep such a row visible but marked
+    // Expired, that's a small follow-up change to this query + the frontend
+    // badge, not a redesign.
+    //
+    // See UserResource::resolveAdminGrant() for how each row's actual
+    // granted role + policy is derived from this — for a secondary grant,
+    // that is NOT the same thing as this account's raw role_id/policy_id.
     // -------------------------------------------------------------------------
     public function index()
     {
         $this->authorize('viewAny', SystemUser::class);
 
-        $users = SystemUser::whereIn('role_id', self::MANAGEABLE_ROLES)
-            ->with(['adminProfile', 'policy'])
+        $adminTier = self::MANAGEABLE_ROLES;
+
+        $users = SystemUser::query()
+            ->where(function ($query) use ($adminTier) {
+                $query->whereIn('role_id', $adminTier)
+                    ->orWhereHas('activeRoleAssignments', function ($q) use ($adminTier) {
+                        $q->whereIn('role_id', $adminTier);
+                    });
+            })
+            ->with([
+                'adminProfile',
+                // Loaded for every row (not just Students/Alumni) so a
+                // "student staff" row's base identity can be displayed —
+                // whenLoaded() in UserResource simply returns null for
+                // rows where the relation doesn't apply.
+                'studentProfile',
+                'alumniProfile',
+                'policy',
+                // Only the administrative rows matter for this listing's
+                // "role granted" / "policy in effect" columns — constrained
+                // to admin-tier here so a student staff account's OWN
+                // baseline Student row doesn't get mixed in.
+                'activeRoleAssignments' => function ($q) use ($adminTier) {
+                    $q->whereIn('role_id', $adminTier)->with('policy');
+                },
+            ])
             ->paginate(20);
 
         return UserResource::collection($users);
@@ -130,35 +186,6 @@ class SystemUserController extends Controller
         // transaction, which drops any previously loaded relations — same
         // reason store() reloads them before building its resource.
         $user->load(['adminProfile', 'policy']);
-
-        return new UserResource($user);
-    }
-
-    // -------------------------------------------------------------------------
-    // PATCH /system-users/{id}/policy
-    //
-    // Attaches (or detaches, when policy_id is null) a permissions policy
-    // to a single admin account. This is the server-side counterpart of
-    // UserManagement.jsx's "Manage Access" → PolicyModal "Attach policy"
-    // flow, which previously only wrote to localStorage.
-    // -------------------------------------------------------------------------
-    public function attachPolicy(AttachSystemUserPolicyRequest $request, $id)
-    {
-        $user = SystemUser::find($id);
-
-        if (!$user) {
-            return response()->json(['message' => 'User not found'], 404);
-        }
-
-        $this->authorize('attachPolicy', $user);
-
-        $validated = $request->validated();
-
-        try {
-            $user = $this->policyService->attachToUser($user, $validated['policy_id'] ?? null, $request);
-        } catch (PolicyException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
 
         return new UserResource($user);
     }

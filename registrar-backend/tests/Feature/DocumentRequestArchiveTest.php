@@ -16,6 +16,12 @@ uses(RefreshDatabase::class);
 function drMakeUser(int $roleId): SystemUser
 {
     $user = SystemUser::factory()->create(['role_id' => $roleId, 'status' => 'Activated']);
+
+    // See tests/Pest.php::grantFullDashboardAccess() — show() is gated by
+    // module:dashboard,View, and a plain admin has zero dashboard access
+    // without an attached policy since Work Item #1.
+    grantFullDashboardAccess($user);
+
     Sanctum::actingAs($user);
     return $user;
 }
@@ -49,7 +55,13 @@ test('admin can delete a document request', function () {
          ->assertOk()
          ->assertJson(['message' => 'Request deleted successfully']);
 
-    $this->assertDatabaseMissing('document_request', ['request_id' => $docReq->request_id]);
+    // destroy() is a soft delete (see DocumentRequestController::destroy):
+    // request_document/request_history carry RESTRICT (not CASCADE) foreign
+    // keys back to document_request, so a real force-delete would fail on
+    // any request that has at least one associated document/history row.
+    // The row therefore still exists with deleted_at stamped, and is
+    // excluded from normal queries by the model's SoftDeletes global scope.
+    $this->assertSoftDeleted('document_request', ['request_id' => $docReq->request_id]);
 });
 
 // NOTE: destroy()'s 409 FK-violation branch isn't exercised here — same

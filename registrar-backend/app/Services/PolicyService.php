@@ -79,16 +79,59 @@ class PolicyService
 
     /**
      * Drop any module key that isn't in Policy::MODULE_KEYS before
-     * persisting. The store()/update() request validation only checks
-     * shape ("is this an array of arrays"), not the key names — this
-     * is what actually keeps `permissions` limited to modules the
-     * EnsureModuleAccess middleware (and the frontend) know how to
-     * enforce, so a typo'd or malicious key can never silently create
-     * an ungated "module".
+     * persisting, then drop any ACTION token within a module that
+     * isn't one that module actually recognizes. The store()/update()
+     * request validation only checks shape ("is this an array of
+     * arrays"), not the key or token names — this is what actually
+     * keeps `permissions` limited to what EnsureModuleAccess (and the
+     * frontend) know how to enforce, so a typo'd/malicious module key
+     * OR action token can never silently create an ungated permission.
+     *
+     * Work Item #1 — Granular Per-Action Permissions: modules listed in
+     * Policy::MODULE_ACTIONS (currently 'dashboard', 'logbook') may
+     * grant any subset of that module's own action list, e.g.
+     * `{"dashboard": ["View", "Complete"]}`. Every other module keeps
+     * the original single-token behavior — its only valid granted
+     * value is `["Access"]`; anything else in that array (a stray
+     * 'Process' typed in by hand via a raw API call, for instance) is
+     * silently dropped rather than persisted. Policy::actionsFor() is
+     * the single source of truth both branches read from, so a module
+     * only ever needs to be added to MODULE_ACTIONS once for both this
+     * sanitizer and SystemUser::hasModuleAccess() to recognize it.
      */
     private function sanitizePermissions(array $permissions): array
     {
-        return array_intersect_key($permissions, array_flip(Policy::MODULE_KEYS));
+        $permissions = array_intersect_key($permissions, array_flip(Policy::MODULE_KEYS));
+
+        $sanitized = [];
+
+        foreach ($permissions as $module => $actions) {
+            $actions = is_array($actions) ? $actions : [];
+            $actions = array_values(array_intersect(
+                array_unique($actions),
+                Policy::actionsFor($module)
+            ));
+
+            // View-dependency guard: for any module whose action
+            // vocabulary includes 'View' (currently 'dashboard',
+            // 'logbook'), granting any OTHER action implies View — you
+            // can't coherently act on something you're not granted to
+            // see. PolicyManagement.jsx already enforces this
+            // client-side (checking Process/Complete auto-checks View;
+            // unchecking View clears them), but that's UI-only — a raw
+            // POST/PUT /policies call bypassed it, letting a policy
+            // persist as e.g. dashboard => ['Process'] with no View.
+            // Backfilling View here (rather than rejecting the
+            // request) mirrors how the frontend already resolves the
+            // same conflict, so this stays a pure sanitizer.
+            if (!empty($actions) && in_array('View', Policy::actionsFor($module), true) && !in_array('View', $actions, true)) {
+                $actions[] = 'View';
+            }
+
+            $sanitized[$module] = $actions;
+        }
+
+        return $sanitized;
     }
 
     /**
@@ -117,11 +160,20 @@ class PolicyService
 
     /**
      * Whether $policy is currently attached to anyone — either as an
-     * admin's primary policy_id (SystemUser) or via a live grant
-     * (RoleAssignment). Mirrors the two places attachToUser() writes
-     * policy_id to, so "in use" here means the same thing it means there.
-     * Revoked/expired RoleAssignment rows are historical and intentionally
-     * excluded — they don't grant this policy to anyone right now.
+     * admin's primary policy_id (SystemUser, still meaningful for
+     * legacy/creation-time data — see the deprecation note on
+     * users.policy_id in database/migrations/2026_08_23_000000_
+     * deprecate_users_policy_id_column.php) or via a live grant
+     * (RoleAssignment). Revoked/expired RoleAssignment rows are
+     * historical and intentionally excluded — they don't grant this
+     * policy to anyone right now.
+     *
+     * Work Item #2 — Admin Management Consolidation: the only remaining
+     * WRITE path for users.policy_id is admin account creation
+     * (AdminUserService::create()) and RoleAssignmentService::editPolicy()'s
+     * baseline-row mirror — this method still has to READ it, since a
+     * newly created admin can hold a policy there before their first
+     * login ever creates a matching role_assignments row.
      */
     private function isInUse(Policy $policy): bool
     {
@@ -132,51 +184,5 @@ class PolicyService
             ->exists();
 
         return $hasPrimaryHolders || $hasActiveAssignments;
-    }
-
-    // -------------------------------------------------------------------------
-    // Attach / detach — the actual "policy attachment" action for admins
-    // -------------------------------------------------------------------------
-
-    /**
-     * @throws PolicyException if $user is not an admin (role_id = 3).
-     */
-    public function attachToUser(SystemUser $user, ?int $policyId, Request $request): SystemUser
-    {
-        if ($user->role_id !== SystemUser::ROLE_ADMIN) {
-            throw new PolicyException(
-                'Policies can only be attached to admin accounts. Super admins have full access by default.'
-            );
-        }
-
-        return DB::transaction(function () use ($user, $policyId, $request) {
-            $user->update(['policy_id' => $policyId]);
-
-            // Keep this user's Active Admin role_assignments row (their
-            // baseline row — see UserProvisioningService::
-            // ensureBaselineRoleAssignment()) in sync with the raw
-            // column we just changed. assumedPolicyId() reads a
-            // role_assignments row's OWN policy_id whenever a session
-            // has switched into that role (Step 3), not the raw column
-            // — so for a student-staff account currently assumed as
-            // Admin, leaving this row stale would silently keep
-            // enforcing the OLD policy for that live session until they
-            // switch away and back. This UI/method only ever targets an
-            // account whose PRIMARY role is Admin (see the guard above),
-            // so `role_id = ROLE_ADMIN` here is unambiguous — it is that
-            // same account's own baseline row, not some other grant.
-            RoleAssignment::where('user_id', $user->user_id)
-                ->where('role_id', SystemUser::ROLE_ADMIN)
-                ->active()
-                ->update(['policy_id' => $policyId]);
-
-            $this->auditLogger->log(
-                $request,
-                $request->user(),
-                $policyId ? AuditLog::ACTION_POLICY_ATTACHED : AuditLog::ACTION_POLICY_DETACHED
-            );
-
-            return $user->fresh()->load(['adminProfile', 'policy']);
-        });
     }
 }

@@ -124,6 +124,19 @@ class DatabaseSeeder extends Seeder
     // 2026_08_03_000005_seed_zero_access_default_policy migration so a
     // fresh `migrate:fresh --seed` and a plain `db:seed` against an
     // already-migrated database both end up in the same state.
+    //
+    // Work Item #1 — Granular Per-Action Permissions: dashboard/logbook
+    // below are seeded directly in the new granular shape (see
+    // App\Models\Policy::MODULE_ACTIONS) rather than the legacy single
+    // "Access" token. This matters specifically for `migrate:fresh
+    // --seed`: migrations run BEFORE seeders, so the
+    // 2026_08_22_000000_convert_dashboard_logbook_to_granular_actions
+    // migration would run against an empty policies table and have
+    // nothing to convert — if this seeder still inserted the legacy
+    // shape afterward, a fresh install would end up back on "Access"
+    // with no later step to fix it. Seeding the target shape directly
+    // here is what keeps a fresh install and an already-migrated
+    // production DB converging on the same final state.
     // ─────────────────────────────────────────────
     private function seedPolicies(): void
     {
@@ -133,10 +146,10 @@ class DatabaseSeeder extends Seeder
                 'name'        => 'Registrar Staff',
                 'permissions' => json_encode([
                     'inbox'      => ['Access'],
-                    'logbook'    => ['Access'],
+                    'logbook'    => ['View', 'Export'],
                     'profile'    => ['Access'],
                     'analytics'  => ['Access'],
-                    'dashboard'  => ['Access'],
+                    'dashboard'  => ['View', 'Process', 'Complete'],
                 ]),
                 'is_system'   => 1,
                 'created_at'  => now(),
@@ -494,6 +507,21 @@ class DatabaseSeeder extends Seeder
                 'trigger_event'        => 'access_request_submitted',
                 'title'                => 'New Access Request',
                 'message_template'     => 'A new access request for :target_email has been submitted and is awaiting your review.',
+                'audience'             => NotificationAudienceEnum::SuperAdmin->value,
+                'is_active'            => 1,
+            ],
+            [
+                // Phase 3e — fires when SecurityEventLogger sees N failed
+                // local-auth attempts against one email within the
+                // configured window (config/security_events.php). Sent via
+                // sendToAllExcept([STUDENT, ALUMNI], ...) — same audience
+                // as notification_type_id 20 (local_auth_login_used) —
+                // since a burst of failed break-glass attempts is exactly
+                // as relevant to Admin + Super Admin as a successful one.
+                'notification_type_id' => 23,
+                'trigger_event'        => 'security_alert_failed_login_burst',
+                'title'                => 'Repeated Failed Login Attempts',
+                'message_template'     => ':attempt_count failed local-auth attempts for :email in the last :window_minutes minutes — verify this was expected.',
                 'audience'             => NotificationAudienceEnum::SuperAdmin->value,
                 'is_active'            => 1,
             ],

@@ -9,7 +9,9 @@ use App\Models\SystemUser;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Contracts\NotificationServiceInterface;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Encapsulates all business logic for document requests.
@@ -137,7 +139,21 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      */
     public function updateRequest(DocumentRequest $documentRequest, array $validated): DocumentRequest
     {
-        return DB::transaction(function () use ($documentRequest, $validated) {
+        // BUG FIX (RIS-PROCESS-BUGS #9 — "Omission of Completed Documents
+        // in Staff Performance Analytics"): every analytics endpoint
+        // (AnalyticsController) is cached for 10 minutes under the
+        // "analytics" cache tag, so a document that just got marked
+        // Completed (or moved through any other status) doesn't show up
+        // in the Staff Performance / overview / volume charts until that
+        // cache entry naturally expires — which reads as "the dashboard
+        // omitted it" if you check within that window. $statusChanged is
+        // set inside the transaction below and read after it commits, so
+        // the flush below only fires once per actual status transition,
+        // and only after that transition is durably committed (never for
+        // a transaction that later rolls back).
+        $statusChanged = false;
+
+        $documentRequest = DB::transaction(function () use ($documentRequest, $validated, &$statusChanged) {
             // Re-fetch with a row-level lock so concurrent admin updates
             // cannot race: the second request will block here until the
             // first transaction commits, then re-read the committed state.
@@ -200,6 +216,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             }
 
             // Enforce allowed status transitions (see RequestStatusEnum::allowedTransitions).
+            $targetStatus = null;
             if (isset($validated['status_id'])) {
                 $currentStatus = RequestStatusEnum::from((int) $oldStatusId);
                 $targetStatus  = RequestStatusEnum::from((int) $validated['status_id']);
@@ -208,11 +225,27 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                 }
             }
 
+            // Work Item #1 — Granular Per-Action Permissions: the FINE
+            // gate. PUT /document-requests/{id} is one endpoint that
+            // handles every status transition, so the coarse route/
+            // policy gate above (DocumentRequestPolicy::update()) can
+            // only confirm the actor has SOME dashboard write action —
+            // it cannot tell "Process" from "Complete" apart, because
+            // that depends on the target status_id, which is only known
+            // here, after the transition itself has been validated as
+            // legal. This is the check that actually stops a Student
+            // Staff account (dashboard: [View, Complete]) from setting
+            // ReadyToClaim/PendingSignature/Forfeited or editing
+            // or_number/receipt_date, even via a direct, manually
+            // crafted API call that never touches the UI.
+            $this->authorizeStatusChange($validated, $targetStatus);
+
             $documentRequest->update($validated);
 
             if (isset($validated['status_id']) && (int) $validated['status_id'] !== (int) $oldStatusId) {
                 $this->recordStatusHistory($documentRequest, $oldStatusId);
                 $this->notifyOwnerOfStatusChange($documentRequest);
+                $statusChanged = true;
             }
 
             if (
@@ -229,6 +262,48 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
             return $documentRequest;
         }); // end DB::transaction
+
+        // See BUG FIX comment above updateRequest()'s signature. Runs
+        // AFTER the transaction has committed — never inside it, so a
+        // Redis hiccup can't roll back an otherwise-successful status
+        // change, and so a transaction that ends up rolling back never
+        // triggers a needless flush.
+        if ($statusChanged) {
+            $this->flushAnalyticsCache();
+        }
+
+        return $documentRequest;
+    }
+
+    /**
+     * Invalidates every cached analytics response (AnalyticsController,
+     * 10-minute TTL) so a status change is reflected on the next request
+     * instead of waiting out the cache window. See updateRequest()'s
+     * BUG FIX comment (RIS-PROCESS-BUGS #9) for why this exists.
+     *
+     * Cache::tags() requires a taggable store (Redis — see
+     * AnalyticsController's docblock; it does NOT work with the "file"
+     * driver). Guarded with an instanceof check plus a try/catch so a
+     * misconfigured or momentarily-unavailable cache backend degrades to
+     * "analytics are stale for up to 10 minutes, as before" rather than
+     * failing the document-status update itself — the cache is a
+     * performance optimization, not a source of truth, so it must never
+     * be allowed to break the actual business transaction it's
+     * piggybacking on.
+     */
+    private function flushAnalyticsCache(): void
+    {
+        try {
+            $store = Cache::getStore();
+
+            if ($store instanceof \Illuminate\Cache\TaggableStore) {
+                Cache::tags(['analytics'])->flush();
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to flush analytics cache after a document request status change.', [
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -441,6 +516,87 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         }
 
         abort(403, 'Unauthorized role.');
+    }
+
+    /**
+     * Work Item #1 — Granular Per-Action Permissions: the fine gate for
+     * PUT /document-requests/{id}, called from updateRequest() after
+     * the transition itself has already been validated as legal.
+     *
+     * Resolves which dashboard action(s) this specific call actually
+     * requires (see requiredDashboardActions()) and aborts with 403 if
+     * the acting admin's policy doesn't grant every one of them.
+     *
+     * Reads the actor off Auth::user() rather than taking a parameter —
+     * matches recordStatusHistory()'s existing Auth::id() usage in this
+     * same class, and keeps this method callable from claimRequest()'s
+     * call into updateRequest() without changing either method's
+     * public signature.
+     *
+     * Deliberately permissive for non-admin/non-SystemUser actors
+     * (console commands, the automated shredder's direct DB writes,
+     * etc.) — those either bypass this service entirely or are already
+     * gated by isStaff()/role middleware upstream. SystemUser::
+     * hasModuleAccess() itself already returns true unconditionally for
+     * super admins and for any non-admin role, so in practice this only
+     * ever restricts an ADMIN whose policy is missing the specific
+     * action a given call needs.
+     */
+    private function authorizeStatusChange(array $validated, ?RequestStatusEnum $targetStatus): void
+    {
+        $actor = Auth::user();
+
+        if (!$actor instanceof SystemUser) {
+            return;
+        }
+
+        foreach ($this->requiredDashboardActions($validated, $targetStatus) as $action) {
+            if (!$actor->hasModuleAccess('dashboard', $action)) {
+                abort(403, "Your account's assigned policy does not grant the '{$action}' action on the dashboard module.");
+            }
+        }
+    }
+
+    /**
+     * Which dashboard action(s) this update() call requires, based on
+     * what's actually in $validated — per the Work Item #1 spec:
+     *
+     *   target = Completed                                  -> Complete
+     *   target = ReadyToClaim | PendingSignature | Forfeited -> Process
+     *   or_number / receipt_date changing (any status)       -> Process
+     *
+     * Both checks apply independently and accumulate: a single call
+     * that both completes the request AND edits or_number requires
+     * BOTH 'Complete' and 'Process' — a Student Staff account (which
+     * only ever has 'Complete') is correctly blocked from smuggling a
+     * metadata edit in alongside a status change it's otherwise allowed
+     * to make. A call with no status_id and no or_number/receipt_date
+     * change (i.e. nothing this policy gates) requires nothing here.
+     *
+     * @return array<string> distinct action tokens, possibly empty
+     */
+    private function requiredDashboardActions(array $validated, ?RequestStatusEnum $targetStatus): array
+    {
+        $required = [];
+
+        if ($targetStatus !== null) {
+            $required[] = match ($targetStatus) {
+                RequestStatusEnum::Completed => 'Complete',
+                // ReadyToClaim, PendingSignature, Forfeited all require
+                // Process. Processing/Cancelled are unreachable at this
+                // point (allowedTransitions() already aborted on an
+                // illegal transition before this runs) — Process is
+                // still the safe default for them since it's the more
+                // restrictive of the two dashboard write actions.
+                default => 'Process',
+            };
+        }
+
+        if (array_key_exists('or_number', $validated) || array_key_exists('receipt_date', $validated)) {
+            $required[] = 'Process';
+        }
+
+        return array_values(array_unique($required));
     }
 
     private function recordStatusHistory(DocumentRequest $documentRequest, int $oldStatusId): void
