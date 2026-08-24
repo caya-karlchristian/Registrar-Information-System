@@ -47,19 +47,6 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   }, []);
 
   useEffect(() => {
-    const headerElement = document.querySelector('header');
-    if (!headerElement) return;
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        setHeaderHeight(entry.target.offsetHeight);
-      }
-    });
-    resizeObserver.observe(headerElement);
-    return () => resizeObserver.disconnect();
-  }, []);
-
-  useEffect(() => {
     const t = setTimeout(() => setVisible(true), 10);
     const openingTimer = setTimeout(() => setOpening(false), 600);
     return () => {
