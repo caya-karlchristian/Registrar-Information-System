@@ -172,6 +172,18 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
   }, [isCollapsed]);
 
   useEffect(() => {
+    const handleSetCollapsed = (event) => {
+      if (typeof event?.detail === 'boolean') {
+        setIsCollapsed(event.detail);
+      } else {
+        setIsCollapsed(true);
+      }
+    };
+    window.addEventListener('collapse-sidebar', handleSetCollapsed);
+    return () => window.removeEventListener('collapse-sidebar', handleSetCollapsed);
+  }, []);
+
+  useEffect(() => {
     const headerElement = document.querySelector('header');
     if (!headerElement) return;
 

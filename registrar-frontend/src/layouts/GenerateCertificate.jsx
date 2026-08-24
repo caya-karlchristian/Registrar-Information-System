@@ -313,6 +313,11 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
+    // Automatically collapse navigation sidebar to maximize workspace for certificate generation
+    window.dispatchEvent(new CustomEvent('collapse-sidebar', { detail: true }));
+  }, []);
+
+  useEffect(() => {
     if (typeof onLoadingChange === "function") {
       onLoadingChange(loading);
     }

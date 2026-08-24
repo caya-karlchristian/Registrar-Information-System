@@ -70,6 +70,8 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
+    // Automatically collapse sidebar when Certificate Modal opens
+    window.dispatchEvent(new CustomEvent('collapse-sidebar', { detail: true }));
     return () => { document.body.style.overflow = ''; };
   }, []);
 
