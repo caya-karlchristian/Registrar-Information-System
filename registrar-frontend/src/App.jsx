@@ -25,7 +25,8 @@ import SuperAdminPage from './pages/SuperAdminPage.jsx';
 import MainPage from './layouts/MainPage.jsx';
 import UserManagementPage from './pages/UserManagementPage.jsx';
 import StaffDashboardPage from './pages/StaffDashboardPage.jsx';
-import StudentDashboard from './layouts/StudentDashboard.jsx';
+import RequestForm from './layouts/RequestForm.jsx';
+import AlumniRequest from './layouts/AlumniRequest.jsx';
 
 // Lazy-loaded Direct Pages
 const ForbiddenPage = lazy(() => import('./components/ForbiddenPage'));
@@ -33,12 +34,11 @@ const SsoCallbackPage = lazy(() => import('./pages/SsoCallbackPage.jsx'));
 const AccessControlPage = lazy(() => import('./pages/AccessControlPage.jsx'));
 const RequestAccessPage = lazy(() => import('./pages/RequestAccessPage.jsx'));
 const DocumentAndCertificateManagement = lazy(() => import('./pages/DocumentAndCertificateManagement.jsx'));
+const StudentDashboard = lazy(() => import('./layouts/StudentDashboard.jsx'));
 
 // Lazy-loaded Layouts
-const RequestForm = lazy(() => import('./layouts/RequestForm.jsx'));
 const DocumentLists = lazy(() => import('./layouts/DocumentLists.jsx'));
 const FAQPage = lazy(() => import('./layouts/FAQs.jsx'));
-const AlumniRequest = lazy(() => import('./layouts/AlumniRequest.jsx'));
 const AlumniDocumentList = lazy(() => import('./layouts/AlumniDocumentList.jsx'));
 const AnalyticsDashboard = lazy(() => import('./layouts/AnalyticsDashboard.jsx'));
 const Logbook = lazy(() => import('./layouts/Logbook.jsx'));
@@ -97,7 +97,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   >
-                    <Route index element={<Navigate to="/student/home" replace />} />
+                    <Route index element={<Navigate to="/student/request" replace />} />
                     <Route path="home" element={<StudentDashboard />} />
                     <Route path="request" element={<RequestForm />} />
                     <Route path="lists" element={<DocumentLists />} />
@@ -116,7 +116,7 @@ const App = () => {
                       </ProtectedRoute>
                     }
                   >
-                    <Route index element={<Navigate to="/alumni/home" replace />} />
+                    <Route index element={<Navigate to="/alumni/request" replace />} />
                     <Route path="home" element={<StudentDashboard />} />
                     <Route path="request" element={<AlumniRequest />} />
                     <Route path="lists" element={<AlumniDocumentList />} />
