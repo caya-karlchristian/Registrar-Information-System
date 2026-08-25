@@ -162,7 +162,7 @@ test.describe('Student Dashboard E2E Tests', () => {
 
   test('1. Verify student dashboard only displays own pending requests', async ({ page }) => {
     // Navigate directly to the student portal (redirects to /student/home)
-    await page.goto('/student');
+    await page.goto('/student/home');
 
     // The default tab is 'Pending'. Verify Request 201 (Transcript of Records) is visible
     await expect(page.getByText('Transcript of Records')).toBeVisible();
@@ -173,7 +173,7 @@ test.describe('Student Dashboard E2E Tests', () => {
   });
 
   test('2. Verify tab switching filters correctly', async ({ page }) => {
-    await page.goto('/student');
+    await page.goto('/student/home');
 
     // In Pending tab: Transcript of Records is visible, Course Description is not
     await expect(page.getByText('Transcript of Records')).toBeVisible();
@@ -189,7 +189,7 @@ test.describe('Student Dashboard E2E Tests', () => {
   });
 
   test('3. Verify details modal displays request details', async ({ page }) => {
-    await page.goto('/student');
+    await page.goto('/student/home');
 
     // Click the Transcript of Records card (events bubble up to the card div)
     await page.getByRole('heading', { name: 'Transcript of Records' }).click();
@@ -206,7 +206,7 @@ test.describe('Student Dashboard E2E Tests', () => {
   });
 
   test('4. Verify search input works correctly', async ({ page }) => {
-    await page.goto('/student');
+    await page.goto('/student/home');
     
     // Switch to To Claim tab to search
     const toClaimTab = page.locator('button:has-text("To Claim")');

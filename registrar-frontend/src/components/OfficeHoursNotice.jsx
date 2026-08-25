@@ -41,8 +41,8 @@ const OfficeHoursNotice = ({ isDark, small = false }) => {
 
   if (failed || !status) return null;
 
-  const containerClasses = `flex flex-col justify-between transition-all duration-300 relative overflow-hidden ${
-    small ? 'gap-3 p-4 sm:p-5 rounded-xl border' : 'gap-4 p-6 rounded-2xl border'
+  const containerClasses = `w-full flex flex-col justify-between transition-all duration-300 relative overflow-hidden mx-auto ${
+    small ? 'gap-3 p-4 sm:p-5 rounded-xl border max-w-[420px]' : 'gap-4 p-5 sm:p-6 rounded-2xl border max-w-[520px]'
   } ${
     isDark
       ? 'bg-[#1e1e1e] border-[#333333] shadow-[0_8px_30px_rgb(0,0,0,0.4)] text-zinc-400'
@@ -50,13 +50,13 @@ const OfficeHoursNotice = ({ isDark, small = false }) => {
   }`;
 
   return (
-    <div className={containerClasses} style={{ minWidth: '280px', maxWidth: small ? '420px' : '540px' }}>
+    <div className={containerClasses}>
       {/* Decorative top gold/maroon accent bar */}
-      <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#800000] via-[#FFC72C] to-[#800000]" />
+      <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-[#800000] via-[#FFC72C] to-[#800000]" />
 
       {/* Details container */}
       <div className="flex flex-col gap-2 mt-1">
-        <div className="flex flex-col gap-1 text-left">
+        <div className="flex flex-col gap-1 text-center sm:text-left">
           <span className={`font-extrabold uppercase tracking-[0.15em] text-[#8C6239] ${
             small ? 'text-[10px] sm:text-[11px]' : 'text-[11px]'
           }`}>
@@ -72,7 +72,7 @@ const OfficeHoursNotice = ({ isDark, small = false }) => {
             )}
           </h4>
         </div>
-        <p className={`leading-relaxed text-left text-gray-500 dark:text-zinc-400 ${
+        <p className={`leading-relaxed text-center sm:text-left text-gray-500 dark:text-zinc-400 ${
           small ? 'text-[10px] sm:text-[11px]' : 'text-[11px]'
         }`}>
           {status.is_open ? (

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { PlusIcon, PencilSquareIcon, TrashIcon, UserGroupIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, PencilSquareIcon, TrashIcon, UserGroupIcon, XMarkIcon, Bars3Icon } from "@heroicons/react/24/outline";
 import { useTheme } from "../context/ThemeContext";
 import { useReferenceData } from "../context/ReferenceDataContext";
 import { createSignatory, updateSignatory, deleteSignatory } from "../services/api";
@@ -8,7 +8,7 @@ import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import ConfirmationModal from "../components/ConfirmationModal.jsx";
 
-const EMPTY_FORM = { name: "", position: "", sort_order: 0 };
+const EMPTY_FORM = { name: "", position: "" };
 
 /**
  * Admin-only CRUD screen for the signatories table (see
@@ -17,22 +17,24 @@ const EMPTY_FORM = { name: "", position: "", sort_order: 0 };
  * certificate (GenerateCertificate.jsx) — this screen is what lets an
  * admin add/rename/reorder/remove them without a code deploy.
  *
- * Self-contained like CertificateTemplateManagement — fetches nothing
- * of its own beyond what ReferenceDataContext already provides, and
- * owns its own toasts/modals so the parent tab switcher
- * (DocumentAndCertificateManagement.jsx) doesn't need any state for it.
+ * Supports drag-and-drop reordering directly in the table.
  */
 const SignatoryManagement = () => {
   const { isDark } = useTheme();
   const { signatories, refreshSignatories } = useReferenceData();
 
   const [search, setSearch] = useState("");
-  const [isFormOpen, setIsFormOpen]   = useState(false);
-  const [editingId, setEditingId]     = useState(null); // null = creating
-  const [form, setForm]               = useState(EMPTY_FORM);
-  const [saving, setSaving]           = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({});
+  const [isFormOpen, setIsFormOpen]     = useState(false);
+  const [editingId, setEditingId]       = useState(null); // null = creating
+  const [form, setForm]                 = useState(EMPTY_FORM);
+  const [saving, setSaving]             = useState(false);
+  const [fieldErrors, setFieldErrors]   = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null); // signatory being confirmed for delete
+
+  // Drag & drop reorder state
+  const [draggedIndex, setDraggedIndex]   = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [isReordering, setIsReordering]   = useState(false);
 
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg]     = useState("");
@@ -49,7 +51,6 @@ const SignatoryManagement = () => {
     setForm({
       name: signatory.name,
       position: signatory.position,
-      sort_order: signatory.sort_order ?? 0,
     });
     setFieldErrors({});
     setIsFormOpen(true);
@@ -62,7 +63,7 @@ const SignatoryManagement = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: name === "sort_order" ? value : value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -70,17 +71,25 @@ const SignatoryManagement = () => {
     setSaving(true);
     setFieldErrors({});
 
-    const payload = {
-      name: form.name.trim(),
-      position: form.position.trim(),
-      sort_order: form.sort_order === "" ? 0 : Number(form.sort_order),
-    };
-
     try {
       if (editingId) {
+        const existing = signatories.find((s) => s.signatory_id === editingId);
+        const payload = {
+          name: form.name.trim(),
+          position: form.position.trim(),
+          sort_order: existing?.sort_order ?? 0,
+        };
         await updateSignatory(editingId, payload);
         setSuccessMsg("Signatory updated successfully!");
       } else {
+        const maxOrder = signatories.length > 0
+          ? Math.max(...signatories.map((s) => Number(s.sort_order) || 0))
+          : -1;
+        const payload = {
+          name: form.name.trim(),
+          position: form.position.trim(),
+          sort_order: maxOrder + 1,
+        };
         await createSignatory(payload);
         setSuccessMsg("Signatory added successfully!");
       }
@@ -121,6 +130,72 @@ const SignatoryManagement = () => {
     }
   };
 
+  // Drag & drop handlers
+  const handleDragStart = (e, index) => {
+    if (search.trim() || isReordering) return;
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (e, index) => {
+    if (search.trim() || isReordering) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (e, targetIndex) => {
+    if (search.trim() || isReordering) return;
+    e.preventDefault();
+
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const reordered = [...signatories];
+    const [movedItem] = reordered.splice(draggedIndex, 1);
+    reordered.splice(targetIndex, 0, movedItem);
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setIsReordering(true);
+
+    try {
+      const updates = reordered.map((item, idx) => {
+        if (item.sort_order !== idx) {
+          return updateSignatory(item.signatory_id, {
+            name: item.name,
+            position: item.position,
+            sort_order: idx,
+          });
+        }
+        return null;
+      }).filter(Boolean);
+
+      if (updates.length > 0) {
+        await Promise.all(updates);
+        await refreshSignatories();
+        setSuccessMsg("Signatories order updated successfully.");
+      }
+    } catch (err) {
+      console.error("Failed to update signatory order:", err);
+      setErrorMsg("Couldn't save the new order. Please try again.");
+      await refreshSignatories();
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
   const inputClass = `w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors focus:ring-2 ${
     isDark
       ? "bg-[#18191a] border-[#3e4042] text-[#e4e6eb] focus:ring-yellow-400/40 focus:border-yellow-400/60"
@@ -131,12 +206,14 @@ const SignatoryManagement = () => {
     const query = search.toLowerCase().trim();
     if (!query) return true;
 
-    const fullName = [signatory.name, signatory.position, String(signatory.sort_order ?? "")]
+    const fullName = [signatory.name, signatory.position]
       .join(" ")
       .toLowerCase();
 
     return fullName.includes(query);
   });
+
+  const isDragDisabled = Boolean(search.trim()) || isReordering;
 
   return (
     <main className={`min-h-screen p-4 sm:p-6 ${isDark ? "bg-[#18191a] text-[#e4e6eb]" : "text-gray-900"}`}>
@@ -150,7 +227,7 @@ const SignatoryManagement = () => {
                 </h1>
               </div>
               <p className={`text-xs mt-1 ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
-                Manage the people selectable as "Signee" when generating certificates.
+                Manage and drag to reorder the signatories selectable on certificates.
               </p>
             </div>
 
@@ -172,11 +249,18 @@ const SignatoryManagement = () => {
                 <VoiceSearchInput
                   value={search}
                   onChange={(value) => setSearch(value)}
-                  placeholder="Search"
+                  placeholder="Search by name or position"
                 />
               </div>
-              <div className={`text-sm font-semibold ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
-                {filteredSignatories.length} result{filteredSignatories.length === 1 ? "" : "s"}
+              <div className="flex items-center gap-3">
+                {search.trim() && (
+                  <span className="text-[11px] text-amber-500 dark:text-amber-400 font-medium">
+                    Clear search to drag & reorder
+                  </span>
+                )}
+                <div className={`text-sm font-semibold ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>
+                  {filteredSignatories.length} result{filteredSignatories.length === 1 ? "" : "s"}
+                </div>
               </div>
             </div>
 
@@ -192,46 +276,83 @@ const SignatoryManagement = () => {
                   <table className="w-full min-w-175 text-sm">
                     <thead>
                       <tr className={isDark ? "border-b border-[#3e4042]" : "border-b border-gray-100"}>
+                        <th className={`px-4 py-4 text-center font-medium w-20 ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`} title="Drag handle">
+                          Order
+                        </th>
                         <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Name</th>
                         <th className={`px-5 py-4 text-left font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Position</th>
-                        <th className={`px-5 py-4 text-center font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Sort Order</th>
                         <th className={`px-5 py-4 text-center font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-500"}`}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredSignatories.map((signatory) => (
-                        <tr key={signatory.signatory_id} className={`border-b last:border-0 transition-colors ${isDark ? "border-[#3e4042] hover:bg-[#2a2a2f]" : "border-gray-100 hover:bg-gray-50"}`}>
-                          <td className={`px-5 py-4 ${isDark ? "text-[#e4e6eb]" : "text-gray-800"}`}>
-                            <div className="font-semibold">{signatory.name}</div>
-                          </td>
-                          <td className={`px-5 py-4 ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
-                            {signatory.position}
-                          </td>
-                          <td className="px-5 py-4 text-center">
-                            <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isDark ? "bg-[#18191a] text-[#b0b3b8]" : "bg-gray-100 text-gray-500"}`} title="Sort order">
-                              {signatory.sort_order}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => openEditForm(signatory)}
-                                className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-[#3a3b3c] text-[#b0b3b8] hover:text-white" : "hover:bg-gray-100 text-gray-500 hover:text-gray-800"}`}
-                                title="Edit"
+                      {filteredSignatories.map((signatory, index) => {
+                        const isDragging = draggedIndex === index;
+                        const isOver = dragOverIndex === index;
+
+                        return (
+                          <tr
+                            key={signatory.signatory_id}
+                            draggable={!isDragDisabled}
+                            onDragStart={(e) => handleDragStart(e, index)}
+                            onDragOver={(e) => handleDragOver(e, index)}
+                            onDragEnd={handleDragEnd}
+                            onDrop={(e) => handleDrop(e, index)}
+                            className={`border-b last:border-0 transition-all duration-150 select-none ${
+                              isDark ? "border-[#3e4042] hover:bg-[#2a2a2f]" : "border-gray-100 hover:bg-gray-50"
+                            } ${isDragging ? "opacity-30 bg-yellow-500/10 scale-[0.99]" : ""} ${
+                              isOver && !isDragging
+                                ? isDark
+                                  ? "border-t-2 border-t-yellow-400 bg-yellow-400/5"
+                                  : "border-t-2 border-t-pup-maroon bg-pup-maroon/5"
+                                : ""
+                            }`}
+                          >
+                            {/* Order & Drag Handle */}
+                            <td className="px-4 py-4 text-center">
+                              <div
+                                className={`inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-lg transition-colors ${
+                                  isDragDisabled
+                                    ? "opacity-50 cursor-default"
+                                    : "cursor-grab active:cursor-grabbing hover:bg-black/5 dark:hover:bg-white/5"
+                                }`}
+                                title={isDragDisabled ? "Clear search to reorder" : "Drag to reorder"}
                               >
-                                <PencilSquareIcon className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => setDeleteTarget(signatory)}
-                                className={`rounded-md p-2 transition-colors ${isDark ? "hover:bg-red-950/40 text-[#b0b3b8] hover:text-red-400" : "hover:bg-red-50 text-gray-500 hover:text-red-600"}`}
-                                title="Delete"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                <Bars3Icon className={`w-4 h-4 shrink-0 ${isDark ? "text-zinc-500" : "text-gray-400"}`} />
+                                <span className={`text-xs font-bold font-mono ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
+                                  {index + 1}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td className={`px-5 py-4 ${isDark ? "text-[#e4e6eb]" : "text-gray-800"}`}>
+                              <div className="font-semibold">{signatory.name}</div>
+                            </td>
+                            <td className={`px-5 py-4 ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
+                              {signatory.position}
+                            </td>
+                            <td className="px-5 py-4 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditForm(signatory)}
+                                  className={`rounded-md p-2 transition-colors cursor-pointer ${isDark ? "hover:bg-[#3a3b3c] text-[#b0b3b8] hover:text-white" : "hover:bg-gray-100 text-gray-500 hover:text-gray-800"}`}
+                                  title="Edit"
+                                >
+                                  <PencilSquareIcon className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteTarget(signatory)}
+                                  className={`rounded-md p-2 transition-colors cursor-pointer ${isDark ? "hover:bg-red-950/40 text-[#b0b3b8] hover:text-red-400" : "hover:bg-red-50 text-gray-500 hover:text-red-600"}`}
+                                  title="Delete"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -254,14 +375,14 @@ const SignatoryManagement = () => {
                   {editingId ? "Edit Signatory" : "Add Signatory"}
                 </h2>
                 <p className={`text-xs mt-0.5 ${isDark ? "text-[#b0b3b8]" : "text-white/60"}`}>
-                  Keep this list ordered for certificate selection.
+                  Enter the signatory's name and official designation.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeForm}
                 disabled={saving}
-                className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white disabled:opacity-50"
+                className="p-1.5 rounded-full hover:bg-white/20 transition-colors text-white disabled:opacity-50 cursor-pointer"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
@@ -284,6 +405,7 @@ const SignatoryManagement = () => {
                     className={inputClass}
                     maxLength={255}
                     required
+                    autoFocus
                   />
                   {fieldErrors.name && (
                     <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.name[0]}</p>
@@ -308,22 +430,6 @@ const SignatoryManagement = () => {
                     <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.position[0]}</p>
                   )}
                 </div>
-
-                <div>
-                  <label className={`mb-1 block text-xs font-semibold uppercase tracking-wider ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
-                    Sort Order
-                  </label>
-                  <input
-                    type="number"
-                    name="sort_order"
-                    value={form.sort_order}
-                    onChange={handleChange}
-                    className={inputClass}
-                  />
-                  {fieldErrors.sort_order && (
-                    <p className="mt-1 text-xs font-semibold text-red-500">{fieldErrors.sort_order[0]}</p>
-                  )}
-                </div>
               </div>
 
               <div className={`px-6 pb-6 pt-4 flex items-center justify-end gap-3 border-t shrink-0 ${isDark ? "border-[#3e4042]" : "border-gray-100"}`}>
@@ -331,7 +437,7 @@ const SignatoryManagement = () => {
                   type="button"
                   onClick={closeForm}
                   disabled={saving}
-                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${
+                  className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer ${
                     isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
                   }`}
                 >
@@ -340,9 +446,9 @@ const SignatoryManagement = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
                     isDark
-                      ? "bg-[#2a2a2f] text-[#e4e6eb] hover:bg-[#353539] border border-[#3e4042]"
+                      ? "bg-yellow-400 text-black hover:bg-yellow-500"
                       : "bg-pup-dark-maroon text-white hover:bg-[#3a0303]"
                   }`}
                 >

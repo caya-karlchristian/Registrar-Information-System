@@ -116,7 +116,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               Completed (100%) or Forfeited/Cancelled (0%). */}
           {progress !== 0 && progress !== 100 && (
             <Section title="Claim Ticket" isDark={isDark}>
-              <div className="flex justify-center">
+              <div className="flex justify-center w-full py-1 sm:py-2">
                 <ClaimTicket uuid={request.uuid} claimCode={request.claim_code} />
               </div>
             </Section>

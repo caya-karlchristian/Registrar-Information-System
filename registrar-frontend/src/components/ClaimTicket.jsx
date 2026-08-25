@@ -19,11 +19,14 @@ import { toPng } from 'html-to-image';
  * dashboard request detail, inbox) renders this the same way, so
  * there is exactly one place this ever needs to be styled or fixed.
  *
+ * Fully responsive: stacks gracefully on mobile / narrow viewports and
+ * lays out side-by-side on larger screens / wider containers.
+ *
  * Renders nothing if the request isn't actually claimable via QR yet
  * (no uuid/claim_code — e.g. an older request created before this
  * feature existed, since the migration is nullable and not backfilled).
  */
-const ClaimTicket = ({ uuid, claimCode, size = 160, downloadOnly = false, small = false }) => {
+const ClaimTicket = ({ uuid, claimCode, size = 144, downloadOnly = false, small = false }) => {
   const { isDark } = useTheme();
   const [copied, setCopied] = useState(false);
   const contentRef = useRef(null);
@@ -67,80 +70,80 @@ const ClaimTicket = ({ uuid, claimCode, size = 160, downloadOnly = false, small 
       });
   };
 
-  const qrSize = small && size === 160 ? 108 : size;
+  const qrSize = small ? 108 : (size || 144);
 
   return (
-    <div className="flex flex-col items-center gap-3 w-full">
+    <div className="flex flex-col items-center gap-3 w-full max-w-full">
       {/* Printable/Downloadable Ticket Wrapper */}
       <div
         ref={contentRef}
         className={`${
           downloadOnly 
-            ? 'absolute left-[-9999px] top-[-9999px]' 
-            : `flex flex-row items-stretch transition-all duration-300 relative overflow-hidden ${
-                small ? 'gap-4 p-4 sm:p-5 rounded-xl border' : 'gap-6 p-6 rounded-2xl border'
+            ? 'absolute -left-2499.75 -top-2499.75' 
+            : `w-full flex flex-col sm:flex-row items-center sm:items-stretch transition-all duration-300 relative overflow-hidden ${
+                small 
+                  ? 'gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-xl border max-w-105' 
+                  : 'gap-4 sm:gap-6 p-4 sm:p-6 rounded-2xl border max-w-130'
               }`
         } ${isDark
             ? 'bg-[#1e1e1e] border-[#333333] shadow-[0_8px_30px_rgb(0,0,0,0.4)]'
             : 'bg-white border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.06)]'
           }`}
-        style={{ minWidth: '280px', maxWidth: small ? '420px' : '540px' }}
       >
         {/* Decorative top gold/maroon accent bar */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#800000] via-[#FFC72C] to-[#800000]" />
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-[#800000] via-[#FFC72C] to-[#800000]" />
 
-        {/* Left Column: Details & Code */}
-        <div className="flex-1 flex flex-col justify-between gap-4">
-          <div className="flex flex-col gap-2 mt-1">
-            <div className="flex flex-col gap-1 text-left">
+        {/* Left Column (or Top section on mobile): Details & Code */}
+        <div className="flex-1 flex flex-col justify-between gap-3 sm:gap-4 w-full min-w-0">
+          <div className="flex flex-col gap-1.5 sm:gap-2 mt-0.5 sm:mt-1">
+            <div className="flex flex-col gap-1 text-center sm:text-left">
               <h4
-                className={`font-extrabold uppercase tracking-[0.2em] ${
-                  small ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'
+                className={`font-extrabold uppercase tracking-[0.15em] sm:tracking-[0.2em] ${
+                  small ? 'text-xs sm:text-sm' : 'text-xs sm:text-sm md:text-base'
                 } ${isDark ? 'text-[#FFC72C]' : 'text-[#800000]'}`}
               >
                 Registrar Claim Ticket
               </h4>
             </div>
-            <p className={`leading-relaxed text-left ${small ? 'text-[10.5px] sm:text-[11px]' : 'text-[11px] sm:text-xs'} ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>
+            <p className={`leading-relaxed text-center sm:text-left ${small ? 'text-[10px] sm:text-[11px]' : 'text-[10.5px] sm:text-xs'} ${isDark ? 'text-zinc-400' : 'text-gray-500'}`}>
               Present this QR code at the Registrar counter to instantly retrieve and claim your documents.
             </p>
           </div>
 
-          <div className="flex flex-col gap-1.5 w-full">
-            <span className={`font-bold uppercase tracking-wider ${small ? 'text-[9px] sm:text-[10px]' : 'text-[10px] sm:text-xs'} ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
+          <div className="flex flex-col gap-1 sm:gap-1.5 w-full">
+            <span className={`font-bold uppercase tracking-wider text-center sm:text-left ${small ? 'text-[9px] sm:text-[10px]' : 'text-[9.5px] sm:text-xs'} ${isDark ? 'text-zinc-500' : 'text-gray-400'}`}>
               Manual Claim Code:
             </span>
             <button
               type="button"
               onClick={handleCopyCode}
               title="Copy claim code"
-              className={`group flex items-center justify-between gap-3 w-full rounded-xl font-mono font-bold tracking-[0.25em] border transition-all active:scale-98 cursor-pointer ${
-                small ? 'px-3 py-1.5 text-sm sm:text-base' : 'px-4 py-2 text-base sm:text-lg'
+              className={`relative group flex items-center justify-center w-full rounded-xl font-mono font-bold tracking-[0.15em] sm:tracking-[0.25em] border transition-all active:scale-98 cursor-pointer ${
+                small ? 'py-2 px-8 text-xs sm:text-sm md:text-base' : 'py-2.5 px-10 text-xs sm:text-base md:text-lg'
               } ${isDark
                   ? 'bg-[#151515] text-[#FFC72C] border-zinc-800 hover:bg-[#202020] hover:border-[#FFC72C]/30'
                   : 'bg-gray-50 text-gray-800 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
                 }`}
             >
-              <span className="w-4" />
-              <span>{claimCode}</span>
-              <span className="text-gray-400 dark:text-zinc-600 group-hover:text-gray-600 dark:group-hover:text-[#FFC72C] transition-colors shrink-0">
+              <span className="truncate text-center">{claimCode}</span>
+              <span className="absolute right-2.5 sm:right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-zinc-600 group-hover:text-gray-600 dark:group-hover:text-[#FFC72C] transition-colors shrink-0">
                 {copied ? (
-                  <CheckIcon className="w-4 h-4 text-green-500" />
+                  <CheckIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
                 ) : (
-                  <ClipboardDocumentIcon className="w-4 h-4" />
+                  <ClipboardDocumentIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 )}
               </span>
             </button>
           </div>
         </div>
 
-        {/* Vertical Divider (always visible) */}
-        <div className={`block border-l border-dashed ${isDark ? 'border-zinc-800' : 'border-gray-200'}`} />
+        {/* Responsive Divider: horizontal on mobile, vertical on sm+ */}
+        <div className={`w-full sm:w-auto self-stretch border-t sm:border-t-0 sm:border-l border-dashed my-1 sm:my-0 shrink-0 ${isDark ? 'border-zinc-800' : 'border-gray-200'}`} />
 
-        {/* Right Column: QR Code Container & Download Action */}
-        <div className="flex flex-col items-center justify-center gap-2 shrink-0">
-          <div className={`rounded-xl bg-white border ${small ? 'p-2' : 'p-3'} ${isDark ? 'border-zinc-800' : 'border-gray-100'}`}>
-            <div className={`border border-dashed border-gray-250 rounded-lg ${small ? 'p-1' : 'p-1.5'}`}>
+        {/* Right Column (or Bottom section on mobile): QR Code Container & Download Action */}
+        <div className="flex flex-col items-center justify-center gap-2 sm:gap-2.5 shrink-0 w-full sm:w-auto">
+          <div className={`rounded-xl bg-white border ${small ? 'p-1.5 sm:p-2' : 'p-2 sm:p-3'} ${isDark ? 'border-zinc-800' : 'border-gray-100'}`}>
+            <div className={`border border-dashed border-gray-250 rounded-lg flex items-center justify-center ${small ? 'p-1' : 'p-1 sm:p-1.5'}`}>
               <QRCodeCanvas id={`qr-canvas-${claimCode}`} value={uuid} size={qrSize} level="M" />
             </div>
           </div>
@@ -149,9 +152,9 @@ const ClaimTicket = ({ uuid, claimCode, size = 160, downloadOnly = false, small 
             type="button"
             onClick={handleDownloadPNG}
             title="Download ticket as image"
-            className="download-btn-hide flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-bold text-[8px] uppercase tracking-wider transition-all active:scale-95 cursor-pointer mt-1 print:hidden bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-[#2d2d30] dark:hover:text-white"
+            className="download-btn-hide flex items-center justify-center gap-1.5 w-full sm:w-auto px-3 py-1.5 rounded-lg border font-bold text-[8px] sm:text-[9px] uppercase tracking-wider transition-all active:scale-95 cursor-pointer mt-0.5 sm:mt-1 print:hidden bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-[#2d2d30] dark:hover:text-white"
           >
-            <ArrowDownTrayIcon className="w-3.5 h-3" />
+            <ArrowDownTrayIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             Download Ticket
           </button>
         </div>
