@@ -2,12 +2,6 @@ import { getTodayDate } from "./helpers";
 
 export const ALUMNI_ACCESS_IDS = [2, 3];
 
-export const getDateDaysAgo = (days) => {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString().split("T")[0];
-};
-
 export const validateProfileStep = (formData) => {
   if (!(formData.firstName || "").trim()) {
     return "Please enter your first name.";
@@ -60,8 +54,8 @@ export const validateReceiptStep = (formData) => {
   if (!formData.dateOfPayment) {
     return "Please select the date of payment.";
   }
-  if (formData.dateOfPayment < getDateDaysAgo(7) || formData.dateOfPayment > getTodayDate()) {
-    return "Date of payment must be within the last 7 days up to today.";
+  if (formData.dateOfPayment > getTodayDate()) {
+    return "Date of payment cannot be in the future.";
   }
 
   // Validate document copies count limits

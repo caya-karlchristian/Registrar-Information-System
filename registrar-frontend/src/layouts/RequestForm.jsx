@@ -102,12 +102,6 @@ const RequestForm = ({ showProfileStep = false }) => {
 
   const availablePurposes = purposes;
 
-  const getDateDaysAgo = (days) => {
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-    return date.toISOString().split('T')[0];
-  };
-
   const [formData, setFormData] = useState({
     termsAgreed: false,
     firstName: '',
@@ -269,8 +263,8 @@ const RequestForm = ({ showProfileStep = false }) => {
       return;
     }
 
-    if (formData.dateOfPayment < getDateDaysAgo(7) || formData.dateOfPayment > getTodayDate()) {
-      setErrorMessage("Date of payment must be within the last 7 days up to today.");
+    if (formData.dateOfPayment > getTodayDate()) {
+      setErrorMessage("Date of payment cannot be in the future.");
       return;
     }
 
@@ -734,7 +728,6 @@ const RequestForm = ({ showProfileStep = false }) => {
                         type="date"
                         value={formData.dateOfPayment}
                         onChange={handleInputChange}
-                        min={getDateDaysAgo(7)}
                         max={getTodayDate()}
                         required
                         voiceEnabled={false}

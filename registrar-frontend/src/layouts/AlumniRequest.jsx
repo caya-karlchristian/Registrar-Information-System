@@ -12,7 +12,6 @@ import OfficeHoursNotice from "../components/OfficeHoursNotice.jsx";
 import qrCode from "../assets/qrcode.png";
 import { useTheme } from "../context/ThemeContext";
 import { useAlumniRequest } from "../hooks/useAlumniRequest";
-import { getDateDaysAgo } from "../utils/alumniRequestUtils";
 import { getTodayDate } from "../utils/helpers";
 import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
@@ -318,7 +317,6 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
                       type="date"
                       value={formData.dateOfPayment}
                       onChange={handleInputChange}
-                      min={getDateDaysAgo(7)}
                       max={getTodayDate()}
                       required
                       voiceEnabled={false}
