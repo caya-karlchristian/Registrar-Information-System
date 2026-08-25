@@ -46,4 +46,20 @@ class StoreSystemUserRequest extends FormRequest
             'policy_id'   => 'nullable|integer|exists:policies,policy_id',
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            // QA bug #2 — "Vague Error Message" on the Add New User form.
+            // Laravel's default unique-rule message ("The email has
+            // already been taken.") doesn't say what already has it or
+            // why that matters here, which reads as a generic/confusing
+            // failure to an admin filling out this form. Matches the
+            // wording AccessRequestService::store() already uses for the
+            // same underlying condition on the Access Request flow, so
+            // the two paths that can hit "this email already belongs to
+            // a SystemUser" now say the same thing.
+            'email.unique' => 'This email is already associated with a SystemUser account.',
+        ];
+    }
 }

@@ -129,7 +129,10 @@ test('store fails validation when email is already taken', function () {
         'first_name' => 'New',
         'last_name'  => 'Admin',
     ])->assertStatus(422)
-      ->assertJsonValidationErrors(['email']);
+      ->assertJsonValidationErrors(['email'])
+      // QA bug #2 — was Laravel's default "The email has already been
+      // taken.", which doesn't tell the admin why it matters here.
+      ->assertJsonFragment(['email' => ['This email is already associated with a SystemUser account.']]);
 });
 
 test('store rejects a password field on create — it is no longer accepted', function () {
@@ -269,7 +272,10 @@ test('update fails validation when email is already taken by someone else', func
 
     $this->putJson("/api/system-users/{$target->user_id}", ['email' => $other->email])
          ->assertStatus(422)
-         ->assertJsonValidationErrors(['email']);
+         ->assertJsonValidationErrors(['email'])
+         // QA bug #2 — Edit User hits the same unique rule as Add New
+         // User, so it needs the same non-default message.
+         ->assertJsonFragment(['email' => ['This email is already associated with a SystemUser account.']]);
 });
 
 test('update allows keeping the same email for the same user (unique rule excludes self)', function () {
