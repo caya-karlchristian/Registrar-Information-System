@@ -24,15 +24,15 @@ export const validateProfileStep = (formData) => {
   return null;
 };
 
-export const validateRequestDetailsStep = (formData, showCertificationDropdown) => {
-  if (formData.documentsRequested.length === 0) {
-    return "Please select at least one document to proceed.";
+export const validateRequestDetailsStep = (formData) => {
+  const hasDocs = (formData.documentsRequested || []).length > 0;
+  const hasCerts = (formData.certification || []).length > 0;
+
+  if (!hasDocs && !hasCerts) {
+    return "Please select at least one document or certification to proceed.";
   }
-  if (formData.purposeOfRequest.length === 0) {
+  if (!formData.purposeOfRequest || formData.purposeOfRequest.length === 0) {
     return "Please select a purpose for your request.";
-  }
-  if (showCertificationDropdown && formData.certification.length === 0) {
-    return "Please specify the certification type.";
   }
   return null;
 };
@@ -59,14 +59,19 @@ export const validateReceiptStep = (formData) => {
   }
 
   // Validate document copies count limits
-  const hasInvalidDocCopy = formData.documentsRequested
+  const hasInvalidDocCopy = (formData.documentsRequested || [])
     .filter((doc) => !doc.toLowerCase().includes("certif"))
     .some((doc) => {
-      const copies = Number(formData.documentCopies[doc] || 1);
+      const copies = Number(formData.documentCopies?.[doc] || 1);
       return !Number.isInteger(copies) || copies < 1 || copies > 10;
     });
 
-  if (hasInvalidDocCopy) {
+  const hasInvalidCertCopy = (formData.certification || []).some((cert) => {
+    const copies = Number(formData.certCopies?.[cert] || 1);
+    return !Number.isInteger(copies) || copies < 1 || copies > 10;
+  });
+
+  if (hasInvalidDocCopy || hasInvalidCertCopy) {
     return "Number of copies must be between 1 and 10.";
   }
 
