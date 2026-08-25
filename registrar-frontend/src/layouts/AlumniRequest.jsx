@@ -107,21 +107,21 @@ const AlumniRequestForm = ({ showProfileStep = false }) => {
             <div className="w-full max-w-4xl mx-auto border-t border-dashed border-white/15 my-6" />
 
             {/* Side-by-Side Grid Container */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mx-auto my-4 items-start text-left">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 w-full max-w-4xl mx-auto my-4 items-start justify-items-center">
               {/* Left Column: Office Hours Notice */}
-              <div className="flex flex-col gap-4 w-full">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center md:text-left">
+              <div className="flex flex-col items-center gap-3 sm:gap-4 w-full max-w-105 mx-auto">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center w-full">
                   Processing Schedule & Hours
                 </h3>
                 <OfficeHoursNotice isDark={isDark} small={true} />
-                <p className="text-white/50 text-[11px] text-center md:text-left leading-relaxed max-w-sm">
+                <p className="text-white/50 text-[11px] text-center leading-relaxed max-w-sm mx-auto">
                   Note: View/download your claim ticket QR code in your inbox or present the manual claim code when claiming.
                 </p>
               </div>
 
               {/* Right Column: Claim Details & QR */}
-              <div className="flex flex-col gap-4 w-full">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center md:text-left">
+              <div className="flex flex-col items-center gap-3 sm:gap-4 w-full max-w-105 mx-auto">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center w-full">
                   Claim Ticket & Code
                 </h3>
 
