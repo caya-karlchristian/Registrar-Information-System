@@ -550,7 +550,7 @@ class DatabaseSeeder extends Seeder
                 'document_requirements'   => "Current Registration Card - (1) Original Copy,\nApplication for Replacement of Lost Identification Card Form - (1) Original Copy,\nAttach with Parents/Guardian ID or Cedula (undergraduates only),\nProof of payment - (1) Original Copy,\nRemarks: Copy the link to view the copy of new/application of ID \nhttps://drive.google.com/file/d/150ijzdHofoMcJzc6L_fChnmM-HSe8GHo/view",
                 'document_process_period' => '2 working day/s, 23 minute/s',
                 'access_id'               => 1,
-                'cashier_document_patterns' => json_encode(['Replacement of ID', 'Replacement of Lost ID', 'New ID -2nd copy']),
+                'cashier_document_patterns' => null,
             ],
             [
                 'document_type_id'        => 5,
@@ -613,7 +613,7 @@ class DatabaseSeeder extends Seeder
                 'document_requirements'   => "A. FOR TRANSFEREES FROM ANOTHER UNIVERSITY/COLLEGE:\n1. Accomplished Course Accreditation Form (Download from PUP Website)\n2. Curriculum Sheet upon Admission to PUP - (1) Original Copy\n3. Certified Copy of TOR with Remarks: 'Copy for PUP' - (1) Original Copy\n4. Subject Description taken from other school/university - (1) Original Copy\n5. Proof of Payment - (1) Original Copy\nB. FOR TRANSFEREES FROM PUP BRANCH/CAMPUS TO MAIN:\n1. Accomplished Accreditation Form (Download from PUP Website)\n2. Curriculum Sheet upon Admission to PUP - (1) Original Copy\n3. Certified Copy of TOR with Remarks: 'Copy for PUP' - (1) Original Copy",
                 'document_process_period' => '1 working day/s, 5 hour/s, 30 minute/s',
                 'access_id'               => 1,
-                'cashier_document_patterns' => json_encode(['Accreditation Fee for transferees from another University (per unit)']),
+                'cashier_document_patterns' => null,
             ],
             [
                 'document_type_id'        => 13,
@@ -631,7 +631,7 @@ class DatabaseSeeder extends Seeder
                 'document_requirements'   => "Student's Request Letter - (1) Original Copy,\nGeneral Clearance showing the client is cleared of all accountabilities - (1) Original Copy,\nLetter request addressed to CHED Regional Director (for CAV-CHED request only) - (1) Original Copy,\n2 (two) pcs of 2x2 pictures in Formal Attire,\nProof of payment - (1) Original Copy,\n1 Long Brown Envelope",
                 'document_process_period' => '2 working days, 7 hours, 10 minutes',
                 'access_id'               => 2,
-                'cashier_document_patterns' => json_encode(['CAV (CHED)', 'CAV (DFA) -undergraduate', 'CAV (DFA) with Special Certification', 'CAV/Apostille (DFA)']),
+                'cashier_document_patterns' => json_encode(['CAV (CHED)', 'CAV (DFA) - undergraduate', 'CAV (DFA) with Special Certification', 'CAV/Apostille (DFA)']),
             ],
             [
                 'document_type_id'        => 15,
@@ -640,14 +640,19 @@ class DatabaseSeeder extends Seeder
                 'document_requirements'   => "A. FIRST COPY (For New Graduates/Transferees):\n1. Accomplished and printed copy of the application and payment voucher from the Campus registrar. - (1) Original (To be Printed by the Registrar)\n2. General Clearance showing the client is cleared of all accountabilities - (1) Original Copy (Printed from SIS)\n3. Certificate of Candidacy - (1) Original (Printed from SIS)\n4. Certificate of Conferment of Degree (Dummy Diploma) - (1) Original Copy (Remarks: Awarded during graduation ceremony)\n5. 2 (two) pcs of 2x2 picture in Academic Gown/Toga\n6. Documentary stamp - (1) Sample\n7. Proof of payment (if not covered by RA 10931) - (1) Original Copy\nReminder: When claiming documents: 8.1 Authorization letter and ID if claimant is immediate family member Special Power of Attorney (SPA) if the claimant is other than the immediate family.\nB. SECOND AND SUCCEEDING COPIES:\n1. Letter of request by the student - (1) Original (To Registrar's Office)\n2. 2 (two) pcs of2x2 picture in Formal Attire (To be submitted to the Admission and Registration Office)\n3. Documentary Stamp - (1) Sample\n4. Proof of Payment - (1) Original Copy\n5. Acknowledged/Signed Copy of Transfer - (1) Original (Remarks: School where applicant is presently enrolled)\nReminder: .When claiming documents: a.Authorization letter and ID if claimant is immediate family member Special Power of Attorney (SPA) if the claimant is other than the immediate family.",
                 'document_process_period' => '8 working day/s, 5 hour/s, 20 minute/s',
                 'access_id'               => 3,
+                // NOTE: "Authentication Fee - Transcript of Records" and
+                // "Authentication Fee - Transcript & Diploma" moved to
+                // certificate_type 7 (Certified True Copy of Records) — per
+                // the final matcher doc these are "Same with CTC (Duplicate)".
+                // "Scanned Picture for Transcript" dropped entirely — matcher
+                // doc flags it "Not in Registrar (Any Certificate - Accessory)".
                 'cashier_document_patterns' => json_encode([
-                    'Transcript of Records', 'Transcript of Records -Undergraduate (2 pages)',
-                    'Transcript of Records -Undergraduate (3 pages)', 'Transcript of Records (1 page)',
-                    'Transcript of Records -Technology Courses', 'Transcript of Records -2nd copy (graduate-engineering)',
-                    'Transcript of Records -2nd copy (non-engineering graduate)', 'Transcript of Records (graduate-Engineering/Copy for)',
+                    'Transcript of Records', 'Transcript of Records - Undergraduate (2 pages)',
+                    'Transcript of Records - Undergraduate (3 pages)', 'Transcript of Records (1 page)',
+                    'Transcript of Records - Technology Courses', 'Transcript of Records - 2nd copy (graduate-engineering)',
+                    'Transcript of Records - 2nd copy (non-engineering graduate)', 'Transcript of Records (graduate-Engineering/Copy for)',
                     'Transcript of Records (graduate-Non-Engineering/Copy for)', 'Transcript of Records (OU)',
-                    'Transcript of Records-2nd copy (graduate-non-engineering)', 'Authentication Fee -Transcript of Records',
-                    'Authentication Fee -Transcript & Diploma', 'Scanned Picture for Transcript',
+                    'Transcript of Records - 2nd copy (graduate-non-engineering)',
                 ]),
             ],
             [
@@ -657,7 +662,10 @@ class DatabaseSeeder extends Seeder
                 'document_requirements'   => "Letter of request stating the purpose - (1) Original Copy,\nProof of payment - (1) Original Copy,\nPUP School Identification Card - (1) Original Copy,\nAuthorization letter (if claimed by a representative) - (1) Original Copy",
                 'document_process_period' => '1 working day/s, 1 hour/s, 18 minute/s',
                 'access_id'               => 1,
-                'cashier_document_patterns' => json_encode(['Informative Copy of Grades', 'Certification Fee - Informative Copy of Grades', 'Certified True Copy - Informative Copy of Grades']),
+                // NOTE: "Certified True Copy - Informative Copy of Grades"
+                // is NOT this type — per the final matcher doc it maps to
+                // "Certified True Copy of Records" (certificate_type 7).
+                'cashier_document_patterns' => json_encode(['Informative Copy of Grades', 'Certification Fee - Informative Copy of Grades']),
             ],
             [
                 'document_type_id'        => 17,
@@ -700,18 +708,22 @@ class DatabaseSeeder extends Seeder
             ['certificate_type_id' => 2,  'certificate_name' => 'Non Issuance of SO',                      'access_id' => 2, 'cashier_document_patterns' => json_encode(['Non-Issuance of S.O.', 'Certification Fee - Non-Issuance of S.O.']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 3,  'certificate_name' => "Certification of Medium \nof Instruction",  'access_id' => 3, 'cashier_document_patterns' => json_encode(['English as Medium of Instruction', 'Certification Fee - Medium of Instruction', 'Certification Fee - English as Medium of Instruction']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 4,  'certificate_name' => "Certification of Medium of \nInstruction with Units", 'access_id' => 3, 'cashier_document_patterns' => json_encode(['English as Medium of Instruction', 'Certification Fee - Medium of Instruction', 'Certification Fee - English as Medium of Instruction']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
-            ['certificate_type_id' => 5,  'certificate_name' => 'Certificate of Attendance',                'access_id' => 3, 'cashier_document_patterns' => json_encode(['Certification Fee - Certificate of Attendance']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
-            ['certificate_type_id' => 6,  'certificate_name' => 'Certificate of  Graduation',               'access_id' => 2, 'cashier_document_patterns' => json_encode(['Certificate of Graduation -2nd copy', 'Certification Fee - Certificate of Graduation']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
-            ['certificate_type_id' => 7,  'certificate_name' => 'Certified True Copy of Records',           'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
+            ['certificate_type_id' => 5,  'certificate_name' => 'Certificate of Attendance',                'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
+            ['certificate_type_id' => 6,  'certificate_name' => 'Certificate of  Graduation',               'access_id' => 2, 'cashier_document_patterns' => json_encode(['Certificate of Graduation - 2nd copy', 'Certification Fee - Certificate of Graduation']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
+            // NOTE: distinct from certificate_type/document_type for
+            // "Informative Copy of Grades" — confirmed 2026-08-25. Patterns
+            // moved here from doc 15 (TOR) and doc 16 (Informative Copy of
+            // Grades) per the final matcher doc.
+            ['certificate_type_id' => 7,  'certificate_name' => 'Certified True Copy of Records',           'access_id' => 3, 'cashier_document_patterns' => json_encode(['Certified True Copy - Informative Copy of Grades', 'Authentication Fee - Transcript of Records', 'Authentication Fee - Transcript & Diploma']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 8,  'certificate_name' => 'Certificate of Graduate Honor',            'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 9,  'certificate_name' => 'Consular Certification',                   'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
-            ['certificate_type_id' => 10, 'certificate_name' => 'Certificate of Enrollment - PRESENT',      'access_id' => 3, 'cashier_document_patterns' => json_encode(['Certificate of Registration', 'Certification Fee - Certificate of Registration', 'Certified True Copy - Certificate of Registration']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
-            ['certificate_type_id' => 11, 'certificate_name' => 'Certificate of Enrollment - UNDERGRAD',    'access_id' => 3, 'cashier_document_patterns' => json_encode(['Certificate of Registration', 'Certification Fee - Certificate of Registration', 'Certified True Copy - Certificate of Registration']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
+            ['certificate_type_id' => 10, 'certificate_name' => 'Certificate of Enrollment - PRESENT',      'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
+            ['certificate_type_id' => 11, 'certificate_name' => 'Certificate of Enrollment - UNDERGRAD',    'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 12, 'certificate_name' => 'Certificate of Ladderized Course',         'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 40, 'layout_footer_logo_size' => 56],
-            ['certificate_type_id' => 13, 'certificate_name' => 'CAV Request Letter',                       'access_id' => 3, 'cashier_document_patterns' => json_encode(['CAV (CHED)', 'CAV (DFA) -undergraduate', 'CAV (DFA) with Special Certification', 'CAV/Apostille (DFA)']), 'layout_header_left_url' => 'certification-layouts/13/header_left/mEVM6frD1JY0pvJ61vTMmQzm7owO4sBndG6Zscz6.jpg', 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
-            ['certificate_type_id' => 14, 'certificate_name' => 'CAV',                                      'access_id' => 3, 'cashier_document_patterns' => json_encode(['CAV (CHED)', 'CAV (DFA) -undergraduate', 'CAV (DFA) with Special Certification', 'CAV/Apostille (DFA)']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
+            ['certificate_type_id' => 13, 'certificate_name' => 'CAV Request Letter',                       'access_id' => 3, 'cashier_document_patterns' => json_encode(['CAV (CHED)', 'CAV (DFA) - undergraduate', 'CAV (DFA) with Special Certification', 'CAV/Apostille (DFA)']), 'layout_header_left_url' => 'certification-layouts/13/header_left/mEVM6frD1JY0pvJ61vTMmQzm7owO4sBndG6Zscz6.jpg', 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
+            ['certificate_type_id' => 14, 'certificate_name' => 'CAV',                                      'access_id' => 3, 'cashier_document_patterns' => json_encode(['CAV (CHED)', 'CAV (DFA) - undergraduate', 'CAV (DFA) with Special Certification', 'CAV/Apostille (DFA)']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 15, 'certificate_name' => 'Certification of NSTP-CWTS',               'access_id' => 3, 'cashier_document_patterns' => json_encode(['Certification Fee - NSTP-CWTS', 'Certification Fee - Certification of NSTP-CWTS']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
-            ['certificate_type_id' => 16, 'certificate_name' => 'Endorsement Letter',                       'access_id' => 3, 'cashier_document_patterns' => json_encode(['Endorsement', 'Certification Fee - Endorsement']), 'layout_header_left_url' => 'certification-layouts/16/header_left/P2nNe3FX8V0fTM0xGHNhXd50AeJiZaR1CW4gkiC2.jpg', 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode(['certification-layouts/16/footer/bSSbPb7evWgo7Vj6Uds099TEdQ7n4eYmM8mDNMyP.jpg']), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
+            ['certificate_type_id' => 16, 'certificate_name' => 'Endorsement Letter',                       'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => 'certification-layouts/16/header_left/P2nNe3FX8V0fTM0xGHNhXd50AeJiZaR1CW4gkiC2.jpg', 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode(['certification-layouts/16/footer/bSSbPb7evWgo7Vj6Uds099TEdQ7n4eYmM8mDNMyP.jpg']), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 17, 'certificate_name' => 'Certificate of Eligibility to Transfer',   'access_id' => 3, 'cashier_document_patterns' => json_encode(['Honorable Dismissal', 'Certification Fee - Honorable Dismissal', 'Certification Fee - Certificate of Eligibility to Transfer']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
         ];
 
