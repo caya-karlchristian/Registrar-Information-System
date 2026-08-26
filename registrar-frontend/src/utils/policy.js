@@ -24,6 +24,7 @@ export const MODULE_KEYS = {
   PROFILE: "profile",
   ACCESS_REQUESTS: "access_requests",
   BUSINESS_CALENDAR: "business_calendar",
+  CASHIER_OVERRIDES: "cashier_overrides",
 };
 
 /**

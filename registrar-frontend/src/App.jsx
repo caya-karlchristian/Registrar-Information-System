@@ -49,6 +49,7 @@ const InboxCenter = lazy(() => import('./layouts/InboxCenter.jsx'));
 const ReportManagement = lazy(() => import('./layouts/ReportManagement.jsx'));
 const SystemSettings = lazy(() => import('./layouts/SystemSettings.jsx'));
 const BusinessCalendarManagement = lazy(() => import('./layouts/BusinessCalendarManagement.jsx'));
+const CashierOrOverrideManagement = lazy(() => import('./layouts/CashierOrOverrideManagement.jsx'));
 const SuperAdminAnalyticsDashboard = lazy(() => import('./layouts/SuperAdminAnalyticsDashboard.jsx'));
 
 const StaffIndexRedirect = () => {
@@ -161,6 +162,9 @@ const App = () => {
                     <Route path="business-calendar" element={
                       <ModuleRoute module={MODULE_KEYS.BUSINESS_CALENDAR}><BusinessCalendarManagement /></ModuleRoute>
                     } />
+                    <Route path="cashier-overrides" element={
+                      <ModuleRoute module={MODULE_KEYS.CASHIER_OVERRIDES}><CashierOrOverrideManagement /></ModuleRoute>
+                    } />
                   </Route>
 
                   {/* SUPER ADMIN (role: super_admin) */}
@@ -181,6 +185,7 @@ const App = () => {
                     <Route path="report" element={<ReportManagement />} />
                     <Route path="settings" element={<SystemSettings />} />
                     <Route path="business-calendar" element={<BusinessCalendarManagement />} />
+                    <Route path="cashier-overrides" element={<CashierOrOverrideManagement />} />
                     <Route path="inbox" element={<InboxCenter />} />
                   </Route>
 

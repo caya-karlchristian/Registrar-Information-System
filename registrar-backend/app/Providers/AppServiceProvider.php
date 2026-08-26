@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\AlumniSystemClientInterface;
+use App\Contracts\CashierServiceInterface;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Contracts\NotificationServiceInterface;
 use App\Models\NotificationType;
@@ -11,6 +12,7 @@ use App\Services\AuditLogger;
 use App\Services\SecurityEventLogger;
 use App\Services\Alumni\AlumniSystemClient;
 use App\Services\Alumni\FakeAlumniSystemClient;
+use App\Services\CashierService;
 use App\Services\DocumentRequestService;
 use App\Services\NotificationService;
 use Illuminate\Support\ServiceProvider;
@@ -35,6 +37,17 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             NotificationServiceInterface::class,
             NotificationService::class,
+        );
+
+        // CashierService — no swap condition today (unlike the alumni
+        // client's mock/real split above), but every consumer now depends
+        // on the interface rather than the concrete class, so a future
+        // provider change, a different transport, or a local-dev fake
+        // becomes a one-line change here instead of a hunt through every
+        // constructor/type-hint that references CashierService directly.
+        $this->app->bind(
+            CashierServiceInterface::class,
+            CashierService::class,
         );
 
         // Alumni System client — swap between real HTTP and fake based on env.

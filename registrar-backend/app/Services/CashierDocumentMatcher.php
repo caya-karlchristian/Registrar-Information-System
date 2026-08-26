@@ -170,23 +170,15 @@ class CashierDocumentMatcher
      * Normalise a cashier label for matching: lowercase, trim, collapse
      * internal whitespace, strip trailing punctuation.
      *
-     * Deliberately kept IDENTICAL to CashierDocumentSuggester::normalise()
-     * (see that class). The two used to diverge — this matcher did a bare
-     * lowercase+trim while the suggester also collapsed whitespace and
-     * stripped trailing punctuation — which meant a receipt line the
-     * suggester happily pre-checked for the student could still fail this
-     * strict check at final submit over nothing but a stray double-space
-     * or trailing period in the cashier system's own copy of the label.
-     * Still exact-match-after-normalisation, not fuzzy: this only forgives
-     * formatting noise, never a different word.
+     * Delegates to CashierLabelNormalizer, the single source of truth for
+     * this algorithm shared with CashierDocumentSuggester and
+     * UnmatchedCashierItem — see that class's docblock for why the three
+     * were unified. Still exact-match-after-normalisation, not fuzzy: this
+     * only forgives formatting noise, never a different word.
      */
     private function normalise(string $label): string
     {
-        $label = mb_strtolower(trim($label));
-        $label = preg_replace('/\s+/', ' ', $label) ?? $label;
-        $label = rtrim($label, " .,;:-");
-
-        return trim($label);
+        return CashierLabelNormalizer::normalize($label);
     }
 
     private function buildReceiptIndex(array $items): array

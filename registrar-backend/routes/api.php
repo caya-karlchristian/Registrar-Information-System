@@ -19,6 +19,7 @@ use App\Http\Controllers\AiQueryController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
 use App\Http\Controllers\UnmatchedCashierItemController;
+use App\Http\Controllers\CashierOrOverrideController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
@@ -210,6 +211,35 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::apiResource('calendar-overrides', CalendarOverrideController::class)
             ->parameters(['calendar-overrides' => 'override'])
             ->only(['index', 'store', 'update', 'destroy']);
+    });
+
+    // Cashier OR override — the scoped, audited admin bypass for one
+    // (or_number, student) pair when a real receipt is wrongly rejected
+    // by the Cashier API (see CashierOrOverrideController and the
+    // cashier_or_overrides migration's docblock for the full design).
+    //
+    // Gated by policy, same pattern as business_calendar directly
+    // above: any admin whose attached policy grants the
+    // "cashier_overrides" module can create/list/revoke overrides;
+    // super admin always has it via SystemUser::hasModuleAccess()'s
+    // unconditional super-admin bypass, with no policy attachment
+    // needed. This is a deliberately narrower gate than the general
+    // "role:3" admin group — bypassing a money-facing check is
+    // sensitive enough that it shouldn't be something every admin
+    // account gets by default just by being role_id=3; a super admin
+    // grants it explicitly per-admin via Policy Management, the same
+    // way business_calendar or access_requests access is granted.
+    Route::middleware(['role:3,4', 'module:cashier_overrides'])->group(function () {
+        // Distinct throttle prefix so this doesn't share a rate-limit
+        // bucket with role-assignments' own search-users route — same
+        // reasoning as that route's own comment on why an unprefixed
+        // throttle would collide.
+        Route::get('cashier-overrides/search-users', [CashierOrOverrideController::class, 'searchUsers'])
+            ->middleware('throttle:30,1,cashier-overrides-search-users');
+
+        Route::get('cashier-overrides',              [CashierOrOverrideController::class, 'index']);
+        Route::post('cashier-overrides',              [CashierOrOverrideController::class, 'store']);
+        Route::post('cashier-overrides/{id}/revoke',  [CashierOrOverrideController::class, 'revoke']);
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.

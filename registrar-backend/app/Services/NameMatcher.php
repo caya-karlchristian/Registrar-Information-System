@@ -244,7 +244,17 @@ class NameMatcher
      * Normalize and defensively bound a single name part before it's used
      * to build strings sent to an external API.
      *
-     * - Trims and uppercases (matches the Cashier convention).
+     * - Trims and uppercases (matches the Cashier convention). Uses
+     *   mb_strtoupper() with an explicit UTF-8 encoding, not strtoupper() —
+     *   PHP's plain strtoupper() only uppercases ASCII a-z and silently
+     *   leaves accented characters (ñ, é, ü, ...) untouched, so a name
+     *   like "Muñoz" would come out as "MUñOZ" — a casing no cashier
+     *   admin would ever type, whether they correctly wrote "MUÑOZ" or
+     *   dropped the tilde to "MUNOZ". Every candidate this method feeds
+     *   into inherited that broken casing, so a name with any accented
+     *   character could never match regardless of how many punctuation/
+     *   order variants existed. mb_strtoupper() uppercases these
+     *   characters the way a human would.
      * - Strips ASCII control characters, which have no legitimate place in
      *   a person's name and could otherwise reach an outbound HTTP call or
      *   an audit log unfiltered.
@@ -259,7 +269,7 @@ class NameMatcher
     {
         $value = preg_replace('/[\x00-\x1F\x7F]/', '', $value) ?? '';
         $value = preg_replace('/\s+/', ' ', $value) ?? '';
-        $value = strtoupper(trim($value));
+        $value = mb_strtoupper(trim($value), 'UTF-8');
 
         return mb_substr($value, 0, self::MAX_PART_LENGTH);
     }
@@ -343,10 +353,14 @@ class NameMatcher
     /**
      * Normalise a name for comparison: uppercase, strip periods, collapse
      * whitespace. Does NOT reorder or split — that happens in splitName().
+     *
+     * Uses mb_strtoupper() (not strtoupper()) for the same reason as
+     * sanitizePart() above — plain strtoupper() leaves accented characters
+     * untouched, which would break comparison for any name containing one.
      */
     private function normalise(string $name): string
     {
-        $name = strtoupper(trim($name));
+        $name = mb_strtoupper(trim($name), 'UTF-8');
         $name = str_replace('.', '', $name);
         $name = preg_replace('/\s+/', ' ', $name) ?? $name;
 

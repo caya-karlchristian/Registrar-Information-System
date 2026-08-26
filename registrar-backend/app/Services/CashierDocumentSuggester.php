@@ -215,19 +215,16 @@ class CashierDocumentSuggester
 
     /**
      * Normalise a label for matching: lowercase, trim, collapse internal
-     * whitespace, strip trailing punctuation. Slightly more forgiving than
-     * CashierDocumentMatcher's normalisation (lowercase+trim only) — safe
-     * here because a false-positive suggestion costs the student one
-     * unchecked box, not a wrongly-approved request. The strict matcher's
-     * own normalisation is intentionally left as-is; see that class.
+     * whitespace, strip trailing punctuation.
+     *
+     * Delegates to CashierLabelNormalizer, the single source of truth for
+     * this algorithm shared with CashierDocumentMatcher and
+     * UnmatchedCashierItem — see that class's docblock for why the three
+     * were unified into one implementation.
      */
     private function normalise(string $label): string
     {
-        $label = mb_strtolower(trim($label));
-        $label = preg_replace('/\s+/', ' ', $label) ?? $label;
-        $label = rtrim($label, " .,;:-");
-
-        return trim($label);
+        return CashierLabelNormalizer::normalize($label);
     }
 
     /**
