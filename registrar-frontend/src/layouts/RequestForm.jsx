@@ -18,8 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useMutation } from '@tanstack/react-query';
 import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
-
-const STUDENT_ACCESS_IDS = [1, 3];
+import { STUDENT_ACCESS_IDS } from "../constants/accessTypes";
 
 // parseRequirements is pure — no hooks needed here
 const parseRequirements = (value) => {

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AccessType;
 use App\Models\CertificationType;
 use App\Models\DocumentType;
 use Illuminate\Support\Facades\Log;
@@ -27,9 +28,14 @@ use Illuminate\Support\Facades\Log;
  * drift apart would be worse than one list serving two purposes.
  *
  * Scope: only document/certificate types visible to self-service students
- * and alumni (access_id 1 or 3 — matches the frontend's STUDENT_ACCESS_IDS
- * filter in RequestForm.jsx) and not archived. A student should never see
- * a suggestion for something they can't actually select on this form.
+ * and alumni (access_id 1, 2, or 3 — the union of RequestForm.jsx's
+ * STUDENT_ACCESS_IDS [1,3] and AlumniRequest.jsx / useAlumniRequest.js's
+ * ALUMNI_ACCESS_IDS [2,3]) and not archived. This suggester runs for both
+ * students and alumni verifying an OR, so it must cover every type either
+ * audience can actually select on their own form — narrowing to only the
+ * student list here silently blinds the suggester (and the unmatched-item
+ * queue) to every alumni-exclusive (access_id=2) type, no matter how many
+ * times an admin resolves it.
  *
  * Matching is still case/whitespace/punctuation-normalised exact string
  * matching, same family of algorithm as the strict matcher — NOT fuzzy
@@ -44,11 +50,19 @@ use Illuminate\Support\Facades\Log;
 class CashierDocumentSuggester
 {
     /**
-     * access_id values visible to the student/alumni self-service request
-     * form. Mirrors STUDENT_ACCESS_IDS in registrar-frontend/src/layouts/
-     * RequestForm.jsx — keep these in sync if that ever changes.
+     * access_id values visible to EITHER self-service form. Sourced from
+     * App\Enums\AccessType::selfServiceVisibleIds() — the single backend
+     * source of truth for this mapping — rather than a hand-typed literal.
+     * See that enum's docblock for why: this suggester previously
+     * hard-coded only the *student* form's subset ([1,3]), which meant
+     * every alumni-exclusive (access_id=2) type could never be suggested
+     * or resolved, no matter how many times an admin attached a pattern
+     * to it.
      */
-    private const STUDENT_ACCESS_IDS = [1, 3];
+    private static function visibleAccessIds(): array
+    {
+        return AccessType::selfServiceVisibleIds();
+    }
 
     /**
      * Build suggestions from a cashier receipt's line items.
@@ -148,7 +162,7 @@ class CashierDocumentSuggester
         $index = [];
 
         $documentTypes = DocumentType::where('is_archived', false)
-            ->whereIn('access_id', self::STUDENT_ACCESS_IDS)
+            ->whereIn('access_id', self::visibleAccessIds())
             ->get(['document_type_id', 'document_name', 'cashier_document_patterns']);
 
         foreach ($documentTypes as $type) {
@@ -158,7 +172,7 @@ class CashierDocumentSuggester
         }
 
         $certificateTypes = CertificationType::where('is_archived', false)
-            ->whereIn('access_id', self::STUDENT_ACCESS_IDS)
+            ->whereIn('access_id', self::visibleAccessIds())
             ->get(['certificate_type_id', 'certificate_name', 'cashier_document_patterns']);
 
         foreach ($certificateTypes as $type) {

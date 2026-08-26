@@ -160,18 +160,41 @@ class CashierDocumentMatcher
 
     /**
      * Build a normalised index of cashier receipt items.
-     * Key: lowercase trimmed document label.
+     * Key: normalised document label (see normalise()).
      * Value: total quantity paid for that label across all line items.
      *
      * @param  array $items  Raw items[] from the cashier API
      * @return array<string, int>
      */
+    /**
+     * Normalise a cashier label for matching: lowercase, trim, collapse
+     * internal whitespace, strip trailing punctuation.
+     *
+     * Deliberately kept IDENTICAL to CashierDocumentSuggester::normalise()
+     * (see that class). The two used to diverge — this matcher did a bare
+     * lowercase+trim while the suggester also collapsed whitespace and
+     * stripped trailing punctuation — which meant a receipt line the
+     * suggester happily pre-checked for the student could still fail this
+     * strict check at final submit over nothing but a stray double-space
+     * or trailing period in the cashier system's own copy of the label.
+     * Still exact-match-after-normalisation, not fuzzy: this only forgives
+     * formatting noise, never a different word.
+     */
+    private function normalise(string $label): string
+    {
+        $label = mb_strtolower(trim($label));
+        $label = preg_replace('/\s+/', ' ', $label) ?? $label;
+        $label = rtrim($label, " .,;:-");
+
+        return trim($label);
+    }
+
     private function buildReceiptIndex(array $items): array
     {
         $index = [];
 
         foreach ($items as $item) {
-            $label = mb_strtolower(trim((string) ($item['document'] ?? '')));
+            $label = $this->normalise((string) ($item['document'] ?? ''));
             if ($label === '') {
                 continue;
             }
@@ -239,7 +262,7 @@ class CashierDocumentMatcher
         $bestQuantityFound = 0;
 
         foreach ($patterns as $pattern) {
-            $normalisedPattern = mb_strtolower(trim($pattern));
+            $normalisedPattern = $this->normalise($pattern);
             $paidQty           = $receiptIndex[$normalisedPattern] ?? 0;
 
             if ($paidQty <= 0) {

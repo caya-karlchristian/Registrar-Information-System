@@ -1,6 +1,9 @@
 import { getTodayDate } from "./helpers";
 
-export const ALUMNI_ACCESS_IDS = [2, 3];
+// Re-exported from the single source of truth so existing imports of
+// ALUMNI_ACCESS_IDS from this file keep working unchanged. See
+// src/constants/accessTypes.js for the canonical definition.
+export { ALUMNI_ACCESS_IDS } from "../constants/accessTypes";
 
 export const validateProfileStep = (formData) => {
   if (!(formData.firstName || "").trim()) {
