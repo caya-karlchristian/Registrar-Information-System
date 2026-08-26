@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\CashierLabelNormalizer;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -104,18 +105,16 @@ class UnmatchedCashierItem extends Model
     }
 
     /**
-     * Same normalisation as CashierDocumentSuggester::normalise() — kept
-     * here as the single source of truth for what "the same label" means
-     * for dedupe purposes, since this model's uniqueness guarantee is the
-     * thing that has to stay correct even if the suggester's own copy is
-     * ever touched independently.
+     * Same normalisation as CashierDocumentSuggester::normalise() and
+     * CashierDocumentMatcher::normalise() — delegates to
+     * CashierLabelNormalizer, the single source of truth for this
+     * algorithm across the cashier subsystem. This model's uniqueness
+     * guarantee on normalised_label depends on that staying identical to
+     * the suggester's own lookup key, so all three now share one
+     * implementation instead of three independently-maintained copies.
      */
     public static function normaliseLabel(string $label): string
     {
-        $label = mb_strtolower(trim($label));
-        $label = preg_replace('/\s+/', ' ', $label) ?? $label;
-        $label = rtrim($label, " .,;:-");
-
-        return trim($label);
+        return CashierLabelNormalizer::normalize($label);
     }
 }

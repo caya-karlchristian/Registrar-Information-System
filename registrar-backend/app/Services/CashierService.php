@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\CashierServiceInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -10,6 +11,12 @@ use Illuminate\Support\Facades\Log;
  *
  * Verifies an Official Receipt (OR) number against the PUP Taguig
  * Cashier System API before a document request is submitted.
+ *
+ * Implements CashierServiceInterface — consumers (DocumentRequestController,
+ * etc.) should depend on that interface, not this concrete class, so a
+ * future swap (different provider, fake for local dev, etc.) is a single
+ * binding change in AppServiceProvider. See the interface's docblock for
+ * the full rationale.
  *
  * Mock mode
  * ---------
@@ -26,7 +33,7 @@ use Illuminate\Support\Facades\Log;
  * Success:  { "valid": true,  "reason": null, "data": { ... } }
  * Failure:  { "valid": false, "reason": "NOT_FOUND" }
  */
-class CashierService
+class CashierService implements CashierServiceInterface
 {
     private const TIMEOUT = 10; // seconds
 
@@ -115,6 +122,15 @@ class CashierService
      * Examples:
      *   Dela Cruz / Juan  / Santos / ""   → "DELA CRUZ, JUAN S."
      *   Guevarra  / Pedro / ""     / "Jr" → "GUEVARRA, PEDRO JR."
+     *
+     * Uses mb_strtoupper() (not strtoupper()), because PHP's plain
+     * strtoupper() only uppercases plain ASCII a-z and silently leaves
+     * accented/multibyte characters untouched — so a name like "Muñoz"
+     * would come out as "MUñOZ", a string that will never match either a
+     * cashier admin who correctly typed "MUÑOZ" or one who dropped the
+     * tilde to "MUNOZ". mb_strtoupper() with an explicit UTF-8 encoding
+     * uppercases ñ, é, ü, etc. correctly, matching how a human would
+     * capitalize the name.
      */
     public function formatCustomerName(
         string $lastName,
@@ -123,18 +139,18 @@ class CashierService
         string $suffix     = '',
     ): string {
         $middleInitial = trim($middleName) !== ''
-            ? strtoupper(mb_substr(trim($middleName), 0, 1)) . '.'
+            ? mb_strtoupper(mb_substr(trim($middleName), 0, 1), 'UTF-8') . '.'
             : '';
 
         $parts = array_filter([
             trim($firstName),
             $middleInitial,
-            trim($suffix) ? rtrim(strtoupper(trim($suffix)), '.') . '.' : '',
+            trim($suffix) ? rtrim(mb_strtoupper(trim($suffix), 'UTF-8'), '.') . '.' : '',
         ]);
 
         $givenNames = implode(' ', $parts);
 
-        return strtoupper(trim($lastName)) . ', ' . strtoupper($givenNames);
+        return mb_strtoupper(trim($lastName), 'UTF-8') . ', ' . mb_strtoupper($givenNames, 'UTF-8');
     }
 
     // -------------------------------------------------------------------------

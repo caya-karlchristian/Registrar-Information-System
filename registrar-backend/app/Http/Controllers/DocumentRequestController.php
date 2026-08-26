@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DocumentRequest;
 use App\Models\SystemUser;
 use App\Models\AuditLog;
+use App\Contracts\CashierServiceInterface;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Http\Requests\DocumentRequest\BulkRequestIdsRequest;
 use App\Http\Requests\DocumentRequest\ClaimDocumentRequestRequest;
@@ -15,7 +16,6 @@ use App\Services\DocumentRequestService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use App\Services\CashierService;
 use App\Services\CashierDocumentMatcher;
 use App\Services\CashierDocumentSuggester;
 use App\Services\NameMatcher;
@@ -54,7 +54,7 @@ class DocumentRequestController extends Controller
 
     public function __construct(
         private DocumentRequestServiceInterface $requestService,
-        private CashierService                  $cashierService,
+        private CashierServiceInterface         $cashierService,
         private CashierDocumentMatcher          $documentMatcher,
         private CashierDocumentSuggester        $documentSuggester,
         private AuditLogger                     $auditLogger,
