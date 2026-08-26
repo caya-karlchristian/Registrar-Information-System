@@ -601,7 +601,7 @@ const CreateOverrideModal = ({ isDark, rowBorder, subtleText, accentBtn, onClose
               onChange={(e) => setReason(e.target.value)}
               rows={3}
               maxLength={1000}
-              placeholder='e.g. "Verified physical receipt at the counter — cashier system typo'd the middle name, OR itself is genuine."'
+              placeholder={`e.g. "Verified physical receipt at the counter — cashier system typo'd the middle name, OR itself is genuine."`}
               className={inputClasses}
             />
             <p className={`text-xs mt-1 ${subtleText}`}>{reason.trim().length}/10 characters minimum</p>
