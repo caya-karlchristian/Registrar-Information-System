@@ -136,6 +136,22 @@ class AuditLog extends Model
     public const ACTION_UNMATCHED_CASHIER_ITEM_RESOLVED  = 'unmatched_cashier_item_resolved';
     public const ACTION_UNMATCHED_CASHIER_ITEM_DISMISSED = 'unmatched_cashier_item_dismissed';
 
+    // Cashier OR override — the scoped, audited alternative to blanking
+    // CASHIER_API_KEY system-wide (see the cashier_or_overrides
+    // migration's docblock for the full rationale). Three distinct
+    // rows, never a mutation of one another, same append-only reasoning
+    // as ACTION_CASHIER_VERIFICATION_ENRICHED above:
+    //   CREATED  — an admin issued the override (metadata carries the
+    //              or_number, target student/alumni, and reason).
+    //   CONSUMED — the override was actually spent by a successful
+    //              DocumentRequestController::store() call (metadata
+    //              carries the resulting request_id).
+    //   REVOKED  — an admin cancelled an unused override before it was
+    //              ever consumed.
+    public const ACTION_CASHIER_OVERRIDE_CREATED  = 'cashier_override_created';
+    public const ACTION_CASHIER_OVERRIDE_CONSUMED = 'cashier_override_consumed';
+    public const ACTION_CASHIER_OVERRIDE_REVOKED  = 'cashier_override_revoked';
+
     // -------------------------------------------------------
     // Relationship back to the acting user (nullable — may be deleted)
     // -------------------------------------------------------

@@ -19,6 +19,7 @@ use App\Http\Controllers\AiQueryController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
 use App\Http\Controllers\UnmatchedCashierItemController;
+use App\Http\Controllers\CashierOrOverrideController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
@@ -280,6 +281,17 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::get('unmatched-cashier-items',              [UnmatchedCashierItemController::class, 'index']);
         Route::post('unmatched-cashier-items/{id}/resolve', [UnmatchedCashierItemController::class, 'resolve']);
         Route::post('unmatched-cashier-items/{id}/dismiss', [UnmatchedCashierItemController::class, 'dismiss']);
+
+        // Cashier OR override — scoped, audited admin bypass for one
+        // (or_number, student) pair when a real receipt is wrongly
+        // rejected by the Cashier API. role:3 here means admin OR
+        // super_admin (super_admin bypasses this middleware entirely —
+        // see RoleMiddleware), matching "either can approve, log which
+        // role" from the design discussion. See CashierOrOverrideController
+        // and the cashier_or_overrides migration's docblock.
+        Route::get('cashier-overrides',              [CashierOrOverrideController::class, 'index']);
+        Route::post('cashier-overrides',              [CashierOrOverrideController::class, 'store']);
+        Route::post('cashier-overrides/{id}/revoke',  [CashierOrOverrideController::class, 'revoke']);
 
         // Signatories (certificate signees) — admin-only end to end,
         // unlike document-types/certifications above whose GET is open to

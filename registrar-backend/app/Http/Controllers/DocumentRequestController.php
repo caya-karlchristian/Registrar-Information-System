@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DocumentRequest;
 use App\Models\SystemUser;
 use App\Models\AuditLog;
-use App\Contracts\CashierServiceInterface;
+use App\Models\CashierOrOverride;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Http\Requests\DocumentRequest\BulkRequestIdsRequest;
 use App\Http\Requests\DocumentRequest\ClaimDocumentRequestRequest;
@@ -16,6 +16,7 @@ use App\Services\DocumentRequestService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Services\CashierService;
 use App\Services\CashierDocumentMatcher;
 use App\Services\CashierDocumentSuggester;
 use App\Services\NameMatcher;
@@ -54,7 +55,7 @@ class DocumentRequestController extends Controller
 
     public function __construct(
         private DocumentRequestServiceInterface $requestService,
-        private CashierServiceInterface         $cashierService,
+        private CashierService                  $cashierService,
         private CashierDocumentMatcher          $documentMatcher,
         private CashierDocumentSuggester        $documentSuggester,
         private AuditLogger                     $auditLogger,
@@ -252,6 +253,13 @@ class DocumentRequestController extends Controller
         // it. CashierDocumentMatcher (the strict cross-check against
         // whatever the student actually confirmed) still runs here and
         // ONLY here, unchanged.
+        // Set below when an admin-issued CashierOrOverride is what let
+        // this OR pass verification (see verifyReceiptAgainstCashier())
+        // — consumed (marked used) only after the request is actually
+        // created, so a submission that fails validation elsewhere
+        // doesn't burn the override for nothing.
+        $consumedOverride = null;
+
         if (!empty($validated['or_number'])) {
             /** @var \App\Models\SystemUser $user */
             $user = Auth::user();
@@ -265,7 +273,12 @@ class DocumentRequestController extends Controller
             // document-validation: cross-check paid items against requested items.
             // Only runs when the cashier API returns items[] (live mode).
             // Mock mode / no-profile skips all checks gracefully — every
-            // item passes when there is nothing to match against.
+            // item passes when there is nothing to match against. An
+            // admin-overridden OR is NOT mock (is_mock is explicitly
+            // false in that branch of verifyReceiptAgainstCashier()) —
+            // it still runs this check, against the admin's
+            // verified_items instead of a live API response, so an
+            // override never weakens the paid-vs-requested guarantee.
             if (!$verification['is_mock']) {
                 $matchResult = $this->documentMatcher->match(
                     cashierItems: $verification['cashier_items'],
@@ -280,11 +293,59 @@ class DocumentRequestController extends Controller
                     ], 422);
                 }
             }
+
+            $consumedOverride = $verification['override'] ?? null;
         }
 
         $documentRequest = $this->requestService->createRequest(Auth::user(), $validated);
 
+        if ($consumedOverride !== null) {
+            $this->consumeOverride($request, $consumedOverride, $documentRequest, Auth::user());
+        }
+
         return response()->json($documentRequest->load(self::RELATIONS), 201);
+    }
+
+    // -------------------------------------------------------------------------
+    // Marks a CashierOrOverride as spent by the DocumentRequest it just
+    // enabled. Called only from store() (a real submission that actually
+    // succeeded), never from verifyOfficialReceipt() — the pre-submission
+    // step must be able to report "this override would apply" without
+    // spending it, the same way a normal OR is never marked used just by
+    // being checked.
+    //
+    // Guarded with an atomic where(used_at, null) update rather than a
+    // plain save(): two near-simultaneous store() calls racing on the
+    // same override (e.g. a double-click submit) must not both succeed
+    // in consuming it — only the first UPDATE that actually matches
+    // used_at IS NULL affects a row; the loser's update() call affects
+    // zero rows and is simply skipped rather than erroring, since by the
+    // time it runs the override having already been consumed by the
+    // other request is the correct outcome, not a failure to surface.
+    // -------------------------------------------------------------------------
+    private function consumeOverride(
+        Request          $request,
+        CashierOrOverride $override,
+        DocumentRequest  $documentRequest,
+        SystemUser       $actor,
+    ): void {
+        $consumed = CashierOrOverride::query()
+            ->whereKey($override->override_id)
+            ->whereNull('used_at')
+            ->update([
+                'used_at'             => now(),
+                'used_by_request_id'  => $documentRequest->request_id,
+            ]);
+
+        if ($consumed === 0) {
+            return; // already consumed by a concurrent request — nothing to log again
+        }
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_CASHIER_OVERRIDE_CONSUMED, [
+            'override_id' => $override->override_id,
+            'or_number'   => $override->or_number,
+            'request_id'  => $documentRequest->request_id,
+        ]);
     }
 
     // -------------------------------------------------------------------------
@@ -347,14 +408,58 @@ class DocumentRequestController extends Controller
     // this OR number, for this user, valid?" and hands back the raw
     // cashier line items for the caller to do what it needs with.
     //
+    // Also checks CashierOrOverride::activeFor() before touching the
+    // real Cashier API at all — see that check's inline comment below
+    // for the full rationale. When an override applies, 'override'
+    // carries the CashierOrOverride model so store() (and only store())
+    // can mark it consumed after the request is actually created;
+    // verifyOfficialReceipt() reads the same key but never consumes it.
+    //
     // @return array{
     //     error: JsonResponse|null,
     //     cashier_items: array,
     //     is_mock: bool,
+    //     override: \App\Models\CashierOrOverride|null,
     // }
     // -------------------------------------------------------------------------
     private function verifyReceiptAgainstCashier(Request $request, \App\Models\SystemUser $user, string $orNumber): array
     {
+        // Admin override check — FIRST, before any Cashier API call or
+        // NameMatcher retry attempt. See CashierOrOverride and the
+        // cashier_or_overrides migration's docblock: this is the scoped,
+        // audited escape hatch for a real receipt the Cashier API
+        // happens to reject, instead of blanking CASHIER_API_KEY
+        // system-wide. Scoped to exactly this (or_number, user_id) pair
+        // — every other student's OR still goes through the full,
+        // unmodified verification path below, untouched.
+        //
+        // is_mock is explicitly false here (not true): mock mode exists
+        // to bypass verification when there is NO real payment context
+        // (local dev, CASHIER_API_KEY unset); an override instead
+        // represents an admin having actively confirmed a REAL receipt,
+        // so CashierDocumentMatcher must still run against it — see
+        // store()'s `if (!$verification['is_mock'])` branch, and the
+        // 'override' key returned below, which store() uses to mark the
+        // override consumed only after the request is actually created.
+        $override = CashierOrOverride::activeFor($orNumber, $user->user_id);
+
+        if ($override !== null) {
+            $this->auditLogger->log($request, $user, \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION, [
+                'or_number'      => $orNumber,
+                'method'         => 'admin_override',
+                'override_id'    => $override->override_id,
+                'final_approved' => true,
+                'is_mock'        => false,
+            ]);
+
+            return [
+                'error'         => null,
+                'cashier_items' => $override->verified_items ?? [],
+                'is_mock'       => false,
+                'override'      => $override,
+            ];
+        }
+
         // Resolve the customer name from the user's profile. Students and
         // alumni have separate profile tables; admins submitting on behalf
         // of a student are not expected to hit this path (walk-in requests
@@ -364,7 +469,7 @@ class DocumentRequestController extends Controller
         $profile = $user->studentProfile ?? $user->alumniProfile ?? null;
 
         if (!$profile) {
-            return ['error' => null, 'cashier_items' => [], 'is_mock' => true];
+            return ['error' => null, 'cashier_items' => [], 'is_mock' => true, 'override' => null];
         }
 
         // The Cashier API does exact string matching against a free-text
@@ -481,6 +586,7 @@ class DocumentRequestController extends Controller
                 ], 422),
                 'cashier_items' => [],
                 'is_mock'       => $isMockAttempt,
+                'override'      => null,
             ];
         }
 
@@ -488,6 +594,7 @@ class DocumentRequestController extends Controller
             'error'         => null,
             'cashier_items' => $verification['data']['items'] ?? [],
             'is_mock'       => $isMockAttempt,
+            'override'      => null,
         ];
     }
 
