@@ -41,7 +41,8 @@ const MODULE_OPTIONS = [
   "Admin Logbook",
   "Admin Profile",
   "Access Requests",
-  "Business Calendar"
+  "Business Calendar",
+  "Cashier OR Overrides"
 ];
 
 // Work Item #1 — Granular Per-Action Permissions: Dashboard and Admin
@@ -61,7 +62,8 @@ const LABEL_TO_KEY = {
   "Admin Logbook": "logbook",
   "Admin Profile": "profile",
   "Access Requests": "access_requests",
-  "Business Calendar": "business_calendar"
+  "Business Calendar": "business_calendar",
+  "Cashier OR Overrides": "cashier_overrides"
 };
 
 const KEY_TO_LABEL = {
@@ -71,7 +73,8 @@ const KEY_TO_LABEL = {
   "logbook": "Admin Logbook",
   "profile": "Admin Profile",
   "access_requests": "Access Requests",
-  "business_calendar": "Business Calendar"
+  "business_calendar": "Business Calendar",
+  "cashier_overrides": "Cashier OR Overrides"
 };
 
 

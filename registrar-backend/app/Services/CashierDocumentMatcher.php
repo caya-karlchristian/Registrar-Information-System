@@ -160,18 +160,33 @@ class CashierDocumentMatcher
 
     /**
      * Build a normalised index of cashier receipt items.
-     * Key: lowercase trimmed document label.
+     * Key: normalised document label (see normalise()).
      * Value: total quantity paid for that label across all line items.
      *
      * @param  array $items  Raw items[] from the cashier API
      * @return array<string, int>
      */
+    /**
+     * Normalise a cashier label for matching: lowercase, trim, collapse
+     * internal whitespace, strip trailing punctuation.
+     *
+     * Delegates to CashierLabelNormalizer, the single source of truth for
+     * this algorithm shared with CashierDocumentSuggester and
+     * UnmatchedCashierItem — see that class's docblock for why the three
+     * were unified. Still exact-match-after-normalisation, not fuzzy: this
+     * only forgives formatting noise, never a different word.
+     */
+    private function normalise(string $label): string
+    {
+        return CashierLabelNormalizer::normalize($label);
+    }
+
     private function buildReceiptIndex(array $items): array
     {
         $index = [];
 
         foreach ($items as $item) {
-            $label = mb_strtolower(trim((string) ($item['document'] ?? '')));
+            $label = $this->normalise((string) ($item['document'] ?? ''));
             if ($label === '') {
                 continue;
             }
@@ -239,7 +254,7 @@ class CashierDocumentMatcher
         $bestQuantityFound = 0;
 
         foreach ($patterns as $pattern) {
-            $normalisedPattern = mb_strtolower(trim($pattern));
+            $normalisedPattern = $this->normalise($pattern);
             $paidQty           = $receiptIndex[$normalisedPattern] ?? 0;
 
             if ($paidQty <= 0) {

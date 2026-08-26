@@ -130,17 +130,27 @@ test('does not suggest an archived document type even if its pattern matches', f
         ->and($result['unresolved'])->toHaveCount(1);
 });
 
-test('does not suggest a document type outside student/alumni self-service access', function () {
-    // access_id 2 = staff-only in this app's convention (not in
-    // CashierDocumentSuggester::STUDENT_ACCESS_IDS = [1, 3]).
-    makeSuggestibleDocType('Internal Staff Memo', ['Internal Staff Memo'], accessId: 2);
+test('suggests an alumni-exclusive (access_id=2) document type', function () {
+    // access_type is 1=Student, 2=Alumni, 3=Both (see DatabaseSeeder::
+    // seedAccessType()) — every value is self-service-visible to someone,
+    // just not necessarily to a *student*. An alumni-only type must still
+    // be suggested, since AlumniRequest.jsx's own ALUMNI_ACCESS_IDS is
+    // [2, 3] and this suggester runs for alumni OR-verification too.
+    // Regression test for the bug where CashierDocumentSuggester's index
+    // only covered [1, 3] (copied from the *student* form's constant),
+    // which meant every alumni-exclusive type could never be suggested or
+    // resolved out of the unmatched-items queue no matter how many times
+    // an admin attached a pattern to it.
+    $docType = makeSuggestibleDocType('Certificate of Eligibility to Transfer', ['Certificate of Eligibility to Transfer'], accessId: 2);
 
     $suggester = new CashierDocumentSuggester();
     $result = $suggester->suggest([
-        ['document' => 'Internal Staff Memo', 'quantity' => 1],
+        ['document' => 'Certificate of Eligibility to Transfer', 'quantity' => 1],
     ]);
 
-    expect($result['documents'])->toBeEmpty();
+    expect($result['documents'])->toHaveCount(1)
+        ->and($result['documents'][0]['document_type_id'])->toBe($docType->document_type_id)
+        ->and($result['unresolved'])->toBeEmpty();
 });
 
 test('a type with null cashier_document_patterns is never suggested', function () {

@@ -3,6 +3,7 @@ import { ChevronDownIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { getDocumentTypes } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { DocumentListSkeleton } from '../components/LoadingSkeleton';
+import { ALUMNI_ACCESS_IDS } from '../constants/accessTypes';
 
 const ensureArray = (data) => {
   if (Array.isArray(data)) return data; // Already an array
@@ -78,8 +79,6 @@ const renderUrlWithBreaks = (url) => {
     </span>
   ));
 };
-
-const ALUMNI_ACCESS_IDS = [2, 3];
 
 const AlumniDocumentList = () => {
   const [openId, setOpenId] = useState(null);

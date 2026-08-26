@@ -199,7 +199,9 @@ const UnmatchedCashierItemsManagement = () => {
                   {showResolved ? (
                     <td className={`px-4 py-3 ${subtleText}`}>
                       {item.resolved_by_user
-                        ? `${item.resolved_by_user.first_name} ${item.resolved_by_user.last_name}`
+                        ? (item.resolved_by_user.admin_profile
+                            ? `${item.resolved_by_user.admin_profile.first_name} ${item.resolved_by_user.admin_profile.last_name}`
+                            : item.resolved_by_user.email)
                         : "—"}
                     </td>
                   ) : (

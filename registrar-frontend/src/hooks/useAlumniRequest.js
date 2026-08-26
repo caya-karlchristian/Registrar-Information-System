@@ -9,7 +9,6 @@ import {
   validateProfileStep,
   validateRequestDetailsStep,
   validateTORStep,
-  getDateDaysAgo,
 } from "../utils/alumniRequestUtils";
 import { getTodayDate } from "../utils/helpers";
 
@@ -223,8 +222,8 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
       return;
     }
 
-    if (formData.dateOfPayment < getDateDaysAgo(7) || formData.dateOfPayment > getTodayDate()) {
-      setErrorMessage("Date of payment must be within the last 7 days up to today.");
+    if (formData.dateOfPayment > getTodayDate()) {
+      setErrorMessage("Date of payment cannot be in the future.");
       return;
     }
 

@@ -1,16 +1,8 @@
-export const EXCLUSIVE_FOR = ["Student", "Alumni", "All"];
-
-export const ACCESS_MAP = {
-  Student: 1,
-  Alumni: 2,
-  All: 3,
-};
-
-export const ACCESS_MAP_REVERSE = {
-  1: "Student",
-  2: "Alumni",
-  3: "All",
-};
+// Re-exported from the single source of truth so existing imports of
+// EXCLUSIVE_FOR / ACCESS_MAP / ACCESS_MAP_REVERSE from this file keep
+// working unchanged. See src/constants/accessTypes.js for the canonical
+// definitions and the rationale for centralizing them.
+export { EXCLUSIVE_FOR, ACCESS_MAP, ACCESS_MAP_REVERSE } from "../constants/accessTypes";
 
 export const EMPTY_FORM = {
   document_name: "",

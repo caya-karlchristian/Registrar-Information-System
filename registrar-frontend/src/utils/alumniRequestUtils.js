@@ -1,12 +1,9 @@
 import { getTodayDate } from "./helpers";
 
-export const ALUMNI_ACCESS_IDS = [2, 3];
-
-export const getDateDaysAgo = (days) => {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString().split("T")[0];
-};
+// Re-exported from the single source of truth so existing imports of
+// ALUMNI_ACCESS_IDS from this file keep working unchanged. See
+// src/constants/accessTypes.js for the canonical definition.
+export { ALUMNI_ACCESS_IDS } from "../constants/accessTypes";
 
 export const validateProfileStep = (formData) => {
   if (!(formData.firstName || "").trim()) {
@@ -30,15 +27,15 @@ export const validateProfileStep = (formData) => {
   return null;
 };
 
-export const validateRequestDetailsStep = (formData, showCertificationDropdown) => {
-  if (formData.documentsRequested.length === 0) {
-    return "Please select at least one document to proceed.";
+export const validateRequestDetailsStep = (formData) => {
+  const hasDocs = (formData.documentsRequested || []).length > 0;
+  const hasCerts = (formData.certification || []).length > 0;
+
+  if (!hasDocs && !hasCerts) {
+    return "Please select at least one document or certification to proceed.";
   }
-  if (formData.purposeOfRequest.length === 0) {
+  if (!formData.purposeOfRequest || formData.purposeOfRequest.length === 0) {
     return "Please select a purpose for your request.";
-  }
-  if (showCertificationDropdown && formData.certification.length === 0) {
-    return "Please specify the certification type.";
   }
   return null;
 };
@@ -60,19 +57,24 @@ export const validateReceiptStep = (formData) => {
   if (!formData.dateOfPayment) {
     return "Please select the date of payment.";
   }
-  if (formData.dateOfPayment < getDateDaysAgo(7) || formData.dateOfPayment > getTodayDate()) {
-    return "Date of payment must be within the last 7 days up to today.";
+  if (formData.dateOfPayment > getTodayDate()) {
+    return "Date of payment cannot be in the future.";
   }
 
   // Validate document copies count limits
-  const hasInvalidDocCopy = formData.documentsRequested
+  const hasInvalidDocCopy = (formData.documentsRequested || [])
     .filter((doc) => !doc.toLowerCase().includes("certif"))
     .some((doc) => {
-      const copies = Number(formData.documentCopies[doc] || 1);
+      const copies = Number(formData.documentCopies?.[doc] || 1);
       return !Number.isInteger(copies) || copies < 1 || copies > 10;
     });
 
-  if (hasInvalidDocCopy) {
+  const hasInvalidCertCopy = (formData.certification || []).some((cert) => {
+    const copies = Number(formData.certCopies?.[cert] || 1);
+    return !Number.isInteger(copies) || copies < 1 || copies > 10;
+  });
+
+  if (hasInvalidDocCopy || hasInvalidCertCopy) {
     return "Number of copies must be between 1 and 10.";
   }
 

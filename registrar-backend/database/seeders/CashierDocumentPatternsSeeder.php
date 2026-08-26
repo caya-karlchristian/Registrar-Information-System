@@ -41,13 +41,10 @@ class CashierDocumentPatternsSeeder extends Seeder
         $patterns = [
 
             // Replacement of Lost Identification Card
-            // Cashier has both "Replacement of Lost ID" and "New ID -2nd copy"
-            // as valid payment options for the same RIS type.
-            2 => [
-                'Replacement of ID',
-                'Replacement of Lost ID',
-                'New ID -2nd copy',
-            ],
+            // Confirmed 2026-08-25: not a Registrar item — Cashier's own doc
+            // now lists this under Student Services. No cashier fee line to
+            // cross-check against; skip item matching.
+            2 => null,
 
             // Recommendation Letter — no cashier fee
             5 => null,
@@ -73,9 +70,9 @@ class CashierDocumentPatternsSeeder extends Seeder
             11 => null,
 
             // Course Accreditation (Transferees)
-            12 => [
-                'Accreditation Fee for transferees from another University (per unit)',
-            ],
+            // Confirmed 2026-08-25: not a Registrar item per the final
+            // matcher doc. Skip item matching.
+            12 => null,
 
             // CERTIFICATION — generic bucket, certificate types handle matching
             13 => null,
@@ -83,37 +80,40 @@ class CashierDocumentPatternsSeeder extends Seeder
             // CAV/APOSTILE
             14 => [
                 'CAV (CHED)',
-                'CAV (DFA) -undergraduate',
+                'CAV (DFA) - undergraduate',
                 'CAV (DFA) with Special Certification',
                 'CAV/Apostille (DFA)',
             ],
 
             // Transcript of Records (TOR)
-            // Covers all TOR variants and related authentication/scanning fees.
+            // NOTE: per the final matcher doc, "Authentication Fee -
+            // Transcript of Records" and "Authentication Fee - Transcript &
+            // Diploma" are "Same with CTC (Duplicate)" — i.e. Certified True
+            // Copy items, not TOR. Moved to certificate_type 7. "Scanned
+            // Picture for Transcript" is flagged "Not in Registrar (Any
+            // Certificate - Accessory)" — dropped entirely, not reassigned.
             15 => [
                 'Transcript of Records',
-                'Transcript of Records -Undergraduate (2 pages)',
-                'Transcript of Records -Undergraduate (3 pages)',
+                'Transcript of Records - Undergraduate (2 pages)',
+                'Transcript of Records - Undergraduate (3 pages)',
                 'Transcript of Records (1 page)',
-                'Transcript of Records -Technology Courses',
-                'Transcript of Records -2nd copy (graduate-engineering)',
-                'Transcript of Records -2nd copy (non-engineering graduate)',
+                'Transcript of Records - Technology Courses',
+                'Transcript of Records - 2nd copy (graduate-engineering)',
+                'Transcript of Records - 2nd copy (non-engineering graduate)',
                 'Transcript of Records (graduate-Engineering/Copy for)',
                 'Transcript of Records (graduate-Non-Engineering/Copy for)',
                 'Transcript of Records (OU)',
-                'Transcript of Records-2nd copy (graduate-non-engineering)',
-                'Authentication Fee -Transcript of Records',
-                'Authentication Fee -Transcript & Diploma',
-                'Scanned Picture for Transcript',
+                'Transcript of Records - 2nd copy (graduate-non-engineering)',
             ],
 
             // Informative Copy of Grades
-            // Cashier admin may prefix with "Certification Fee -" or
-            // "Certified True Copy -" depending on the transaction type.
+            // NOTE: "Certified True Copy - Informative Copy of Grades" is
+            // NOT this type — per the final matcher doc it maps to the
+            // registrar name "Certified True Copy of Records" (certificate_
+            // type 7), a separate document. Do not add it back here.
             16 => [
                 'Informative Copy of Grades',
                 'Certification Fee - Informative Copy of Grades',
-                'Certified True Copy - Informative Copy of Grades',
             ],
 
             // Request for Leave of Absences — no cashier fee
@@ -175,22 +175,29 @@ class CashierDocumentPatternsSeeder extends Seeder
             ],
 
             // Certificate of Attendance
-            // No standalone cashier item — only appears as a labelled fee.
-            5 => [
-                'Certification Fee - Certificate of Attendance',
-            ],
+            // Confirmed 2026-08-25: not a Registrar item per the final
+            // matcher doc; its old pattern matches nothing there. Skip
+            // item matching.
+            5 => null,
 
             // Certificate of Graduation
             6 => [
-                'Certificate of Graduation -2nd copy',
+                'Certificate of Graduation - 2nd copy',
                 'Certification Fee - Certificate of Graduation',
             ],
 
             // Certified True Copy of Records
-            // "Certified True Copy -" is a label prefix in the cashier, always
-            // applied to a specific document. Skipping item match — OR
-            // existence + name check is sufficient.
-            7 => null,
+            // Distinct from Doc 16 (Informative Copy of Grades) — confirmed
+            // 2026-08-25. Per the final matcher doc: "Certified True Copy -
+            // Informative Copy of Grades" is the cashier label for THIS type
+            // (registrar name = "Certified True Copy of Records"). The two
+            // "Authentication Fee -" items are flagged "Same with CTC
+            // (Duplicate)", i.e. also this type — moved here from doc 15.
+            7 => [
+                'Certified True Copy - Informative Copy of Grades',
+                'Authentication Fee - Transcript of Records',
+                'Authentication Fee - Transcript & Diploma',
+            ],
 
             // Certificate of Graduate Honor — no cashier equivalent
             8 => null,
@@ -199,21 +206,21 @@ class CashierDocumentPatternsSeeder extends Seeder
             9 => null,
 
             // Certificate of Enrollment - PRESENT
-            // "Certificate of Registration" is the cashier's name for
-            // enrollment certificates.
-            10 => [
-                'Certificate of Registration',
-                'Certification Fee - Certificate of Registration',
-                'Certified True Copy - Certificate of Registration',
-            ],
+            // NOTE: previously matched against "Certificate of Registration"
+            // cashier items. Confirmed 2026-08-25 that Certificate of
+            // Registration (COR) and Certificate of Enrollment are two
+            // different, separately-paid documents (COR is NOT free) — the
+            // old assumption that they were the same was wrong and let
+            // students submit Enrollment requests using a COR receipt.
+            // Cashier has no distinct fee line for Certificate of Enrollment
+            // yet (per the June 2026 matcher doc, it's still "Add in our
+            // system"), so there's nothing correct to match against. Skip
+            // item matching until Cashier creates that fee line — do NOT
+            // reintroduce "Certificate of Registration" here.
+            10 => null,
 
-            // Certificate of Enrollment - UNDERGRAD
-            // Same cashier fees as ID 10.
-            11 => [
-                'Certificate of Registration',
-                'Certification Fee - Certificate of Registration',
-                'Certified True Copy - Certificate of Registration',
-            ],
+            // Certificate of Enrollment - UNDERGRAD — same situation as ID 10.
+            11 => null,
 
             // Certificate of Ladderized Course — no cashier equivalent
             12 => null,
@@ -221,7 +228,7 @@ class CashierDocumentPatternsSeeder extends Seeder
             // CAV Request Letter
             13 => [
                 'CAV (CHED)',
-                'CAV (DFA) -undergraduate',
+                'CAV (DFA) - undergraduate',
                 'CAV (DFA) with Special Certification',
                 'CAV/Apostille (DFA)',
             ],
@@ -229,7 +236,7 @@ class CashierDocumentPatternsSeeder extends Seeder
             // CAV — same pool as ID 13
             14 => [
                 'CAV (CHED)',
-                'CAV (DFA) -undergraduate',
+                'CAV (DFA) - undergraduate',
                 'CAV (DFA) with Special Certification',
                 'CAV/Apostille (DFA)',
             ],
@@ -242,10 +249,10 @@ class CashierDocumentPatternsSeeder extends Seeder
             ],
 
             // Endorsement Letter
-            16 => [
-                'Endorsement',
-                'Certification Fee - Endorsement',
-            ],
+            // Confirmed 2026-08-25: not a Registrar item — Cashier's own doc
+            // now lists this under Head of Academic Program. Skip item
+            // matching.
+            16 => null,
 
             // Certificate of Eligibility to Transfer
             // "Honorable Dismissal" is the cashier's equivalent.

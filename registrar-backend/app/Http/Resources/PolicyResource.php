@@ -23,6 +23,7 @@ class PolicyResource extends JsonResource
         'profile'           => 'Admin Profile',
         'access_requests'   => 'Access Requests',
         'business_calendar' => 'Business Calendar',
+        'cashier_overrides' => 'Cashier OR Overrides',
     ];
 
     public function toArray($request): array
