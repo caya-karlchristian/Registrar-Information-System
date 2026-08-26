@@ -36,7 +36,16 @@ class UnmatchedCashierItemController extends Controller
         $query = UnmatchedCashierItem::query();
 
         if ($request->boolean('resolved')) {
-            $query->whereNotNull('resolved_at')->with('resolvedByUser:user_id,first_name,last_name');
+            // first_name/last_name live on admin_profile, not on the users
+            // table itself (users only has user_id, email, role_id, etc.)
+            // — constraining the eager-load to columns that don't exist on
+            // `users` throws a SQL error, not an empty result, which is
+            // why this branch specifically 500'd. Load the profile
+            // relation instead of pretending users carries a name.
+            $query->whereNotNull('resolved_at')->with([
+                'resolvedByUser:user_id,email',
+                'resolvedByUser.adminProfile:admin_profile_id,user_id,first_name,last_name',
+            ]);
         } else {
             $query->whereNull('resolved_at');
         }
