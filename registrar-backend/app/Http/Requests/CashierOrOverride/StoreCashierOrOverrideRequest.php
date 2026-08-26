@@ -10,10 +10,12 @@ use Illuminate\Validation\Validator;
 /**
  * Validates POST /cashier-overrides.
  *
- * Route sits behind 'role:3' in routes/api.php (admin; superadmin
- * bypasses via RoleMiddleware) — same convention as
- * ResolveUnmatchedCashierItemRequest — so authorize() only needs to
- * confirm the target account is actually a student/alumni, not staff.
+ * Route sits behind 'role:3,4' + 'module:cashier_overrides' in
+ * routes/api.php (super admin bypasses the module check inherently via
+ * SystemUser::hasModuleAccess(); a regular admin needs the
+ * "Cashier OR Overrides" module explicitly granted through Policy
+ * Management) — so authorize() only needs to confirm the target account
+ * is actually a student/alumni, not staff.
  *
  * Deliberately does NOT check "is this OR already used" or "does an
  * active override already exist for this pair" here — those are

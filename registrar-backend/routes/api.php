@@ -213,6 +213,28 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
             ->only(['index', 'store', 'update', 'destroy']);
     });
 
+    // Cashier OR override — the scoped, audited admin bypass for one
+    // (or_number, student) pair when a real receipt is wrongly rejected
+    // by the Cashier API (see CashierOrOverrideController and the
+    // cashier_or_overrides migration's docblock for the full design).
+    //
+    // Gated by policy, same pattern as business_calendar directly
+    // above: any admin whose attached policy grants the
+    // "cashier_overrides" module can create/list/revoke overrides;
+    // super admin always has it via SystemUser::hasModuleAccess()'s
+    // unconditional super-admin bypass, with no policy attachment
+    // needed. This is a deliberately narrower gate than the general
+    // "role:3" admin group — bypassing a money-facing check is
+    // sensitive enough that it shouldn't be something every admin
+    // account gets by default just by being role_id=3; a super admin
+    // grants it explicitly per-admin via Policy Management, the same
+    // way business_calendar or access_requests access is granted.
+    Route::middleware(['role:3,4', 'module:cashier_overrides'])->group(function () {
+        Route::get('cashier-overrides',              [CashierOrOverrideController::class, 'index']);
+        Route::post('cashier-overrides',              [CashierOrOverrideController::class, 'store']);
+        Route::post('cashier-overrides/{id}/revoke',  [CashierOrOverrideController::class, 'revoke']);
+    });
+
     // Request history — READ ONLY. History is written only by DocumentRequestService.
     Route::middleware(['role:3,4', 'module:logbook,View'])->prefix('request-history')->group(function () {
         Route::get('/',    [RequestHistoryController::class, 'index']);
@@ -281,17 +303,6 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::get('unmatched-cashier-items',              [UnmatchedCashierItemController::class, 'index']);
         Route::post('unmatched-cashier-items/{id}/resolve', [UnmatchedCashierItemController::class, 'resolve']);
         Route::post('unmatched-cashier-items/{id}/dismiss', [UnmatchedCashierItemController::class, 'dismiss']);
-
-        // Cashier OR override — scoped, audited admin bypass for one
-        // (or_number, student) pair when a real receipt is wrongly
-        // rejected by the Cashier API. role:3 here means admin OR
-        // super_admin (super_admin bypasses this middleware entirely —
-        // see RoleMiddleware), matching "either can approve, log which
-        // role" from the design discussion. See CashierOrOverrideController
-        // and the cashier_or_overrides migration's docblock.
-        Route::get('cashier-overrides',              [CashierOrOverrideController::class, 'index']);
-        Route::post('cashier-overrides',              [CashierOrOverrideController::class, 'store']);
-        Route::post('cashier-overrides/{id}/revoke',  [CashierOrOverrideController::class, 'revoke']);
 
         // Signatories (certificate signees) — admin-only end to end,
         // unlike document-types/certifications above whose GET is open to

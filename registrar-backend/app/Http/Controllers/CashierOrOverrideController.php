@@ -7,7 +7,7 @@ use App\Models\AuditLog;
 use App\Models\CashierOrOverride;
 use App\Models\SystemUser;
 use App\Services\AuditLogger;
-use App\Services\CashierService;
+use App\Contracts\CashierServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +19,15 @@ use Illuminate\Support\Facades\DB;
  * happens to reject never forces an admin to blank CASHIER_API_KEY
  * system-wide).
  *
+ * Gated in routes/api.php by 'role:3,4' + 'module:cashier_overrides' —
+ * a super admin always has access (SystemUser::hasModuleAccess()'s
+ * unconditional bypass), a regular admin needs the "Cashier OR
+ * Overrides" module explicitly granted via Policy Management. This is
+ * deliberately its own module rather than folded into the general
+ * "role:3" admin group: bypassing a money-facing check is sensitive
+ * enough to be opt-in per admin, not a default every admin account
+ * gets.
+ *
  * Consumption of an override (marking it used_at / used_by_request_id)
  * happens in DocumentRequestController::store(), not here — this
  * controller only ever creates, lists, and revokes.
@@ -26,8 +35,8 @@ use Illuminate\Support\Facades\DB;
 class CashierOrOverrideController extends Controller
 {
     public function __construct(
-        private AuditLogger    $auditLogger,
-        private CashierService $cashierService,
+        private AuditLogger           $auditLogger,
+        private CashierServiceInterface $cashierService,
     ) {}
 
     /**
