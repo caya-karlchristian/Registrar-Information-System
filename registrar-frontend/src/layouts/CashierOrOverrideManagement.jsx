@@ -629,13 +629,13 @@ const CreateOverrideModal = ({ isDark, rowBorder, subtleText, accentBtn, onClose
             {items.length > 0 && (
               <div className="space-y-2">
                 {items.map((row, idx) => (
-                  <div key={idx} className="flex gap-2 items-start">
+                  <div key={idx} className="flex flex-wrap sm:flex-nowrap gap-2 items-start">
                     <input
                       type="text"
                       value={row.document}
                       onChange={(e) => updateItemRow(idx, "document", e.target.value)}
                       placeholder="Document label"
-                      className={`${inputClasses} flex-1`}
+                      className={`${inputClasses} flex-1 min-w-[180px] basis-full sm:basis-auto`}
                     />
                     <input
                       type="number"
@@ -643,19 +643,19 @@ const CreateOverrideModal = ({ isDark, rowBorder, subtleText, accentBtn, onClose
                       max={999}
                       value={row.quantity}
                       onChange={(e) => updateItemRow(idx, "quantity", e.target.value)}
-                      className={`${inputClasses} w-20`}
+                      className={`${inputClasses} w-20 shrink-0`}
                     />
                     <input
                       type="text"
                       value={row.amount}
                       onChange={(e) => updateItemRow(idx, "amount", e.target.value)}
                       placeholder="Amount"
-                      className={`${inputClasses} w-24`}
+                      className={`${inputClasses} w-24 shrink-0`}
                     />
                     <button
                       type="button"
                       onClick={() => removeItemRow(idx)}
-                      className="text-red-500 text-sm cursor-pointer px-1 py-2"
+                      className="text-red-500 text-sm cursor-pointer px-1 py-2 shrink-0"
                       aria-label="Remove item"
                     >
                       ✕
