@@ -4,6 +4,7 @@ import { getDocumentTypes } from '../services/api';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
 import { useTheme } from '../context/ThemeContext';
 import { DocumentListSkeleton } from '../components/LoadingSkeleton';
+import { STUDENT_ACCESS_IDS } from '../constants/accessTypes';
 
 const ensureArray = (data) => {
   if (Array.isArray(data)) return data; // Already an array
@@ -79,8 +80,6 @@ const renderUrlWithBreaks = (url) => {
     </span>
   ));
 };
-
-const STUDENT_ACCESS_IDS = [1, 3];
 
 const DocumentLists = () => {
   const [openId, setOpenId] = useState(null);

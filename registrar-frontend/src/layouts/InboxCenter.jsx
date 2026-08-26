@@ -333,11 +333,11 @@ const InboxCenter = () => {
                             also no-ops on missing props, so this is a
                             belt-and-suspenders check, not the only guard. */}
                       {selectedMail._raw?.uuid && selectedMail._raw?.claim_code && (
-                        <div className={`rounded-lg border px-4 py-4 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
-                          <p className={`text-[11px] font-semibold uppercase tracking-widest mb-3 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
+                        <div className={`rounded-xl border p-3.5 sm:p-5 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
+                          <p className={`text-[11px] font-bold uppercase tracking-widest mb-3 text-center sm:text-left ${isDark ? 'text-pup-yellow' : 'text-[#800000]'}`}>
                             Your Claim Ticket
                           </p>
-                          <div className="flex justify-center">
+                          <div className="flex justify-center w-full">
                             <ClaimTicket
                               uuid={selectedMail._raw.uuid}
                               claimCode={selectedMail._raw.claim_code}
