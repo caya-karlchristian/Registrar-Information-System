@@ -175,6 +175,22 @@ export const dismissUnmatchedCashierItem = (id) =>
   api.post(`/unmatched-cashier-items/${id}/dismiss`);
 
 // -------------------------------------------------------
+// CASHIER OR OVERRIDES (Admin with the "cashier_overrides" module, or
+// Super Admin) — the scoped, audited bypass for one (or_number,
+// student) pair when a real receipt is wrongly rejected by the
+// Cashier API. See CashierOrOverrideController on the backend for the
+// full design rationale.
+// -------------------------------------------------------
+export const getCashierOverrides = (params = {}) =>
+  api.get("/cashier-overrides", { params });
+export const createCashierOverride = (data) =>
+  api.post("/cashier-overrides", data);
+export const revokeCashierOverride = (id) =>
+  api.post(`/cashier-overrides/${id}/revoke`);
+export const searchCashierOverrideUsers = (q) =>
+  api.get("/cashier-overrides/search-users", { params: { q } });
+
+// -------------------------------------------------------
 // SIGNATORIES (certificate signees) — read/write: Admin only
 // (unlike document-types/certifications, GET is admin-only here too —
 // see routes/api.php)

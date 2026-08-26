@@ -230,6 +230,13 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     // grants it explicitly per-admin via Policy Management, the same
     // way business_calendar or access_requests access is granted.
     Route::middleware(['role:3,4', 'module:cashier_overrides'])->group(function () {
+        // Distinct throttle prefix so this doesn't share a rate-limit
+        // bucket with role-assignments' own search-users route — same
+        // reasoning as that route's own comment on why an unprefixed
+        // throttle would collide.
+        Route::get('cashier-overrides/search-users', [CashierOrOverrideController::class, 'searchUsers'])
+            ->middleware('throttle:30,1,cashier-overrides-search-users');
+
         Route::get('cashier-overrides',              [CashierOrOverrideController::class, 'index']);
         Route::post('cashier-overrides',              [CashierOrOverrideController::class, 'store']);
         Route::post('cashier-overrides/{id}/revoke',  [CashierOrOverrideController::class, 'revoke']);

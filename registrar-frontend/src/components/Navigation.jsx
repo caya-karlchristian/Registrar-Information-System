@@ -65,6 +65,7 @@ const ROLE_CONFIG = {
       { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon, module: MODULE_KEYS.LOGBOOK },
       { name: 'Access Requests', to: 'access-requests', icon: ClipboardDocumentCheckIcon, module: MODULE_KEYS.ACCESS_REQUESTS },
       { name: 'Business Calendar', to: 'business-calendar', icon: CalendarDaysIcon, module: MODULE_KEYS.BUSINESS_CALENDAR },
+      { name: 'Cashier OR Overrides', to: 'cashier-overrides', icon: ShieldCheckIcon, module: MODULE_KEYS.CASHIER_OVERRIDES },
       { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon, module: MODULE_KEYS.PROFILE },
     ],
   },
@@ -78,6 +79,7 @@ const ROLE_CONFIG = {
       { name: 'Audit Trail', to: 'report', icon: UserCircleIcon },
       { name: 'Announcement Management', to: 'settings', icon: Cog6ToothIcon },
       { name: 'Business Calendar', to: 'business-calendar', icon: CalendarDaysIcon },
+      { name: 'Cashier OR Overrides', to: 'cashier-overrides', icon: ShieldCheckIcon },
     ],
   },
 };

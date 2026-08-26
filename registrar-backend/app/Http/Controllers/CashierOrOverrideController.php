@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\CashierOrOverride\StoreCashierOrOverrideRequest;
+use App\Http\Resources\GrantableUserResource;
 use App\Models\AuditLog;
 use App\Models\CashierOrOverride;
 use App\Models\SystemUser;
@@ -64,6 +65,61 @@ class CashierOrOverrideController extends Controller
             ->paginate($request->integer('per_page', 25));
 
         return response()->json($overrides, 200);
+    }
+
+    /**
+     * GET /cashier-overrides/search-users — typeahead lookup so an admin
+     * building an override can find the right student/alumni by name or
+     * email instead of needing their raw user_id on hand.
+     *
+     * Deliberately NOT RoleAssignmentController::searchUsers() /
+     * RoleAssignmentService::searchGrantableUsers(): that endpoint is
+     * authorized via RoleAssignmentPolicy::grant(), which is
+     * Super-Admin-only, full stop. A regular admin who has been granted
+     * the "cashier_overrides" module through Policy Management — the
+     * whole point of that module existing — would get a 403 reusing it,
+     * even though this controller's own create/list/revoke actions are
+     * already open to them. Same query shape and the same minimal
+     * GrantableUserResource output (no PII beyond what's needed to
+     * confirm identity), gated by this controller's own
+     * role:3,4 + module:cashier_overrides middleware instead, so access
+     * follows the same rule as every other action here.
+     *
+     * Scoped to student/alumni only, matching
+     * StoreCashierOrOverrideRequest's own restriction — there's no
+     * reason to surface staff/admin accounts in a picker for a form
+     * that would reject them anyway.
+     */
+    public function searchUsers(Request $request)
+    {
+        $validated = $request->validate([
+            'q' => 'required|string|min:2|max:100',
+        ]);
+
+        // Escape LIKE metacharacters in the raw input so a literal '%'
+        // or '_' typed by the admin is matched literally rather than
+        // changing LIKE's matching semantics.
+        $escaped = addcslashes($validated['q'], '%_\\');
+        $prefix  = $escaped . '%';
+
+        $users = SystemUser::query()
+            ->where('status', 'Activated')
+            ->whereIn('role_id', [SystemUser::ROLE_STUDENT, SystemUser::ROLE_ALUMNI])
+            ->where(function ($query) use ($prefix) {
+                $query->where('email', 'like', $prefix)
+                    ->orWhereHas('studentProfile', fn ($p) => $p
+                        ->where('first_name', 'like', $prefix)
+                        ->orWhere('last_name', 'like', $prefix))
+                    ->orWhereHas('alumniProfile', fn ($p) => $p
+                        ->where('first_name', 'like', $prefix)
+                        ->orWhere('last_name', 'like', $prefix));
+            })
+            ->with(['studentProfile', 'alumniProfile'])
+            ->orderBy('email')
+            ->limit(10)
+            ->get();
+
+        return GrantableUserResource::collection($users);
     }
 
     /**
