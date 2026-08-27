@@ -53,7 +53,17 @@ class AnalyticsService
     // Overview KPIs
     // -------------------------------------------------------------------------
 
-    public function overview(array $range): array
+    /**
+     * @param array $range [Carbon $from, Carbon $to] — see
+     *                      AnalyticsController::dateRange().
+     * @param string $rangeKey The raw ?range= value ('today'|'week'|
+     *                         'month'|'year'|'all'|'custom'), default
+     *                         'month' to preserve prior call sites/tests
+     *                         that don't pass it. Only used to decide
+     *                         whether a previous-period comparison is
+     *                         even meaningful — see the block below.
+     */
+    public function overview(array $range, string $rangeKey = 'month'): array
     {
         [$from, $to] = $range;
 
@@ -97,19 +107,48 @@ class AnalyticsService
             'dr'
         )->avg('rh.business_minutes');
 
-        // Previous period comparison
-        $periodLength = $from->diffInSeconds($to);
-        $prevFrom     = $from->copy()->subSeconds($periodLength);
-        $prevTo       = $from->copy();
+        // BUG FIX (QA #13 — "'No Prior Data' Despite History"): 'all'
+        // sets $from to now()->subYears(100) (see AnalyticsController::
+        // dateRange()), so $periodLength below would be ~100 years and
+        // $prevFrom/$prevTo would land 200-100 years ago — a window
+        // that can never contain a real row, in any dataset, ever. That
+        // guaranteed-empty query was previously run anyway and its
+        // result (always 0) rendered as "No prior data" on the
+        // dashboard — technically not wrong (there IS no previous
+        // period for an open-ended range), but indistinguishable from
+        // the genuine "we checked and found nothing" case, and a
+        // wasted query every time an admin opens "All Time". Skip it
+        // outright for 'all' rather than let a nonsensical date range
+        // produce a nonsensical (if accidentally-plausible-looking)
+        // result.
+        if ($rangeKey === 'all') {
+            $prevTotal = 0;
+        } else {
+            // Previous period comparison: the same-length window
+            // immediately preceding $from. Note this is a rolling
+            // window, not a calendar-aligned "last week"/"last month" —
+            // e.g. for ?range=week checked on a Wednesday, this compares
+            // against the ~2.5 days immediately before this week
+            // started, not the equivalent Mon-Wed of last week. That
+            // is intentional (matches "vs previous period of equal
+            // length" everywhere else this pattern is used) and is not
+            // part of what QA #13 was about — see the dateRange() fix
+            // above for the actual bug (UTC vs local boundaries), which
+            // is what was making even well-populated previous periods
+            // read as empty.
+            $periodLength = $from->diffInSeconds($to);
+            $prevFrom     = $from->copy()->subSeconds($periodLength);
+            $prevTo       = $from->copy();
 
-        $prev = DocumentRequest::whereBetween('requested_at', [$prevFrom, $prevTo])
-            ->selectRaw('
-                COUNT(*) as total,
-                SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as completed
-            ', [RequestStatusEnum::Completed->value])
-            ->first();
+            $prev = DocumentRequest::whereBetween('requested_at', [$prevFrom, $prevTo])
+                ->selectRaw('
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status_id = ? THEN 1 ELSE 0 END) as completed
+                ', [RequestStatusEnum::Completed->value])
+                ->first();
 
-        $prevTotal = (int) $prev->total;
+            $prevTotal = (int) $prev->total;
+        }
 
         return [
             'total'                  => $total,

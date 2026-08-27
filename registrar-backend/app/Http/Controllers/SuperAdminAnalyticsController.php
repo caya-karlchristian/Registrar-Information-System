@@ -47,23 +47,34 @@ class SuperAdminAnalyticsController extends Controller
     // controller. Revisit if a third analytics controller needs the
     // same parsing.
     // -------------------------------------------------------
+    // BUG FIX (QA #13 — "'No Prior Data' Despite History"): same
+    // UTC-vs-display_timezone boundary bug as AnalyticsController::
+    // dateRange() — see that method's docblock for the full
+    // explanation. Duplicated there rather than shared (per this
+    // method's own existing comment above), so the fix is duplicated
+    // too, kept identical on purpose.
     private function dateRange(Request $request): array
     {
-        $rangeKey = $request->query('range', 'month');
+        $rangeKey  = $request->query('range', 'month');
+        $displayTz = config('app.display_timezone', 'Asia/Manila');
+        $storageTz = config('app.timezone', 'UTC');
 
         if ($rangeKey === 'custom') {
-            $from = now()->parse($request->query('from', now()->startOfMonth()->toDateString()))->startOfDay();
-            $to   = now()->parse($request->query('to',   now()->toDateString()))->endOfDay();
+            $defaultFrom = now($displayTz)->startOfMonth()->toDateString();
+            $defaultTo   = now($displayTz)->toDateString();
+
+            $from = now($displayTz)->parse($request->query('from', $defaultFrom))->startOfDay()->setTimezone($storageTz);
+            $to   = now($displayTz)->parse($request->query('to',   $defaultTo))->endOfDay()->setTimezone($storageTz);
             return [$from, $to];
         }
 
         $to   = now();
         $from = match ($rangeKey) {
-            'today' => now()->startOfDay(),
-            'week'  => now()->startOfWeek(),
-            'year'  => now()->startOfYear(),
+            'today' => now($displayTz)->startOfDay()->setTimezone($storageTz),
+            'week'  => now($displayTz)->startOfWeek()->setTimezone($storageTz),
+            'year'  => now($displayTz)->startOfYear()->setTimezone($storageTz),
             'all'   => now()->subYears(100),
-            default  => now()->startOfMonth(),
+            default  => now($displayTz)->startOfMonth()->setTimezone($storageTz),
         };
         return [$from, $to];
     }

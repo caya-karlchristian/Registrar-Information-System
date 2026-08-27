@@ -43,24 +43,57 @@ class AnalyticsController extends Controller
     // Accepts ?range=today|week|month|year|all|custom (default: month)
     // For custom ranges: also accepts ?from=YYYY-MM-DD&to=YYYY-MM-DD
     // Returns [Carbon $from, Carbon $to]
+    //
+    // BUG FIX (QA #13 — "'No Prior Data' Despite History"): every boundary
+    // below used bare now()->startOfDay()/startOfWeek()/startOfMonth()/
+    // startOfYear(), which resolve in config('app.timezone') — UTC (see
+    // config/app.php). That's 8 hours behind Asia/Manila (config('app.
+    // display_timezone'), which every OTHER place in this codebase that
+    // reasons about "what local day/hour did this happen on" already
+    // uses — see BusinessCalendarService::minutesBetween() and
+    // AnalyticsService::localExpression()'s docblock). So "Today" here
+    // didn't mean the admin's actual today: at 7:59am Manila (still
+    // "yesterday" in UTC), ?range=today would resolve $from to yesterday
+    // 00:00 UTC = the day before yesterday, 8:00am Manila — an 8-hour-
+    // shifted window that, especially checked first thing each morning
+    // (exactly when staff open the dashboard), can easily land on a
+    // slice of time with zero requests even though "today" and "the
+    // previous period" both have real data just a few hours away. Same
+    // shift applies to week/month/year at their respective boundaries.
+    //
+    // Fix: compute each boundary AS a local-timezone instant (so
+    // startOfDay/Week/Month/Year truncate against the calendar day the
+    // admin is actually in), then convert back to app.timezone (UTC)
+    // before returning — Carbon represents an absolute instant either
+    // way, but Laravel's query grammar formats bound parameters using
+    // the Carbon object's OWN timezone, and the DB column is UTC, so
+    // the returned instances must carry UTC or every query silently
+    // reintroduces the same 8-hour offset in the other direction.
+    // $to is unaffected — "now" is the same absolute instant regardless
+    // of which timezone reads it.
     // -------------------------------------------------------
     private function dateRange(Request $request): array
     {
-        $rangeKey = $request->query('range', 'month');
+        $rangeKey       = $request->query('range', 'month');
+        $displayTz      = config('app.display_timezone', 'Asia/Manila');
+        $storageTz      = config('app.timezone', 'UTC');
 
         if ($rangeKey === 'custom') {
-            $from = now()->parse($request->query('from', now()->startOfMonth()->toDateString()))->startOfDay();
-            $to   = now()->parse($request->query('to',   now()->toDateString()))->endOfDay();
+            $defaultFrom = now($displayTz)->startOfMonth()->toDateString();
+            $defaultTo   = now($displayTz)->toDateString();
+
+            $from = now($displayTz)->parse($request->query('from', $defaultFrom))->startOfDay()->setTimezone($storageTz);
+            $to   = now($displayTz)->parse($request->query('to',   $defaultTo))->endOfDay()->setTimezone($storageTz);
             return [$from, $to];
         }
 
         $to   = now();
         $from = match ($rangeKey) {
-            'today' => now()->startOfDay(),
-            'week'  => now()->startOfWeek(),
-            'year'  => now()->startOfYear(),
+            'today' => now($displayTz)->startOfDay()->setTimezone($storageTz),
+            'week'  => now($displayTz)->startOfWeek()->setTimezone($storageTz),
+            'year'  => now($displayTz)->startOfYear()->setTimezone($storageTz),
             'all'   => now()->subYears(100),
-            default  => now()->startOfMonth(),
+            default  => now($displayTz)->startOfMonth()->setTimezone($storageTz),
         };
         return [$from, $to];
     }
@@ -87,8 +120,14 @@ class AnalyticsController extends Controller
 
     public function overview(Request $request)
     {
+        // BUG FIX (QA #13): 'all' has no meaningful "previous period" —
+        // see AnalyticsService::overview()'s doc block for why this is
+        // passed through explicitly instead of just letting the
+        // prev-period query run and come back empty.
+        $rangeKey = $request->query('range', 'month');
+
         return response()->json(
-            $this->cached($request, 'overview', fn () => $this->analytics->overview($this->dateRange($request)))
+            $this->cached($request, 'overview', fn () => $this->analytics->overview($this->dateRange($request), $rangeKey))
         );
     }
 
