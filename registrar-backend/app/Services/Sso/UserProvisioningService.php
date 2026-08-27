@@ -4,6 +4,7 @@ namespace App\Services\Sso;
 
 use App\DTOs\Alumni\AlumniDTO;
 use App\Exceptions\AccountDeactivatedException;
+use App\Exceptions\AccountExpiredException;
 use App\Exceptions\OgosException;
 use App\Exceptions\UnregisteredAccountException;
 use App\Models\Alumni;
@@ -119,6 +120,39 @@ class UserProvisioningService
                 );
             }
 
+            // BUG FIX (QA #11 — "Expired Status Not Auto-Tagged"): mirrors
+            // the Deactivated check directly above. provisioning:expire-stale
+            // only flips 'Pending Activation' -> 'Expired' once a day, so
+            // without this, an invite past its 14-day pending_expires_at
+            // window could still be silently activated below for up to
+            // ~24h after it should have been rejected — the stored `status`
+            // column lagging reality is exactly what QA flagged. Checking
+            // pending_expires_at directly here, on every login attempt,
+            // closes that window instead of waiting on the sweep.
+            //
+            // Self-heals the row while we're already here (same audit
+            // action + attribution convention ExpireStaleProvisioning
+            // uses) rather than just rejecting silently — so the account
+            // reads correctly everywhere immediately, not just on this
+            // one request.
+            if (
+                $existing
+                && $existing->status === 'Pending Activation'
+                && $existing->pending_expires_at
+                && $existing->pending_expires_at->isPast()
+            ) {
+                $existing->update(['status' => 'Expired']);
+
+                $this->auditLogger->log($request, $existing, AuditLog::ACTION_ADMIN_EXPIRED, [
+                    'target_user_id' => $existing->user_id,
+                    'target_email'   => $existing->email,
+                ]);
+
+                throw new AccountExpiredException(
+                    'This invitation has expired. Please contact the registrar for a new invite.'
+                );
+            }
+
             $roleId = $this->roleResolver->resolve($existing);
 
             // Captured only if the not-pre-registered branch below ends up
@@ -183,6 +217,13 @@ class UserProvisioningService
             // backfills idp_user_id, it never re-derives role from the IdP.
             if ($existing
                 && $existing->status === 'Pending Activation'
+                // Belt-and-suspenders: the guard above already throws
+                // before reaching here whenever pending_expires_at has
+                // elapsed, so this condition should always be true by
+                // this point. Kept anyway in case a future branch is
+                // added between the two checks that reaches this code
+                // without passing through the guard.
+                && (!$existing->pending_expires_at || $existing->pending_expires_at->isFuture())
                 && in_array($roleId, [SystemUser::ROLE_ADMIN, SystemUser::ROLE_SUPER_ADMIN], true)
             ) {
                 $user->idp_user_id        = $profile['id'] ?? $user->idp_user_id;

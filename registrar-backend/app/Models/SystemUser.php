@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\AdminProfile;
@@ -445,6 +446,43 @@ class SystemUser extends Authenticatable
     public function adminProfile()
     {
         return $this->hasOne(AdminProfile::class, 'user_id', 'user_id');
+    }
+
+    // -------------------------------------------------------
+    // EFFECTIVE STATUS (QA #11 — "Expired Status Not Auto-Tagged")
+    //
+    // provisioning:expire-stale only sweeps 'Pending Activation' ->
+    // 'Expired' once a day (routes/console.php, dailyAt('08:15')), so a
+    // record can be functionally expired for up to ~24h while every
+    // read of the raw `status` column still says 'Pending Activation'.
+    // Same shape as RoleAssignment::effectiveStatus() (see that class's
+    // docblock for the full reasoning): a purely computed accessor that
+    // reports 'Expired' the instant pending_expires_at has elapsed,
+    // regardless of whether the sweep has run yet.
+    //
+    // Login-eligibility enforcement (EnsureAccountActive middleware,
+    // UserProvisioningService's real-time guard) does NOT need to read
+    // this — 'Pending Activation' was already rejected there before an
+    // account was ever functionally usable, so there's no access gap,
+    // only a display one. UserResource is what should render this, not
+    // the raw column.
+    //
+    // Never persisted from here — same footgun-avoidance reasoning as
+    // RoleAssignment's accessor: an accessor should not have side
+    // effects, and a read-triggered write is unsafe under concurrent
+    // requests. provisioning:expire-stale (and, for the SSO login path
+    // specifically, UserProvisioningService::provision()) remain the
+    // only writers of the persisted `status` column.
+    // -------------------------------------------------------
+    protected function effectiveStatus(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => ($this->status === 'Pending Activation'
+                && $this->pending_expires_at
+                && $this->pending_expires_at->isPast())
+                ? 'Expired'
+                : $this->status,
+        );
     }
 
     protected static function newFactory()

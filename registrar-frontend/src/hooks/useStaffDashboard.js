@@ -64,6 +64,16 @@ export const useStaffDashboard = (viewMode) => {
   const resolvedStatusIds = resolveStatusIds(requestStatuses);
 
   /* ---------------- TANSTACK QUERY: FETCH REQUESTS ---------------- */
+  // BUG FIX (client-side auto-forfeit race condition — see routes/console.php
+  // for the full writeup): this queryFn used to call updateDocumentRequest()
+  // for any request it locally decided was 90+ days old, on every 30s poll,
+  // from every open staff dashboard — a write triggered by a read, racing
+  // across every open tab, and computed from the wrong clock (requested_at
+  // instead of the most recent ReadyToClaim transition the backend actually
+  // uses). Forfeiture is now handled exclusively by the backend's
+  // ShredExpiredRequests cron (now hourly), which is transactional, audited,
+  // and cache-invalidated. This queryFn is a pure read again — it maps and
+  // returns whatever status the backend reports, nothing more.
   const { data: requests = [], isLoading: loading } = useQuery({
     queryKey: ['documentRequests', viewMode],
     queryFn: async () => {
@@ -73,15 +83,7 @@ export const useStaffDashboard = (viewMode) => {
       });
 
       const rawList = requestsRes.data?.data ?? requestsRes.data ?? [];
-      return rawList.map(r => {
-        const mapped = mapDocumentRequest(r, resolvedStatusIds, docTypeName);
-        if (mapped.autoForfeit) {
-          updateDocumentRequest(r.request_id, { status_id: resolvedStatusIds.FORFEITED }).catch(err => {
-            console.error(`Failed to forfeit request ${r.request_id}:`, err);
-          });
-        }
-        return mapped;
-      });
+      return rawList.map(r => mapDocumentRequest(r, resolvedStatusIds, docTypeName));
     },
     refetchInterval: 30_000,
     staleTime: 10_000,
