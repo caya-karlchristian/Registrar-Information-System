@@ -19,9 +19,31 @@ Artisan::command('inspire', function () {
 | Scheduled Commands — Unclaimed Document Policy
 |--------------------------------------------------------------------------
 |
-| Order matters:
-|   08:00  ShredExpiredRequests    — forfeit 90-day-old unclaimed requests
-|                                    BEFORE the 7-day reminder runs.
+| BUG FIX (client-side auto-forfeit race condition, found while
+| investigating QA #12):
+|
+| useStaffDashboard.js used to compute "90+ days old" client-side and
+| fire a real forfeit write directly from the dashboard's poll — on
+| EVERY staff member's browser, every 30s, for every stale request. Two
+| distinct problems: (1) N dashboards open == N racing writes for the
+| same request with no lock, and (2) it used the wrong clock entirely
+| (requested_at — creation time — instead of the most recent transition
+| into ReadyToClaim), a silently-diverging definition of the same
+| business rule this command already gets right.
+|
+| That client-side stand-in only existed because this job ran once a
+| day, so staff would otherwise see a stale ReadyToClaim request for up
+| to ~24h after it should have been forfeited. Rather than patch the
+| symptom (add a lock, fix the date math client-side, keep two
+| implementations in sync forever), the fix is to make the one correct,
+| already-transactional, already-audited, already-cache-invalidated
+| implementation (this command) run often enough that no client-side
+| stand-in is needed at all — exactly the precedent already set below
+| by role-assignments:expire for the identical "daily cadence leaves
+| stale status visible too long" problem.
+|
+| Order still matters relative to the other 08:xx jobs:
+|   08:00  (kept, redundant with hourly() below, harmless)
 |   08:05  SendUnclaimedReminders  — send 7-day warnings for the rest.
 |
 | withoutOverlapping() — prevents a slow DB run from spawning a duplicate.
@@ -31,7 +53,7 @@ Artisan::command('inspire', function () {
 */
 
 Schedule::command('notifications:shred-expired-requests')
-    ->dailyAt('08:00')
+    ->hourly()
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
