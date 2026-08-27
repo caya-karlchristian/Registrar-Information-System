@@ -28,7 +28,16 @@ class AccessRequestResource extends JsonResource
                 'name'      => $this->requestedPolicy->name,
             ] : null),
             'justification'      => $this->justification,
-            'status'             => $this->status,
+
+            // BUG FIX (QA #11 — "Expired Status Not Auto-Tagged"): same
+            // status/stored_status convention as RoleAssignmentResource
+            // and UserResource (see AccessRequest::effectiveStatus()).
+            // effective_status reports 'Expired' immediately once
+            // expires_at has elapsed, even before
+            // provisioning:expire-stale sweeps the row — this is what
+            // the Access Requests queue should render.
+            'status'             => $this->effective_status,
+            'stored_status'      => $this->status,
             'reviewed_by'        => $this->when($this->reviewed_by, fn () => [
                 'user_id' => $this->reviewedBy?->user_id,
                 'email'   => $this->reviewedBy?->email,

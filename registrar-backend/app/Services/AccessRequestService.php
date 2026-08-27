@@ -178,5 +178,21 @@ class AccessRequestService
                 'status' => "This request is already '{$accessRequest->status}' and can no longer be reviewed.",
             ]);
         }
+
+        // BUG FIX (QA #11 — "Expired Status Not Auto-Tagged"): the raw
+        // status column above only rules out requests already swept to
+        // Expired/Approved/etc. provisioning:expire-stale doesn't run
+        // until 08:15 daily, so a request whose 7-day expires_at has
+        // already passed can still read 'Requested' here for up to
+        // ~24h. Check isCurrentlyPending() (time-aware) rather than
+        // trusting the sweep already ran, so an expired request can
+        // never be approved or rejected in that window.
+        if (!$accessRequest->isCurrentlyPending()) {
+            throw ValidationException::withMessages([
+                'status' => 'This request expired on '
+                    . $accessRequest->expires_at->format('M j, Y g:i A')
+                    . ' and can no longer be reviewed.',
+            ]);
+        }
     }
 }
