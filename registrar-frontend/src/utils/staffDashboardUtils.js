@@ -234,8 +234,12 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
 /**
  * Filter and sort data records.
  */
-export const filterAndSortRequests = (requests, { filterStatus, filterClassification, searchTerm, sortOrder, viewMode, resolvedStatusIds }) => {
-  const isFiltering = filterStatus !== 'All' || filterClassification !== 'All' || searchTerm.trim() !== '';
+export const filterAndSortRequests = (requests, { filterStatus, filterClassification, filterDocument, searchTerm, sortOrder, viewMode, resolvedStatusIds }) => {
+  const isFiltering =
+    filterStatus !== 'All' ||
+    filterClassification !== 'All' ||
+    (filterDocument && filterDocument !== 'All') ||
+    searchTerm.trim() !== '';
 
   return requests
     .filter(r => {
@@ -253,12 +257,20 @@ export const filterAndSortRequests = (requests, { filterStatus, filterClassifica
       const matchesClassification =
         filterClassification === 'All' ||
         r.userType.toLowerCase() === filterClassification.toLowerCase();
+      const matchesDocument =
+        !filterDocument ||
+        filterDocument === 'All' ||
+        (r.documentDetailsArray && r.documentDetailsArray.some(d =>
+          d.toLowerCase() === filterDocument.toLowerCase() ||
+          d.toLowerCase().includes(filterDocument.toLowerCase()) ||
+          filterDocument.toLowerCase().includes(d.toLowerCase())
+        ));
       const matchesSearch =
         searchTerm.trim() === '' ||
         r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.id.toString().includes(searchTerm);
-      return matchesStatus && matchesClassification && matchesSearch;
+      return matchesStatus && matchesClassification && matchesDocument && matchesSearch;
     })
     .sort((a, b) => {
       const aCompleted = String(a.statusId) === String(resolvedStatusIds?.COMPLETED) || String(a.statusName ?? '').trim().toLowerCase() === 'completed';

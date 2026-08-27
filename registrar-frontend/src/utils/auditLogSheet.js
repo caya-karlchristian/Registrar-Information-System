@@ -1,44 +1,29 @@
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import XLSX from 'xlsx-js-style';
 
 /**
  * Generates and downloads the official Institutional Audit Log Spreadsheet (.xlsx)
+ * using xlsx-js-style (100% CSP compliant, no unsafe-eval).
  *
  * @param {Array} logs - List of audit log records
  * @param {Object} options - Filter & metadata options (dateRangeLabel, roleFilter, actionFilter, browserFilter, search)
  */
 export const AuditLogSheet = async (logs = [], options = {}) => {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'PUP Registrar Information System';
-  workbook.created = new Date();
+  const wb = XLSX.utils.book_new();
 
-  const worksheet = workbook.addWorksheet('Audit Logs', {
-    views: [{ showGridLines: true }],
-    pageSetup: {
-      orientation: 'landscape',
-      paperSize: 9, // A4
-      fitToPage: true,
-      fitToWidth: 1,
-      fitToHeight: 0,
-    },
-  });
+  const data = [];
+  const merges = [];
+  const rowHeights = [];
 
-  // Set column definitions & base widths (5 columns: A to E)
-  worksheet.columns = [
-    { key: 'timestamp', width: 24 },
-    { key: 'user', width: 36 },
-    { key: 'role', width: 20 },
-    { key: 'action', width: 28 },
-    { key: 'browser', width: 26 },
-  ];
+  // Helper to get cell address like "A1"
+  const getCellRef = (r, c) => XLSX.utils.encode_cell({ r, c });
 
-  // 1. Report Title
-  const titleRow = worksheet.addRow(['SYSTEM AUDIT TRAIL AND ACTIVITY REPORT']);
-  worksheet.mergeCells(`A${titleRow.number}:E${titleRow.number}`);
-  titleRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-  titleRow.getCell(1).font = { name: 'Lucida Fax', size: 13, bold: true, color: { argb: 'FF7F0000' } };
+  // 1. Report Title (Row 0)
+  const titleRowIndex = data.length;
+  data.push(['SYSTEM AUDIT TRAIL AND ACTIVITY REPORT', '', '', '', '']);
+  merges.push({ s: { r: titleRowIndex, c: 0 }, e: { r: titleRowIndex, c: 4 } });
+  rowHeights.push({ hpt: 24 });
 
-  // Subtitle / Filter Metadata
+  // 2. Subtitle / Filter Metadata (Row 1)
   const subtitleText = `Total Records: ${logs.length}${
     options.dateRangeLabel ? `  |  Period: ${options.dateRangeLabel}` : ''
   }${
@@ -49,103 +34,176 @@ export const AuditLogSheet = async (logs = [], options = {}) => {
     options.browserFilter && options.browserFilter !== 'All' ? `  |  Browser: ${options.browserFilter}` : ''
   }`;
 
-  const subRow = worksheet.addRow([subtitleText]);
-  worksheet.mergeCells(`A${subRow.number}:E${subRow.number}`);
-  subRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-  subRow.getCell(1).font = { name: 'Lucida Fax', size: 9.5, italic: true, color: { argb: 'FF555555' } };
+  const subRowIndex = data.length;
+  data.push([subtitleText, '', '', '', '']);
+  merges.push({ s: { r: subRowIndex, c: 0 }, e: { r: subRowIndex, c: 4 } });
+  rowHeights.push({ hpt: 18 });
 
-  // Blank spacing row
-  worksheet.addRow([]);
+  // Blank spacing row (Row 2)
+  data.push(['', '', '', '', '']);
+  rowHeights.push({ hpt: 10 });
 
-  // 3. Table Header Row (Maroon background, white bold text)
+  // 3. Table Header Row (Row 3)
+  const headerRowIndex = data.length;
   const tableHeaders = ['TIMESTAMP', 'USER ACCOUNT', 'ROLE', 'ACTION PERFORMED', 'BROWSER / PLATFORM'];
-  const tableHeaderRow = worksheet.addRow(tableHeaders);
-  tableHeaderRow.height = 26;
-
-  tableHeaderRow.eachCell((c) => {
-    c.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF7F0000' }, // Maroon
-    };
-    c.font = {
-      name: 'Lucida Fax',
-      size: 9.5,
-      bold: true,
-      color: { argb: 'FFFFFFFF' },
-    };
-    c.alignment = { horizontal: 'center', vertical: 'middle' };
-    c.border = {
-      top: { style: 'thin', color: { argb: 'FFB0B0B0' } },
-      left: { style: 'thin', color: { argb: 'FFB0B0B0' } },
-      bottom: { style: 'thin', color: { argb: 'FFB0B0B0' } },
-      right: { style: 'thin', color: { argb: 'FFB0B0B0' } },
-    };
-  });
+  data.push(tableHeaders);
+  rowHeights.push({ hpt: 26 });
 
   // 4. Data Rows
+  const dataStartRowIndex = data.length;
   if (!logs || logs.length === 0) {
-    const emptyRow = worksheet.addRow(['No audit records match the selected filter criteria.']);
-    worksheet.mergeCells(`A${emptyRow.number}:E${emptyRow.number}`);
-    emptyRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-    emptyRow.getCell(1).font = { name: 'Lucida Fax', size: 10, italic: true, color: { argb: 'FF777777' } };
-    emptyRow.height = 24;
+    const emptyRowIndex = data.length;
+    data.push(['No audit records match the selected filter criteria.', '', '', '', '']);
+    merges.push({ s: { r: emptyRowIndex, c: 0 }, e: { r: emptyRowIndex, c: 4 } });
+    rowHeights.push({ hpt: 24 });
   } else {
-    logs.forEach((log, index) => {
-      const dataRow = worksheet.addRow([
+    logs.forEach((log) => {
+      data.push([
         `${log.date || ''} ${log.time || ''}`.trim() || '—',
         log.user || '—',
         log.role ? String(log.role).toUpperCase() : '—',
         log.action || '—',
         log.browser || '—',
       ]);
-      dataRow.height = 20;
-
-      const isEven = index % 2 === 1;
-      dataRow.eachCell((c, colNumber) => {
-        c.font = { name: 'Lucida Fax', size: 9, color: { argb: 'FF1F1F1F' } };
-        c.alignment = {
-          vertical: 'middle',
-          horizontal: colNumber === 2 ? 'left' : 'center',
-        };
-        c.border = {
-          top: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-          left: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-          bottom: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-          right: { style: 'thin', color: { argb: 'FFE0E0E0' } },
-        };
-        if (isEven) {
-          c.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF9F9F9' },
-          };
-        }
-      });
+      rowHeights.push({ hpt: 20 });
     });
   }
 
+  // Blank spacing row before footer
+  data.push(['', '', '', '', '']);
+  rowHeights.push({ hpt: 10 });
+
   // 5. Footer & Data Privacy Disclaimer
-  worksheet.addRow([]);
-  const footerRow1 = worksheet.addRow(['This document contains personal-identifiable information that is subject to Data Privacy.']);
-  worksheet.mergeCells(`A${footerRow1.number}:E${footerRow1.number}`);
-  footerRow1.getCell(1).font = { name: 'Lucida Fax', size: 8, bold: true, color: { argb: 'FFCC0000' } };
+  const footer1Index = data.length;
+  data.push(['This document contains personal-identifiable information that is subject to Data Privacy.', '', '', '', '']);
+  merges.push({ s: { r: footer1Index, c: 0 }, e: { r: footer1Index, c: 4 } });
+  rowHeights.push({ hpt: 16 });
 
-  const footerRow2 = worksheet.addRow(['This is system-generated from the Registrar Information System (RIS).']);
-  worksheet.mergeCells(`A${footerRow2.number}:E${footerRow2.number}`);
-  footerRow2.getCell(1).font = { name: 'Lucida Fax', size: 8, italic: true, color: { argb: 'FF666666' } };
+  const footer2Index = data.length;
+  data.push(['This is system-generated from the Registrar Information System (RIS).', '', '', '', '']);
+  merges.push({ s: { r: footer2Index, c: 0 }, e: { r: footer2Index, c: 4 } });
+  rowHeights.push({ hpt: 16 });
 
-  // Write to buffer and trigger download
-  const buffer = await workbook.xlsx.writeBuffer();
+  // Build Worksheet from 2D Array
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Column definitions & base widths (5 columns: A to E)
+  ws['!cols'] = [
+    { wch: 24 }, // A: Timestamp
+    { wch: 36 }, // B: User Account
+    { wch: 20 }, // C: Role
+    { wch: 28 }, // D: Action
+    { wch: 26 }, // E: Browser
+  ];
+  ws['!merges'] = merges;
+  ws['!rows'] = rowHeights;
+
+  // ── Apply Styles ──────────────────────────────────────────────────────────
+
+  // Title Style
+  const titleCell = ws[getCellRef(titleRowIndex, 0)];
+  if (titleCell) {
+    titleCell.s = {
+      font: { name: 'Lucida Fax', sz: 13, bold: true, color: { rgb: '7F0000' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+  }
+
+  // Subtitle Style
+  const subCell = ws[getCellRef(subRowIndex, 0)];
+  if (subCell) {
+    subCell.s = {
+      font: { name: 'Lucida Fax', sz: 9.5, italic: true, color: { rgb: '555555' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+  }
+
+  // Header Row Styles
+  const headerBorder = {
+    top: { style: 'thin', color: { rgb: 'B0B0B0' } },
+    bottom: { style: 'thin', color: { rgb: 'B0B0B0' } },
+    left: { style: 'thin', color: { rgb: 'B0B0B0' } },
+    right: { style: 'thin', color: { rgb: 'B0B0B0' } },
+  };
+
+  for (let c = 0; c < 5; c++) {
+    const cell = ws[getCellRef(headerRowIndex, c)];
+    if (cell) {
+      cell.s = {
+        fill: { fgColor: { rgb: '7F0000' } },
+        font: { name: 'Lucida Fax', sz: 9.5, bold: true, color: { rgb: 'FFFFFF' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: headerBorder,
+      };
+    }
+  }
+
+  // Data Rows Styles
+  const dataBorder = {
+    top: { style: 'thin', color: { rgb: 'E0E0E0' } },
+    bottom: { style: 'thin', color: { rgb: 'E0E0E0' } },
+    left: { style: 'thin', color: { rgb: 'E0E0E0' } },
+    right: { style: 'thin', color: { rgb: 'E0E0E0' } },
+  };
+
+  if (!logs || logs.length === 0) {
+    const emptyCell = ws[getCellRef(dataStartRowIndex, 0)];
+    if (emptyCell) {
+      emptyCell.s = {
+        font: { name: 'Lucida Fax', sz: 10, italic: true, color: { rgb: '777777' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+      };
+    }
+  } else {
+    logs.forEach((_, idx) => {
+      const r = dataStartRowIndex + idx;
+      const isEven = idx % 2 === 1;
+
+      for (let c = 0; c < 5; c++) {
+        const cell = ws[getCellRef(r, c)];
+        if (cell) {
+          cell.s = {
+            font: { name: 'Lucida Fax', sz: 9, color: { rgb: '1F1F1F' } },
+            alignment: {
+              vertical: 'center',
+              horizontal: c === 1 ? 'left' : 'center',
+            },
+            border: dataBorder,
+            ...(isEven ? { fill: { fgColor: { rgb: 'F9F9F9' } } } : {}),
+          };
+        }
+      }
+    });
+  }
+
+  // Footer 1 Style
+  const footer1Cell = ws[getCellRef(footer1Index, 0)];
+  if (footer1Cell) {
+    footer1Cell.s = {
+      font: { name: 'Lucida Fax', sz: 8, bold: true, color: { rgb: 'CC0000' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+    };
+  }
+
+  // Footer 2 Style
+  const footer2Cell = ws[getCellRef(footer2Index, 0)];
+  if (footer2Cell) {
+    footer2Cell.s = {
+      font: { name: 'Lucida Fax', sz: 8, italic: true, color: { rgb: '666666' } },
+      alignment: { horizontal: 'left', vertical: 'center' },
+    };
+  }
+
+  // Append Sheet to Workbook
+  XLSX.utils.book_append_sheet(wb, ws, 'Audit Logs');
+
+  // Trigger Download
   const year = new Date().getFullYear();
   const fileName = options.dateRangeLabel
     ? `Audit_Log_Report_${options.dateRangeLabel.replace(/[\s\/\\]/g, '_')}.xlsx`
     : `Audit_Log_Report_${year}.xlsx`;
 
-  saveAs(
-    new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-    fileName
-  );
+  XLSX.writeFile(wb, fileName);
 };
 
 export default AuditLogSheet;

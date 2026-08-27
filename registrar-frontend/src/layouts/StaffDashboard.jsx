@@ -218,6 +218,11 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
     setFilterClassification,
     classificationDropdownOpen,
     setClassificationDropdownOpen,
+    filterDocument,
+    setFilterDocument,
+    documentDropdownOpen,
+    setDocumentDropdownOpen,
+    documentOptions,
     printedCertificateIds,
     resolvedStatusIds,
     requestStatuses,
@@ -235,6 +240,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
   const sortDropdownRef = useRef(null);
   const statusDropdownRef = useRef(null);
   const classificationDropdownRef = useRef(null);
+  const documentDropdownRef = useRef(null);
 
   const handleSort = (field) => {
     if (field === 'Date & Time') {
@@ -401,18 +407,20 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
           </div>
         )}
         <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          {(filterStatus !== 'All' || filterClassification !== 'All' || sortOrder !== 'Recent Requests' || searchTerm.trim() !== '') && (
+          {(filterStatus !== 'All' || filterClassification !== 'All' || filterDocument !== 'All' || sortOrder !== 'Recent Requests' || searchTerm.trim() !== '') && (
             <button
               type="button"
               onClick={() => {
                 setFilterStatus('All');
                 setFilterClassification('All');
+                setFilterDocument('All');
                 setSortOrder('Recent Requests');
                 setSearchTerm('');
                 setSelectedIds([]);
                 setSortDropdownOpen(false);
                 setStatusDropdownOpen(false);
                 setClassificationDropdownOpen(false);
+                setDocumentDropdownOpen(false);
               }}
               className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold transition-colors border shadow-sm flex items-center justify-center shrink-0
               ${isDark
@@ -471,7 +479,26 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                   ]}
                 />
               </Th>
-              <Th center>Document</Th>
+              <Th center>
+                <DashboardDropdown
+                  isOpen={documentDropdownOpen}
+                  setIsOpen={setDocumentDropdownOpen}
+                  dropdownRef={documentDropdownRef}
+                  align="center"
+                  width="w-64"
+                  trigger={<span>Document</span>}
+                  sections={[
+                    {
+                      title: 'Filter by Document',
+                      items: documentOptions.map(option => ({
+                        label: option,
+                        isSelected: filterDocument === option,
+                        onClick: () => setFilterDocument(option)
+                      }))
+                    }
+                  ]}
+                />
+              </Th>
               <Th center>
                 <button
                   type="button"
