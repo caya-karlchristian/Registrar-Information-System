@@ -53,4 +53,15 @@ class UpdateSystemUserRequest extends FormRequest
             'suffix'      => 'nullable|string|max:20',
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            // QA bug #2 — same generic-message fix as StoreSystemUserRequest,
+            // applied here too since Edit User hits the identical unique
+            // rule (and therefore the identical default message) whenever
+            // an admin changes a user's email to one already in use.
+            'email.unique' => 'This email is already associated with a SystemUser account.',
+        ];
+    }
 }

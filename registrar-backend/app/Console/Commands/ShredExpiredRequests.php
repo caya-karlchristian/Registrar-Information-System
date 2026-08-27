@@ -7,6 +7,7 @@ use App\Models\DocumentRequest;
 use App\Models\RequestHistory;
 use App\Models\SystemUser;
 use App\Contracts\NotificationServiceInterface;
+use App\Services\Concerns\FlushesAnalyticsCache;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -41,6 +42,8 @@ use Illuminate\Support\Facades\Log;
 
 class ShredExpiredRequests extends Command
 {
+    use FlushesAnalyticsCache;
+
     protected $signature   = 'notifications:shred-expired-requests';
     protected $description = 'Auto-forfeit ReadyToClaim requests unclaimed for 90+ days and notify the student';
 
@@ -52,12 +55,27 @@ class ShredExpiredRequests extends Command
         // If a request was ever cycled back through Processing and then
         // set ReadyToClaim again, the 90-day clock should restart from the
         // latest transition — not from the original one.
+        //
+        // NOTE: this is deliberately a raw whereExists() rather than
+        // whereHas('history', ...). whereHas()'s automatic "select 1"
+        // existence-subquery optimization does not apply once the
+        // closure adds its own groupBy()/havingRaw(), so Eloquent falls
+        // back to selecting request_history's full column list. Combined
+        // with GROUP BY request_id, that trips MySQL's ONLY_FULL_GROUP_BY
+        // mode (every unaggregated column in the SELECT list must be in
+        // the GROUP BY). Building the subquery explicitly with
+        // select(DB::raw(1)) sidesteps that entirely and doesn't depend
+        // on Eloquent's relation-existence internals staying the same
+        // across versions.
         $requests = DocumentRequest::query()
             ->where('status_id', RequestStatusEnum::ReadyToClaim->value)
-            ->whereHas('history', function ($q) use ($cutoff) {
-                $q->where('new_status_id', RequestStatusEnum::ReadyToClaim->value)
-                  ->havingRaw('MAX(changed_at) <= ?', [$cutoff])
-                  ->groupBy('request_id');
+            ->whereExists(function ($query) use ($cutoff) {
+                $query->select(DB::raw(1))
+                    ->from('request_history')
+                    ->whereColumn('request_history.request_id', 'document_request.request_id')
+                    ->where('request_history.new_status_id', RequestStatusEnum::ReadyToClaim->value)
+                    ->groupBy('request_history.request_id')
+                    ->havingRaw('MAX(request_history.changed_at) <= ?', [$cutoff]);
             })
             ->with('user')
             ->get();
@@ -103,6 +121,24 @@ class ShredExpiredRequests extends Command
         }
 
         $this->info("[ShredExpiredRequests] {$shredded} request(s) forfeited.");
+
+        // QA bugs #4/#9 ("Forfeited Count Mismatch" / "Forfeited Missing
+        // from Admin Analytics") — this command writes status_id
+        // directly to the DB via a bare $request->update(), bypassing
+        // DocumentRequestService::updateRequest() entirely, which is the
+        // only other place that used to invalidate the "analytics"
+        // cache. That meant an auto-forfeiture from this cron could
+        // leave the Forfeited summary card and detail table
+        // disagreeing for up to 10 minutes — exactly the symptom QA
+        // reported. Flushed ONCE after the loop (not per-row): a tag
+        // flush clears everything regardless of row count, so per-row
+        // flushing would just be N-1 wasted Redis round trips for the
+        // same result. Skipped entirely when nothing was forfeited, to
+        // avoid a pointless cache round trip on the common no-op run.
+        if ($shredded > 0) {
+            $this->flushAnalyticsCache();
+        }
+
         return self::SUCCESS;
     }
 }

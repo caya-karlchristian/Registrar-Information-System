@@ -1,11 +1,12 @@
 import React, { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 // Auth
 import { ROLES, useAuth } from './context/AuthProvider';
 import { useTheme } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ModuleRoute from './components/ModuleRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 import { MODULE_KEYS, hasModuleAccess } from './utils/policy';
 import { FolderLoadingOverlay } from './components/LoadingSkeleton.jsx';
 
@@ -76,12 +77,18 @@ const StaffIndexRedirect = () => {
 
 const App = () => {
   const { isDark } = useTheme();
+  const location = useLocation();
   return (
     <NotificationToastProvider>
       <AlertToastProvider>
         <ReferenceDataProvider>
           <NotificationsProvider>
             <div className="flex flex-col min-h-screen">
+              {/* BUG FIX (QA #6) — resetKey={location.pathname} means that if
+                  one page's render throws, clicking "Back to Login" (or any
+                  navigation) actually clears the fallback instead of staying
+                  stuck until a hard reload. See ErrorBoundary.jsx docblock. */}
+              <ErrorBoundary resetKey={location.pathname}>
               <Suspense fallback={<FolderLoadingOverlay isDark={isDark} message="Loading..." />}>
                 <Routes>
                   <Route path="/" element={<MainPage />} />
@@ -192,6 +199,7 @@ const App = () => {
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
+              </ErrorBoundary>
 
               {/* Global toast stack — rendered outside Routes so it persists across navigation */}
               <NotificationToast />

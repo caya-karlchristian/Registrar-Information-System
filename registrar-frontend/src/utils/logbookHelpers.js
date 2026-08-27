@@ -138,11 +138,79 @@ export const getProcessedAt = (row, historyByRequestId = {}) => {
   return entry?.changed_at || null;
 };
 
-/** minutes_processed from the same ReadyToClaim entry for consistency. */
+/**
+ * Raw cumulative wall-clock minutes (minutes_processed) from the ReadyToClaim
+ * entry. Kept for backward compatibility and as the fallback source when a
+ * request predates business_minutes (see getBusinessMinutesProcessed below).
+ * Do not use this directly for a "processing time" figure shown to staff —
+ * it counts weekends/holidays/after-hours as elapsed time. Use
+ * getProcessingDuration() instead, which prefers the business-hours-aware
+ * figure and only falls back to this.
+ */
 export const getMinutesProcessed = (row, historyByRequestId = {}) => {
   const history = getHistoryRows(row, historyByRequestId);
   const entry = history.find((h) => h.new_status_id === 2);
   return entry?.minutes_processed ?? null;
+};
+
+/**
+ * Cumulative, calendar-aware processing time (minutes) from the request
+ * being filed through its ReadyToClaim transition — i.e. the office-hours
+ * counterpart of getMinutesProcessed() above.
+ *
+ * WHY THIS ISN'T A SIMPLE FIELD SWAP:
+ * Each request_history row's `business_minutes` is a PER-SEGMENT duration —
+ * the calendar-aware time elapsed since the PREVIOUS status change, not
+ * since the request was filed (see BusinessCalendarService and the
+ * business_minutes column comment on migration
+ * 2026_08_15_000000_add_pending_signature_status on the backend). A request
+ * that went Processing -> Pending Signature -> Ready to Claim has its
+ * total office-hours processing time split across two separate history
+ * rows. Reading business_minutes off only the ReadyToClaim row — mirroring
+ * how getMinutesProcessed() reads minutes_processed off that single row —
+ * would silently drop every earlier segment.
+ *
+ * This walks the request's full history chronologically and sums
+ * business_minutes for every segment up to and including the ReadyToClaim
+ * transition, which is the calendar-aware equivalent of "cumulative time
+ * since requested_at" that minutes_processed represents.
+ *
+ * Returns null (never a partial/incorrect number) when:
+ *   - there's no ReadyToClaim entry for this row, or
+ *   - any segment in that span predates the business_minutes column and is
+ *     therefore null — callers should fall back to getMinutesProcessed()
+ *     for those older records rather than mixing business-hours and
+ *     wall-clock minutes into one total.
+ */
+export const getBusinessMinutesProcessed = (row, historyByRequestId = {}) => {
+  const history = getHistoryRows(row, historyByRequestId); // newest first
+  const readyIndex = history.findIndex((h) => h.new_status_id === 2);
+  if (readyIndex === -1) return null;
+
+  // Every segment from the earliest history row through the ReadyToClaim
+  // transition (inclusive) — getHistoryRows() sorts newest-first, so that's
+  // everything from readyIndex to the end of the array.
+  const segments = history.slice(readyIndex);
+
+  let total = 0;
+  for (const segment of segments) {
+    const minutes = segment?.business_minutes;
+    if (minutes === null || minutes === undefined) return null; // incomplete data — let the caller fall back
+    total += Number(minutes) || 0;
+  }
+
+  return total;
+};
+
+/**
+ * The processing-time figure that should be shown/exported to staff:
+ * business-hours-aware when available, transparently falling back to the
+ * raw cumulative figure for requests that predate the business_minutes
+ * column so older records still display something rather than "---".
+ */
+export const getProcessingDuration = (row, historyByRequestId = {}) => {
+  const businessMinutes = getBusinessMinutesProcessed(row, historyByRequestId);
+  return businessMinutes ?? getMinutesProcessed(row, historyByRequestId);
 };
 
 /** Timestamp when the request was claimed (new_status_id === 3) */

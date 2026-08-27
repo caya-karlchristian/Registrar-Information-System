@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\AccountDeactivatedException;
+use App\Exceptions\AccountExpiredException;
 use App\Exceptions\IdpException;
 use App\Exceptions\UnregisteredAccountException;
 use App\Http\Resources\UserResource;
@@ -59,6 +60,23 @@ class SsoCallbackController extends Controller
             ], 403);
         } catch (AccountDeactivatedException $e) {
             $this->safeLog('warning', 'SSO: deactivated account attempted login', ['message' => $e->getMessage()]);
+
+            $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
+                'client_id'                => config('sso.client_id'),
+                'post_logout_redirect_uri' => config('app.url'),
+            ]);
+
+            return response()->json([
+                'message'    => $e->getMessage(),
+                'logout_url' => $logoutUrl,
+            ], 403);
+        } catch (AccountExpiredException $e) {
+            // BUG FIX (QA #11) — same shape as AccountDeactivatedException
+            // above (403 + logout_url so the frontend can clear the IdP
+            // session too), kept as a separate catch block so the log
+            // line and any future handling can tell "deactivated" and
+            // "invite expired" apart without parsing $e->getMessage().
+            $this->safeLog('warning', 'SSO: expired invite attempted login', ['message' => $e->getMessage()]);
 
             $logoutUrl = config('sso.base_url') . '/logout?' . http_build_query([
                 'client_id'                => config('sso.client_id'),

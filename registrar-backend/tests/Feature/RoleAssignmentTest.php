@@ -82,6 +82,43 @@ test('grant() backfills a missing baseline row for the users current role before
     expect($baseline->granted_by)->toBeNull();
 });
 
+test('rejects granting a role to a Deactivated account', function () {
+    // Bug #5 (QA) — grant() must enforce this itself and not rely solely
+    // on searchGrantableUsers() filtering the picker, since a direct API
+    // call bypasses that filter entirely.
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $student    = SystemUser::factory()->create([
+        'role_id' => SystemUser::ROLE_STUDENT,
+        'status'  => 'Deactivated',
+    ]);
+
+    $service = app(RoleAssignmentService::class);
+
+    expect(fn () => $service->grant([
+        'user_id'    => $student->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'expires_at' => now()->addMonths(4),
+    ], roleAssignmentTestRequest($superAdmin)))->toThrow(ValidationException::class);
+
+    expect(RoleAssignment::where('user_id', $student->user_id)->exists())->toBeFalse();
+});
+
+test('rejects granting a role to a Pending Activation account', function () {
+    $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
+    $pending    = SystemUser::factory()->create([
+        'role_id' => SystemUser::ROLE_ADMIN,
+        'status'  => 'Pending Activation',
+    ]);
+
+    $service = app(RoleAssignmentService::class);
+
+    expect(fn () => $service->grant([
+        'user_id'    => $pending->user_id,
+        'role_id'    => SystemUser::ROLE_ADMIN,
+        'expires_at' => now()->addMonths(4),
+    ], roleAssignmentTestRequest($superAdmin)))->toThrow(ValidationException::class);
+});
+
 test('rejects granting a role the user already actively holds', function () {
     $superAdmin = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_SUPER_ADMIN]);
     $admin      = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ADMIN]);

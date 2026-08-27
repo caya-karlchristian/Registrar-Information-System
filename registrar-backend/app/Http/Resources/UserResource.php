@@ -89,7 +89,17 @@ class UserResource extends JsonResource
                 fn () => $this->effectivePermissions()
             ),
 
-            'status'    => $this->status,
+            // BUG FIX (QA #11 — "Expired Status Not Auto-Tagged"): same
+            // convention as RoleAssignmentResource's status/stored_status
+            // split (see RoleAssignment::effectiveStatus() docblock).
+            // effective_status reports 'Expired' the instant
+            // pending_expires_at has elapsed, even if provisioning:expire-stale
+            // hasn't swept this row yet — this is what the frontend
+            // (status badge, status filter) should render. stored_status
+            // is the raw column, for anyone specifically debugging the
+            // sweep job itself.
+            'status'        => $this->effective_status,
+            'stored_status' => $this->status,
             // Only meaningful while status === 'Pending Activation' — when
             // this passes, provisioning:expire-stale flips status to
             // 'Expired' (see Console\Commands\ExpireStaleProvisioning).

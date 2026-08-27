@@ -8,10 +8,9 @@ use App\Models\RequestHistory;
 use App\Models\SystemUser;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Contracts\NotificationServiceInterface;
+use App\Services\Concerns\FlushesAnalyticsCache;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Encapsulates all business logic for document requests.
@@ -21,6 +20,8 @@ use Illuminate\Support\Facades\Log;
  */
 class DocumentRequestService implements DocumentRequestServiceInterface
 {
+    use FlushesAnalyticsCache;
+
     public function __construct(
         private NotificationServiceInterface $notificationService,
         private BusinessCalendarService $businessCalendarService,
@@ -275,36 +276,11 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         return $documentRequest;
     }
 
-    /**
-     * Invalidates every cached analytics response (AnalyticsController,
-     * 10-minute TTL) so a status change is reflected on the next request
-     * instead of waiting out the cache window. See updateRequest()'s
-     * BUG FIX comment (RIS-PROCESS-BUGS #9) for why this exists.
-     *
-     * Cache::tags() requires a taggable store (Redis — see
-     * AnalyticsController's docblock; it does NOT work with the "file"
-     * driver). Guarded with an instanceof check plus a try/catch so a
-     * misconfigured or momentarily-unavailable cache backend degrades to
-     * "analytics are stale for up to 10 minutes, as before" rather than
-     * failing the document-status update itself — the cache is a
-     * performance optimization, not a source of truth, so it must never
-     * be allowed to break the actual business transaction it's
-     * piggybacking on.
-     */
-    private function flushAnalyticsCache(): void
-    {
-        try {
-            $store = Cache::getStore();
-
-            if ($store instanceof \Illuminate\Cache\TaggableStore) {
-                Cache::tags(['analytics'])->flush();
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Failed to flush analytics cache after a document request status change.', [
-                'exception' => $e->getMessage(),
-            ]);
-        }
-    }
+    // flushAnalyticsCache() now lives in Concerns\FlushesAnalyticsCache —
+    // shared with AccessRequestService and ShredExpiredRequests, which
+    // had the same "writes a status the dashboard counts, never
+    // invalidates the cache" gap (QA bugs #4/#9/#14). See that trait's
+    // docblock for the full reasoning.
 
     // -------------------------------------------------------------------------
     // Claim (QR scan / manual claim_code)

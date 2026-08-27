@@ -11,7 +11,7 @@ import {
   getEmail,
   getHistoryRows,
   getProcessedAt,
-  getMinutesProcessed,
+  getProcessingDuration,
   getClaimedAt,
 } from './logbookHelpers.js';
 // FE-2 migration: helpers imported from logbookHelpers.js
@@ -250,7 +250,7 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
       buildHeaderRowCell('Gender', colWidths[3]),
       buildHeaderRowCell('Email Address/Contact', colWidths[4]),
       buildHeaderRowCell('Date/Time Processed', colWidths[5]),
-      buildHeaderRowCell('No. of Minutes Processed', colWidths[6]),
+      buildHeaderRowCell('No. of Minutes Processed (Business Hours)', colWidths[6]),
       buildHeaderRowCell('Date Claimed', colWidths[7]),
     ],
   });
@@ -304,7 +304,7 @@ export const logbookDocx = async (sectionsOrRows, pupLogoSrc = null, bpLogoSrc =
       cell(getGender(row), { width: colWidths[3], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
       cell(getEmail(row), { width: colWidths[4], align: AlignmentType.LEFT, size: DEFAULT_TEXT_SIZE }),
       cell(formatDateLong(getProcessedAt(row, historyByRequestId), true) || '---', { width: colWidths[5], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
-      cell(formatMinutesDuration(getMinutesProcessed(row, historyByRequestId)), { width: colWidths[6], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
+      cell(formatMinutesDuration(getProcessingDuration(row, historyByRequestId)), { width: colWidths[6], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
       cell(formatDateLong(getClaimedAt(row, historyByRequestId)) || 'Pending', { width: colWidths[7], align: AlignmentType.CENTER, size: DEFAULT_TEXT_SIZE }),
     ],
   }));

@@ -128,25 +128,24 @@ export const isDefaultVisible = (req, resolvedStatusIds) => {
  */
 export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
   const requestDate = r.requested_at ? new Date(r.requested_at) : null;
-  const now = new Date();
-  const diffDays = requestDate ? (now - requestDate) / (1000 * 60 * 60 * 24) : 0;
 
   let computedStatusId = r.status?.status_id;
   let computedStatusName = r.status?.status_name;
 
   const isArchived = Boolean(r.is_archived);
-  const STATUS = resolvedStatusIds;
 
-  const alreadyForfeited = computedStatusId === STATUS.FORFEITED || String(computedStatusName).toLowerCase() === 'forfeited';
-  const alreadyCompleted = computedStatusId === STATUS.COMPLETED || String(computedStatusName).toLowerCase() === 'completed';
-
-  const autoForfeit = !alreadyForfeited && !alreadyCompleted && !isArchived && diffDays >= 90;
-  // Archived records are read-only (Archive Rules policy) — never
-  // auto-transition their status client-side while archived.
-  if (autoForfeit) {
-    computedStatusId = STATUS.FORFEITED;
-    computedStatusName = 'Forfeited';
-  }
+  // BUG FIX (client-side auto-forfeit race condition — see
+  // routes/console.php and useStaffDashboard.js for the full writeup):
+  // this used to locally recompute "is this forfeited yet?" from
+  // requested_at (creation date) and relabel the row as Forfeited in the
+  // UI ahead of the backend actually forfeiting it — using a different
+  // clock than the backend's own rule (which measures from the most
+  // recent transition INTO ReadyToClaim, not from creation). That made
+  // the two implementations silently disagree on which requests were
+  // actually overdue, on top of the write-race problem in the hook.
+  // The backend (ShredExpiredRequests, now hourly) is the single source
+  // of truth for this transition — status_id/status_name below always
+  // reflect exactly what the server reports, nothing computed on top.
 
   const finalCertName = r.certificates?.length > 0
     ? r.certificates.map(c => c.certification_type?.certificate_name).filter(Boolean).join(', ')
@@ -229,7 +228,6 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
     isArchived,
     archivedOn: r.archived_on ?? null,
     archivedBy: r.archived_by_user?.email ?? null,
-    autoForfeit
   };
 };
 
