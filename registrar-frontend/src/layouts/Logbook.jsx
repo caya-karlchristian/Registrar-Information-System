@@ -7,7 +7,7 @@ import { getAllLogbookData, getDocumentTypes, getCertifications } from '../servi
 import {
   formatMinutesDuration,
   getProcessedAt,
-  getMinutesProcessed,
+  getProcessingDuration,
   getFullName,
   getCourse,
   getGender,
@@ -451,7 +451,7 @@ const LogbookRecords = () => {
                 <th className="py-4 px-2 text-[10px] font-black w-[8%] whitespace-nowrap">Gender</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[15%] whitespace-nowrap">Email</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[11%] whitespace-nowrap">Date/Time Processed</th>
-                <th className="py-4 px-2 text-[10px] font-black w-[10%] whitespace-nowrap">No. of Minutes Processed</th>
+                <th className="py-4 px-2 text-[10px] font-black w-[10%] whitespace-nowrap" title="Office-hours time only — weekends, holidays, and after-hours are excluded">No. of Minutes Processed (Business Hours)</th>
                 <th className="py-4 px-2 text-[10px] font-black w-[12%] whitespace-nowrap">Date Claimed</th>
               </tr>
             </thead>
@@ -491,7 +491,7 @@ const LogbookRecords = () => {
                       </td>
 
                       <td className="p-3 sm:p-4 text-center whitespace-nowrap">
-                        {formatMinutesDuration(getMinutesProcessed(row))}
+                        {formatMinutesDuration(getProcessingDuration(row))}
                       </td>
 
                       <td className="p-3 sm:p-4 text-center italic text-gray-400 whitespace-nowrap">

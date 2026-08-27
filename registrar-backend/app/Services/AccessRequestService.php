@@ -6,6 +6,7 @@ use App\Contracts\NotificationServiceInterface;
 use App\Models\AccessRequest;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
+use App\Services\Concerns\FlushesAnalyticsCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +24,8 @@ use Illuminate\Validation\ValidationException;
  */
 class AccessRequestService
 {
+    use FlushesAnalyticsCache;
+
     public function __construct(
         private AdminUserService           $adminUserService,
         private AuditLogger                $auditLogger,
@@ -53,6 +56,17 @@ class AccessRequestService
             'status'               => AccessRequest::STATUS_REQUESTED,
             'expires_at'           => now()->addDays(7),
         ]);
+
+        // QA bugs #4/#9/#14 — a new request changes the Access Request
+        // Throughput panel's pending/requested count, so the 10-minute
+        // "analytics" cache must be invalidated here too, not just on
+        // the document-request side (DocumentRequestService already did
+        // this for RIS-PROCESS-BUGS #9; access requests had the same
+        // gap). See Concerns\FlushesAnalyticsCache for the full
+        // reasoning. Not wrapped in a transaction here — the create()
+        // above is already a single, durably-committed insert by the
+        // time execution reaches this line.
+        $this->flushAnalyticsCache();
 
         $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ACCESS_REQUEST_SUBMITTED, [
             'target_email'      => $accessRequest->target_email,
@@ -88,7 +102,7 @@ class AccessRequestService
     {
         $this->assertPending($accessRequest);
 
-        return DB::transaction(function () use ($accessRequest, $request) {
+        $user = DB::transaction(function () use ($accessRequest, $request) {
             $user = $this->adminUserService->create([
                 'email'       => $accessRequest->target_email,
                 'role_id'     => $accessRequest->requested_role_id,
@@ -115,6 +129,15 @@ class AccessRequestService
 
             return $user;
         });
+
+        // QA bugs #4/#9/#14 — run AFTER the transaction has committed,
+        // never inside it, so a Redis hiccup can't roll back an
+        // otherwise-successful approval and a transaction that later
+        // rolls back never triggers a needless flush. Same placement
+        // rule DocumentRequestService::updateRequest() already follows.
+        $this->flushAnalyticsCache();
+
+        return $user;
     }
 
     /**
@@ -131,6 +154,10 @@ class AccessRequestService
             'rejection_reason'  => $reason,
             'expires_at'        => null,
         ]);
+
+        // QA bugs #4/#9/#14 — see store()'s comment above for why this
+        // is needed here too.
+        $this->flushAnalyticsCache();
 
         $this->auditLogger->log($request, $request->user(), AuditLog::ACTION_ACCESS_REQUEST_REJECTED, [
             'target_email'      => $accessRequest->target_email,

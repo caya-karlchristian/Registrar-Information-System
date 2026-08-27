@@ -8,6 +8,38 @@ import { getDocumentTypes, getAllLogbookData, getCertifications } from '../servi
 // now uses getAllLogbookData() since the backend endpoint is paginated and this
 // export groups records across the full completed-request history.
 
+/**
+ * Cumulative, calendar-aware processing minutes for a request, computed
+ * from its full request_history array.
+ *
+ * request_history.business_minutes (see BusinessCalendarService on the
+ * backend) is a PER-SEGMENT duration — time elapsed since the previous
+ * status change only, counting office hours alone. Below, `historyRows` is
+ * a request's entire history, and the "most recent" entry in it is always
+ * whichever transition the caller is measuring through (e.g. the Completed
+ * transition). Since nothing in the array is more recent than that entry,
+ * summing business_minutes across the WHOLE array gives the cumulative
+ * office-hours duration from the request being filed through that
+ * transition — the calendar-aware equivalent of the cumulative
+ * minutes_processed figure this file used to read directly.
+ *
+ * Returns null (rather than a partial total) when any segment predates the
+ * business_minutes column, so callers can fall back to minutes_processed
+ * for older records instead of mixing business-hours and wall-clock
+ * minutes into one figure.
+ */
+const cumulativeBusinessMinutes = (historyRows) => {
+  if (!Array.isArray(historyRows) || historyRows.length === 0) return null;
+
+  let total = 0;
+  for (const row of historyRows) {
+    const minutes = row?.business_minutes;
+    if (minutes === null || minutes === undefined) return null;
+    total += Number(minutes) || 0;
+  }
+  return total;
+};
+
 const noBorder = {
   top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
   bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
@@ -182,7 +214,7 @@ const buildReportTable = (rows) => {
           cell('ESTIMATED DAY/TIME TO PROCESS', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 24 }),
           cell('DATE REQUESTED', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 19 }),
           cell('DATE PROCESSED', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 19 }),
-          cell('NUMBER OF MINUTES PROCESSED', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 20 }),
+          cell('NUMBER OF MINUTES PROCESSED (BUSINESS HOURS)', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 20 }),
         ],
       }),
       ...rows.map((row) => new TableRow({
@@ -582,7 +614,11 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
           : [];
         const history = historyRows[0] || null;
         const processedDate = toDate(history?.changed_at ?? request?.processed_at ?? request?.date_processed);
-        const minutesProcessed = Number(history?.minutes_processed ?? request?.minutes_processed ?? request?.minutes ?? request?.number_of_minutes_processed);
+        // Prefer the calendar-aware (business-hours-only) cumulative total;
+        // fall back to the raw wall-clock figure for pre-business_minutes
+        // records so older requests still report something.
+        const minutesProcessed = cumulativeBusinessMinutes(historyRows)
+          ?? Number(history?.minutes_processed ?? request?.minutes_processed ?? request?.minutes ?? request?.number_of_minutes_processed);
         return { requestedDate, processedDate, minutesProcessed, historyRows, history };
       };
 
@@ -631,7 +667,11 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
           const bTime = new Date(b?.changed_at || 0).getTime();
           return bTime - aTime;
         })[0] || null;
-        const minutesFromHistory = Number(history?.minutes_processed ?? NaN);
+        // Same business-hours-first, wall-clock-fallback preference as
+        // parseRequestDates() above — see cumulativeBusinessMinutes() doc
+        // block for why this can't be read off a single history row.
+        const businessMinutes = cumulativeBusinessMinutes(historyRows);
+        const minutesFromHistory = businessMinutes ?? Number(history?.minutes_processed ?? NaN);
         if (Number.isFinite(minutesFromHistory) && minutesFromHistory >= 0) {
           totalMinutes += Number(minutesFromHistory);
           debugRequestIds.push(request?.request_id);
@@ -673,7 +713,7 @@ export const exportMonthlyDocx = async (startYM, endYM, docType = 'ALL', certTyp
           cell('ESTIMATED DAY/TIME TO PROCESS', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 24 }),
           cell('DATE REQUESTED', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 19 }),
           cell('DATE PROCESSED', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 19 }),
-          cell('NUMBER OF MINUTES PROCESSED', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 20 }),
+          cell('NUMBER OF MINUTES PROCESSED (BUSINESS HOURS)', { bold: true, shading: { fill: '7F0000' }, color: 'FFFFFF', width: 20 }),
         ]}),
         buildEmptyRow('No data available for this document and period'),
       ]}));

@@ -7,6 +7,7 @@ use App\Models\SystemUser;
 use App\Services\AccessRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Sanctum;
 
@@ -277,6 +278,76 @@ test('reject() stores the reason and marks the request Rejected without creating
 
     $this->assertDatabaseMissing('users', ['email' => 'rejected@example.com']);
     $this->assertDatabaseHas('audit_logs', ['action' => AuditLog::ACTION_ACCESS_REQUEST_REJECTED]);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// analytics cache invalidation (QA bugs #4 / #9 / #14)
+// ═════════════════════════════════════════════════════════════════════════════
+// AnalyticsController / SuperAdminAnalyticsController cache every panel
+// for 10 minutes under the shared "analytics" Cache::tags() bucket.
+// store()/approve()/reject() must each flush that tag so a change here
+// shows up on the next dashboard load instead of within-window stale
+// data. Simulated the same way SuperAdminAnalyticsControllerTest does:
+// seed a key under the tag, run the write, assert the key is gone.
+
+test('store() flushes the analytics cache', function () {
+    arsActingAdmin();
+    Cache::tags(['analytics'])->put('probe', 'stale', now()->addMinutes(10));
+
+    $service = app(AccessRequestService::class);
+    $service->store([
+        'target_email'      => 'cacheflush-store@example.com',
+        'target_first_name' => 'New',
+        'target_last_name'  => 'Person',
+        'requested_role_id' => SystemUser::ROLE_ADMIN,
+        'justification'     => 'Needs access to help at the front desk.',
+    ], arsRequest());
+
+    expect(Cache::tags(['analytics'])->has('probe'))->toBeFalse();
+});
+
+test('approve() flushes the analytics cache', function () {
+    $submitter = arsActingAdmin();
+    $accessRequest = AccessRequest::create([
+        'requested_by'      => $submitter->user_id,
+        'target_email'      => 'cacheflush-approve@example.com',
+        'target_first_name' => 'X',
+        'target_last_name'  => 'Y',
+        'requested_role_id' => SystemUser::ROLE_ADMIN,
+        'justification'     => 'Needed.',
+        'status'            => AccessRequest::STATUS_REQUESTED,
+        'expires_at'        => now()->addDays(7),
+    ]);
+
+    arsActingSuperAdmin();
+    Cache::tags(['analytics'])->put('probe', 'stale', now()->addMinutes(10));
+
+    $service = app(AccessRequestService::class);
+    $service->approve($accessRequest, arsRequest());
+
+    expect(Cache::tags(['analytics'])->has('probe'))->toBeFalse();
+});
+
+test('reject() flushes the analytics cache', function () {
+    $submitter = arsActingAdmin();
+    $accessRequest = AccessRequest::create([
+        'requested_by'      => $submitter->user_id,
+        'target_email'      => 'cacheflush-reject@example.com',
+        'target_first_name' => 'X',
+        'target_last_name'  => 'Y',
+        'requested_role_id' => SystemUser::ROLE_ADMIN,
+        'justification'     => 'Needed.',
+        'status'            => AccessRequest::STATUS_REQUESTED,
+        'expires_at'        => now()->addDays(7),
+    ]);
+
+    arsActingSuperAdmin();
+    Cache::tags(['analytics'])->put('probe', 'stale', now()->addMinutes(10));
+
+    $service = app(AccessRequestService::class);
+    $service->reject($accessRequest, 'Not enough justification provided.', arsRequest());
+
+    expect(Cache::tags(['analytics'])->has('probe'))->toBeFalse();
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

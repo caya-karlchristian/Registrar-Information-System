@@ -56,6 +56,28 @@ class RoleAssignmentService
         $this->assertDirectionAllowed($targetUser, (int) $validated['role_id']);
 
         return DB::transaction(function () use ($validated, $targetUser, $request) {
+            // Bug #5 (QA) — "Roles Assigned to Deactivated Accounts".
+            // searchGrantableUsers() already excludes non-Activated
+            // accounts from the picker, but that's a read-time filter on
+            // a UI convenience endpoint, not an enforced invariant — a
+            // direct API call bypasses it entirely, and even a
+            // picker-driven request can race a concurrent deactivation
+            // between when the list loaded and when this submits. Re-fetch
+            // and lock the row here (same lockForUpdate pattern
+            // editPolicy() and the duplicate check below already use) so
+            // the status actually being written to is the one enforced,
+            // not a stale copy read before the transaction opened.
+            $targetUser = SystemUser::where('user_id', $targetUser->user_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($targetUser->status !== 'Activated') {
+                throw ValidationException::withMessages([
+                    'user_id' => "This account is '{$targetUser->status}' and cannot be granted a role. "
+                        . 'Only Activated accounts are eligible.',
+                ]);
+            }
+
             // Enforced here rather than a DB partial-unique index (MySQL
             // has no native partial unique constraint without a generated
             // column) — the transaction + row lock below makes this safe
