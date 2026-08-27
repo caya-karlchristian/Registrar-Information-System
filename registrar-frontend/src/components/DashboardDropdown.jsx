@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '../context/ThemeContext';
 
 const DashboardDropdown = ({
@@ -10,11 +10,23 @@ const DashboardDropdown = ({
   trigger,
   align = 'center',
   isIconButton = false,
+  width = 'w-48',
   sections = [],
+  searchThreshold = 6,
+  searchPlaceholder = 'Search options...',
 }) => {
   const { isDark } = useTheme();
+  const [searchTerm, setSearchTerm] = useState('');
+  const searchInputRef = useRef(null);
 
-  React.useEffect(() => {
+  // Reset search filter when dropdown closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (event) => {
@@ -28,6 +40,31 @@ const DashboardDropdown = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen, setIsOpen, dropdownRef]);
+
+  // Calculate total number of items across all sections
+  const totalItems = useMemo(() => {
+    return sections.reduce((acc, sec) => acc + (sec.items?.length || 0), 0);
+  }, [sections]);
+
+  // Only show the search bar if total items exceed the threshold
+  const showSearch = totalItems > searchThreshold;
+
+  // Filter sections and items based on search term
+  const filteredSections = useMemo(() => {
+    if (!showSearch || !searchTerm.trim()) return sections;
+    const term = searchTerm.toLowerCase().trim();
+
+    return sections
+      .map(section => ({
+        ...section,
+        items: (section.items || []).filter(item =>
+          item.label.toLowerCase().includes(term)
+        ),
+      }))
+      .filter(section => section.items.length > 0);
+  }, [sections, showSearch, searchTerm]);
+
+  const hasMatches = filteredSections.some(sec => (sec.items?.length || 0) > 0);
 
   const alignClasses = {
     left: 'left-0 mt-2',
@@ -71,7 +108,7 @@ const DashboardDropdown = ({
 
       {isOpen && (
         <div
-          className={`absolute ${alignClasses[align]} w-48 rounded-xl shadow-lg border z-50 overflow-hidden text-left ${
+          className={`absolute ${alignClasses[align]} ${width} rounded-xl shadow-lg border z-50 overflow-hidden text-left ${
             isDark ? 'bg-[#1f1f1f] text-[#e4e6eb]' : 'bg-white text-gray-700'
           }`}
           style={{
@@ -79,24 +116,67 @@ const DashboardDropdown = ({
             border: '1px solid #FFC72C',
           }}
         >
-          <div className="py-1.5">
-            {sections.map((section, secIdx) => (
-              <React.Fragment key={secIdx}>
-                {secIdx > 0 && (
-                  <div className={`border-t my-1.5 ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`} />
-                )}
-
-                {section.title && (
-                  <div
-                    className={`text-[10px] uppercase font-bold tracking-wider px-4 pt-1.5 pb-1 ${
-                      isDark ? 'text-gray-400' : 'text-gray-500'
+          {/* Search bar appears only when items exceed the threshold */}
+          {showSearch && (
+            <div className={`p-2 border-b ${isDark ? 'border-[#3e4042] bg-[#18191a]/50' : 'border-gray-100 bg-gray-50/70'}`}>
+              <div className="relative flex items-center">
+                <MagnifyingGlassIcon className={`w-3.5 h-3.5 absolute left-2.5 pointer-events-none ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`} />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder={searchPlaceholder}
+                  className={`w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#2a2a2f] border-[#3e4042] text-[#e4e6eb] placeholder-gray-500 focus:border-[#FFC72C]'
+                      : 'bg-white border-gray-200 text-gray-800 placeholder-gray-400 focus:border-[#800000]'
+                  }`}
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSearchTerm('');
+                      searchInputRef.current?.focus();
+                    }}
+                    className={`absolute right-2 p-0.5 rounded transition-colors ${
+                      isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-600'
                     }`}
                   >
-                    {section.title}
-                  </div>
+                    <XMarkIcon className="w-3.5 h-3.5" />
+                  </button>
                 )}
+              </div>
+            </div>
+          )}
 
-                <div className="flex flex-col gap-0.5 max-h-56 overflow-y-auto dropdown-scroll">
+          <div className="py-1.5">
+            {!hasMatches && (
+              <div className={`px-4 py-3 text-xs text-center italic ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                No matching options
+              </div>
+            )}
+
+            <div className="flex flex-col gap-0.5 max-h-56 overflow-y-auto dropdown-scroll">
+              {filteredSections.map((section, secIdx) => (
+                <React.Fragment key={secIdx}>
+                  {secIdx > 0 && (
+                    <div className={`border-t my-1.5 ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`} />
+                  )}
+
+                  {section.title && (
+                    <div
+                      className={`text-[10px] uppercase font-bold tracking-wider px-4 pt-1.5 pb-1 ${
+                        isDark ? 'text-gray-400' : 'text-gray-500'
+                      }`}
+                    >
+                      {section.title}
+                    </div>
+                  )}
+
                   {section.items.map((item, itemIdx) => {
                     const Icon = item.icon;
                     if (Icon) {
@@ -151,9 +231,9 @@ const DashboardDropdown = ({
                       </button>
                     );
                   })}
-                </div>
-              </React.Fragment>
-            ))}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
 
           {/* Gold bottom accent */}
@@ -171,6 +251,9 @@ DashboardDropdown.propTypes = {
   trigger: PropTypes.node.isRequired,
   align: PropTypes.oneOf(['left', 'right', 'center']),
   isIconButton: PropTypes.bool,
+  width: PropTypes.string,
+  searchThreshold: PropTypes.number,
+  searchPlaceholder: PropTypes.string,
   sections: PropTypes.arrayOf(
     PropTypes.shape({
       title: PropTypes.string,
