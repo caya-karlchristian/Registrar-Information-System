@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getDocumentRequests,
@@ -31,11 +31,13 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
 ]);
 
 export const useStaffDashboard = (viewMode) => {
-  const { docTypeName, statuses: referenceStatuses } = useReferenceData();
+  const { docTypeName, statuses: referenceStatuses, documentTypes, certifications } = useReferenceData();
   const queryClient = useQueryClient();
   const { notifications } = useNotificationsContext();
 
   const [filterStatus, setFilterStatus] = useState('All');
+  const [filterClassification, setFilterClassification] = useState('All');
+  const [filterDocument, setFilterDocument] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -46,8 +48,8 @@ export const useStaffDashboard = (viewMode) => {
   const [certRequest, setCertRequest] = useState(null);
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-  const [filterClassification, setFilterClassification] = useState('All');
   const [classificationDropdownOpen, setClassificationDropdownOpen] = useState(false);
+  const [documentDropdownOpen, setDocumentDropdownOpen] = useState(false);
 
   const [printedCertificateIds, setPrintedCertificateIds] = useState(() => {
     if (typeof window === 'undefined') return [];
@@ -105,7 +107,7 @@ export const useStaffDashboard = (viewMode) => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterStatus, filterClassification, searchTerm, sortOrder]);
+  }, [filterStatus, filterClassification, filterDocument, searchTerm, sortOrder]);
 
   /* ---------------- TANSTACK QUERY: MUTATIONS ---------------- */
   const invalidateRequests = () =>
@@ -211,9 +213,26 @@ export const useStaffDashboard = (viewMode) => {
     setPrintedCertificateIds(prev => (prev.includes(requestId) ? prev : [...prev, requestId]));
   };
 
+  const documentOptions = useMemo(() => {
+    const set = new Set();
+    (requests || []).forEach(r => {
+      (r.documentDetailsArray || []).forEach(doc => {
+        if (doc) set.add(doc);
+      });
+    });
+    (documentTypes || []).forEach(d => {
+      if (d?.document_name) set.add(d.document_name);
+    });
+    (certifications || []).forEach(c => {
+      if (c?.certificate_name) set.add(`Certification: ${c.certificate_name}`);
+    });
+    return ['All', ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+  }, [requests, documentTypes, certifications]);
+
   const filteredData = filterAndSortRequests(requests, {
     filterStatus,
     filterClassification,
+    filterDocument,
     searchTerm,
     sortOrder,
     viewMode,
@@ -251,6 +270,11 @@ export const useStaffDashboard = (viewMode) => {
     setFilterClassification,
     classificationDropdownOpen,
     setClassificationDropdownOpen,
+    filterDocument,
+    setFilterDocument,
+    documentDropdownOpen,
+    setDocumentDropdownOpen,
+    documentOptions,
     printedCertificateIds,
     resolvedStatusIds,
     requestStatuses,
