@@ -166,8 +166,8 @@ test.describe('Alumni Request Form E2E Tests', () => {
     await page.getByRole('button', { name: 'Next' }).click();
 
     // --- STEP 3: ALUMNI REQUEST (Document & Purpose Selection) ---
-    await expect(page.getByText('Documents', { exact: true })).toBeVisible();
-    await expect(page.getByText('Certifications', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Select documents' })).toBeVisible();
+    await expect(page.getByText('Documents & Certifications')).toBeVisible();
 
     // 'Honorable Dismissal' should already be selected — auto-filled
     // from the verify-or suggestion above — so just confirm the
@@ -203,5 +203,44 @@ test.describe('Alumni Request Form E2E Tests', () => {
 
     // --- SUCCESS SCREEN ---
     await expect(page.getByText('Please be patient as we process your requested document.')).toBeVisible();
+  });
+
+  test('Pressing Enter on OR input verifies OR and advances to next step instead of submitting form', async ({ page }) => {
+    let postRequestSubmitted = false;
+    await page.route('**/api/document-requests', async (route) => {
+      if (route.request().method() === 'POST') {
+        postRequestSubmitted = true;
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, request_id: 601 }),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: [] }),
+        });
+      }
+    });
+
+    await page.goto('/alumni/request');
+
+    // Step 1: Agree to terms and proceed
+    await page.locator('input[name="termsAgreed"]').check();
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    // Step 2: Fill OR fields
+    await page.getByPlaceholder('XXXXXXX').fill('7654321');
+    const today = new Date().toISOString().split('T')[0];
+    await page.locator('input[name="dateOfPayment"]').fill(today);
+
+    // Press Enter while focused inside the OR number input
+    await page.getByPlaceholder('XXXXXXX').press('Enter');
+
+    // Should verify OR and advance to Step 3, without submitting the entire request
+    await expect(page.getByText('Documents', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Auto-filled from OR #7654321/)).toBeVisible();
+    expect(postRequestSubmitted).toBe(false);
   });
 });

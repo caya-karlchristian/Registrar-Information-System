@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { QRCodeSVG } from 'qrcode.react';
-import { createDocumentRequest, verifyOfficialReceipt } from "../services/api"
+import { createDocumentRequest, verifyOfficialReceipt } from "../services/api";
 import InputGroup from "../components/InputGroup.jsx";
-import CheckboxItem from "../components/Checkbox.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
 import MultiSelectDropdown from "../components/MultiSelection.jsx";
 import LoadingOverlay from "../components/LoadingOverlay.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import StepProgress from "../components/StepProgress.jsx";
+import TermsAndConditionsStep from "../components/TermsAndConditionsStep.jsx";
+import OrValidationErrorModal from "../components/OrValidationErrorModal.jsx";
 import { getTodayDate } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
@@ -17,7 +18,13 @@ import { useFormDraft } from '../hooks/useFormDraft';
 import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useMutation } from '@tanstack/react-query';
-import { InformationCircleIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import {
+  InformationCircleIcon,
+  ExclamationTriangleIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CheckIcon
+} from "@heroicons/react/24/outline";
 import { STUDENT_ACCESS_IDS } from "../constants/accessTypes";
 
 // parseRequirements is pure — no hooks needed here
@@ -34,7 +41,25 @@ const parseRequirements = (value) => {
   return [];
 };
 
-const RequestForm = ({ showProfileStep = false }) => {
+const wizardSteps = [
+  { id: 1, label: "Terms" },
+  { id: 2, label: "Receipt" },
+  { id: 3, label: "Documents" },
+  { id: 4, label: "Review" },
+];
+
+const stepTitles = {
+  1: { title: "Terms & Conditions", subtitle: "Please review and accept our data privacy and release guidelines." },
+  2: { title: "Official Receipt", subtitle: "Verify your receipt from the Cashier's Office." },
+  3: { title: "Select documents", subtitle: "Choose what you're requesting based on your receipt." },
+  4: { title: "Review & Copies", subtitle: "Specify number of copies and check required documents." },
+};
+
+const finalStep = 4;
+const orStep = 2;
+const docStep = 3;
+
+const RequestForm = () => {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const {
@@ -58,6 +83,8 @@ const RequestForm = ({ showProfileStep = false }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showOrModal, setShowOrModal] = useState(false);
+  const [orModalMessage, setOrModalMessage] = useState("");
   // Populated from the create response on success — holds just the two
   // fields ClaimTicket needs. Not the whole DocumentRequest object: this
   // screen has nothing else to do with the rest of it, and keeping only
@@ -77,18 +104,6 @@ const RequestForm = ({ showProfileStep = false }) => {
   const [unresolvedItems, setUnresolvedItems] = useState([]);
   const [autoFilledNames, setAutoFilledNames] = useState([]);
 
-  const [copied, setCopied] = useState(false);
-  const handleCopyCode = async () => {
-    if (!claimTicket?.claimCode) return;
-    try {
-      await navigator.clipboard.writeText(claimTicket.claimCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch (err) {
-      console.error("Failed to copy code:", err);
-    }
-  };
-
   const availableDocs = useMemo(() => {
     return documentTypes
       .filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id))
@@ -103,12 +118,6 @@ const RequestForm = ({ showProfileStep = false }) => {
 
   const [formData, setFormData] = useState({
     termsAgreed: false,
-    firstName: '',
-    middleName: '',
-    surname: '',
-    dob: '',
-    address: '',
-    contactNumber: '',
     documentsRequested: [],
     purposeOfRequest: "",
     certification: [],
@@ -130,6 +139,37 @@ const RequestForm = ({ showProfileStep = false }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCombinedItemsChange = (e) => {
+    const selectedList = e.target.value || [];
+
+    const newDocs = selectedList.filter((name) =>
+      documentOptions.includes(name) || availableDocs.some((d) => d.document_name === name)
+    );
+    const newCerts = selectedList.filter((name) =>
+      certificationOptions.includes(name) || availableCertifications.some((c) => c.certificate_name === name)
+    );
+
+    setFormData((prev) => {
+      const newDocCopies = { ...prev.documentCopies };
+      newDocs.forEach((doc) => {
+        if (!newDocCopies[doc]) newDocCopies[doc] = 1;
+      });
+
+      const newCertCopies = { ...prev.certCopies };
+      newCerts.forEach((cert) => {
+        if (!newCertCopies[cert]) newCertCopies[cert] = 1;
+      });
+
+      return {
+        ...prev,
+        documentsRequested: newDocs,
+        certification: newCerts,
+        documentCopies: newDocCopies,
+        certCopies: newCertCopies,
+      };
+    });
   };
 
   const handlePreSubmit = (e) => {
@@ -184,11 +224,6 @@ const RequestForm = ({ showProfileStep = false }) => {
     setFormData((prev) => ({ ...prev, [name]: checked }));
   };
 
-  const hasProfileStep = showProfileStep;
-  const finalStep = hasProfileStep ? 5 : 4;
-  const orStep = hasProfileStep ? 3 : 2;
-  const docStep = hasProfileStep ? 4 : 3;
-
   const verifyOrMutation = useMutation({
     mutationFn: verifyOfficialReceipt,
     onSuccess: (response) => {
@@ -239,10 +274,11 @@ const RequestForm = ({ showProfileStep = false }) => {
     },
     onError: (error) => {
       console.error("OR verification error:", error.response?.data || error);
-      setErrorMessage(
+      const msg =
         error.response?.data?.message
-        || "We couldn't verify that Official Receipt. Please check the details and try again."
-      );
+        || "The Cashier's Office couldn't match this receipt to your record. This usually happens when the name on the receipt doesn't exactly match your name in the system.";
+      setOrModalMessage(msg);
+      setShowOrModal(true);
     },
   });
 
@@ -280,38 +316,6 @@ const RequestForm = ({ showProfileStep = false }) => {
     if (currentStep === 1 && !formData.termsAgreed) {
       setErrorMessage("You must read and agree to the Terms & Conditions to proceed.");
       return;
-    }
-
-    if (hasProfileStep && currentStep === 2) {
-      if (!(formData.firstName || '').trim()) {
-        setErrorMessage("Please enter the first name.");
-        return;
-      }
-
-      if (!(formData.middleName || '').trim()) {
-        setErrorMessage("Please enter the middle name.");
-        return;
-      }
-
-      if (!(formData.surname || '').trim()) {
-        setErrorMessage("Please enter the surname.");
-        return;
-      }
-
-      if (!formData.dob) {
-        setErrorMessage("Please select the date of birth.");
-        return;
-      }
-
-      if (!(formData.address || '').trim()) {
-        setErrorMessage("Please enter the present/permanent mailing address.");
-        return;
-      }
-
-      if (!(formData.contactNumber || '').trim()) {
-        setErrorMessage("Please enter the contact number.");
-        return;
-      }
     }
 
     // OR-verification step: don't just advance — verify against the
@@ -416,12 +420,6 @@ const RequestForm = ({ showProfileStep = false }) => {
     setCurrentStep(1);
     setFormData({
       termsAgreed: false,
-      firstName: '',
-      middleName: '',
-      surname: '',
-      dob: '',
-      address: '',
-      contactNumber: '',
       documentsRequested: [],
       purposeOfRequest: "",
       certification: [],
@@ -433,6 +431,8 @@ const RequestForm = ({ showProfileStep = false }) => {
     setErrorMessage("");
     mutation.reset();
     verifyOrMutation.reset();
+    setShowOrModal(false);
+    setOrModalMessage("");
     setUnresolvedItems([]);
     setAutoFilledNames([]);
   };
@@ -447,36 +447,6 @@ const RequestForm = ({ showProfileStep = false }) => {
     }
   };
 
-  const handleGoToInbox = () => {
-    if (window.location.pathname.startsWith('/staff')) {
-      navigate('/staff/inbox');
-    } else if (window.location.pathname.startsWith('/alumni')) {
-      navigate('/alumni/inbox');
-    } else {
-      navigate('/student/inbox');
-    }
-  };
-
-  const showCertificationDropdown = formData.documentsRequested.some((doc) => {
-    const lower = doc.toLowerCase();
-    return lower.includes("certif");
-  });
-
-  const stepProcess = hasProfileStep
-    ? {
-      1: "Terms & Conditions",
-      2: "Student Profile",
-      3: "Official Receipt Verification",
-      4: "Document Request",
-      5: "Number of Copies & Claim Ticket",
-    }
-    : {
-      1: "Terms & Conditions",
-      2: "Official Receipt Verification",
-      3: "Document Request",
-      4: "Number of Copies & Claim Ticket",
-    };
-
   const purposeOptions = availablePurposes.length > 0
     ? availablePurposes.map(p => p.purpose_name)
     : [];
@@ -489,7 +459,9 @@ const RequestForm = ({ showProfileStep = false }) => {
     ? availableDocs.map(d => d.document_name)
     : [];
 
-  const certificationLabel = formData.certification.join(', ');
+  const combinedOptions = useMemo(() => {
+    return [...documentOptions, ...certificationOptions];
+  }, [documentOptions, certificationOptions]);
 
   const docByName = useMemo(() => {
     return availableDocs.reduce((acc, doc) => {
@@ -517,10 +489,14 @@ const RequestForm = ({ showProfileStep = false }) => {
         <LoadingOverlay isVisible={isLoading} message="Submitting Request..." />
         <LoadingOverlay isVisible={isVerifyingOr} message="Verifying Official Receipt..." />
         {isSubmitted ? (
-          <div className="max-w-4xl mx-auto">
-            <div className="shadow-2xl border-t-4 border-pup-yellow flex flex-col items-center text-center px-6 py-12 md:px-10 lg:px-16 bg-[#660000]">
+          <div className="max-w-4xl mx-auto animate-fadeIn">
+            <div className={`shadow-2xl rounded-3xl border flex flex-col items-center text-center px-6 py-12 md:px-10 lg:px-16 transition-all duration-300 ${
+              isDark
+                ? 'bg-[#18191a] border-[#3e4042]/70 text-[#e4e6eb]'
+                : 'bg-pup-dark-maroon border-pup-yellow/30 text-white'
+            }`}>
               {/* Green Check Icon */}
-              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 text-green-400/80 mb-6 shrink-0">
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 mb-6 shrink-0 shadow-lg shadow-green-500/10">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
@@ -530,28 +506,34 @@ const RequestForm = ({ showProfileStep = false }) => {
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-3 tracking-wide">
                 Request Submitted Successfully
               </h2>
-              <p className="text-white/80 text-[10px] sm:text-base max-w-xl mx-auto mb-6 font-medium">
+              <p className={`text-xs sm:text-base max-w-xl mx-auto mb-6 font-medium ${
+                isDark ? 'text-gray-300' : 'text-white/85'
+              }`}>
                 Please be patient as we process your requested document. Thank you and keep safe always!
               </p>
 
               {/* Top Divider */}
-              <div className="w-full max-w-4xl mx-auto border-t border-dashed border-white/15 my-6" />
+              <div className={`w-full max-w-4xl mx-auto border-t border-dashed my-6 ${
+                isDark ? 'border-[#3e4042]' : 'border-white/15'
+              }`} />
 
               {/* Side-by-Side Grid Container */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 w-full max-w-4xl mx-auto my-4 items-start justify-items-center">
                 {/* Left Column: Office Hours Notice */}
-                <div className="flex flex-col items-center gap-3 sm:gap-4 w-full max-w-[420px] mx-auto">
+                <div className="flex flex-col items-center gap-3 sm:gap-4 w-full max-w-105 mx-auto">
                   <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center w-full">
                     Processing Schedule & Hours
                   </h3>
                   <OfficeHoursNotice isDark={isDark} small={true} />
-                  <p className="text-white/50 text-[11px] text-center leading-relaxed max-w-sm mx-auto">
+                  <p className={`text-[11px] text-center leading-relaxed max-w-sm mx-auto ${
+                    isDark ? 'text-gray-400' : 'text-white/50'
+                  }`}>
                     Note: View/download your claim ticket QR code in your inbox or present the manual claim code when claiming.
                   </p>
                 </div>
 
                 {/* Right Column: Claim Details & QR */}
-                <div className="flex flex-col items-center gap-3 sm:gap-4 w-full max-w-[420px] mx-auto">
+                <div className="flex flex-col items-center gap-3 sm:gap-4 w-full max-w-105 mx-auto">
                   <h3 className="text-xs font-bold uppercase tracking-widest text-[#FFC72C] text-center w-full">
                     Claim Ticket & Code
                   </h3>
@@ -562,21 +544,27 @@ const RequestForm = ({ showProfileStep = false }) => {
               </div>
 
               {/* Bottom Divider */}
-              <div className="w-full max-w-4xl mx-auto border-t border-dashed border-white/15 my-6" />
+              <div className={`w-full max-w-4xl mx-auto border-t border-dashed my-6 ${
+                isDark ? 'border-[#3e4042]' : 'border-white/15'
+              }`} />
 
               {/* Bottom Navigation Actions */}
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-xl mx-auto mt-6">
                 <button
                   type="button"
                   onClick={handleConfirm}
-                  className="w-full sm:w-1/2 py-3 px-6 rounded-lg font-bold text-sm border border-white/10 bg-[#3d0c0c] hover:bg-[#4c1212] text-white transition-all shadow-md active:scale-95 text-center cursor-pointer"
+                  className={`w-full sm:w-1/2 py-3 px-6 rounded-xl font-bold text-sm transition-all shadow-md active:scale-95 text-center cursor-pointer ${
+                    isDark
+                      ? 'bg-[#2b2c2f] hover:bg-[#383a3e] text-gray-200 border border-[#3e4042]'
+                      : 'border border-white/15 bg-[#3d0c0c] hover:bg-[#4c1212] text-white'
+                  }`}
                 >
                   Create Another Request
                 </button>
                 <button
                   type="button"
                   onClick={handleGoToDashboard}
-                  className="w-full sm:w-1/2 py-3 px-8 rounded-lg font-bold text-sm bg-[#F8BF1E] hover:bg-[#e6b01b] text-pup-maroon transition-all shadow-md active:scale-95 text-center cursor-pointer"
+                  className="w-full sm:w-1/2 py-3 px-8 rounded-xl font-bold text-sm bg-[#F8BF1E] hover:bg-[#e6b01b] text-pup-maroon transition-all shadow-md shadow-yellow-500/20 active:scale-95 text-center cursor-pointer"
                 >
                   Go to Dashboard
                 </button>
@@ -584,133 +572,57 @@ const RequestForm = ({ showProfileStep = false }) => {
             </div>
           </div>
         ) : (
-          <div ref={formRef} className="max-w-5xl mx-auto -mt-2">
+          <div ref={formRef} className="max-w-4xl mx-auto">
+            {/* Top Stepper Progress */}
+            <StepProgress
+              steps={wizardSteps}
+              currentStep={currentStep}
+              isDark={isDark}
+            />
+
+            {/* Main Form Card */}
             <form
-              className={`shadow-2xl border-t-4 border-pup-yellow h-225 lg:h-187.5 flex flex-col relative ${isDark ? 'bg-[#242526]' : 'bg-pup-dark-maroon'}`}
-              onSubmit={handleSubmit}
+              className={`shadow-2xl rounded-2xl sm:rounded-3xl border flex flex-col relative transition-all duration-300 ${
+                isDark
+                  ? 'bg-[#18191a] border-[#3e4042]/70 text-[#e4e6eb]'
+                  : 'bg-pup-dark-maroon border-pup-yellow/30 text-white'
+              }`}
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (currentStep < finalStep) {
+                  nextStep(e);
+                } else {
+                  handlePreSubmit(e);
+                }
+              }}
               noValidate
             >
-              {/* Step Indicators */}
-              <div className="flex flex-col items-center pt-4 pb-4">
-                <div className="flex space-x-3 mb-2">
-                  {Array.from({ length: finalStep }, (_, index) => index + 1).map((step) => (
-                    <div
-                      key={step}
-                      className={`w-4 h-4 rounded-full border border-pup-yellow ${step <= currentStep ? "bg-pup-yellow" : (isDark ? "bg-[#3a3b3c]" : "bg-white")
-                        }`}
-                    />
-                  ))}
-                </div>
-                <p className="text-pup-yellow font-bold text-sm tracking-wider">
-                  {currentStep} of {finalStep}
-                </p>
-                <h2 className="text-white text-xl font-semibold mt-2">
-                  {stepProcess[currentStep]}
+              {/* Card Header */}
+              <div className="px-6 sm:px-10 pt-8 pb-4">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-1.5">
+                  {stepTitles[currentStep]?.title}
                 </h2>
+                <p className="text-sm sm:text-base text-gray-300">
+                  {stepTitles[currentStep]?.subtitle}
+                </p>
               </div>
 
-              <div className={`flex-1 px-4 sm:px-6 md:px-10 py-2 text-white `}>
-                {/* STEP 1 */}
+              {/* Step Content Container */}
+              <div className="px-6 sm:px-10 py-4 flex-1">
+                {/* STEP 1: Terms & Conditions (Modular Component) */}
                 {currentStep === 1 && (
-                  <div className="space-y-6 animate-fadeIn text-[11px] text-justify lg:text-[14px]">
-                    <p><strong>A.</strong> In compliance with the Data Privacy Act (DPA) of 2012, and its implementing rules
-                      and regulations (IRR), upon filling up this request through the system constitutes, I am hereby providing my
-                      consent and authorization to use my personal data for this request.
-                    </p>
-
-                    <p><strong>B.</strong> This request is only for ONSITE TRANSACTION with Official Receipt issued by the Cashier's Office</p>
-
-                    <p><strong>C.</strong> All CERTIFICATIONS are processed within three (3) working days, while TOR is within 12 working days.</p>
-
-                    <p>
-                      <strong>D.</strong> REMINDERS:<br />
-                      • Requests must be submitted within one (1) week after receiving the receipt. Requests exceeding this period may be considered invalid.<br />
-                      • For TOR (First Copy): Bring one (1) documentary stamp, two (2) colored 2x2 ID pictures in academic gown, valid PUP ID, and dummy diploma. In case of loss, an Affidavit of Loss is required.<br />
-                      • For TOR (Second Copy): Bring one (1) violet documentary stamp and two (2) colored 2x2 ID pictures in formal attire with white background.<br />
-                      • For Honorable Dismissal and other Certifications: Bring one (1) violet documentary stamp (or two (2) brown documentary stamps) per requested document.
-                    </p>
-
-                    <p>
-                      <strong>E.</strong> In compliance with R.A. No. 10173 (Data Privacy Act of 2012), representatives must present a signed Authorization Letter (for immediate family) or Special Power of Attorney (for non-family), along with valid IDs of both the student and the representative upon claiming documents.
-                    </p>
-
-                    <p><strong>F.</strong> All documents unclaimed within 90 days on the date of request will be shredded automatically.</p>
-
-                    <div className={`mt-2 pt-4 border-t text-l ${isDark ? 'border-white/20' : 'border-white/10'}`}>
-                      <CheckboxItem
-                        name="termsAgreed"
-                        checked={formData.termsAgreed}
-                        onChange={handleCheckboxChange}
-                        text="I have read, understood, and agree to the Terms & Conditions stated above."
-                      />
-                    </div>
-                  </div>
+                  <TermsAndConditionsStep
+                    termsAgreed={formData.termsAgreed}
+                    onCheckboxChange={handleCheckboxChange}
+                    isDark={isDark}
+                  />
                 )}
-
-                {/* STEP 2: Student Profile */}
-                {hasProfileStep && currentStep === 2 && (
-                  <div className="space-y-6 animate-fadeIn">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <InputGroup
-                        name="firstName"
-                        label="First Name"
-                        value={formData.firstName}
-                        onChange={handleInputChange}
-                        placeholder="e.g., Juan"
-                      />
-
-                      <InputGroup
-                        name="middleName"
-                        label="Middle Name"
-                        value={formData.middleName}
-                        onChange={handleInputChange}
-                        placeholder="e.g., Miguel"
-                      />
-
-                      <InputGroup
-                        name="surname"
-                        label="Surname"
-                        value={formData.surname}
-                        onChange={handleInputChange}
-                        placeholder="e.g., Dela Cruz"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <InputGroup
-                        label="Date of Birth"
-                        type="date"
-                        name="dob"
-                        value={formData.dob}
-                        onChange={handleInputChange}
-                        className="w-full p-2 rounded text-black bg-white focus:outline-none focus:ring-2 focus:ring-[#FFC72C]"
-                      />
-
-                      <InputGroup
-                        name="contactNumber"
-                        label="Contact Number"
-                        placeholder="09XXXXXXXXX"
-                        value={formData.contactNumber}
-                        onChange={handleInputChange}
-                      />
-                    </div>
-
-                    <InputGroup
-                      name="address"
-                      label="Present/Permanent Mailing Address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder="House No., Street, Barangay, City/Municipality"
-                    />
-                  </div>
-                )}
-
-                {/* STEP: Official Receipt Verification (new — moved ahead of
+                  {/* STEP: Official Receipt Verification (new — moved ahead of
                     Documents so the receipt can drive what gets suggested).
                     Clicking Next here calls handleVerifyOr(), which hits
                     verify-or and only advances on a successful match. */}
                 {currentStep === orStep && (
-                  <div className="space-y-6 animate-fadeIn -mt-1">
+                  <div className="space-y-6 animate-fadeIn">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <InputGroup
                         name="receiptNumber"
@@ -732,24 +644,30 @@ const RequestForm = ({ showProfileStep = false }) => {
                         voiceEnabled={false}
                       />
                     </div>
-                    <p className="text-white/60 text-xs leading-relaxed">
-                      We'll verify this against the Cashier's Office and use it to suggest which
-                      documents to request on the next step — you'll still be able to review and
-                      change your selection before submitting.
-                    </p>
+                    <div className={`p-4 rounded-xl border text-xs sm:text-sm flex items-start gap-3 ${
+                      isDark ? 'bg-[#242526] border-[#3e4042] text-gray-300' : 'bg-white/10 border-white/15 text-white/90'
+                    }`}>
+                      <InformationCircleIcon className="w-5 h-5 shrink-0 text-[#FFC72C] mt-0.5" />
+                      <p className="leading-relaxed">
+                        We'll verify this against the Cashier's Office and use it to automatically suggest which
+                        documents to request on the next step — you'll still be able to review and
+                        change your selection before submitting.
+                      </p>
+                    </div>
                   </div>
                 )}
 
-                {/* STEP: Documents Requested */}
+                {/* STEP 3: Documents Requested */}
                 {currentStep === docStep && (
                   <div className="space-y-6 animate-fadeIn">
+                    {/* Auto-filled notice */}
                     {autoFilledNames.length > 0 && (
                       <div className={`flex items-start gap-3 p-4 rounded-xl border text-sm transition-all ${
                         isDark
-                          ? 'bg-[#3a3b3c] border-[#4e4f50] text-[#e4e6eb]'
+                          ? 'bg-[#242526] border-[#FFC72C]/40 text-[#e4e6eb]'
                           : 'bg-white/10 border-white/20 text-white'
                       }`}>
-                        <InformationCircleIcon className="w-5 h-5 shrink-0 text-white/80 mt-0.5" />
+                        <InformationCircleIcon className="w-5 h-5 shrink-0 text-[#FFC72C] mt-0.5" />
                         <div className="leading-relaxed">
                           Auto-filled from <span className="text-[#FFC72C] font-semibold">OR #{formData.receiptNumber}</span> — we pre-selected the documents that match your receipt. Uncheck anything wrong, or add more below.
                         </div>
@@ -758,52 +676,58 @@ const RequestForm = ({ showProfileStep = false }) => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <MultiSelectDropdown
-                        name="documentsRequested"
-                        label="Documents"
-                        options={documentOptions}
-                        selectedValues={formData.documentsRequested}
-                        onChange={handleInputChange}
+                        name="selectedItems"
+                        label="Documents & Certifications"
+                        options={combinedOptions}
+                        selectedValues={[
+                          ...(formData.documentsRequested || []),
+                          ...(formData.certification || []),
+                        ]}
+                        onChange={handleCombinedItemsChange}
+                        Required
                       />
 
-                      <MultiSelectDropdown
-                        name="certification"
-                        label="Certifications"
-                        options={certificationOptions}
-                        selectedValues={formData.certification}
+                      <DropdownGroup
+                        name="purposeOfRequest"
+                        label="Purpose of Request"
+                        value={formData.purposeOfRequest}
                         onChange={handleInputChange}
+                        required
+                        options={purposeOptions}
                       />
                     </div>
 
-                    <DropdownGroup
-                      name="purposeOfRequest"
-                      label="Purpose of Request"
-                      value={formData.purposeOfRequest}
-                      onChange={handleInputChange}
-                      required
-                      options={purposeOptions}
-                    />
-
+                    {/* Unresolved Receipt Items Callout Card */}
                     {unresolvedItems.length > 0 && (
-                      <div className={`p-4 rounded-xl border text-sm transition-all ${
+                      <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
                         isDark
-                          ? 'bg-[#3a3b3c]/50 border-[#FFC72C]/30'
-                          : 'bg-white/5 border-[#FFC72C]/30'
+                          ? 'bg-[#241a0e]/80 border-amber-600/40'
+                          : 'bg-amber-950/40 border-amber-500/30'
                       }`}>
-                        <div className={`flex items-center justify-between pb-3 border-b ${isDark ? 'border-[#4e4f50]/40' : 'border-white/10'}`}>
+                        <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
                           <div className="flex items-center gap-2">
-                            <ExclamationTriangleIcon className="w-5 h-5 shrink-0 text-[#FFC72C]" />
-                            <span className="font-semibold text-white">Couldn't match automatically</span>
+                            <ExclamationTriangleIcon className="w-5 h-5 shrink-0 text-amber-400" />
+                            <span className="font-semibold text-amber-300 text-sm sm:text-base">
+                              Couldn't match automatically
+                            </span>
                           </div>
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#FFC72C] text-[#350e0e]">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#1a1309] text-amber-300 border border-amber-500/30">
                             {unresolvedItems.length} {unresolvedItems.length === 1 ? 'item' : 'items'}
                           </span>
                         </div>
 
-                        <div className="max-h-32.5 overflow-y-auto custom-scrollbar pr-2 space-y-0">
+                        <div className="max-h-48 overflow-y-auto custom-scrollbar pr-1 space-y-2 mt-3">
                           {unresolvedItems.map((item, i) => (
-                            <div key={i} className={`flex justify-between items-center py-3 border-b ${isDark ? 'border-[#4e4f50]/40' : 'border-white/10'}`}>
-                              <span className="text-[#FFC72C] font-semibold">{item.label}</span>
-                              <span className="text-white/70 text-sm">
+                            <div
+                              key={i}
+                              className={`flex justify-between items-center px-4 py-3 rounded-xl border transition-all ${
+                                isDark
+                                  ? 'bg-[#18120a] border-amber-500/20 text-gray-200'
+                                  : 'bg-black/20 border-amber-500/20 text-white'
+                              }`}
+                            >
+                              <span className="font-medium text-sm text-amber-200">{item.label}</span>
+                              <span className="text-xs font-medium text-amber-400/90 shrink-0 ml-2">
                                 {item.amount ? `₱${parseFloat(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''}
                                 {item.amount ? ' • ' : ''}
                                 qty {item.quantity}
@@ -812,7 +736,7 @@ const RequestForm = ({ showProfileStep = false }) => {
                           ))}
                         </div>
 
-                        <p className="text-white/50 text-xs mt-3">
+                        <p className="text-amber-200/70 text-xs mt-3">
                           Select the matching document below, or contact the registrar's office if unsure.
                         </p>
                       </div>
@@ -820,17 +744,19 @@ const RequestForm = ({ showProfileStep = false }) => {
                   </div>
                 )}
 
-                {/* STEP: Number of Copies & Claim Ticket */}
+                {/* STEP 4: Number of Copies & Review */}
                 {currentStep === finalStep && (
-                  <div className="space-y-6 animate-fadeIn -mt-1">
-                    <div className={`p-4 rounded-lg border -mb-1 ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
-                      <h3 className="text-[#eebc48] font-bold mb-3 uppercase text-sm tracking-wide">
+                  <div className="space-y-6 animate-fadeIn">
+                    <div className={`p-5 rounded-2xl border ${
+                      isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white/10 border-white/20'
+                    }`}>
+                      <h3 className="text-[#FFC72C] font-bold mb-4 uppercase text-xs sm:text-sm tracking-wider">
                         Number of copies per document / certificate
                       </h3>
-                      <div className="space-y-3 max-h-36 overflow-y-auto pr-2 custom-scrollbar">
+                      <div className="space-y-3 max-h-44 overflow-y-auto pr-2 custom-scrollbar">
                         {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => (
-                          <div key={`doc-copy-${index}`} className="flex items-center justify-between gap-4">
-                            <label className="text-white text-sm flex-1">
+                          <div key={`doc-copy-${index}`} className="flex items-center justify-between gap-4 py-1">
+                            <label className="text-white text-sm font-medium flex-1">
                               {doc}
                             </label>
                             <div className="w-24">
@@ -840,12 +766,9 @@ const RequestForm = ({ showProfileStep = false }) => {
                                 max="10"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                className={`w-full p-2 text-sm rounded-lg 
-                                  outline-none transition-all duration-200
-                                  focus:border-[#FFC72C] 
-                                  focus:ring-2 
-                                  focus:ring-[#FFC72C]/30
-                                  appearance-auto ${isDark ? 'bg-[#1a1b1e] border border-[#3e4042] text-white focus:bg-[#1a1b1e]' : 'bg-gray-50 border border-gray-300 text-gray-700 focus:bg-white focus:text-black'}`}
+                                className={`w-full p-2 text-center text-sm font-bold rounded-xl outline-none transition-all duration-200 focus:ring-2 focus:ring-[#FFC72C] ${
+                                  isDark ? 'bg-[#18191a] border border-[#3e4042] text-white' : 'bg-white text-black'
+                                }`}
                                 value={formData.documentCopies[doc] === undefined ? 1 : formData.documentCopies[doc]}
                                 onChange={e => {
                                   const val = e.target.value;
@@ -860,8 +783,8 @@ const RequestForm = ({ showProfileStep = false }) => {
                         ))}
                         {formData.certification.length > 0 &&
                           formData.certification.map((certName, index) => (
-                            <div key={`cert-copy-${index}`} className="flex items-center justify-between gap-4">
-                              <label className="text-white text-sm flex-1">
+                            <div key={`cert-copy-${index}`} className="flex items-center justify-between gap-4 py-1">
+                              <label className="text-white text-sm font-medium flex-1">
                                 {certName} <span className="text-[#FFC72C] text-xs font-semibold">(Certificate)</span>
                               </label>
                               <div className="w-24">
@@ -869,7 +792,9 @@ const RequestForm = ({ showProfileStep = false }) => {
                                   type="number"
                                   min="1"
                                   max="10"
-                                  className={`w-full p-2 text-sm rounded-lg outline-none transition-all duration-200 focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/30 ${isDark ? 'bg-[#1a1b1e] border border-[#3e4042] text-white focus:bg-[#1a1b1e]' : 'bg-gray-50 border border-gray-300 text-gray-700 focus:bg-white focus:text-black'}`}
+                                  className={`w-full p-2 text-center text-sm font-bold rounded-xl outline-none transition-all duration-200 focus:ring-2 focus:ring-[#FFC72C] ${
+                                    isDark ? 'bg-[#18191a] border border-[#3e4042] text-white' : 'bg-white text-black'
+                                  }`}
                                   value={formData.certCopies[certName] === undefined ? 1 : formData.certCopies[certName]}
                                   onChange={e => {
                                     const val = e.target.value;
@@ -885,8 +810,14 @@ const RequestForm = ({ showProfileStep = false }) => {
                         }
                       </div>
                     </div>
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className={`flex flex-col gap-3 max-h-50 md:max-h-105 lg:max-h-70 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar p-2 rounded-lg border ${isDark ? 'bg-[#3a3b3c] border-[#4e4f50]' : 'bg-white/10 border-white/20'}`}>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className={`flex flex-col gap-3 max-h-64 overflow-y-auto pr-1 custom-scrollbar p-3 rounded-2xl border ${
+                        isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white/10 border-white/20'
+                      }`}>
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#FFC72C] px-1">
+                          Document Requirements
+                        </span>
                         {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => {
                           const docData = docByName[doc];
                           const requirements = docData?.requirementsParsed ?? [];
@@ -894,27 +825,25 @@ const RequestForm = ({ showProfileStep = false }) => {
                           return (
                             <div
                               key={`doc-req-${index}`}
-                              className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'}`}
+                              className={`p-3 rounded-xl border ${isDark ? 'bg-[#18191a] border-[#3e4042]' : 'bg-white/10 border-white/15'}`}
                             >
-                              <div className="flex items-center gap-2 mb-3">
-                                <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
-                                <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-1 h-3.5 bg-[#FFC72C] rounded-full shrink-0" />
+                                <h4 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
                                   {doc}
-                                </h3>
+                                </h4>
                               </div>
 
-                              <ul className="flex flex-col gap-1.5 pl-1">
+                              <ul className="flex flex-col gap-1 pl-1">
                                 {requirements.length > 0 ? (
                                   requirements.map((req, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
-                                      <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
-                                      <span className="flex-1 min-w-0 whitespace-normal break-normal max-w-full">
-                                        {req}
-                                      </span>
+                                    <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed">
+                                      <span className="w-1 h-1 bg-[#FFC72C] rounded-full shrink-0 mt-1.5" />
+                                      <span>{req}</span>
                                     </li>
                                   ))
                                 ) : (
-                                  <li className="text-xs text-white/35 italic">No requirements available</li>
+                                  <li className="text-xs text-white/40 italic">No special requirements</li>
                                 )}
                               </ul>
                             </div>
@@ -928,88 +857,101 @@ const RequestForm = ({ showProfileStep = false }) => {
                           return (
                             <div
                               key={`cert-req-${index}`}
-                              className={`p-4 rounded-lg border px-4 py-3 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-white/10 border-white/20'}`}
+                              className={`p-3 rounded-xl border ${isDark ? 'bg-[#18191a] border-[#3e4042]' : 'bg-white/10 border-white/15'}`}
                             >
-                              <div className="flex items-center gap-2 mb-3">
-                                <div className="w-0.75 h-4 bg-[#FFC72C] rounded-full shrink-0" />
-                                <h3 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-1 h-3.5 bg-[#FFC72C] rounded-full shrink-0" />
+                                <h4 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide">
                                   {certName} <span className="text-white/60 font-normal normal-case">(Certificate)</span>
-                                </h3>
+                                </h4>
                               </div>
 
-                              <ul className="flex flex-col gap-1.5 pl-1">
+                              <ul className="flex flex-col gap-1 pl-1">
                                 {requirements.length > 0 ? (
                                   requirements.map((req, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed min-w-0">
-                                      <span className="w-1.5 h-1.5 bg-[#FFC72C] rounded-full shrink-0 mt-1" />
-                                      <span className="flex-1 min-w-0 whitespace-normal break-normal max-w-full">
-                                        {req}
-                                      </span>
+                                    <li key={i} className="flex items-start gap-2 text-xs text-white/80 leading-relaxed">
+                                      <span className="w-1 h-1 bg-[#FFC72C] rounded-full shrink-0 mt-1.5" />
+                                      <span>{req}</span>
                                     </li>
                                   ))
                                 ) : (
-                                  <li className="text-xs text-white/35 italic">No requirements available</li>
+                                  <li className="text-xs text-white/40 italic">No special requirements</li>
                                 )}
                               </ul>
                             </div>
                           );
                         })}
                       </div>
-                      <div className="-mt-9 flex justify-center items-start">
-                        <div className=" p-4 md:mt-4 lg:mt-5 w-full max-w-sm max-h-lg flex flex-col items-center">
-                          <p className="lg:mt-2 text-[10px] text-white/70 text-center leading-relaxed">
-                            <strong>REMINDER</strong>: Your feedback is important to us. Kindly take a moment to share your experience.
-                          </p>
 
-                          <h3 className="text-[#FFC72C]  font-bold text-[10px] md:text-sm lg:text-sm uppercase tracking-wide md:mb-3 text-center">
-                            Scan QR Code
-                          </h3>
+                      <div className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center ${
+                        isDark ? 'bg-[#242526] border-[#3e4042]' : 'bg-white/10 border-white/20'
+                      }`}>
+                        <p className="text-xs text-white/80 leading-relaxed mb-2">
+                          <strong>REMINDER</strong>: Your feedback is important to us. Kindly take a moment to share your experience.
+                        </p>
 
-                          <img
-                            src={qrCode}
-                            alt="QR Code"
-                            className="w-20 h-20 lg:w-40 lg:h-40 object-contain"
-                          />
+                        <h4 className="text-[#FFC72C] font-bold text-xs uppercase tracking-wide mb-2">
+                          Scan QR Code
+                        </h4>
 
-                          <a
-                            href="https://pupsinta.freshservice.com/support/home"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="lg:mt-2 lg:text-sm text-[10px] text-[#FFC72C] underline text-center whitespace-normal break-normal hover:text-yellow-400 transition"
-                          >
-                            https://pupsinta.freshservice.com/support/home
-                          </a>
+                        <img
+                          src={qrCode}
+                          alt="QR Code"
+                          className="w-24 h-24 sm:w-28 sm:h-28 object-contain my-1 bg-white p-1 rounded-lg"
+                        />
 
-                        </div>
+                        <a
+                          href="https://pupsinta.freshservice.com/support/home"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 text-xs text-[#FFC72C] underline hover:text-yellow-400 transition break-all"
+                        >
+                          https://pupsinta.freshservice.com/support/home
+                        </a>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Navigation Buttons */}
-              <div className="mb-8 px-8 flex justify-between items-center mt-auto">
-                {currentStep > 1 && (
+              {/* Navigation Action Buttons */}
+              <div className={`mt-8 px-6 sm:px-10 py-5 flex items-center justify-between border-t ${
+                isDark ? 'border-[#3e4042]/50 bg-[#141517]/50' : 'border-white/10 bg-black/10'
+              } rounded-b-2xl sm:rounded-b-3xl`}>
+                {currentStep > 1 ? (
                   <button
                     type="button"
                     onClick={prevStep}
-                    className={`font-bold py-2 px-6 rounded shadow-md w-32 transition-colors ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
+                    className={`inline-flex items-center gap-2 font-semibold text-sm py-2.5 px-6 rounded-xl transition-all duration-200 cursor-pointer active:scale-95 ${
+                      isDark
+                        ? 'bg-[#2b2c2f] hover:bg-[#383a3e] text-gray-200 border border-[#444649]'
+                        : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                    }`}
                   >
-                    Back
+                    <ArrowLeftIcon className="w-4 h-4" />
+                    <span>Back</span>
                   </button>
-                )}
+                ) : <div />}
 
                 <button
                   type="button"
                   onClick={currentStep < finalStep ? nextStep : handlePreSubmit}
                   disabled={isVerifyingOr}
-                  className={`font-bold py-2 px-6 rounded shadow-md w-32 ml-auto transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${isDark ? 'bg-[#3a3b3c] hover:bg-[#4e4f50] text-[#e4e6eb] border border-[#4e4f50]' : 'bg-pup-yellow hover:bg-[#eeb61b] text-pup-maroon'}`}
+                  className="inline-flex items-center justify-center gap-2 font-bold text-sm py-2.5 px-7 rounded-xl bg-pup-yellow hover:bg-[#e6b01b] text-pup-maroon active:scale-95 transition-all duration-200 shadow-md shadow-yellow-500/20 disabled:opacity-60 disabled:cursor-not-allowed ml-auto cursor-pointer"
                 >
-                  {currentStep === orStep && isVerifyingOr
-                    ? "Verifying..."
-                    : currentStep < finalStep ? "Next" : "Submit"}
+                  <span>
+                    {currentStep === orStep && isVerifyingOr
+                      ? "Verifying..."
+                      : currentStep < finalStep
+                      ? "Next"
+                      : "Submit"}
+                  </span>
+                  {currentStep < finalStep ? (
+                    <ArrowRightIcon className="w-4 h-4 stroke-[2.5]" />
+                  ) : (
+                    <CheckIcon className="w-4 h-4 stroke-[2.5]" />
+                  )}
                 </button>
-
               </div>
             </form>
           </div>
@@ -1025,6 +967,11 @@ const RequestForm = ({ showProfileStep = false }) => {
           message="Are you sure you want to submit your request?"
         />
       </div>
+      <OrValidationErrorModal
+        isOpen={showOrModal}
+        onClose={() => setShowOrModal(false)}
+        message={orModalMessage}
+      />
       <ErrorToast
         message={errorMessage}
         onClose={() => setErrorMessage("")}
