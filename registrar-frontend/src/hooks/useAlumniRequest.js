@@ -25,6 +25,8 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showOrModal, setShowOrModal] = useState(false);
+  const [orModalMessage, setOrModalMessage] = useState("");
   // See RequestForm.jsx's identical claimTicket state — only the two
   // fields ClaimTicket needs, not the whole created request.
   const [claimTicket, setClaimTicket] = useState(null);
@@ -128,6 +130,37 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     }));
   };
 
+  const handleCombinedItemsChange = (e) => {
+    const selectedList = e.target.value || [];
+
+    const newDocs = selectedList.filter((name) =>
+      documentOptions.includes(name) || availableDocs.some((d) => d.document_name === name)
+    );
+    const newCerts = selectedList.filter((name) =>
+      certificationOptions.includes(name) || availableCertifications.some((c) => c.certificate_name === name)
+    );
+
+    setFormData((prev) => {
+      const newDocCopies = { ...prev.documentCopies };
+      newDocs.forEach((doc) => {
+        if (!newDocCopies[doc]) newDocCopies[doc] = 1;
+      });
+
+      const newCertCopies = { ...prev.certCopies };
+      newCerts.forEach((cert) => {
+        if (!newCertCopies[cert]) newCertCopies[cert] = 1;
+      });
+
+      return {
+        ...prev,
+        documentsRequested: newDocs,
+        certification: newCerts,
+        documentCopies: newDocCopies,
+        certCopies: newCertCopies,
+      };
+    });
+  };
+
   const hasTOR = formData.documentsRequested.some(
     (doc) => doc.toLowerCase().includes("tor") || doc.toLowerCase().includes("transcript")
   );
@@ -199,10 +232,11 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     },
     onError: (error) => {
       console.error("OR verification error:", error.response?.data || error);
-      setErrorMessage(
+      const msg =
         error.response?.data?.message
-        || "We couldn't verify that Official Receipt. Please check the details and try again."
-      );
+        || "The Cashier's Office couldn't match this receipt to your record. This usually happens when the name on the receipt doesn't exactly match your name in the system.";
+      setOrModalMessage(msg);
+      setShowOrModal(true);
     },
   });
 
@@ -428,6 +462,10 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
       ? availableDocs.map((d) => d.document_name)
       : Object.values(DOC_TYPE_MAP);
 
+  const combinedOptions = useMemo(() => {
+    return [...documentOptions, ...certificationOptions];
+  }, [documentOptions, certificationOptions]);
+
   // Step labels mirror the RequestForm.jsx ordering:
   // 1: Terms & Conditions
   // (optional) 2: Alumni Profile
@@ -479,6 +517,9 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     setErrorMessage,
     showConfirmModal,
     setShowConfirmModal,
+    showOrModal,
+    setShowOrModal,
+    orModalMessage,
     formData,
     handleInputChange,
     handleCheckboxChange,
@@ -496,6 +537,8 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     certificationOptions,
     purposeOptions,
     documentOptions,
+    combinedOptions,
+    handleCombinedItemsChange,
     stepLabels,
     totalSteps,
     hasTOR,
