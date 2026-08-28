@@ -93,13 +93,21 @@ const InputGroup = ({
           name={name}
           value={displayValue}
           onChange={handleChange}
-          placeholder={voiceEnabled && isListening ? "Listening... Speak now" : placeholder}
+          placeholder={voiceEnabled && isListening ? "Listening..." : placeholder}
           required={required}
           pattern={pattern}
           title={title}
           min={min}
           max={max}
-          className={`w-full px-3 py-3 rounded-lg text-sm font-medium shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#FFC72C] ${isDark ? 'bg-[#1f1f1f] text-[#e4e6eb] border border-[#3e4042] placeholder:text-[#8f949d]' : 'bg-white text-gray-700 border border-gray-200 placeholder:text-gray-400'} ${voiceEnabled ? "pr-20" : ""}`}
+          className={`w-full px-3 py-3 rounded-lg text-sm font-medium shadow-sm transition-all duration-200 focus:outline-none ${
+            isListening
+              ? 'border-[#FFC72C] ring-2 ring-[#FFC72C]/25'
+              : 'focus:border-[#FFC72C] focus:ring-2 focus:ring-[#FFC72C]/25'
+          } ${
+            isDark
+              ? 'bg-[#1f1f1f] text-[#e4e6eb] border-[#3e4042] placeholder:text-[#8f949d]'
+              : 'bg-white text-gray-700 border-gray-200 placeholder:text-gray-400'
+          } ${voiceEnabled ? "pr-20" : ""}`}
         />
 
         <div className="absolute right-2 flex items-center gap-1">
@@ -121,8 +129,10 @@ const InputGroup = ({
               aria-label={isListening ? "Stop listening" : `Start voice input for ${label}`}
               className={`p-1.5 rounded-md transition-all duration-200 shrink-0 ${
                 isListening
-                  ? (isDark ? "text-[#FFC72C] bg-[#FFC72C]/10 animate-pulse" : "text-[#800000] bg-red-50 animate-pulse")
-                  : (isDark ? "text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#3a3b3c]" : "text-gray-400 hover:text-[#800000] hover:bg-gray-100")
+                  ? 'text-[#b58700] dark:text-[#FFC72C] bg-[#FFC72C]/20 border border-[#FFC72C]/40 animate-pulse'
+                  : isDark
+                    ? 'text-[#b0b3b8] hover:text-[#FFC72C] hover:bg-[#3a3b3c]'
+                    : 'text-gray-400 hover:text-[#b58700] hover:bg-amber-50'
               }`}
             >
               <MicrophoneIcon className="w-4 h-4" />
