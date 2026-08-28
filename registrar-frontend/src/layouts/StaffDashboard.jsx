@@ -175,7 +175,7 @@ const RowActionsDropdown = ({
 
 const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim }) => {
   const { isDark } = useTheme();
-  const { showError } = useAlertToast();
+  const { showError, showSuccess } = useAlertToast();
   const { user } = useAuth();
 
   // Work Item #1 — Granular Per-Action Permissions: UX layer only —
@@ -234,8 +234,69 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
     handleRestoreSelected,
     handleArchiveOne,
     handleRestoreOne,
+    handleBulkReady,
+    handleBulkDone,
     markCertificateAsPrinted,
   } = useStaffDashboard(viewMode);
+
+  const handleBulkReadyClick = () => {
+    if (selectedIds.length === 0) return;
+
+    const eligibleRequests = requests.filter(
+      r => selectedIds.includes(r.id) &&
+      !r.isArchived &&
+      (r.statusId === resolvedStatusIds.PENDING || r.statusId === resolvedStatusIds.PENDING_SIGNATURE)
+    );
+
+    if (eligibleRequests.length === 0) {
+      showError('None of the selected requests can be marked as Ready to Claim.');
+      return;
+    }
+
+    const unprintedCert = eligibleRequests.find(
+      r => r.isCertificate && !printedCertificateIds.includes(r.id)
+    );
+
+    if (unprintedCert) {
+      showError('You need to process or print the certificate first for selected certificate requests.');
+      return;
+    }
+
+    const targetIds = eligibleRequests.map(r => r.id);
+    handleBulkReady(targetIds, {
+      onSuccess: () => {
+        showSuccess(`Successfully marked ${targetIds.length} request(s) as Ready to Claim.`);
+      },
+      onError: (err) => {
+        showError('Error updating status: ' + (err?.response?.data?.message || err.message));
+      },
+    });
+  };
+
+  const handleBulkDoneClick = () => {
+    if (selectedIds.length === 0) return;
+
+    const eligibleRequests = requests.filter(
+      r => selectedIds.includes(r.id) &&
+      !r.isArchived &&
+      r.statusId === resolvedStatusIds.READY
+    );
+
+    if (eligibleRequests.length === 0) {
+      showError('None of the selected requests can be marked as Done (requests must be Ready for Pickup first).');
+      return;
+    }
+
+    const targetIds = eligibleRequests.map(r => r.id);
+    handleBulkDone(targetIds, {
+      onSuccess: () => {
+        showSuccess(`Successfully marked ${targetIds.length} request(s) as Done.`);
+      },
+      onError: (err) => {
+        showError('Error updating status: ' + (err?.response?.data?.message || err.message));
+      },
+    });
+  };
 
   const sortDropdownRef = useRef(null);
   const statusDropdownRef = useRef(null);
@@ -300,30 +361,28 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
 
       {/* ---------------- TOOLBAR ---------------- */}
       <div className={isEmbedded ? "mb-6 flex flex-col md:flex-row gap-4 justify-between items-center w-full" : `p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-center ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white border border-gray-100'}`}>
-        
         {selectedIds.length > 0 ? (
           <div className={`flex flex-wrap items-center gap-3 p-2 rounded-lg border w-full md:w-auto ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-blue-50/30 border-blue-100'}`}>
             <span className={`font-bold text-sm ml-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{selectedIds.length} Selected</span>
-            <button 
-              onClick={handleDeleteSelected}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
-            >
-              <TrashIcon className="w-4 h-4" /> Delete Selected
-            </button>
-            {viewMode === 'archived' ? (
-              <button 
-                onClick={handleRestoreSelected}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
-              >
-                <CheckIcon className="w-4 h-4" /> Restore Selected
-              </button>
-            ) : (
-              <button 
-                onClick={handleArchiveSelected}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
-              >
-                <ArchiveBoxIcon className="w-4 h-4" /> Archive Selected
-              </button>
+            {viewMode !== 'archived' && (
+              <>
+                {canProcess && (
+                  <button 
+                    onClick={handleBulkReadyClick}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" /> Mark Ready
+                  </button>
+                )}
+                {canComplete && (
+                  <button 
+                    onClick={handleBulkDoneClick}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" /> Mark Done
+                  </button>
+                )}
+              </>
             )}
           </div>
         ) : (
@@ -432,11 +491,55 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
             </button>
           )}
 
+          {viewMode === 'archived' ? (
+            <button
+              type="button"
+              disabled={selectedIds.length === 0}
+              onClick={handleRestoreSelected}
+              title={selectedIds.length > 0 ? `Restore ${selectedIds.length} selected request(s)` : 'Select requests to restore'}
+              className={`p-2 rounded-lg transition-all border flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                isDark
+                  ? 'bg-[#1f1f1f] text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#2a2a2f] border-[#3e4042]'
+                  : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-gray-200 shadow-xs'
+              }`}
+            >
+              <CheckIcon className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={selectedIds.length === 0}
+              onClick={handleArchiveSelected}
+              title={selectedIds.length > 0 ? `Archive ${selectedIds.length} selected request(s)` : 'Select requests to archive'}
+              className={`p-2 rounded-lg transition-all border flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                isDark
+                  ? 'bg-[#1f1f1f] text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#2a2a2f] border-[#3e4042]'
+                  : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-gray-200 shadow-xs'
+              }`}
+            >
+              <ArchiveBoxIcon className="w-5 h-5" />
+            </button>
+          )}
+
+          <button
+            type="button"
+            disabled={selectedIds.length === 0}
+            onClick={handleDeleteSelected}
+            title={selectedIds.length > 0 ? `Delete ${selectedIds.length} selected request(s)` : 'Select requests to delete'}
+            className={`p-2 rounded-lg transition-all border flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+              isDark
+                ? 'bg-[#1f1f1f] text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#2a2a2f] border-[#3e4042]'
+                : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-gray-200 shadow-xs'
+            }`}
+          >
+            <TrashIcon className="w-5 h-5" />
+          </button>
+
           {viewMode === 'active' && onScanToClaim && (
             <button
               type="button"
               onClick={onScanToClaim}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pup-maroon text-white text-sm font-bold hover:bg-pup-dark-maroon transition-all active:scale-95 shadow-sm shrink-0"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pup-maroon text-white text-sm font-bold hover:bg-pup-dark-maroon transition-all active:scale-95 shadow-sm shrink-0 cursor-pointer"
             >
               <QrCodeIcon className="w-5 h-5" />
               <span>Scan to Claim</span>
@@ -640,7 +743,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                           }`}>
                             <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
                           </span>
-                          <span>Awaiting Signature</span>
+                          <span>Pending Signature</span>
                         </button>
                       )}
                       {canProcess && (!req.isArchived && (req.statusId === resolvedStatusIds.PENDING || req.statusId === resolvedStatusIds.PENDING_SIGNATURE)) && (

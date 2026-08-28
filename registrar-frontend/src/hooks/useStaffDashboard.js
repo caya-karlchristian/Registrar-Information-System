@@ -160,14 +160,55 @@ export const useStaffDashboard = (viewMode) => {
     onError: (err) => alert('Error restoring request: ' + (err?.response?.data?.message || err.message)),
   });
 
+  const bulkReadyMutation = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map(id => updateDocumentRequest(id, { status_id: resolvedStatusIds.READY }))),
+    onSuccess: () => {
+      setSelectedIds([]);
+      invalidateRequests();
+    },
+    onError: (err) => {
+      console.error('Bulk ready status update failed:', err);
+    },
+  });
+
+  const bulkDoneMutation = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map(id => updateDocumentRequest(id, { status_id: resolvedStatusIds.COMPLETED }))),
+    onSuccess: () => {
+      setSelectedIds([]);
+      invalidateRequests();
+    },
+    onError: (err) => {
+      console.error('Bulk completed status update failed:', err);
+    },
+  });
+
   const actionLoading = statusMutation.isPending || deleteMutation.isPending ||
     archiveSelectedMutation.isPending || restoreSelectedMutation.isPending ||
-    archiveOneMutation.isPending || restoreOneMutation.isPending;
+    archiveOneMutation.isPending || restoreOneMutation.isPending ||
+    bulkReadyMutation.isPending || bulkDoneMutation.isPending;
 
   const handleStatusUpdate = (id, newStatusId) => {
     setUpdatingId(id);
     statusMutation.mutate({ id, statusId: newStatusId }, {
       onSettled: () => setUpdatingId(null),
+    });
+  };
+
+  const handleBulkReady = (targetIds, callbacks = {}) => {
+    const ids = targetIds || selectedIds;
+    if (!ids || ids.length === 0) return;
+    bulkReadyMutation.mutate(ids, {
+      onSuccess: callbacks.onSuccess,
+      onError: callbacks.onError,
+    });
+  };
+
+  const handleBulkDone = (targetIds, callbacks = {}) => {
+    const ids = targetIds || selectedIds;
+    if (!ids || ids.length === 0) return;
+    bulkDoneMutation.mutate(ids, {
+      onSuccess: callbacks.onSuccess,
+      onError: callbacks.onError,
     });
   };
 
@@ -286,6 +327,8 @@ export const useStaffDashboard = (viewMode) => {
     handleRestoreSelected,
     handleArchiveOne,
     handleRestoreOne,
+    handleBulkReady,
+    handleBulkDone,
     markCertificateAsPrinted,
   };
 };
