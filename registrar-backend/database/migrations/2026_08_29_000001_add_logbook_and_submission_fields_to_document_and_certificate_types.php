@@ -58,9 +58,10 @@ return new class extends Migration
             }
         });
 
-        // FKs added as a separate step, guarded via information_schema, so
-        // this stays safely re-runnable even from a partially-applied state.
-        if (!$this->hasForeignKey('document_type', 'document_type_logbook_category_fk')) {
+        // FKs added as a separate step, guarded via a portable existence
+        // check, so this stays safely re-runnable even from a
+        // partially-applied state.
+        if (!$this->hasForeignKey('document_type', 'document_type_logbook_category_fk', 'logbook_category_id', 'logbook_category')) {
             Schema::table('document_type', function (Blueprint $table) {
                 $table->foreign('logbook_category_id', 'document_type_logbook_category_fk')
                     ->references('logbook_category_id')->on('logbook_category')
@@ -68,7 +69,7 @@ return new class extends Migration
             });
         }
 
-        if (!$this->hasForeignKey('certificate_type', 'certificate_type_logbook_category_fk')) {
+        if (!$this->hasForeignKey('certificate_type', 'certificate_type_logbook_category_fk', 'logbook_category_id', 'logbook_category')) {
             Schema::table('certificate_type', function (Blueprint $table) {
                 $table->foreign('logbook_category_id', 'certificate_type_logbook_category_fk')
                     ->references('logbook_category_id')->on('logbook_category')
@@ -79,7 +80,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        if ($this->hasForeignKey('document_type', 'document_type_logbook_category_fk')) {
+        if ($this->hasForeignKey('document_type', 'document_type_logbook_category_fk', 'logbook_category_id', 'logbook_category')) {
             Schema::table('document_type', function (Blueprint $table) {
                 $table->dropForeign('document_type_logbook_category_fk');
             });
@@ -93,7 +94,7 @@ return new class extends Migration
             }
         });
 
-        if ($this->hasForeignKey('certificate_type', 'certificate_type_logbook_category_fk')) {
+        if ($this->hasForeignKey('certificate_type', 'certificate_type_logbook_category_fk', 'logbook_category_id', 'logbook_category')) {
             Schema::table('certificate_type', function (Blueprint $table) {
                 $table->dropForeign('certificate_type_logbook_category_fk');
             });
@@ -109,21 +110,54 @@ return new class extends Migration
     }
 
     /**
-     * Whether a named foreign key constraint already exists on a table.
-     * Schema::hasColumn() has no FK equivalent, so this checks
-     * information_schema directly. Safe for this app's MySQL/MariaDB
-     * target (see config/database.php).
+     * Portable "does this FK constraint already exist" check.
+     *
+     * information_schema.TABLE_CONSTRAINTS works on MySQL/MariaDB (this
+     * project's production DB — see config/database.php) and on Postgres,
+     * but NOT on SQLite, which the test suite uses for speed (see
+     * phpunit.xml, DB_CONNECTION=sqlite, DB_DATABASE=:memory:). SQLite has
+     * no information_schema at all, so this must branch by driver rather
+     * than assume one dialect everywhere — same approach already used in
+     * 2026_07_11_000001_create_policies_table.php.
+     *
+     * @param  string  $table            Table the FK lives on.
+     * @param  string  $constraintName   Named constraint (MySQL/Postgres path only).
+     * @param  string  $column           Local column the FK is defined on (SQLite path).
+     * @param  string  $referencesTable  Table the FK points to (SQLite path).
      */
-    private function hasForeignKey(string $table, string $constraintName): bool
+    private function hasForeignKey(string $table, string $constraintName, string $column, string $referencesTable): bool
     {
         $connection = Schema::getConnection();
+
+        if ($connection->getDriverName() === 'sqlite') {
+            // SQLite doesn't track FK constraint names the way MySQL/Postgres
+            // do, so we approximate "does this FK already exist" by matching
+            // on the (from column, referenced table) pair instead of the
+            // constraint name — sufficient for this migration's idempotency
+            // purposes, since in tests the table is always created fresh.
+            $foreignKeys = $connection->select("PRAGMA foreign_key_list($table)");
+
+            foreach ($foreignKeys as $fk) {
+                if ($fk->from === $column && $fk->table === $referencesTable) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $database = $connection->getDatabaseName();
 
-        return $connection->table('information_schema.TABLE_CONSTRAINTS')
-            ->where('CONSTRAINT_SCHEMA', $database)
-            ->where('TABLE_NAME', $table)
-            ->where('CONSTRAINT_NAME', $constraintName)
-            ->where('CONSTRAINT_TYPE', 'FOREIGN KEY')
-            ->exists();
+        $result = $connection->selectOne(
+            'SELECT COUNT(*) AS count
+             FROM information_schema.TABLE_CONSTRAINTS
+             WHERE CONSTRAINT_SCHEMA = ?
+               AND TABLE_NAME = ?
+               AND CONSTRAINT_NAME = ?
+               AND CONSTRAINT_TYPE = "FOREIGN KEY"',
+            [$database, $table, $constraintName]
+        );
+
+        return $result && $result->count > 0;
     }
 };
