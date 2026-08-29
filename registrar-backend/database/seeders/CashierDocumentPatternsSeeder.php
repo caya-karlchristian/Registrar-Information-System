@@ -18,6 +18,17 @@ use Illuminate\Support\Facades\DB;
  * Source of truth: Cashier System API PDF (as of June 5 2026) cross-referenced
  * against live DB rows confirmed via tinker on 2026-06-09.
  *
+ * IMPORTANT — predates the CTC/Completion Fee/TOR reconciliation
+ * (2026_08_29_000002/000003/000006, and DatabaseSeeder::seedDocumentTypes()/
+ * seedCertificateTypes(), which now seed the reconciled state directly).
+ * This seeder runs AFTER those in DatabaseSeeder::run(), so any id listed
+ * here silently overwrites whatever the reconciled seeding just set.
+ * document_type_id 10, document_type_id 15, and certificate_type_id 7 have
+ * been deliberately removed from the arrays below for exactly this reason
+ * — do NOT re-add them here; edit DatabaseSeeder::seedDocumentTypes()/
+ * seedCertificateTypes() instead, which is now the single source of truth
+ * for those rows' patterns.
+ *
  * To update patterns after a cashier fee rename:
  *   1. Edit the array below (or update via the admin CRUD endpoint).
  *   2. Re-run: php artisan db:seed --class=CashierDocumentPatternsSeeder
@@ -62,9 +73,10 @@ class CashierDocumentPatternsSeeder extends Seeder
                 'Detailed Description of Subjects',
             ],
 
-            // Correction of Entry of Grade / Completion / Late Reporting
-            // — internal grade processing, no cashier fee
-            10 => null,
+            // document_type_id 10 (Correction of Entry of Grade) intentionally
+            // NOT listed here — see class docblock. Owned by
+            // DatabaseSeeder::seedDocumentTypes() as of the CTC/Completion
+            // Fee reconciliation; this seeder must not overwrite it.
 
             // Course Accreditation (SHS to Bridge) — no cashier equivalent
             11 => null,
@@ -85,26 +97,11 @@ class CashierDocumentPatternsSeeder extends Seeder
                 'CAV/Apostille (DFA)',
             ],
 
-            // Transcript of Records (TOR)
-            // NOTE: per the final matcher doc, "Authentication Fee -
-            // Transcript of Records" and "Authentication Fee - Transcript &
-            // Diploma" are "Same with CTC (Duplicate)" — i.e. Certified True
-            // Copy items, not TOR. Moved to certificate_type 7. "Scanned
-            // Picture for Transcript" is flagged "Not in Registrar (Any
-            // Certificate - Accessory)" — dropped entirely, not reassigned.
-            15 => [
-                'Transcript of Records',
-                'Transcript of Records - Undergraduate (2 pages)',
-                'Transcript of Records - Undergraduate (3 pages)',
-                'Transcript of Records (1 page)',
-                'Transcript of Records - Technology Courses',
-                'Transcript of Records - 2nd copy (graduate-engineering)',
-                'Transcript of Records - 2nd copy (non-engineering graduate)',
-                'Transcript of Records (graduate-Engineering/Copy for)',
-                'Transcript of Records (graduate-Non-Engineering/Copy for)',
-                'Transcript of Records (OU)',
-                'Transcript of Records - 2nd copy (graduate-non-engineering)',
-            ],
+            // document_type_id 15 (Transcript of Records) intentionally NOT
+            // listed here — see class docblock. It was repurposed to the
+            // plain/base TOR variant (single pattern) by the TOR split;
+            // owned by DatabaseSeeder::seedDocumentTypes(), and the other 10
+            // variants are now their own rows (ids 30-39) there too.
 
             // Informative Copy of Grades
             // NOTE: "Certified True Copy - Informative Copy of Grades" is
@@ -186,18 +183,10 @@ class CashierDocumentPatternsSeeder extends Seeder
                 'Certification Fee - Certificate of Graduation',
             ],
 
-            // Certified True Copy of Records
-            // Distinct from Doc 16 (Informative Copy of Grades) — confirmed
-            // 2026-08-25. Per the final matcher doc: "Certified True Copy -
-            // Informative Copy of Grades" is the cashier label for THIS type
-            // (registrar name = "Certified True Copy of Records"). The two
-            // "Authentication Fee -" items are flagged "Same with CTC
-            // (Duplicate)", i.e. also this type — moved here from doc 15.
-            7 => [
-                'Certified True Copy - Informative Copy of Grades',
-                'Authentication Fee - Transcript of Records',
-                'Authentication Fee - Transcript & Diploma',
-            ],
+            // certificate_type_id 7 intentionally NOT listed here — see class
+            // docblock. Deleted entirely per 2026_08_29_000002: CTC and
+            // Authentication Fee items are document_type rows now (ids
+            // 21-29), not a certificate_type. Do not re-add.
 
             // Certificate of Graduate Honor — no cashier equivalent
             8 => null,
