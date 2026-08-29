@@ -44,6 +44,15 @@ use Illuminate\Support\Facades\Schema;
  * set to its parent document_request's CURRENT status_id, so nothing
  * regresses — a request already sitting in ReadyToClaim doesn't
  * suddenly show its items as unstarted.
+ *
+ * Backfill portability note: the backfill originally used MySQL's
+ * multi-table `UPDATE ... INNER JOIN ... SET` syntax. That syntax is a
+ * MySQL/MariaDB extension — it does not exist in SQLite (used by the
+ * test suite, see phpunit.xml DB_CONNECTION=sqlite) or in standard
+ * ANSI SQL, so it broke every test that boots the app. Rewritten below
+ * as a correlated-subquery UPDATE, which is valid, identical SQL on
+ * MySQL, MariaDB, PostgreSQL, and SQLite alike — no driver branching
+ * required.
  */
 return new class extends Migration
 {
@@ -97,18 +106,37 @@ return new class extends Migration
 
         // Backfill: every existing line item inherits its parent request's
         // CURRENT status_id, so nothing regresses for in-flight requests.
+        // Correlated-subquery form — portable across MySQL/MariaDB,
+        // PostgreSQL, and SQLite (unlike the MySQL-only multi-table
+        // UPDATE...JOIN...SET syntax this replaces).
         DB::statement(<<<'SQL'
-            UPDATE request_document rd
-            INNER JOIN document_request dr ON dr.request_id = rd.request_id
-            SET rd.status_id = dr.status_id
-            WHERE rd.status_id IS NULL
+            UPDATE request_document
+            SET status_id = (
+                SELECT dr.status_id
+                FROM document_request dr
+                WHERE dr.request_id = request_document.request_id
+            )
+            WHERE status_id IS NULL
+              AND EXISTS (
+                SELECT 1
+                FROM document_request dr
+                WHERE dr.request_id = request_document.request_id
+              )
         SQL);
 
         DB::statement(<<<'SQL'
-            UPDATE request_certificate rc
-            INNER JOIN document_request dr ON dr.request_id = rc.request_id
-            SET rc.status_id = dr.status_id
-            WHERE rc.status_id IS NULL
+            UPDATE request_certificate
+            SET status_id = (
+                SELECT dr.status_id
+                FROM document_request dr
+                WHERE dr.request_id = request_certificate.request_id
+            )
+            WHERE status_id IS NULL
+              AND EXISTS (
+                SELECT 1
+                FROM document_request dr
+                WHERE dr.request_id = request_certificate.request_id
+              )
         SQL);
     }
 
