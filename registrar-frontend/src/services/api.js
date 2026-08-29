@@ -144,6 +144,29 @@ export const archiveDocumentType = (id, reason) => api.patch(`/document-types/${
 export const restoreDocumentType = (id)      => api.patch(`/document-types/${id}/restore`);
 
 // -------------------------------------------------------
+// LOGBOOK CATEGORIES (read: all | write: Admin+)
+// -------------------------------------------------------
+export const getLogbookCategories  = ()          => api.get("/logbook-categories");
+export const getLogbookCategory    = (id)        => api.get(`/logbook-categories/${id}`);
+export const createLogbookCategory = (data)      => api.post("/logbook-categories", data);
+export const updateLogbookCategory = (id, data)  => api.put(`/logbook-categories/${id}`, data);
+export const deleteLogbookCategory = (id)        => api.delete(`/logbook-categories/${id}`);
+
+// Fulfillment tracks (Phase 3 claim grouping) — same shape as Logbook
+// Category above. See FulfillmentTrackController: assigning a non-null
+// fulfillment_track_id to a document_type/certificate_type is what
+// actually makes RequestReleaseGroupService::assignReleaseGroups() split
+// a request into more than one claim ticket. Before this was wired into
+// DocumentManagement.jsx, no type in the system ever had a track
+// assigned — the whole grouping feature existed in code but was
+// unreachable in practice.
+export const getFulfillmentTracks  = ()          => api.get("/fulfillment-tracks");
+export const getFulfillmentTrack   = (id)        => api.get(`/fulfillment-tracks/${id}`);
+export const createFulfillmentTrack = (data)     => api.post("/fulfillment-tracks", data);
+export const updateFulfillmentTrack = (id, data) => api.put(`/fulfillment-tracks/${id}`, data);
+export const deleteFulfillmentTrack = (id)       => api.delete(`/fulfillment-tracks/${id}`);
+
+// -------------------------------------------------------
 // CERTIFICATIONS (read: all | write: Admin+)
 // -------------------------------------------------------
 export const getCertifications         = ()          => api.get("/certifications");
@@ -304,6 +327,36 @@ export const restoreDocumentRequests = (ids) => api.post(`/document-requests/res
 // rather than writing a new message client-side.
 // -------------------------------------------------------
 export const claimDocumentRequest = (credential) => api.post(`/document-requests/claim`, credential);
+
+// -------------------------------------------------------
+// ITEM-LEVEL STATUS (Phase 2) — staff/admin only.
+// Advances ONE request_document/request_certificate row independently
+// of the rest of the request — see backend RequestItemStatusService.
+// Same coarse role/module gate as updateDocumentRequest above; the
+// Process-vs-Complete split is enforced server-side once the target
+// status is known. On success the backend returns the updated line
+// item (not the parent request) — callers should re-fetch the parent
+// via getDocumentRequest(id) to pick up the recomputed aggregate
+// status shown elsewhere in the UI.
+// -------------------------------------------------------
+export const updateRequestDocumentStatus = (requestId, requestDocumentId, statusId) =>
+  api.put(`/document-requests/${requestId}/documents/${requestDocumentId}`, { status_id: statusId });
+export const updateRequestCertificateStatus = (requestId, requestCertificateId, statusId) =>
+  api.put(`/document-requests/${requestId}/certificates/${requestCertificateId}`, { status_id: statusId });
+
+// Real print/generation signal — replaces the old printedCertificateIds
+// localStorage-only flag (see staffDashboardUtils.js's certificatesGenerated
+// derivation), which never reached the server and so could never actually
+// gate the "must be generated before Ready to Claim" checks. Called from
+// GenerateCertificate.jsx's print action. requestCertificateId is optional:
+// pass it when the caller knows which specific certificate line item was
+// just printed (see CertificateModal.jsx's name -> id map) to mark only
+// that row; omit it to fall back to marking every ungenerated certificate
+// on the request (see DocumentRequestService::markCertificatesGenerated()).
+export const markCertificatesGenerated = (requestId, requestCertificateId = null) =>
+  api.post(`/document-requests/${requestId}/mark-certificates-generated`, {
+    ...(requestCertificateId != null ? { request_certificate_id: requestCertificateId } : {}),
+  });
 
 // -------------------------------------------------------
 // REQUEST HISTORY (read-only from the frontend)

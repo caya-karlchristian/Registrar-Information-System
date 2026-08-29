@@ -19,12 +19,14 @@ class CertificationType extends Model
         'layout_header_left_url', 'layout_header_right_url', 'layout_footer_urls',
         'layout_header_logo_size', 'layout_footer_logo_size',
         'cashier_document_patterns', 'is_archived', 'archived_on', 'archived_by',
+        'logbook_category_id', 'requires_source_submission', 'fulfillment_track_id',
     ];
 
     protected $casts = [
-        'cashier_document_patterns' => 'array',
+        'cashier_document_patterns'  => 'array',
         'is_archived'                => 'boolean',
         'archived_on'                => 'datetime',
+        'requires_source_submission' => 'boolean',
     ];
 
     // layout_footer_urls is stored as a JSON array of bare paths.
@@ -110,12 +112,33 @@ class CertificationType extends Model
         return $this->belongsTo(AccessType::class, 'access_id');
     }
 
+    public function logbookCategory()
+    {
+        return $this->belongsTo(LogbookCategory::class, 'logbook_category_id');
+    }
+
+    // See DocumentType::fulfillmentTrack() — identical convention.
+    public function fulfillmentTrack()
+    {
+        return $this->belongsTo(FulfillmentTrack::class, 'fulfillment_track_id');
+    }
+
     // Named archivedByUser() (not archivedBy()) so it serializes to
     // "archived_by_user" — "archived_by" is the raw FK column, same
     // convention as DocumentRequest::archivedByUser().
     public function archivedByUser()
     {
         return $this->belongsTo(SystemUser::class, 'archived_by', 'user_id');
+    }
+
+    /**
+     * The label this type should be logged under. Falls back to the
+     * type's own name when no logbook_category is set (see
+     * DocumentType::logbookLabel() — same convention on both tables).
+     */
+    public function logbookLabel(): string
+    {
+        return $this->logbookCategory?->name ?? $this->certificate_name;
     }
 
     /**

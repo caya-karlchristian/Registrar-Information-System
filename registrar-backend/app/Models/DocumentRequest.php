@@ -157,6 +157,21 @@ class DocumentRequest extends Model
         return $this->hasMany(RequestHistory::class, 'request_id');
     }
 
+    /**
+     * Phase 3 (fulfillment_track claim grouping) — see
+     * RequestReleaseGroupService::assignReleaseGroups(). Most requests
+     * have zero of these rows; only present when a request's items span
+     * more than one fulfillment_track, in which case each group carries
+     * its own uuid/claim_code separate from this request's own. Exposed
+     * here (and via DocumentRequestController::RELATIONS) so the
+     * frontend can render every valid ticket for a request, not just the
+     * request-level one — see RequestDetailModal.jsx.
+     */
+    public function releaseGroups()
+    {
+        return $this->hasMany(RequestReleaseGroup::class, 'request_id');
+    }
+
     public function notifications()
     {
         return $this->hasMany(Notification::class, 'request_id');

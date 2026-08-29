@@ -19,6 +19,7 @@
 import { formatName } from './formatters';
 
 export const WORKFLOW_STATUS_NAMES = [
+  'Awaiting Submission',
   'Processing',
   'Pending Signature',
   'Ready to Claim',
@@ -59,9 +60,24 @@ export const STATUS_FALLBACK = {
   READY: 2,
   COMPLETED: 3,
   FORFEITED: 4,
+  // See RequestStatusEnum::AwaitingSubmission (backend) — status_id 12,
+  // the starting status for requests with a requires_source_submission
+  // item (CTC / Authentication Fee). Falls back to 12 for the same
+  // reason the others fall back to their fixed ids: if the reference-data
+  // fetch hasn't resolved yet, we still want a correct id rather than
+  // `undefined` breaking every `statusId === resolvedStatusIds.X` check.
+  AWAITING_SUBMISSION: 12,
 };
 
 export const COMPLETED_VISIBILITY_MS = 24 * 60 * 60 * 1000;
+
+// Deprecated: was the localStorage key for the old client-only
+// printedCertificateIds flag. Removed along with that flag now that
+// certificatesGenerated (derived from the server's generated_at column
+// in mapDocumentRequest below) is the real, persisted signal. Left as a
+// no-op export rather than deleted outright in case anything external
+// still imports it, or a browser has a stale value sitting under this
+// key — it's inert either way.
 export const PRINTED_CERTIFICATE_STORAGE_KEY = 'printed-certificate-request-ids';
 
 /**
@@ -101,18 +117,24 @@ export const resolveStatusIds = (requestStatuses) => {
     READY: lowerNameToId['ready to claim'] ?? STATUS_FALLBACK.READY,
     COMPLETED: lowerNameToId.completed ?? STATUS_FALLBACK.COMPLETED,
     FORFEITED: lowerNameToId.forfeited ?? STATUS_FALLBACK.FORFEITED,
+    // 'awaiting submission' lowercases to a string distinct from 'pending'
+    // — same non-collision reasoning as PENDING_SIGNATURE above (see
+    // RequestStatusEnum::AwaitingSubmission's doc block on the backend).
+    AWAITING_SUBMISSION: lowerNameToId['awaiting submission'] ?? STATUS_FALLBACK.AWAITING_SUBMISSION,
   };
 };
 
 /**
  * Default dashboard visibility rules:
- *  - Pending / Processing / Pending Signature / Ready to Claim → always shown
+ *  - Awaiting Submission / Pending / Processing / Pending Signature /
+ *    Ready to Claim → always shown
  *  - Completed → shown only within 1 day of the request date
  *  - Everything else (Forfeited, Cancelled, ...) → hidden unless filtered/searched
  */
 export const isDefaultVisible = (req, resolvedStatusIds) => {
   const { statusId, statusName, timestamp } = req;
   const name = String(statusName ?? '').trim().toLowerCase();
+  if (statusId === resolvedStatusIds.AWAITING_SUBMISSION || name === 'awaiting submission') return true;
   if (statusId === resolvedStatusIds.PENDING || name === 'pending')         return true;
   if (name === 'processing')                                           return true;
   if (statusId === resolvedStatusIds.PENDING_SIGNATURE || name === 'pending signature') return true;
@@ -150,6 +172,20 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
   const finalCertName = r.certificates?.length > 0
     ? r.certificates.map(c => c.certification_type?.certificate_name).filter(Boolean).join(', ')
     : null;
+
+  // Real, server-derived replacement for the old printedCertificateIds
+  // localStorage flag — true when the request has no certificates at all
+  // (nothing to gate), or when EVERY certificate line item has actually
+  // been generated (generated_at set — see migration
+  // 2026_08_29_000010_add_generated_at_to_request_certificate). Requiring
+  // all rather than "at least one" matches the per-item guard in
+  // RequestItemStatusService::guardCertificateGenerated(), which checks
+  // each certificate independently; the whole-request buttons in
+  // StaffDashboard.jsx that read this field are coarser (one badge for
+  // the whole row), so "all generated" is the safer bar to clear before
+  // showing that row as unblocked.
+  const certificatesGenerated = !(r.certificates?.length > 0)
+    || r.certificates.every(c => c.generated_at != null);
 
   const isCertificate = Boolean(
     (r.certificates && r.certificates.length > 0) ||
@@ -203,6 +239,7 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
     certName: finalCertName,
     certificateNames: r.certificates?.map(c => c.certification_type?.certificate_name).filter(Boolean) ?? [],
     isCertificate,
+    certificatesGenerated,
     copies: totalCopies,
     documentDetailsArray,
     course: r.student_profile?.course ?? '',

@@ -18,14 +18,16 @@
 // Status IDs mirror RequestStatusEnum in the backend:
 //   1 = Processing  2 = ReadyToClaim  3 = Completed
 //   4 = Forfeited   5 = Cancelled     6 = PendingSignature
+//   12 = AwaitingSubmission
 // Keep in sync with backend Enums/RequestStatusEnum.php
 export const STATUS_CONFIG = {
-  1: { label: "Processing",        classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  2: { label: "Ready to Claim",    classes: "bg-green-100 text-green-700 border-green-200"   },
-  3: { label: "Completed",         classes: "bg-gray-100 text-gray-700 border-gray-200"      },
-  4: { label: "Forfeited",         classes: "bg-red-100 text-red-700 border-red-200"         },
-  5: { label: "Cancelled",         classes: "bg-orange-100 text-orange-700 border-orange-200"},
-  6: { label: "Awaiting Signature",classes: "bg-orange-100 text-orange-700 border-orange-200"},
+  1:  { label: "Processing",         classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  2:  { label: "Ready to Claim",     classes: "bg-green-100 text-green-700 border-green-200"   },
+  3:  { label: "Completed",          classes: "bg-gray-100 text-gray-700 border-gray-200"      },
+  4:  { label: "Forfeited",          classes: "bg-red-100 text-red-700 border-red-200"         },
+  5:  { label: "Cancelled",          classes: "bg-orange-100 text-orange-700 border-orange-200"},
+  6:  { label: "Awaiting Signature", classes: "bg-orange-100 text-orange-700 border-orange-200"},
+  12: { label: "Awaiting Submission",classes: "bg-purple-100 text-purple-700 border-purple-200"},
 };
 
 export const TAB_MAP = {
@@ -37,6 +39,9 @@ export const TAB_MAP = {
   6: "pending",   // Pending Signature — registrar-side view: still "in progress",
                   // not yet claimable. Kept out of "ready" so a student doesn't
                   // see "To Claim" for a document that isn't actually there yet.
+  12: "pending",  // Awaiting Submission — same reasoning as Pending Signature:
+                  // it's the request's starting, in-progress state, not yet
+                  // claimable, so it belongs in "pending" not "ready".
 };
 
 export const TABS = [
@@ -67,6 +72,13 @@ export const TABS = [
 ];
 
 export const PROGRESS_MAP = {
+  12: 10,  // Awaiting Submission — request exists but registrar can't start
+           // until the client hands over the source document. Deliberately
+           // less than Processing's 25%, since no registrar work has begun
+           // yet; deliberately not 0%, since 0% is read elsewhere (see
+           // RequestDetailModal's getProgressLabel/Claim Ticket visibility)
+           // as "nothing left to claim" (Forfeited/Cancelled), which this
+           // is not.
   1: 25,   // Processing
   2: 75,   // Ready to Claim
   3: 100,  // Completed

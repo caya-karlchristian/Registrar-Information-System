@@ -13,6 +13,7 @@ export const CATEGORY_MAP = {
   payment_invalid:             { category: 'Payment',     color: 'bg-rose-600' },
   status_updated:              { category: 'Update',      color: 'bg-blue-400' },
   request_processing:          { category: 'Processing',  color: 'bg-blue-400' },
+  awaiting_submission:         { category: 'Submission',  color: 'bg-purple-400' },
   action_needed:               { category: 'Action',      color: 'bg-rose-600' },
   pending_signature:           { category: 'Signature',   color: 'bg-orange-400' },
   ready_to_claim:              { category: 'Ready',       color: 'bg-green-400' },

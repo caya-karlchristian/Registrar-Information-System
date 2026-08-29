@@ -36,6 +36,17 @@ class DocumentTypeController extends Controller
     {
         $docType = DocumentType::create($request->validated());
 
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_DOCUMENT_TYPE_CREATED, [
+            'document_type_id'          => $docType->document_type_id,
+            'document_name'             => $docType->document_name,
+            'cashier_document_patterns' => $docType->cashier_document_patterns,
+            'fulfillment_track_id'      => $docType->fulfillment_track_id,
+            'logbook_category_id'       => $docType->logbook_category_id,
+        ]);
+
         return response()->json($docType, 201);
     }
 
@@ -46,12 +57,25 @@ class DocumentTypeController extends Controller
             return response()->json(['message' => 'Document type not found'], 404);
         }
 
-        $docType->update($request->validated());
+        $validated = $request->validated();
+        $docType->update($validated);
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_DOCUMENT_TYPE_UPDATED, [
+            'document_type_id'          => $docType->document_type_id,
+            'document_name'             => $docType->document_name,
+            'changed_fields'            => array_keys($validated),
+            'cashier_document_patterns' => $docType->cashier_document_patterns,
+            'fulfillment_track_id'      => $docType->fulfillment_track_id,
+            'logbook_category_id'       => $docType->logbook_category_id,
+        ]);
 
         return response()->json($docType, 200);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $docType = DocumentType::find($id);
         if (!$docType) {
@@ -70,6 +94,14 @@ class DocumentTypeController extends Controller
 
             throw $e;
         }
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_DOCUMENT_TYPE_DELETED, [
+            'document_type_id' => $docType->document_type_id,
+            'document_name'    => $docType->document_name,
+        ]);
 
         return response()->json(['message' => 'Document type deleted'], 200);
     }

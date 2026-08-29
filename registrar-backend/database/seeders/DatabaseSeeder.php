@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
         $this->seedRequestPurpose();
         $this->seedAlumniType();
         $this->seedNotificationTypes();
+        $this->seedLogbookCategories();
         $this->seedDocumentTypes();
         $this->seedCertificateTypes();
 
@@ -264,6 +265,12 @@ class DatabaseSeeder extends Seeder
             ['status_id' => 9,  'status_name' => 'Returned'],
             ['status_id' => 10, 'status_name' => 'Archived'],
             ['status_id' => 11, 'status_name' => 'Draft'],
+            // See migration 2026_08_29_000004_add_awaiting_submission_status
+            // and RequestStatusEnum::AwaitingSubmission for the full
+            // reasoning. Lowercases to "awaiting submission" — not
+            // "pending" — so it does not collide with the exact-match
+            // "pending" lookup landmine documented above.
+            ['status_id' => 12, 'status_name' => 'Awaiting Submission'],
         ];
 
         foreach ($rows as $row) {
@@ -326,6 +333,21 @@ class DatabaseSeeder extends Seeder
                 'trigger_event'        => 'request_submitted',
                 'title'                => 'Request Submitted',
                 'message_template'     => 'Your document request has been successfully submitted.',
+                'audience'             => NotificationAudienceEnum::StudentAlumni->value,
+                'is_active'            => 1,
+            ],
+            [
+                // Fires from DocumentRequestService::createRequest() when
+                // the request starts in AwaitingSubmission (see
+                // RequestStatusEnum::AwaitingSubmission) — i.e. it
+                // contains at least one CTC/Authentication Fee item.
+                // Deliberately separate from request_submitted above:
+                // that one reads as "we're on it," this one needs to say
+                // "we can't start until you bring us something."
+                'notification_type_id' => 24,
+                'trigger_event'        => 'awaiting_submission',
+                'title'                => 'Source Document Required',
+                'message_template'     => 'Your request includes an item that requires you to submit the original source document before processing can begin. Please see the requirements list for details.',
                 'audience'             => NotificationAudienceEnum::StudentAlumni->value,
                 'is_active'            => 1,
             ],
@@ -540,8 +562,77 @@ class DatabaseSeeder extends Seeder
     // NOTE: access_type rows (1=student, 2=alumni, 3=both) must exist
     //       before this runs. Seed access_type separately if starting fresh.
     // ─────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // logbook_category
+    // ─────────────────────────────────────────────
+    // Fixed, explicit IDs — same convention as seedAccessType() — so
+    // document_type/certificate_type rows below can reference them
+    // directly instead of doing a firstOrCreate lookup per row.
+    private const LOGBOOK_CTC_ID = 1;
+    private const LOGBOOK_COMPLETION_FEE_ID = 2;
+    private const LOGBOOK_TOR_ID = 3;
+
+    private function seedLogbookCategories(): void
+    {
+        $rows = [
+            ['logbook_category_id' => self::LOGBOOK_CTC_ID, 'name' => 'Certified True Copy of Records'],
+            ['logbook_category_id' => self::LOGBOOK_COMPLETION_FEE_ID, 'name' => 'Completion Fee'],
+            ['logbook_category_id' => self::LOGBOOK_TOR_ID, 'name' => 'Transcript of Records'],
+        ];
+
+        foreach ($rows as $row) {
+            DB::table('logbook_category')->updateOrInsert(
+                ['logbook_category_id' => $row['logbook_category_id']],
+                ['name' => $row['name']]
+            );
+        }
+    }
+
     private function seedDocumentTypes(): void
     {
+        $torRequirements = "A. FIRST COPY (For New Graduates/Transferees):\n1. Accomplished and printed copy of the application and payment voucher from the Campus registrar. - (1) Original (To be Printed by the Registrar)\n2. General Clearance showing the client is cleared of all accountabilities - (1) Original Copy (Printed from SIS)\n3. Certificate of Candidacy - (1) Original (Printed from SIS)\n4. Certificate of Conferment of Degree (Dummy Diploma) - (1) Original Copy (Remarks: Awarded during graduation ceremony)\n5. 2 (two) pcs of 2x2 picture in Academic Gown/Toga\n6. Documentary stamp - (1) Sample\n7. Proof of payment (if not covered by RA 10931) - (1) Original Copy\nReminder: When claiming documents: 8.1 Authorization letter and ID if claimant is immediate family member Special Power of Attorney (SPA) if the claimant is other than the immediate family.\nB. SECOND AND SUCCEEDING COPIES:\n1. Letter of request by the student - (1) Original (To Registrar's Office)\n2. 2 (two) pcs of2x2 picture in Formal Attire (To be submitted to the Admission and Registration Office)\n3. Documentary Stamp - (1) Sample\n4. Proof of Payment - (1) Original Copy\n5. Acknowledged/Signed Copy of Transfer - (1) Original (Remarks: School where applicant is presently enrolled)\nReminder: .When claiming documents: a.Authorization letter and ID if claimant is immediate family member Special Power of Attorney (SPA) if the claimant is other than the immediate family.";
+        $torProcessPeriod = '8 working day/s, 5 hour/s, 20 minute/s';
+
+        $completionRequirements = "Accomplished Completion Form - (3) Original Copies (Download from PUP website),\nPhotocopy of Class Record of the Faculty - 1 Photo Copy,\nNotarized Affidavit for Change of Grade signed by Professor - Original Copy,\nProof of payment - (1) Original Copy,\nOfficial Logbook - (1) Original Copy";
+        $completionProcessPeriod = '5 working day/s, 59 minute/s';
+
+        $ctcPendingProcessPeriod = 'Pending admin configuration - set via Document Management';
+        $ctcPendingRequirements = 'TODO (admin): confirm exact requirements for this certified-copy variant. Must include, at minimum, the original/photocopy of the source document being certified, proof of payment, and valid ID.';
+
+        // The 10 TOR variants split off from document_type_id 15 — see
+        // 2026_08_29_000003_split_tor_document_type_variants.php for the
+        // authoritative version of this list; kept in sync here so a
+        // fresh install matches an existing, migrated database.
+        $torVariants = [
+            ['id' => 30, 'name' => 'Transcript of Records - Undergraduate (2 pages)', 'pattern' => 'Transcript of Records - Undergraduate (2 pages)', 'access_id' => 3],
+            ['id' => 31, 'name' => 'Transcript of Records - Undergraduate (3 pages)', 'pattern' => 'Transcript of Records - Undergraduate (3 pages)', 'access_id' => 3],
+            ['id' => 32, 'name' => 'Transcript of Records (1 page)', 'pattern' => 'Transcript of Records (1 page)', 'access_id' => 3],
+            ['id' => 33, 'name' => 'Transcript of Records - Technology Courses', 'pattern' => 'Transcript of Records - Technology Courses', 'access_id' => 3],
+            ['id' => 34, 'name' => 'Transcript of Records - 2nd Copy (Graduate, Engineering)', 'pattern' => 'Transcript of Records - 2nd copy (graduate-engineering)', 'access_id' => 2],
+            ['id' => 35, 'name' => 'Transcript of Records - 2nd Copy (Non-Engineering Graduate)', 'pattern' => 'Transcript of Records - 2nd copy (non-engineering graduate)', 'access_id' => 2],
+            ['id' => 36, 'name' => 'Transcript of Records (Graduate, Engineering - Copy For)', 'pattern' => 'Transcript of Records (graduate-Engineering/Copy for)', 'access_id' => 2],
+            ['id' => 37, 'name' => 'Transcript of Records (Graduate, Non-Engineering - Copy For)', 'pattern' => 'Transcript of Records (graduate-Non-Engineering/Copy for)', 'access_id' => 2],
+            ['id' => 38, 'name' => 'Transcript of Records (OU)', 'pattern' => 'Transcript of Records (OU)', 'access_id' => 3],
+            ['id' => 39, 'name' => 'Transcript of Records - 2nd Copy (Graduate, Non-Engineering)', 'pattern' => 'Transcript of Records - 2nd copy (graduate-non-engineering)', 'access_id' => 2],
+        ];
+
+        // The 9 CTC / Authentication Fee source-document combinations —
+        // see 2026_08_29_000002_reconcile_ctc_and_completion_fee_document_types.php
+        // for the authoritative version. requirements/process period are
+        // still real placeholders here too (never confirmed) — set the
+        // real values via Document Management, same note as that migration.
+        $ctcDocumentTypes = [
+            ['id' => 21, 'name' => 'Authentication Fee - Diploma', 'access_id' => 2],
+            ['id' => 22, 'name' => 'Authentication Fee - Transcript & Diploma', 'access_id' => 2],
+            ['id' => 23, 'name' => 'Authentication Fee - Transcript of Records', 'access_id' => 2],
+            ['id' => 24, 'name' => 'Certified True Copy - Certificate of Registration', 'access_id' => 1],
+            ['id' => 25, 'name' => 'Certified True Copy - Certificate of Candidacy', 'access_id' => 3],
+            ['id' => 26, 'name' => 'Certified True Copy - Certificate of Graduation', 'access_id' => 3],
+            ['id' => 27, 'name' => 'Certified True Copy - Diploma', 'access_id' => 2],
+            ['id' => 28, 'name' => 'Certified True Copy - Informative Copy of Grades', 'access_id' => 2],
+            ['id' => 29, 'name' => 'Certified True Copy - Transcript of Records', 'access_id' => 3],
+        ];
+
         $rows = [
             [
                 'document_type_id'        => 2,
@@ -588,14 +679,54 @@ class DatabaseSeeder extends Seeder
                 'access_id'               => 1,
                 'cashier_document_patterns' => json_encode(['Detailed Description of Subjects']),
             ],
+            // document_type_id 10 previously crammed three distinct actions
+            // (Correction of Entry of Grade / Completion of Incomplete Grade /
+            // Late Reporting of Grade) into one comma-joined name. Split per
+            // 2026_08_29_000002 — id 10 is repurposed as Correction of Entry
+            // of Grade specifically (preserves existing request_document
+            // references), and the other two become new rows below (19, 20),
+            // all three sharing logbook_category_id = LOGBOOK_COMPLETION_FEE_ID.
             [
                 'document_type_id'        => 10,
-                'document_name'           => "Correction of Entry of Grade,\nCompletion of Incomplete Grade,\nLate Reporting of Grade",
+                'document_name'           => 'Correction of Entry of Grade',
                 'document_description'    => '',
-                'document_requirements'   => "Accomplished Completion Form - (3) Original Copies (Download from PUP website),\nPhotocopy of Class Record of the Faculty - 1 Photo Copy,\nNotarized Affidavit for Change of Grade signed by Professor - Original Copy,\nProof of payment - (1) Original Copy,\nOfficial Logbook - (1) Original Copy",
-                'document_process_period' => '5 working day/s, 59 minute/s',
+                'document_requirements'   => $completionRequirements,
+                'document_process_period' => $completionProcessPeriod,
                 'access_id'               => 1,
+                // Confirmed exact string from the official Cashier item list
+                // (Cashier_System_API.pdf). See 2026_08_29_000006 for why the
+                // earlier guessed second pattern was dropped.
+                'cashier_document_patterns' => json_encode(['Completion Fee (correction of entry)']),
+                'logbook_category_id'      => self::LOGBOOK_COMPLETION_FEE_ID,
+                'requires_source_submission' => false,
+            ],
+            [
+                'document_type_id'        => 19,
+                'document_name'           => 'Completion of Incomplete Grade',
+                'document_description'    => '',
+                'document_requirements'   => $completionRequirements,
+                'document_process_period' => $completionProcessPeriod,
+                'access_id'               => 1,
+                'cashier_document_patterns' => json_encode(['Completion Fee']),
+                'logbook_category_id'      => self::LOGBOOK_COMPLETION_FEE_ID,
+                'requires_source_submission' => false,
+            ],
+            [
+                'document_type_id'        => 20,
+                'document_name'           => 'Late Reporting of Grade',
+                'document_description'    => '',
+                'document_requirements'   => $completionRequirements,
+                'document_process_period' => $completionProcessPeriod,
+                'access_id'               => 1,
+                // Intentionally null — no confirmed Cashier pattern exists
+                // for this item (it does not appear in the official Cashier
+                // item list). Set via Document Management once known; see
+                // 2026_08_29_000006 for the full explanation and the known
+                // effect of leaving this null (payment verification is
+                // skipped for this item until a real pattern is set).
                 'cashier_document_patterns' => null,
+                'logbook_category_id'      => self::LOGBOOK_COMPLETION_FEE_ID,
+                'requires_source_submission' => false,
             ],
             [
                 'document_type_id'        => 11,
@@ -633,27 +764,22 @@ class DatabaseSeeder extends Seeder
                 'access_id'               => 2,
                 'cashier_document_patterns' => json_encode(['CAV (CHED)', 'CAV (DFA) - undergraduate', 'CAV (DFA) with Special Certification', 'CAV/Apostille (DFA)']),
             ],
+            // document_type_id 15 previously bundled all 11 TOR Cashier
+            // patterns into one row. Split per 2026_08_29_000003 — id 15 is
+            // repurposed as the plain/base variant (preserves existing
+            // request_document references), the other 10 become new rows
+            // below (30-39), all 11 sharing logbook_category_id =
+            // LOGBOOK_TOR_ID so they still collapse to one logbook line.
             [
                 'document_type_id'        => 15,
-                'document_name'           => 'Transcript of Records (TOR)',
+                'document_name'           => 'Transcript of Records',
                 'document_description'    => '',
-                'document_requirements'   => "A. FIRST COPY (For New Graduates/Transferees):\n1. Accomplished and printed copy of the application and payment voucher from the Campus registrar. - (1) Original (To be Printed by the Registrar)\n2. General Clearance showing the client is cleared of all accountabilities - (1) Original Copy (Printed from SIS)\n3. Certificate of Candidacy - (1) Original (Printed from SIS)\n4. Certificate of Conferment of Degree (Dummy Diploma) - (1) Original Copy (Remarks: Awarded during graduation ceremony)\n5. 2 (two) pcs of 2x2 picture in Academic Gown/Toga\n6. Documentary stamp - (1) Sample\n7. Proof of payment (if not covered by RA 10931) - (1) Original Copy\nReminder: When claiming documents: 8.1 Authorization letter and ID if claimant is immediate family member Special Power of Attorney (SPA) if the claimant is other than the immediate family.\nB. SECOND AND SUCCEEDING COPIES:\n1. Letter of request by the student - (1) Original (To Registrar's Office)\n2. 2 (two) pcs of2x2 picture in Formal Attire (To be submitted to the Admission and Registration Office)\n3. Documentary Stamp - (1) Sample\n4. Proof of Payment - (1) Original Copy\n5. Acknowledged/Signed Copy of Transfer - (1) Original (Remarks: School where applicant is presently enrolled)\nReminder: .When claiming documents: a.Authorization letter and ID if claimant is immediate family member Special Power of Attorney (SPA) if the claimant is other than the immediate family.",
-                'document_process_period' => '8 working day/s, 5 hour/s, 20 minute/s',
+                'document_requirements'   => $torRequirements,
+                'document_process_period' => $torProcessPeriod,
                 'access_id'               => 3,
-                // NOTE: "Authentication Fee - Transcript of Records" and
-                // "Authentication Fee - Transcript & Diploma" moved to
-                // certificate_type 7 (Certified True Copy of Records) — per
-                // the final matcher doc these are "Same with CTC (Duplicate)".
-                // "Scanned Picture for Transcript" dropped entirely — matcher
-                // doc flags it "Not in Registrar (Any Certificate - Accessory)".
-                'cashier_document_patterns' => json_encode([
-                    'Transcript of Records', 'Transcript of Records - Undergraduate (2 pages)',
-                    'Transcript of Records - Undergraduate (3 pages)', 'Transcript of Records (1 page)',
-                    'Transcript of Records - Technology Courses', 'Transcript of Records - 2nd copy (graduate-engineering)',
-                    'Transcript of Records - 2nd copy (non-engineering graduate)', 'Transcript of Records (graduate-Engineering/Copy for)',
-                    'Transcript of Records (graduate-Non-Engineering/Copy for)', 'Transcript of Records (OU)',
-                    'Transcript of Records - 2nd copy (graduate-non-engineering)',
-                ]),
+                'cashier_document_patterns' => json_encode(['Transcript of Records']),
+                'logbook_category_id'      => self::LOGBOOK_TOR_ID,
+                'requires_source_submission' => false,
             ],
             [
                 'document_type_id'        => 16,
@@ -662,9 +788,12 @@ class DatabaseSeeder extends Seeder
                 'document_requirements'   => "Letter of request stating the purpose - (1) Original Copy,\nProof of payment - (1) Original Copy,\nPUP School Identification Card - (1) Original Copy,\nAuthorization letter (if claimed by a representative) - (1) Original Copy",
                 'document_process_period' => '1 working day/s, 1 hour/s, 18 minute/s',
                 'access_id'               => 1,
-                // NOTE: "Certified True Copy - Informative Copy of Grades"
-                // is NOT this type — per the final matcher doc it maps to
-                // "Certified True Copy of Records" (certificate_type 7).
+                // NOTE: "Certified True Copy - Informative Copy of Grades" is
+                // NOT this type — it's its own document_type row (id 28,
+                // "Certified True Copy - Informative Copy of Grades"), part
+                // of the CTC cluster under logbook_category_id =
+                // LOGBOOK_CTC_ID. See 2026_08_29_000002 for why CTC items
+                // are document_type rows, not certificate_type.
                 'cashier_document_patterns' => json_encode(['Informative Copy of Grades', 'Certification Fee - Informative Copy of Grades']),
             ],
             [
@@ -686,6 +815,34 @@ class DatabaseSeeder extends Seeder
                 'cashier_document_patterns' => json_encode(['Re-admission Fee']),
             ],
         ];
+
+        foreach ($torVariants as $variant) {
+            $rows[] = [
+                'document_type_id'        => $variant['id'],
+                'document_name'           => $variant['name'],
+                'document_description'    => '',
+                'document_requirements'   => $torRequirements,
+                'document_process_period' => $torProcessPeriod,
+                'access_id'               => $variant['access_id'],
+                'cashier_document_patterns' => json_encode([$variant['pattern']]),
+                'logbook_category_id'      => self::LOGBOOK_TOR_ID,
+                'requires_source_submission' => false,
+            ];
+        }
+
+        foreach ($ctcDocumentTypes as $ctc) {
+            $rows[] = [
+                'document_type_id'        => $ctc['id'],
+                'document_name'           => $ctc['name'],
+                'document_description'    => '',
+                'document_requirements'   => $ctcPendingRequirements,
+                'document_process_period' => $ctcPendingProcessPeriod,
+                'access_id'               => $ctc['access_id'],
+                'cashier_document_patterns' => json_encode([$ctc['name']]),
+                'logbook_category_id'      => self::LOGBOOK_CTC_ID,
+                'requires_source_submission' => true,
+            ];
+        }
 
         foreach ($rows as $row) {
             DB::table('document_type')->updateOrInsert(
@@ -710,11 +867,13 @@ class DatabaseSeeder extends Seeder
             ['certificate_type_id' => 4,  'certificate_name' => "Certification of Medium of \nInstruction with Units", 'access_id' => 3, 'cashier_document_patterns' => json_encode(['English as Medium of Instruction', 'Certification Fee - Medium of Instruction', 'Certification Fee - English as Medium of Instruction']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 5,  'certificate_name' => 'Certificate of Attendance',                'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 6,  'certificate_name' => 'Certificate of  Graduation',               'access_id' => 2, 'cashier_document_patterns' => json_encode(['Certificate of Graduation - 2nd copy', 'Certification Fee - Certificate of Graduation']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
-            // NOTE: distinct from certificate_type/document_type for
-            // "Informative Copy of Grades" — confirmed 2026-08-25. Patterns
-            // moved here from doc 15 (TOR) and doc 16 (Informative Copy of
-            // Grades) per the final matcher doc.
-            ['certificate_type_id' => 7,  'certificate_name' => 'Certified True Copy of Records',           'access_id' => 3, 'cashier_document_patterns' => json_encode(['Certified True Copy - Informative Copy of Grades', 'Authentication Fee - Transcript of Records', 'Authentication Fee - Transcript & Diploma']), 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
+            // certificate_type_id 7 ("Certified True Copy of Records") was
+            // deleted per 2026_08_29_000002 — CTC/Authentication Fee items
+            // are not certificate_type rows (nothing is generated in-system;
+            // Registrar certifies something that already exists), so they
+            // were moved to document_type as their own rows (ids 21-29),
+            // sharing logbook_category_id = LOGBOOK_CTC_ID. Do not re-add
+            // certificate_type_id 7 here.
             ['certificate_type_id' => 8,  'certificate_name' => 'Certificate of Graduate Honor',            'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 9,  'certificate_name' => 'Consular Certification',                   'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],
             ['certificate_type_id' => 10, 'certificate_name' => 'Certificate of Enrollment - PRESENT',      'access_id' => 3, 'cashier_document_patterns' => null, 'layout_header_left_url' => null, 'layout_header_right_url' => null, 'layout_footer_urls' => json_encode([]), 'layout_header_logo_size' => 56, 'layout_footer_logo_size' => 56],

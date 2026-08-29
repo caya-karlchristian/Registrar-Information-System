@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\RequestStatusEnum;
+use App\Models\CertificationType;
 use App\Models\DocumentRequest;
+use App\Models\DocumentType;
 use App\Models\RequestHistory;
 use App\Models\SystemUser;
 use App\Contracts\DocumentRequestServiceInterface;
@@ -25,6 +27,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
     public function __construct(
         private NotificationServiceInterface $notificationService,
         private BusinessCalendarService $businessCalendarService,
+        private RequestReleaseGroupService $releaseGroupService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -38,23 +41,90 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      */
     public function createRequest(SystemUser $user, array $validated): DocumentRequest
     {
-        $requestData = $this->buildRequestData($user, $validated);
+        $initialStatus = $this->requestRequiresSourceSubmission($validated)
+            ? RequestStatusEnum::AwaitingSubmission
+            : RequestStatusEnum::Processing;
 
-        $documentRequest = DocumentRequest::create($requestData);
+        $requestData = $this->buildRequestData($user, $validated, $initialStatus);
 
-        foreach ($validated['documents'] ?? [] as $doc) {
-            $documentRequest->documents()->create([
-                'document_type_id' => $doc['document_type_id'],
-                'number_of_copies' => $doc['number_of_copies'],
-            ]);
-        }
+        // BUG FIX (createRequest was never transactional): the parent
+        // document_request row, every request_document/request_certificate
+        // child row, and Phase 3's release-group assignment used to be
+        // separate, unwrapped writes. If item creation failed partway
+        // through (bad type id slipping past validation, a DB hiccup,
+        // a deadlock on a concurrent request), the result was a
+        // document_request row with SOME or NONE of its line items —
+        // silently orphaned, no error surfaced to the student, and
+        // nothing to roll it back. Wrapping the whole write path in one
+        // transaction makes request creation all-or-nothing: either the
+        // request and every one of its items (and its release groups)
+        // exist together, or none of them do and the caller gets a
+        // clean exception instead of a half-created request.
+        //
+        // Notifications deliberately stay OUTSIDE this transaction (see
+        // below) — they're an external side effect, not a DB write, and
+        // should only fire once the request is durably committed.
+        $documentRequest = DB::transaction(function () use ($user, $validated, $requestData) {
+            $documentRequest = DocumentRequest::create($requestData);
 
-        foreach ($validated['certificates'] ?? [] as $cert) {
-            $documentRequest->certificates()->create([
-                'certificate_type_id' => $cert['certificate_type_id'],
-                'number_of_copies'    => $cert['number_of_copies'] ?? 1,
-            ]);
-        }
+            // BUG FIX (per-item status was never set at creation): every
+            // request_document/request_certificate row created below used to
+            // be left with status_id = NULL, invisible to
+            // RequestItemStatusService::recomputeAggregateStatus()'s
+            // whereNotNull('status_id') filter — meaning a brand-new
+            // request's items didn't participate in their own aggregate
+            // until a staff member happened to touch one manually.
+            //
+            // Fixed by resolving each item's OWN initial status here — same
+            // AwaitingSubmission-vs-Processing decision
+            // requestRequiresSourceSubmission() already makes for the whole
+            // request, just applied per item instead of once. A single
+            // whereIn() per type table keeps this to two extra queries
+            // regardless of how many line items are submitted.
+            $documentTypeIds    = array_column($validated['documents'] ?? [], 'document_type_id');
+            $certificateTypeIds = array_column($validated['certificates'] ?? [], 'certificate_type_id');
+
+            $documentTypeMeta = $documentTypeIds
+                ? DocumentType::whereIn('document_type_id', $documentTypeIds)->get()->keyBy('document_type_id')
+                : collect();
+
+            $certificateTypeMeta = $certificateTypeIds
+                ? CertificationType::whereIn('certificate_type_id', $certificateTypeIds)->get()->keyBy('certificate_type_id')
+                : collect();
+
+            foreach ($validated['documents'] ?? [] as $doc) {
+                $requiresSubmission = (bool) ($documentTypeMeta[$doc['document_type_id']]->requires_source_submission ?? false);
+
+                $documentRequest->documents()->create([
+                    'document_type_id' => $doc['document_type_id'],
+                    'number_of_copies' => $doc['number_of_copies'],
+                    'status_id'        => $requiresSubmission
+                        ? RequestStatusEnum::AwaitingSubmission->value
+                        : RequestStatusEnum::Processing->value,
+                ]);
+            }
+
+            foreach ($validated['certificates'] ?? [] as $cert) {
+                $requiresSubmission = (bool) ($certificateTypeMeta[$cert['certificate_type_id']]->requires_source_submission ?? false);
+
+                $documentRequest->certificates()->create([
+                    'certificate_type_id' => $cert['certificate_type_id'],
+                    'number_of_copies'    => $cert['number_of_copies'] ?? 1,
+                    'status_id'           => $requiresSubmission
+                        ? RequestStatusEnum::AwaitingSubmission->value
+                        : RequestStatusEnum::Processing->value,
+                ]);
+            }
+
+            // Phase 3 — group into per-track claim tickets IF the items
+            // actually span more than one fulfillment_track. Must run after
+            // every item above has its status_id set (see that method's
+            // docblock) and before the notification block below, since
+            // nothing downstream reads release-group data yet.
+            $this->releaseGroupService->assignReleaseGroups($documentRequest);
+
+            return $documentRequest;
+        });
 
         // ── Build per-item requirements list ─────────────────────────────────
         // Load relations fresh so we always have the latest document/cert data
@@ -122,6 +192,27 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             data:         ['request_id' => $documentRequest->request_id],
             requestId:    $documentRequest->request_id,
         );
+
+        // A request that started in AwaitingSubmission doesn't go through
+        // updateRequest()/notifyOwnerOfStatusChange() to reach that status
+        // — it's assigned at creation, above — so it needs its own
+        // notification here. The requirements checklist already sent
+        // above tells the student WHAT to bring (each CTC item's
+        // document_requirements text already says "source document
+        // required"); this one specifically flags that nothing will be
+        // processed until they do, since request_submitted alone reads as
+        // "your request is being worked on."
+        if ($initialStatus === RequestStatusEnum::AwaitingSubmission) {
+            $this->notificationService->send(
+                recipient:    $user,
+                triggerEvent: $initialStatus->notificationTrigger(),
+                data:         [
+                    'request_id'   => $documentRequest->request_id,
+                    'requirements' => $requirements,
+                ],
+                requestId:    $documentRequest->request_id,
+            );
+        }
 
         return $documentRequest;
     }
@@ -202,12 +293,22 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                 // Only enforce the print-first rule when this request actually
                 // includes certificate items. Document-only requests skip this guard.
                 if ($submittedCertCount > 0) {
-                    // All certificate items must have been generated before claiming.
-                    // Currently: if the row exists it has been generated (the modal
-                    // creates the row). Adjust this condition if a "generated" flag
-                    // is added to the model later.
+                    // FIXED (was a no-op): this used to check
+                    // whereNotNull('certificate_type_id'), which is a
+                    // non-nullable column set once at request creation — it
+                    // is never null, so this could never actually block
+                    // anything. Now checks generated_at (see migration
+                    // 2026_08_29_000010_add_generated_at_to_request_certificate),
+                    // set by markCertificatesGenerated() below when staff
+                    // actually print/generate the certificate — a real
+                    // persisted signal, replacing the client-only
+                    // printedCertificateIds localStorage flag that never
+                    // reached the server. Kept in parity with
+                    // RequestItemStatusService::guardCertificateGenerated(),
+                    // which enforces the same rule at the per-item level —
+                    // update both together if this condition ever changes.
                     $generatedCount = $documentRequest->certificates()
-                        ->whereNotNull('certificate_type_id')
+                        ->whereNotNull('generated_at')
                         ->count();
 
                     if ($generatedCount === 0) {
@@ -283,6 +384,73 @@ class DocumentRequestService implements DocumentRequestServiceInterface
     // docblock for the full reasoning.
 
     // -------------------------------------------------------------------------
+    // Mark certificates generated (real print/generation signal)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Records that this request's certificate(s) have actually been
+     * generated/printed — the real signal the "must be generated before
+     * ReadyToClaim" guards in updateRequest() and
+     * RequestItemStatusService::guardCertificateGenerated() now check,
+     * replacing the old certificate_type_id no-op and the client-only
+     * printedCertificateIds localStorage flag that never reached the
+     * server (see migration
+     * 2026_08_29_000010_add_generated_at_to_request_certificate).
+     *
+     * Called from GenerateCertificate.jsx's print action. GenerateCertificate
+     * now identifies which specific request_certificate row it's printing
+     * for whenever it can resolve one (see CertificateModal.jsx's
+     * name -> request_certificate_id map), so $requestCertificateId marks
+     * just that row. Callers that can't resolve a specific item (or older
+     * callers not yet updated) can omit it, which falls back to the
+     * original behaviour of marking every not-yet-generated certificate
+     * row on the request — the same granularity the whole-request guard
+     * already checks at ("at least one certificate item generated"), kept
+     * for backward compatibility rather than as the preferred path.
+     *
+     * Deliberately idempotent and side-effect-free beyond the column
+     * write: re-printing an already-generated certificate just leaves
+     * its original generated_at timestamp alone (whereNull scopes the
+     * update), so this is safe to call on every print click without
+     * needing the caller to track whether it already fired.
+     */
+    public function markCertificatesGenerated(DocumentRequest $documentRequest, ?int $requestCertificateId = null): void
+    {
+        DB::transaction(function () use ($documentRequest, $requestCertificateId) {
+            $documentRequest = DocumentRequest::lockForUpdate()
+                ->findOrFail($documentRequest->request_id);
+
+            if ($documentRequest->is_archived) {
+                abort(422, 'This request is archived and is read-only. Restore it first.');
+            }
+
+            if ($requestCertificateId !== null) {
+                // Scoped to one line item — 404 rather than a silent no-op
+                // if the id doesn't actually belong to this request, so a
+                // frontend bug (wrong id resolved) surfaces immediately
+                // instead of quietly marking nothing. (Already-generated
+                // items are found here too, just left untouched below by
+                // the whereNull on the update — re-printing stays a no-op,
+                // not an error.)
+                $documentRequest->certificates()
+                    ->where('request_certificate_id', $requestCertificateId)
+                    ->firstOrFail();
+
+                $documentRequest->certificates()
+                    ->whereNull('generated_at')
+                    ->where('request_certificate_id', $requestCertificateId)
+                    ->update(['generated_at' => now()]);
+
+                return;
+            }
+
+            $documentRequest->certificates()
+                ->whereNull('generated_at')
+                ->update(['generated_at' => now()]);
+        });
+    }
+
+    // -------------------------------------------------------------------------
     // Claim (QR scan / manual claim_code)
     // -------------------------------------------------------------------------
 
@@ -293,6 +461,16 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      */
     public function claimRequest(array $credential): DocumentRequest
     {
+        // Phase 3 — a scanned uuid/claim_code might belong to a
+        // request_release_group ticket rather than the request itself.
+        // Checked first: group tickets and request tickets are drawn
+        // from the same alphabet/uuid format, so there's no way to tell
+        // them apart except by which table actually has the row.
+        $releaseGroup = $this->releaseGroupService->findByCredential($credential);
+        if ($releaseGroup) {
+            return $this->releaseGroupService->claimReleaseGroup($releaseGroup);
+        }
+
         // Plain lookup, no lock here on purpose: updateRequest() below
         // re-fetches by request_id under lockForUpdate() and re-validates
         // everything (archived, transition-allowed) against the committed
@@ -312,6 +490,21 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             // Deliberately generic — doesn't reveal whether a uuid or
             // claim_code was the invalid part of the payload.
             abort(404, 'No matching request found for that code.');
+        }
+
+        // Phase 3 guard: once a request has been split into release
+        // groups, the request-level ticket stops being a meaningful
+        // "claim everything" action UNTIL every group has already been
+        // individually claimed (at which point document_request.
+        // status_id is already Completed via the aggregate, and the
+        // transition guard below rejects it naturally with "already
+        // completed" — no special case needed for that path). Blocking
+        // it explicitly here, rather than letting it silently complete
+        // only whichever groups happen to be ready, avoids an ambiguous
+        // partial claim on a single ticket.
+        $groupState = $this->releaseGroupService->groupCompletionState($documentRequest);
+        if ($groupState['hasGroups'] && !$groupState['allCompleted']) {
+            abort(422, 'This request has separate release tickets for its items — scan the specific ticket for what is being claimed.');
         }
 
         // Reuses the exact same guarded path a manual admin status change
@@ -449,11 +642,54 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      *
      * @throws \RuntimeException
      */
-    private function buildRequestData(SystemUser $user, array $validated): array
+    /**
+     * Whether ANY document/certificate type in this request's submitted
+     * items has requires_source_submission = true — e.g. any CTC /
+     * Authentication Fee document_type row (see the 2026_08_29 logbook_
+     * category/CTC reconciliation migrations). If so, the whole request
+     * starts life in AwaitingSubmission rather than Processing.
+     *
+     * Deliberately request-level, not per-item: request_document/
+     * request_certificate have no status column of their own today (see
+     * the Phase 2 discussion this gating is a slice of — item-level
+     * status is a larger structural change than this flag alone
+     * justifies). A request that mixes a plain document with a CTC item
+     * gates the WHOLE request until the CTC item's source is submitted;
+     * splitting fast/slow items to progress independently is future
+     * work, not something this check attempts.
+     *
+     * Two whereIn() lookups instead of one query per item — this runs
+     * once per request creation, not once per line item, keeping it cheap
+     * regardless of how many documents/certificates are submitted.
+     */
+    private function requestRequiresSourceSubmission(array $validated): bool
+    {
+        $documentTypeIds = array_column($validated['documents'] ?? [], 'document_type_id');
+        if (!empty($documentTypeIds)) {
+            $needsSubmission = DocumentType::whereIn('document_type_id', $documentTypeIds)
+                ->where('requires_source_submission', true)
+                ->exists();
+
+            if ($needsSubmission) {
+                return true;
+            }
+        }
+
+        $certificateTypeIds = array_column($validated['certificates'] ?? [], 'certificate_type_id');
+        if (!empty($certificateTypeIds)) {
+            return CertificationType::whereIn('certificate_type_id', $certificateTypeIds)
+                ->where('requires_source_submission', true)
+                ->exists();
+        }
+
+        return false;
+    }
+
+    private function buildRequestData(SystemUser $user, array $validated, RequestStatusEnum $initialStatus): array
     {
         $base = [
             'user_id'            => $user->user_id,
-            'status_id'          => RequestStatusEnum::Processing->value,
+            'status_id'          => $initialStatus->value,
             'request_purpose_id' => $validated['request_purpose_id'],
             'or_number'          => $validated['or_number'] ?? null,
             'receipt_date'       => $validated['receipt_date'] ?? null,
@@ -558,11 +794,15 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         if ($targetStatus !== null) {
             $required[] = match ($targetStatus) {
                 RequestStatusEnum::Completed => 'Complete',
-                // ReadyToClaim, PendingSignature, Forfeited all require
-                // Process. Processing/Cancelled are unreachable at this
-                // point (allowedTransitions() already aborted on an
-                // illegal transition before this runs) — Process is
-                // still the safe default for them since it's the more
+                // ReadyToClaim, PendingSignature, and Forfeited all
+                // require Process — as does Processing itself, which
+                // (unlike before AwaitingSubmission existed) IS now a
+                // reachable target via AwaitingSubmission -> Processing
+                // (staff confirming a CTC/Authentication Fee source
+                // document has been received). Cancelled is unreachable
+                // (allowedTransitions() already aborted on an illegal
+                // transition before this runs). Process is the safe
+                // default across all of these since it's the more
                 // restrictive of the two dashboard write actions.
                 default => 'Process',
             };

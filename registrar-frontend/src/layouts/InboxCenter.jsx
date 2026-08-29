@@ -56,6 +56,11 @@ const toMailItem = (n) => {
     title.toLowerCase().includes('new document request')
   ) {
     dotColor = 'bg-green-500';
+  } else if (
+    type === 'awaiting_submission' ||
+    title.toLowerCase().includes('source document required')
+  ) {
+    dotColor = 'bg-purple-500';
   }
 
   return {

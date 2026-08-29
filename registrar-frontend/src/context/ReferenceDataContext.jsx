@@ -6,6 +6,8 @@ import {
   getRequestPurposes,
   getPrograms,
   getSignatories,
+  getLogbookCategories,
+  getFulfillmentTracks,
 } from "../services/api";
 import { useAuth } from "./AuthProvider";
 
@@ -48,12 +50,17 @@ import { useAuth } from "./AuthProvider";
 // stable by design (changing status IDs is a breaking migration, not a routine
 // admin action). We map over API-fetched statuses and merge this in.
 const STATUS_DISPLAY = {
-  1: { label: "Processing",         classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  2: { label: "Ready to Claim",     classes: "bg-green-100 text-green-700 border-green-200"  },
-  3: { label: "Completed",          classes: "bg-gray-100 text-gray-700 border-gray-200"     },
-  4: { label: "Forfeited",          classes: "bg-red-100 text-red-700 border-red-200"        },
-  5: { label: "Cancelled",          classes: "bg-orange-100 text-orange-700 border-orange-200" },
-  6: { label: "Awaiting Signature", classes: "bg-orange-100 text-orange-700 border-orange-200" },
+  1:  { label: "Processing",         classes: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  2:  { label: "Ready to Claim",     classes: "bg-green-100 text-green-700 border-green-200"  },
+  3:  { label: "Completed",          classes: "bg-gray-100 text-gray-700 border-gray-200"     },
+  4:  { label: "Forfeited",          classes: "bg-red-100 text-red-700 border-red-200"        },
+  5:  { label: "Cancelled",          classes: "bg-orange-100 text-orange-700 border-orange-200" },
+  6:  { label: "Awaiting Signature", classes: "bg-orange-100 text-orange-700 border-orange-200" },
+  // RequestStatusEnum::AwaitingSubmission (backend) — the CTC / Authentication
+  // Fee starting status. Given its own color (not reused from Pending
+  // Signature's orange) so staff can tell the two "waiting on something
+  // outside our control" states apart at a glance.
+  12: { label: "Awaiting Submission", classes: "bg-purple-100 text-purple-700 border-purple-200" },
 };
 
 const ReferenceDataContext = createContext(null);
@@ -67,6 +74,8 @@ export const ReferenceDataProvider = ({ children }) => {
   const [purposes,        setPurposes]        = useState([]);
   const [programs,        setPrograms]        = useState([]);
   const [signatories,     setSignatories]     = useState([]);
+  const [logbookCategories, setLogbookCategories] = useState([]);
+  const [fulfillmentTracks, setFulfillmentTracks] = useState([]);
   const [loading,         setLoading]         = useState(true);
 
   useEffect(() => {
@@ -86,6 +95,8 @@ export const ReferenceDataProvider = ({ children }) => {
       setPurposes([]);
       setPrograms([]);
       setSignatories([]);
+      setLogbookCategories([]);
+      setFulfillmentTracks([]);
       setLoading(false);
       return;
     }
@@ -101,6 +112,8 @@ export const ReferenceDataProvider = ({ children }) => {
         getRequestPurposes(),
         getPrograms(),
         getSignatories(),
+        getLogbookCategories(),
+        getFulfillmentTracks(),
       ]);
       if (results[0].status === "fulfilled") setDocumentTypes(results[0].value.data ?? []);
       if (results[1].status === "fulfilled") setCertifications(results[1].value.data ?? []);
@@ -111,6 +124,8 @@ export const ReferenceDataProvider = ({ children }) => {
       // Rejects here (e.g. 403 for a non-admin session) simply leave signatories
       // as [] — see the doc comment above.
       if (results[5].status === "fulfilled") setSignatories(results[5].value.data ?? []);
+      if (results[6].status === "fulfilled") setLogbookCategories(results[6].value.data ?? []);
+      if (results[7].status === "fulfilled") setFulfillmentTracks(results[7].value.data ?? []);
       setLoading(false);
     };
 
@@ -156,6 +171,14 @@ export const ReferenceDataProvider = ({ children }) => {
   const signatoryById = (id) =>
     signatories.find((s) => Number(s.signatory_id) === Number(id));
 
+  /** Return the logbook category name for a given logbook_category_id, or undefined. */
+  const logbookCategoryName = (id) =>
+    logbookCategories.find((c) => Number(c.logbook_category_id) === Number(id))?.name;
+
+  /** Return the fulfillment track name for a given fulfillment_track_id, or undefined. */
+  const fulfillmentTrackName = (id) =>
+    fulfillmentTracks.find((t) => Number(t.fulfillment_track_id) === Number(id))?.name;
+
   /**
    * Re-fetch just the signatories list. Call this after create/update/delete
    * from an admin management screen so the rest of the app (e.g. the
@@ -172,6 +195,38 @@ export const ReferenceDataProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Re-fetch just the logbook categories list. Call this after creating a
+   * new category inline from the Add Document/Add Certificate screen
+   * (DocumentManagement.jsx) so the dropdown reflects it immediately
+   * without a full reload of every other reference dataset — same
+   * pattern as refreshSignatories() above.
+   */
+  const refreshLogbookCategories = async () => {
+    try {
+      const res = await getLogbookCategories();
+      setLogbookCategories(res.data ?? []);
+    } catch {
+      // Leave the existing list as-is on failure, same reasoning as
+      // refreshSignatories().
+    }
+  };
+
+  /**
+   * Re-fetch just the fulfillment tracks list. Same pattern and same
+   * reason as refreshLogbookCategories() — used after an inline create
+   * from DocumentManagement.jsx.
+   */
+  const refreshFulfillmentTracks = async () => {
+    try {
+      const res = await getFulfillmentTracks();
+      setFulfillmentTracks(res.data ?? []);
+    } catch {
+      // Leave the existing list as-is on failure, same reasoning as
+      // refreshSignatories().
+    }
+  };
+
   return (
     <ReferenceDataContext.Provider
       value={{
@@ -181,6 +236,8 @@ export const ReferenceDataProvider = ({ children }) => {
         purposes,
         programs,
         signatories,
+        logbookCategories,
+        fulfillmentTracks,
         loading,
         docTypeName,
         certName,
@@ -188,7 +245,11 @@ export const ReferenceDataProvider = ({ children }) => {
         purposeName,
         programName,
         signatoryById,
+        logbookCategoryName,
+        fulfillmentTrackName,
         refreshSignatories,
+        refreshLogbookCategories,
+        refreshFulfillmentTracks,
       }}
     >
       {children}

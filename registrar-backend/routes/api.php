@@ -18,6 +18,8 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AiQueryController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
+use App\Http\Controllers\LogbookCategoryController;
+use App\Http\Controllers\FulfillmentTrackController;
 use App\Http\Controllers\UnmatchedCashierItemController;
 use App\Http\Controllers\CashierOrOverrideController;
 use App\Http\Controllers\AlumniSystemController;
@@ -180,6 +182,27 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show'])->middleware('module:dashboard,View');
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware(['role:3', 'module:dashboard,Process|Complete']);
+        // Item-level status — see RequestItemStatusService and
+        // DocumentRequestController::updateDocumentItemStatus()/
+        // updateCertificateItemStatus(). Same coarse role/module gate as
+        // the whole-request update() above; the Process-vs-Complete
+        // fine-grained check happens inside the service once the actual
+        // target status is known, same split as update() already uses.
+        Route::put('{documentRequest}/documents/{requestDocument}',
+            [DocumentRequestController::class, 'updateDocumentItemStatus'])
+            ->middleware(['role:3', 'module:dashboard,Process|Complete']);
+        Route::put('{documentRequest}/certificates/{requestCertificate}',
+            [DocumentRequestController::class, 'updateCertificateItemStatus'])
+            ->middleware(['role:3', 'module:dashboard,Process|Complete']);
+        // Real print/generation signal — see DocumentRequestService::
+        // markCertificatesGenerated() and migration
+        // 2026_08_29_000010_add_generated_at_to_request_certificate. Gated
+        // the same as the item-status writes above: staff need at least
+        // Process access on the dashboard module to record a certificate
+        // as generated.
+        Route::post('{documentRequest}/mark-certificates-generated',
+            [DocumentRequestController::class, 'markCertificatesGenerated'])
+            ->middleware(['role:3', 'module:dashboard,Process|Complete']);
         Route::patch('{documentRequest}/archive', [DocumentRequestController::class, 'archive'])->middleware('role:3');
         Route::patch('{documentRequest}/restore', [DocumentRequestController::class, 'restore'])->middleware('role:3');
         Route::delete('{documentRequest}', [DocumentRequestController::class, 'destroy'])->middleware('role:3');
@@ -258,6 +281,10 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     Route::get('request-statuses/{id}',      [RequestStatusController::class, 'show']);
     Route::get('request-purposes',      [RequestPurposeController::class, 'index']);
     Route::get('request-purposes/{id}', [RequestPurposeController::class, 'show']);
+    Route::get('logbook-categories',      [LogbookCategoryController::class, 'index']);
+    Route::get('logbook-categories/{id}', [LogbookCategoryController::class, 'show']);
+    Route::get('fulfillment-tracks',      [FulfillmentTrackController::class, 'index']);
+    Route::get('fulfillment-tracks/{id}', [FulfillmentTrackController::class, 'show']);
     Route::get('programs', [ProgramController::class, 'index']);
 
     // Admin only (role 3 — superadmin bypasses via RoleMiddleware)
@@ -303,6 +330,14 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
         Route::put('request-purposes/{id}',    [RequestPurposeController::class, 'update']);
         Route::delete('request-purposes/{id}', [RequestPurposeController::class, 'destroy']);
+
+        Route::post('logbook-categories',        [LogbookCategoryController::class, 'store']);
+        Route::put('logbook-categories/{id}',    [LogbookCategoryController::class, 'update']);
+        Route::delete('logbook-categories/{id}', [LogbookCategoryController::class, 'destroy']);
+
+        Route::post('fulfillment-tracks',        [FulfillmentTrackController::class, 'store']);
+        Route::put('fulfillment-tracks/{id}',    [FulfillmentTrackController::class, 'update']);
+        Route::delete('fulfillment-tracks/{id}', [FulfillmentTrackController::class, 'destroy']);
 
         // Unmatched cashier receipt labels — admin review screen backing
         // the naming-drift fix from CashierDocumentSuggester. See

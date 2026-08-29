@@ -3,3 +3,6 @@ public/storage/**
 vendor
 node_modules
 .git
+.env
+.env.*
+!.env.example

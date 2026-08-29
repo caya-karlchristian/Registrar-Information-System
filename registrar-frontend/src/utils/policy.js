@@ -70,22 +70,35 @@ export function hasModuleAccess(user, moduleKey) {
  *
  * This is a UX layer only, same caveat as hasModuleAccess() above —
  * the real security boundary is the backend's fine-grained check in
- * DocumentRequestService::updateRequest() (and the coarse
- * EnsureModuleAccess middleware ahead of it). This function exists so
- * the UI can hide a button the backend would reject anyway (e.g. a
- * Student Staff account never sees a "Ready to claim" button it can't
- * actually use), never as the only thing standing between an admin and
- * an action they aren't supposed to take.
+ * DocumentRequestService::updateRequest() / RequestItemStatusService
+ * (and the coarse EnsureModuleAccess + role:3,4 route middleware ahead
+ * of it). This function exists so the UI can hide a button the backend
+ * would reject anyway, never as the only thing standing between a user
+ * and an action they aren't supposed to take.
  *
- * - No user yet / super_admin / non-admin: same short-circuits as
- *   hasModuleAccess() — non-admins and super admins are never gated.
+ * IMPORTANT — this deliberately does NOT mirror hasModuleAccess()'s
+ * "any non-admin role is never gated" shortcut. hasModuleAccess() is
+ * about whole-page visibility (a student's own dashboard genuinely has
+ * no policy restrictions). hasModuleAction() is about specific staff
+ * capabilities — every current MODULE_ACTIONS entry (dashboard
+ * Process/Complete, logbook Export) is a staff-only action, and some of
+ * the components that call this (e.g. RequestDetailModal.jsx) are
+ * shared with student/alumni views. Bypassing the check for student/
+ * alumni here would surface staff-only controls (that the backend would
+ * then correctly 403) inside a student's own request-detail modal —
+ * which is exactly the bug this function used to have.
+ *
+ * - No user yet: false.
+ * - super_admin: always true.
  * - admin: true only if `action` is present in
  *   `user.effective_permissions[module]`.
+ * - Any other role (student, alumni, ...): false — these actions don't
+ *   apply to non-staff accounts at all.
  */
 export function hasModuleAction(user, moduleKey, action) {
   if (!user) return false;
   if (user.role_name === "super_admin") return true;
-  if (user.role_name !== "admin") return true;
+  if (user.role_name !== "admin") return false;
 
   const granted = user.effective_permissions?.[moduleKey];
   return Array.isArray(granted) && granted.includes(action);

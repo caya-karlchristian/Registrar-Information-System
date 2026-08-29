@@ -14,7 +14,6 @@ import { useReferenceData } from '../context/ReferenceDataContext';
 import {
   resolveStatusIds,
   mapDocumentRequest,
-  PRINTED_CERTIFICATE_STORAGE_KEY,
   filterAndSortRequests,
 } from '../utils/staffDashboardUtils';
 
@@ -23,6 +22,7 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
   'admin_payment_verification',
   'admin_incomplete_request',
   'status_updated',
+  'awaiting_submission',
   'request_processing',
   'pending_signature',
   'ready_to_claim',
@@ -50,17 +50,6 @@ export const useStaffDashboard = (viewMode) => {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [classificationDropdownOpen, setClassificationDropdownOpen] = useState(false);
   const [documentDropdownOpen, setDocumentDropdownOpen] = useState(false);
-
-  const [printedCertificateIds, setPrintedCertificateIds] = useState(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = window.localStorage.getItem(PRINTED_CERTIFICATE_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
 
   const requestStatuses = referenceStatuses ?? [];
   const resolvedStatusIds = resolveStatusIds(requestStatuses);
@@ -99,11 +88,6 @@ export const useStaffDashboard = (viewMode) => {
       queryClient.invalidateQueries({ queryKey: ['documentRequests', viewMode] });
     }
   }, [notifications[0]?.id, viewMode, queryClient, notifications]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(PRINTED_CERTIFICATE_STORAGE_KEY, JSON.stringify(printedCertificateIds));
-  }, [printedCertificateIds]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -249,9 +233,16 @@ export const useStaffDashboard = (viewMode) => {
     restoreOneMutation.mutate(id, { onSettled: () => setUpdatingId(null) });
   };
 
-  const markCertificateAsPrinted = (requestId) => {
-    if (!requestId) return;
-    setPrintedCertificateIds(prev => (prev.includes(requestId) ? prev : [...prev, requestId]));
+  // Replaces the old markCertificateAsPrinted (localStorage-only flag that
+  // never reached the server — see staffDashboardUtils.js's
+  // certificatesGenerated for the real signal it's been replaced by).
+  // GenerateCertificate.jsx already persists the actual generated_at
+  // write itself via markCertificatesGenerated(); by the time this fires,
+  // the server already knows — this just invalidates the cached request
+  // list so the dashboard's next render reflects it instead of waiting
+  // out the 30s poll.
+  const handleCertificatePrinted = () => {
+    invalidateRequests();
   };
 
   const documentOptions = useMemo(() => {
@@ -316,7 +307,6 @@ export const useStaffDashboard = (viewMode) => {
     documentDropdownOpen,
     setDocumentDropdownOpen,
     documentOptions,
-    printedCertificateIds,
     resolvedStatusIds,
     requestStatuses,
     handleStatusUpdate,
@@ -329,6 +319,6 @@ export const useStaffDashboard = (viewMode) => {
     handleRestoreOne,
     handleBulkReady,
     handleBulkDone,
-    markCertificateAsPrinted,
+    handleCertificatePrinted,
   };
 };

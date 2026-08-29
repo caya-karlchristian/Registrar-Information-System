@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import InputGroup from "../components/InputGroup";
 import ProcessPeriodInput from "../components/ProcessPeriodInput.jsx";
@@ -8,7 +8,9 @@ import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
 import { useTheme } from "../context/ThemeContext";
+import { useReferenceData } from "../context/ReferenceDataContext";
 import { useDocumentManagement } from "../hooks/useDocumentManagement";
+import { createLogbookCategory, createFulfillmentTrack } from "../services/api";
 import {
   EXCLUSIVE_FOR,
   FOLDER_COLORS,
@@ -17,6 +19,7 @@ import {
   ManagementCard,
   ManagementCarousel,
 } from "../components/DocumentManagementComponents";
+import { EnabledSwitch } from "../components/BusinessCalendarComponents.jsx";
 
 const DocumentManagement = ({
   documents,
@@ -28,6 +31,28 @@ const DocumentManagement = ({
   onArchiveCert,
 }) => {
   const { isDark } = useTheme();
+  const { logbookCategories, refreshLogbookCategories, fulfillmentTracks, refreshFulfillmentTracks } = useReferenceData();
+
+  // Inline "add a new logbook category" flow — lets an admin create the
+  // umbrella label (e.g. "Certified True Copy of Records") right from
+  // this form the first time they need it, instead of requiring a
+  // separate admin screen just to seed rows into logbook_category.
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categorySaving, setCategorySaving] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
+
+  // Same inline-create pattern as Logbook Category above, for
+  // fulfillment_track. Until this existed, no document/certificate type
+  // could ever be assigned a non-null track from the UI — the only way
+  // was a direct DB write, which meant RequestReleaseGroupService::
+  // assignReleaseGroups() never had more than one bucket to work with
+  // and Phase 3 claim-ticket grouping never actually triggered for any
+  // real request.
+  const [addingTrack, setAddingTrack] = useState(false);
+  const [newTrackName, setNewTrackName] = useState("");
+  const [trackSaving, setTrackSaving] = useState(false);
+  const [trackError, setTrackError] = useState("");
 
   const {
     search,
@@ -64,6 +89,54 @@ const DocumentManagement = ({
     onArchiveDoc,
     onArchiveCert,
   });
+
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) {
+      setCategoryError("Category name is required.");
+      return;
+    }
+    setCategorySaving(true);
+    setCategoryError("");
+    try {
+      const res = await createLogbookCategory({ name });
+      const created = res?.data;
+      await refreshLogbookCategories();
+      if (created?.logbook_category_id) {
+        setForm((prev) => ({ ...prev, logbook_category_id: created.logbook_category_id }));
+      }
+      setNewCategoryName("");
+      setAddingCategory(false);
+    } catch (err) {
+      setCategoryError(err.response?.data?.message || "Failed to create category.");
+    } finally {
+      setCategorySaving(false);
+    }
+  };
+
+  const handleCreateTrack = async () => {
+    const name = newTrackName.trim();
+    if (!name) {
+      setTrackError("Track name is required.");
+      return;
+    }
+    setTrackSaving(true);
+    setTrackError("");
+    try {
+      const res = await createFulfillmentTrack({ name });
+      const created = res?.data;
+      await refreshFulfillmentTracks();
+      if (created?.fulfillment_track_id) {
+        setForm((prev) => ({ ...prev, fulfillment_track_id: created.fulfillment_track_id }));
+      }
+      setNewTrackName("");
+      setAddingTrack(false);
+    } catch (err) {
+      setTrackError(err.response?.data?.message || "Failed to create track.");
+    } finally {
+      setTrackSaving(false);
+    }
+  };
 
   // Filter lists by search query and active status
   const filteredDocs = documents.filter(
@@ -306,6 +379,202 @@ const DocumentManagement = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* Logbook Category — nullable FK. Most document/certificate
+              types don't collapse with anything else, so "None" (log
+              under this row's own name) is the common, valid default —
+              see the logbook_category migration docblock. Only types
+              that genuinely share a logbook line with others (e.g. every
+              "Certified True Copy of X" variant) need one assigned. */}
+          <div className="flex flex-col gap-1.5 w-full">
+            <span className={`text-sm font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
+              Logbook Category
+            </span>
+            {!addingCategory ? (
+              <div className="flex gap-2">
+                <select
+                  name="logbook_category_id"
+                  value={form.logbook_category_id}
+                  onChange={handleChange}
+                  className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors cursor-pointer ${
+                    isDark
+                      ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb]"
+                      : "bg-white border-gray-200 text-gray-700"
+                  }`}
+                >
+                  <option value="">None — log under this item's own name</option>
+                  {logbookCategories.map((cat) => (
+                    <option key={cat.logbook_category_id} value={cat.logbook_category_id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setAddingCategory(true)}
+                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-colors cursor-pointer ${
+                    isDark
+                      ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]"
+                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  + New Category
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="e.g. Certified True Copy of Records"
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors ${
+                      isDark
+                        ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] placeholder-[#6b6b6b]"
+                        : "bg-white border-gray-200 text-gray-700 placeholder-gray-400"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    disabled={categorySaving}
+                    onClick={handleCreateCategory}
+                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 ${
+                      isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"
+                    }`}
+                  >
+                    {categorySaving ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddingCategory(false);
+                      setNewCategoryName("");
+                      setCategoryError("");
+                    }}
+                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {categoryError && (
+                  <span className="text-xs text-red-400">{categoryError}</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Fulfillment Track — nullable FK, same shape and defaulting
+              as Logbook Category above. NULL means "standard track": the
+              overwhelming majority of types should stay this way. Only
+              assign a track when this type's items genuinely need to be
+              claimable separately from a request's other items — see
+              RequestReleaseGroupService::assignReleaseGroups(), which
+              only splits a request into more than one claim ticket when
+              its items span more than one distinct track. */}
+          <div className="flex flex-col gap-1.5 w-full">
+            <span className={`text-sm font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
+              Fulfillment Track
+            </span>
+            {!addingTrack ? (
+              <div className="flex gap-2">
+                <select
+                  name="fulfillment_track_id"
+                  value={form.fulfillment_track_id}
+                  onChange={handleChange}
+                  className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors cursor-pointer ${
+                    isDark
+                      ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb]"
+                      : "bg-white border-gray-200 text-gray-700"
+                  }`}
+                >
+                  <option value="">Standard — claim together with everything else</option>
+                  {fulfillmentTracks.map((track) => (
+                    <option key={track.fulfillment_track_id} value={track.fulfillment_track_id}>
+                      {track.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setAddingTrack(true)}
+                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-colors cursor-pointer ${
+                    isDark
+                      ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]"
+                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  + New Track
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTrackName}
+                    onChange={(e) => setNewTrackName(e.target.value)}
+                    placeholder="e.g. Awaiting Submission"
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors ${
+                      isDark
+                        ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] placeholder-[#6b6b6b]"
+                        : "bg-white border-gray-200 text-gray-700 placeholder-gray-400"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    disabled={trackSaving}
+                    onClick={handleCreateTrack}
+                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 ${
+                      isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"
+                    }`}
+                  >
+                    {trackSaving ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddingTrack(false);
+                      setNewTrackName("");
+                      setTrackError("");
+                    }}
+                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                      isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {trackError && (
+                  <span className="text-xs text-red-400">{trackError}</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* requires_source_submission — the CTC / Authentication Fee case.
+              Gates the request into RequestStatusEnum::AwaitingSubmission
+              at creation instead of the usual Processing (see
+              DocumentRequestService::createRequest() on the backend). */}
+          <div className="flex items-center justify-between gap-3 w-full">
+            <div className="flex flex-col">
+              <span className={`text-sm font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
+                Requires Source Submission
+              </span>
+              <span className={`text-xs ${isDark ? "text-[#6b6b6b]" : "text-gray-400"}`}>
+                Client must hand over the physical source document before staff can start processing.
+              </span>
+            </div>
+            <EnabledSwitch
+              isDark={isDark}
+              enabled={Boolean(form.requires_source_submission)}
+              onToggle={() =>
+                setForm((prev) => ({ ...prev, requires_source_submission: !prev.requires_source_submission }))
+              }
+            />
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-end gap-3 pt-2">
