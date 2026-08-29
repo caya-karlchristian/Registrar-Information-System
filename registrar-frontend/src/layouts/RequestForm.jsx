@@ -9,12 +9,13 @@ import ErrorToast from "../components/ErrorToast.jsx";
 import StepProgress from "../components/StepProgress.jsx";
 import TermsAndConditionsStep from "../components/TermsAndConditionsStep.jsx";
 import OrValidationErrorModal from "../components/OrValidationErrorModal.jsx";
-import { getTodayDate } from "../utils/helpers";
+import { getTodayDate, useHeaderResponsiveState } from "../utils/helpers";
 import qrCode from "../assets/qrcode.png";
 import SubmitConfirmationModal from '../components/SubmitConfirmationModal.jsx';
 import ClaimTicket from '../components/ClaimTicket.jsx';
 import OfficeHoursNotice from '../components/OfficeHoursNotice.jsx';
 import { useFormDraft } from '../hooks/useFormDraft';
+import { useScrollToTop } from '../hooks/useScrollToTop';
 import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
 import { useMutation } from '@tanstack/react-query';
@@ -61,6 +62,7 @@ const docStep = 3;
 
 const RequestForm = () => {
   const { isDark } = useTheme();
+  const { headerHeight } = useHeaderResponsiveState();
   const navigate = useNavigate();
   const {
     documentTypes,
@@ -72,15 +74,8 @@ const RequestForm = () => {
   } = useReferenceData();
 
   const [currentStep, setCurrentStep] = useState(1);
-  const formRef = useRef(null);
-
-  useEffect(() => {
-    if (formRef.current) {
-      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [currentStep]);
-
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const { targetRef: formRef } = useScrollToTop([currentStep, isSubmitted]);
   const [errorMessage, setErrorMessage] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showOrModal, setShowOrModal] = useState(false);
@@ -572,12 +567,24 @@ const RequestForm = () => {
             </div>
           </div>
         ) : (
-          <div ref={formRef} className="max-w-4xl mx-auto">
+          <main
+            ref={formRef}
+            style={{
+              scrollMarginTop: `${headerHeight + 20}px`,
+            }}
+            className="max-w-4xl mx-auto space-y-6 pt-2 sm:pt-4 pb-12 animate-fadeIn"
+          >
             {/* Top Stepper Progress */}
             <StepProgress
               steps={wizardSteps}
               currentStep={currentStep}
               isDark={isDark}
+              onStepClick={(stepId) => {
+                if (stepId < currentStep) {
+                  setErrorMessage("");
+                  setCurrentStep(stepId);
+                }
+              }}
             />
 
             {/* Main Form Card */}
@@ -954,7 +961,7 @@ const RequestForm = () => {
                 </button>
               </div>
             </form>
-          </div>
+          </main>
         )}
         <SubmitConfirmationModal
           isOpen={showConfirmModal}

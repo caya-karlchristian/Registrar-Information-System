@@ -15,7 +15,8 @@ import OrValidationErrorModal from "../components/OrValidationErrorModal.jsx";
 import qrCode from "../assets/qrcode.png";
 import { useTheme } from "../context/ThemeContext";
 import { useAlumniRequest } from "../hooks/useAlumniRequest";
-import { getTodayDate } from "../utils/helpers";
+import { useScrollToTop } from "../hooks/useScrollToTop";
+import { getTodayDate, useHeaderResponsiveState } from "../utils/helpers";
 import {
   InformationCircleIcon,
   ExclamationTriangleIcon,
@@ -26,8 +27,8 @@ import {
 
 const AlumniRequestForm = () => {
   const { isDark } = useTheme();
+  const { headerHeight } = useHeaderResponsiveState();
   const navigate = useNavigate();
-  const formRef = useRef(null);
 
   const {
     currentStep,
@@ -123,11 +124,7 @@ const AlumniRequestForm = () => {
     }
   };
 
-  useEffect(() => {
-    if (formRef.current) {
-      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [currentStep]);
+  const { targetRef: formRef } = useScrollToTop([currentStep, isSubmitted]);
 
   return (
     <div className="relative min-h-screen pb-20 z-10">
@@ -217,12 +214,24 @@ const AlumniRequestForm = () => {
           </div>
         </div>
       ) : (
-        <div ref={formRef} className="max-w-4xl mx-auto">
+        <main
+          ref={formRef}
+          style={{
+            scrollMarginTop: `${headerHeight + 20}px`,
+          }}
+          className="max-w-4xl mx-auto space-y-6 pt-2 sm:pt-4 pb-12 animate-fadeIn"
+        >
           {/* Top Stepper Progress */}
           <StepProgress
             steps={wizardSteps}
             currentStep={currentStep}
             isDark={isDark}
+            onStepClick={(stepId) => {
+              if (stepId < currentStep) {
+                setErrorMessage("");
+                setCurrentStep(stepId);
+              }
+            }}
           />
 
           {/* Main Form Card */}
@@ -664,7 +673,7 @@ const AlumniRequestForm = () => {
               </button>
             </div>
           </form>
-        </div>
+        </main>
       )}
       <SubmitConfirmationModal
         isOpen={showConfirmModal}

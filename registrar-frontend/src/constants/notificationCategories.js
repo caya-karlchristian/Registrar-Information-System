@@ -15,14 +15,14 @@ export const CATEGORY_MAP = {
   request_processing:          { category: 'Processing',  color: 'bg-blue-400' },
   awaiting_submission:         { category: 'Submission',  color: 'bg-purple-400' },
   action_needed:               { category: 'Action',      color: 'bg-rose-600' },
-  pending_signature:           { category: 'Signature',   color: 'bg-orange-400' },
+  pending_signature:           { category: 'Signature',   color: 'bg-amber-400' },
   ready_to_claim:              { category: 'Ready',       color: 'bg-green-400' },
-  request_completed:           { category: 'Completed',   color: 'bg-green-400' },
+  request_completed:           { category: 'Completed',   color: 'bg-gray-400' },
   request_forfeited:           { category: 'Forfeited',   color: 'bg-rose-600' },
   reminder_claim:              { category: 'Reminder',    color: 'bg-pup-yellow' },
   reminder_final_warning:      { category: 'Warning',     color: 'bg-rose-600' },
-  request_closed:              { category: 'Closed',      color: 'bg-white/40' },
-  request_auto_archived:       { category: 'Archived',    color: 'bg-white/40' },
+  request_closed:              { category: 'Closed',      color: 'bg-gray-400' },
+  request_auto_archived:       { category: 'Archived',    color: 'bg-gray-400' },
   // Announcements — broadcast by admins to all users
   announcement_sent:           { category: 'Announcement', color: 'bg-purple-400' },
 
