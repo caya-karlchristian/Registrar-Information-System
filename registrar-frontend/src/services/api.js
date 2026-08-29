@@ -345,14 +345,18 @@ export const updateRequestCertificateStatus = (requestId, requestCertificateId, 
   api.put(`/document-requests/${requestId}/certificates/${requestCertificateId}`, { status_id: statusId });
 
 // Real print/generation signal — replaces the old printedCertificateIds
-// localStorage-only flag (see useStaffDashboard.js), which never reached
-// the server and so could never actually gate the "must be generated
-// before Ready to Claim" checks. Called from GenerateCertificate.jsx's
-// print action; marks every not-yet-generated certificate on the request
-// (see DocumentRequestService::markCertificatesGenerated() for why it's
-// request-scoped rather than per-item).
-export const markCertificatesGenerated = (requestId) =>
-  api.post(`/document-requests/${requestId}/mark-certificates-generated`);
+// localStorage-only flag (see staffDashboardUtils.js's certificatesGenerated
+// derivation), which never reached the server and so could never actually
+// gate the "must be generated before Ready to Claim" checks. Called from
+// GenerateCertificate.jsx's print action. requestCertificateId is optional:
+// pass it when the caller knows which specific certificate line item was
+// just printed (see CertificateModal.jsx's name -> id map) to mark only
+// that row; omit it to fall back to marking every ungenerated certificate
+// on the request (see DocumentRequestService::markCertificatesGenerated()).
+export const markCertificatesGenerated = (requestId, requestCertificateId = null) =>
+  api.post(`/document-requests/${requestId}/mark-certificates-generated`, {
+    ...(requestCertificateId != null ? { request_certificate_id: requestCertificateId } : {}),
+  });
 
 // -------------------------------------------------------
 // REQUEST HISTORY (read-only from the frontend)

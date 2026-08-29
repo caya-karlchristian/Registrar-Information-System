@@ -70,6 +70,14 @@ export const STATUS_FALLBACK = {
 };
 
 export const COMPLETED_VISIBILITY_MS = 24 * 60 * 60 * 1000;
+
+// Deprecated: was the localStorage key for the old client-only
+// printedCertificateIds flag. Removed along with that flag now that
+// certificatesGenerated (derived from the server's generated_at column
+// in mapDocumentRequest below) is the real, persisted signal. Left as a
+// no-op export rather than deleted outright in case anything external
+// still imports it, or a browser has a stale value sitting under this
+// key — it's inert either way.
 export const PRINTED_CERTIFICATE_STORAGE_KEY = 'printed-certificate-request-ids';
 
 /**
@@ -165,6 +173,20 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
     ? r.certificates.map(c => c.certification_type?.certificate_name).filter(Boolean).join(', ')
     : null;
 
+  // Real, server-derived replacement for the old printedCertificateIds
+  // localStorage flag — true when the request has no certificates at all
+  // (nothing to gate), or when EVERY certificate line item has actually
+  // been generated (generated_at set — see migration
+  // 2026_08_29_000010_add_generated_at_to_request_certificate). Requiring
+  // all rather than "at least one" matches the per-item guard in
+  // RequestItemStatusService::guardCertificateGenerated(), which checks
+  // each certificate independently; the whole-request buttons in
+  // StaffDashboard.jsx that read this field are coarser (one badge for
+  // the whole row), so "all generated" is the safer bar to clear before
+  // showing that row as unblocked.
+  const certificatesGenerated = !(r.certificates?.length > 0)
+    || r.certificates.every(c => c.generated_at != null);
+
   const isCertificate = Boolean(
     (r.certificates && r.certificates.length > 0) ||
       r.documents?.some(d => {
@@ -217,6 +239,7 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
     certName: finalCertName,
     certificateNames: r.certificates?.map(c => c.certification_type?.certificate_name).filter(Boolean) ?? [],
     isCertificate,
+    certificatesGenerated,
     copies: totalCopies,
     documentDetailsArray,
     course: r.student_profile?.course ?? '',

@@ -28,6 +28,28 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
   const certNames = Array.from(new Set(requestedNames)).filter((name) => configNames.includes(name));
   const fallbackCertName = configNames[0] ?? '';
 
+  // Name -> request_certificate_id map, built from the real backend rows
+  // (request.rawRequest.certificates — see staffDashboardUtils.js's
+  // mapDocumentRequest, which keeps the original raw payload alongside the
+  // flattened dashboard fields). Lets GenerateCertificate.jsx resolve which
+  // specific certificate line item is currently selected in its dropdown
+  // and mark just that one as generated on print, instead of the older
+  // whole-request fallback. A request with two certificates of the same
+  // name (unusual, but not impossible) collapses to one id here — the last
+  // one wins — which only means the fallback (mark-all) behavior is used
+  // for that edge case rather than a wrong id; see
+  // DocumentRequestService::markCertificatesGenerated()'s docblock.
+  const certificateIdsByName = (Array.isArray(request?.rawRequest?.certificates)
+    ? request.rawRequest.certificates
+    : []
+  ).reduce((acc, c) => {
+    const certName = normalizeCertName(c?.certification_type?.certificate_name);
+    if (certName && c?.request_certificate_id != null) {
+      acc[certName] = c.request_certificate_id;
+    }
+    return acc;
+  }, {});
+
   const [visible, setVisible] = useState(false);
   const [opening, setOpening] = useState(true);
   const [editLoading, setEditLoading] = useState(false);
@@ -86,6 +108,7 @@ const CertificateModal = ({ request, onClose, onCertificatePrinted }) => {
     major: request.major ?? '',
     date: new Date().toISOString().split('T')[0],
     officialReceiptNum: request.or_number ?? '',
+    certificateIdsByName,
   };
 
   return createPortal(

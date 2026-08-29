@@ -353,6 +353,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
                     isUpdating={updatingItemKey === `cert-${c.request_certificate_id}`}
                     onAdvance={(target) => advanceCertificateItem(c, target)}
                     isDark={isDark}
+                    generatedAt={c.generated_at}
                   />
                 ))}
               </ul>
@@ -392,11 +393,24 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
  * "hide, don't disable" convention the whole-request buttons already use
  * elsewhere in this app.
  */
-const LineItemRow = ({ name, statusId, statusConfig, actions, canProcess, canComplete, isUpdating, onAdvance, isDark }) => {
+/**
+ * generatedAt is only ever passed for certificate rows (documents have no
+ * such concept) — undefined for a document row simply skips the badge and
+ * the extra guard below. See RequestItemStatusService::guardCertificateGenerated()
+ * for the server-side rule this mirrors: a certificate can't move into
+ * ReadyToClaim (target 2) until it's actually been generated/printed.
+ * Surfacing that here as a disabled state with a tooltip, rather than only
+ * finding out via the 422 after clicking, is the same "hide/disable, don't
+ * silently fail" convention the whole-request buttons in StaffDashboard.jsx
+ * already use for this exact check.
+ */
+const LineItemRow = ({ name, statusId, statusConfig, actions, canProcess, canComplete, isUpdating, onAdvance, isDark, generatedAt }) => {
   const status = statusConfig(statusId);
   const availableActions = actions.filter((a) =>
     a.requiredAction === 'Complete' ? canComplete : canProcess
   );
+  const isCertificateRow = generatedAt !== undefined;
+  const isGenerated = generatedAt != null;
 
   return (
     <li className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border px-3 py-2 ${isDark ? 'border-[#3e4042]' : 'border-gray-200'}`}>
@@ -405,21 +419,37 @@ const LineItemRow = ({ name, statusId, statusConfig, actions, canProcess, canCom
         <span className={`inline-flex shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full border ${status.classes}`}>
           {status.label}
         </span>
+        {isCertificateRow && (
+          <span
+            className={`inline-flex shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+              isGenerated
+                ? (isDark ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700')
+                : (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600')
+            }`}
+            title={isGenerated ? `Generated ${new Date(generatedAt).toLocaleString()}` : 'Not yet printed/generated'}
+          >
+            {isGenerated ? 'Generated' : 'Not generated'}
+          </span>
+        )}
       </div>
       {availableActions.length > 0 && (
         <div className="flex flex-wrap gap-2 shrink-0">
-          {availableActions.map((action) => (
-            <button
-              key={action.target}
-              type="button"
-              disabled={isUpdating}
-              onClick={() => onAdvance(action.target)}
-              className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-purple-900/20 hover:bg-purple-900/30 text-purple-400 border border-purple-600' : 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200'}`}
-            >
-              <span>{action.label}</span>
-              <ArrowRightIcon className="w-3 h-3" />
-            </button>
-          ))}
+          {availableActions.map((action) => {
+            const blockedByGeneration = isCertificateRow && !isGenerated && action.target === 2;
+            return (
+              <button
+                key={action.target}
+                type="button"
+                disabled={isUpdating || blockedByGeneration}
+                onClick={() => onAdvance(action.target)}
+                title={blockedByGeneration ? 'Print/generate this certificate first' : undefined}
+                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-purple-900/20 hover:bg-purple-900/30 text-purple-400 border border-purple-600' : 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200'}`}
+              >
+                <span>{action.label}</span>
+                <ArrowRightIcon className="w-3 h-3" />
+              </button>
+            );
+          })}
         </div>
       )}
     </li>

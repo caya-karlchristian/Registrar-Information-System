@@ -223,7 +223,6 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
     documentDropdownOpen,
     setDocumentDropdownOpen,
     documentOptions,
-    printedCertificateIds,
     resolvedStatusIds,
     requestStatuses,
     handleStatusUpdate,
@@ -236,7 +235,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
     handleRestoreOne,
     handleBulkReady,
     handleBulkDone,
-    markCertificateAsPrinted,
+    handleCertificatePrinted,
   } = useStaffDashboard(viewMode);
 
   const handleBulkReadyClick = () => {
@@ -254,7 +253,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
     }
 
     const unprintedCert = eligibleRequests.find(
-      r => r.isCertificate && !printedCertificateIds.includes(r.id)
+      r => r.isCertificate && !r.certificatesGenerated
     );
 
     if (unprintedCert) {
@@ -744,19 +743,19 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                         <button
                           disabled={updatingId === req.id}
                           onClick={() => {
-                            if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
+                            if (req.isCertificate && !req.certificatesGenerated) {
                               showError('You need to process or print the certificate first.');
                               return;
                             }
                             handleStatusUpdate(req.id, resolvedStatusIds.PENDING_SIGNATURE);
                           }}
                           className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
-                            req.isCertificate && !printedCertificateIds.includes(req.id)
+                            req.isCertificate && !req.certificatesGenerated
                               ? 'opacity-40 filter blur-[0.5px] cursor-pointer'
                               : ''
                           } ${isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-200'}`}
                           title={
-                            req.isCertificate && !printedCertificateIds.includes(req.id)
+                            req.isCertificate && !req.certificatesGenerated
                               ? 'Print the certificate first before sending it for signature'
                               : "Registrar's part is done — send this to an external office for signature. Stops the registrar's own processing-time clock and starts tracking the signing office's turnaround separately."
                           }
@@ -773,19 +772,19 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                         <button
                           disabled={updatingId === req.id}
                           onClick={() => {
-                            if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
+                            if (req.isCertificate && !req.certificatesGenerated) {
                               showError('You need to process or print the certificate first.');
                               return;
                             }
                             handleStatusUpdate(req.id, resolvedStatusIds.READY);
                           }}
                           className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
-                            req.isCertificate && !printedCertificateIds.includes(req.id)
+                            req.isCertificate && !req.certificatesGenerated
                               ? 'opacity-40 filter blur-[0.5px] cursor-pointer'
                               : ''
                           } ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
                           title={
-                            req.isCertificate && !printedCertificateIds.includes(req.id)
+                            req.isCertificate && !req.certificatesGenerated
                               ? 'Print certificate first'
                               : req.statusId === resolvedStatusIds.PENDING_SIGNATURE
                               ? 'Signature received — mark as Ready to claim'
@@ -850,7 +849,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
       {certRequest && (
         <CertificateModal
           request={certRequest}
-          onCertificatePrinted={markCertificateAsPrinted}
+          onCertificatePrinted={handleCertificatePrinted}
           onClose={() => setCertRequest(null)}
         />
       )}

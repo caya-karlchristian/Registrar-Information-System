@@ -708,10 +708,23 @@ class DocumentRequestController extends Controller
     // check (see DocumentRequestService::markCertificatesGenerated()).
     // Replaces the client-only printedCertificateIds localStorage flag,
     // which never reached the server.
+    //
+    // Optional request_certificate_id (validated inline — this is a single
+    // nullable field, not worth its own FormRequest class) scopes the write
+    // to one line item when the frontend can resolve which certificate it
+    // just printed; omitted, it falls back to marking every ungenerated
+    // certificate on the request, same as before per-item targeting existed.
     // -------------------------------------------------------------------------
-    public function markCertificatesGenerated(DocumentRequest $documentRequest): JsonResponse
+    public function markCertificatesGenerated(Request $request, DocumentRequest $documentRequest): JsonResponse
     {
-        $this->documentRequestService->markCertificatesGenerated($documentRequest);
+        $validated = $request->validate([
+            'request_certificate_id' => 'sometimes|nullable|integer|exists:request_certificate,request_certificate_id',
+        ]);
+
+        $this->documentRequestService->markCertificatesGenerated(
+            $documentRequest,
+            $validated['request_certificate_id'] ?? null
+        );
 
         return response()->json([
             'message'      => 'Certificate(s) marked as generated.',

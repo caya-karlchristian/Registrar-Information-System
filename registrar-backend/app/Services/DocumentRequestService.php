@@ -397,16 +397,16 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      * server (see migration
      * 2026_08_29_000010_add_generated_at_to_request_certificate).
      *
-     * Called from GenerateCertificate.jsx's print action. That screen
-     * doesn't currently identify which specific request_certificate row
-     * it's printing for — a request may in principle carry more than
-     * one — so this marks every not-yet-generated certificate row on the
-     * request, matching the granularity the whole-request guard already
-     * checks at ("at least one certificate item generated"). If the
-     * print flow is later wired to a specific request_certificate_id,
-     * prefer a narrower per-item call through
-     * RequestItemStatusService/a dedicated per-item endpoint instead of
-     * widening this method.
+     * Called from GenerateCertificate.jsx's print action. GenerateCertificate
+     * now identifies which specific request_certificate row it's printing
+     * for whenever it can resolve one (see CertificateModal.jsx's
+     * name -> request_certificate_id map), so $requestCertificateId marks
+     * just that row. Callers that can't resolve a specific item (or older
+     * callers not yet updated) can omit it, which falls back to the
+     * original behaviour of marking every not-yet-generated certificate
+     * row on the request — the same granularity the whole-request guard
+     * already checks at ("at least one certificate item generated"), kept
+     * for backward compatibility rather than as the preferred path.
      *
      * Deliberately idempotent and side-effect-free beyond the column
      * write: re-printing an already-generated certificate just leaves
@@ -414,14 +414,34 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      * update), so this is safe to call on every print click without
      * needing the caller to track whether it already fired.
      */
-    public function markCertificatesGenerated(DocumentRequest $documentRequest): void
+    public function markCertificatesGenerated(DocumentRequest $documentRequest, ?int $requestCertificateId = null): void
     {
-        DB::transaction(function () use ($documentRequest) {
+        DB::transaction(function () use ($documentRequest, $requestCertificateId) {
             $documentRequest = DocumentRequest::lockForUpdate()
                 ->findOrFail($documentRequest->request_id);
 
             if ($documentRequest->is_archived) {
                 abort(422, 'This request is archived and is read-only. Restore it first.');
+            }
+
+            if ($requestCertificateId !== null) {
+                // Scoped to one line item — 404 rather than a silent no-op
+                // if the id doesn't actually belong to this request, so a
+                // frontend bug (wrong id resolved) surfaces immediately
+                // instead of quietly marking nothing. (Already-generated
+                // items are found here too, just left untouched below by
+                // the whereNull on the update — re-printing stays a no-op,
+                // not an error.)
+                $documentRequest->certificates()
+                    ->where('request_certificate_id', $requestCertificateId)
+                    ->firstOrFail();
+
+                $documentRequest->certificates()
+                    ->whereNull('generated_at')
+                    ->where('request_certificate_id', $requestCertificateId)
+                    ->update(['generated_at' => now()]);
+
+                return;
             }
 
             $documentRequest->certificates()
