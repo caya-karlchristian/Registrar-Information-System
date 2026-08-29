@@ -315,6 +315,22 @@ export const restoreDocumentRequests = (ids) => api.post(`/document-requests/res
 export const claimDocumentRequest = (credential) => api.post(`/document-requests/claim`, credential);
 
 // -------------------------------------------------------
+// ITEM-LEVEL STATUS (Phase 2) — staff/admin only.
+// Advances ONE request_document/request_certificate row independently
+// of the rest of the request — see backend RequestItemStatusService.
+// Same coarse role/module gate as updateDocumentRequest above; the
+// Process-vs-Complete split is enforced server-side once the target
+// status is known. On success the backend returns the updated line
+// item (not the parent request) — callers should re-fetch the parent
+// via getDocumentRequest(id) to pick up the recomputed aggregate
+// status shown elsewhere in the UI.
+// -------------------------------------------------------
+export const updateRequestDocumentStatus = (requestId, requestDocumentId, statusId) =>
+  api.put(`/document-requests/${requestId}/documents/${requestDocumentId}`, { status_id: statusId });
+export const updateRequestCertificateStatus = (requestId, requestCertificateId, statusId) =>
+  api.put(`/document-requests/${requestId}/certificates/${requestCertificateId}`, { status_id: statusId });
+
+// -------------------------------------------------------
 // REQUEST HISTORY (read-only from the frontend)
 // -------------------------------------------------------
 export const getRequestHistory = () => api.get("/request-history");

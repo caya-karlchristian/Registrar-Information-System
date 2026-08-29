@@ -838,7 +838,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
           handleNextPage={handleNextPage}
         />
       </div>
-      <RequestDetailsModal request={selectedRequest} onClose={() => setSelectedRequest(null)} />
+      <RequestDetailsModal request={selectedRequest} onClose={() => setSelectedRequest(null)} user={user} />
       <DeleteConfirmModal
         open={showDeleteConfirm}
         count={selectedIds.length}

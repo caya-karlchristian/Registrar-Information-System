@@ -54,8 +54,15 @@ class DocumentRequestController extends Controller
         'status',
         'requestPurpose',
         'documents.documentType',
+        'documents.status',
         'certificates.certificationType',
+        'certificates.status',
         'archivedByUser',
+        // Phase 3 — see DocumentRequest::releaseGroups(). Nearly always
+        // empty; only populated for requests whose items span more than
+        // one fulfillment_track. Loading fulfillmentTrack alongside it
+        // so the frontend can label each ticket without a second call.
+        'releaseGroups.fulfillmentTrack',
     ];
 
     public function __construct(
