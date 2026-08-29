@@ -23,6 +23,7 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
   'admin_payment_verification',
   'admin_incomplete_request',
   'status_updated',
+  'awaiting_submission',
   'request_processing',
   'pending_signature',
   'ready_to_claim',

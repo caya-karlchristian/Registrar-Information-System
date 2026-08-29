@@ -104,11 +104,12 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
 
           {/* Claim Ticket — QR Code Claiming Policy v1.0 §3.2 access point 2
               (dashboard). Shown for the entire lifetime a request is still
-              claimable — Processing (25%), PendingSignature (60%), and
-              ReadyToClaim (75%) — matching the pop-up shown immediately on
-              submit (RequestForm.jsx/AlumniRequest.jsx) and the inbox
-              notification sent at request_submitted: the student can access
-              their ticket from day one, not only once it's Ready to Claim.
+              claimable — AwaitingSubmission (10%), Processing (25%),
+              PendingSignature (60%), and ReadyToClaim (75%) — matching the
+              pop-up shown immediately on submit (RequestForm.jsx/
+              AlumniRequest.jsx) and the inbox notification sent at
+              request_submitted: the student can access their ticket from
+              day one, not only once it's Ready to Claim.
               Staff can only ever *act* on a scan once the request is
               actually ReadyToClaim — that restriction is enforced
               server-side in the claim endpoint, not by hiding the ticket
@@ -222,6 +223,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
 const getProgressLabel = (progress) => {
   switch (progress) {
     case 0:   return "Request was forfeited";
+    case 10:  return "Awaiting submission of source document";
     case 25:  return "Request received and under review";
     case 60:  return "Registrar processing complete — awaiting signature";
     case 75:  return "Document is ready to claim";

@@ -47,17 +47,47 @@ enum RequestStatusEnum: int
     case PendingSignature = 6;
 
     /**
+     * A request that cannot begin registrar processing yet because the
+     * client must first hand over a physical source document — the CTC /
+     * "Authentication Fee" case (see document_type.requires_source_
+     * submission and the 2026_08_29 logbook_category/CTC reconciliation
+     * migrations). Unlike PendingSignature, this is not a mid-processing
+     * wait: it is the request's STARTING status, assigned at creation
+     * time by DocumentRequestService::createRequest() whenever any
+     * requested document/certificate type has requires_source_submission
+     * = true, instead of the usual Processing.
+     *
+     * status_id = 12 — the next free id after Draft (11); see
+     * migration 2026_08_29_000004_add_awaiting_submission_status and the
+     * matching comment in DatabaseSeeder::seedRequestStatus() for the
+     * same "don't collide with an exact-match lookup" caution that
+     * governed PendingSignature's id choice. "Awaiting Submission"
+     * lowercases to "awaiting submission", which is not "pending" and
+     * does not collide with the frontend's exact-match "pending" lookup
+     * (see the long-form note on that landmine in
+     * DatabaseSeeder::seedRequestStatus()).
+     *
+     * The registrar's SLA clock does not start until staff confirm the
+     * source document has actually been received and move the request to
+     * Processing — the same "stop the clock while waiting on someone
+     * outside the Registrar's control" reasoning as PendingSignature,
+     * just applied at the front of the workflow instead of the middle.
+     */
+    case AwaitingSubmission = 12;
+
+    /**
      * Returns the set of statuses that this status may legally transition to.
      * Used by DocumentRequestService::updateRequest() to reject illegal moves.
      *
      * Transition map:
-     *   Processing       → ReadyToClaim | PendingSignature
-     *   PendingSignature → ReadyToClaim
-     *   ReadyToClaim     → Completed    | Forfeited
-     *   Completed        → (terminal)
-     *   Forfeited        → (terminal)
-     *   Cancelled        → (terminal, and unreachable from any other status — see
-     *                       the @deprecated note on the Cancelled case above)
+     *   AwaitingSubmission → Processing
+     *   Processing         → ReadyToClaim | PendingSignature
+     *   PendingSignature   → ReadyToClaim
+     *   ReadyToClaim       → Completed    | Forfeited
+     *   Completed          → (terminal)
+     *   Forfeited          → (terminal)
+     *   Cancelled          → (terminal, and unreachable from any other status — see
+     *                         the @deprecated note on the Cancelled case above)
      *
      * Note: the automated shredder (ShredExpiredRequests) transitions
      * ReadyToClaim → Forfeited by writing directly to the DB, so it
@@ -72,17 +102,24 @@ enum RequestStatusEnum: int
      * should not be modeled as one more state the SLA clock has to reason
      * about.
      *
+     * AwaitingSubmission follows the same one-way principle: it is only
+     * ever the request's initial status (never entered via updateRequest())
+     * and can only move forward to Processing once staff confirm the
+     * source document is in hand. There is no AwaitingSubmission ←
+     * Processing "undo" for the same reason PendingSignature has none.
+     *
      * @return array<self>
      */
     public function allowedTransitions(): array
     {
         return match ($this) {
-            self::Processing       => [self::ReadyToClaim, self::PendingSignature],
-            self::PendingSignature => [self::ReadyToClaim],
-            self::ReadyToClaim     => [self::Completed, self::Forfeited],
-            self::Completed        => [],
-            self::Forfeited        => [],
-            self::Cancelled        => [],
+            self::AwaitingSubmission => [self::Processing],
+            self::Processing          => [self::ReadyToClaim, self::PendingSignature],
+            self::PendingSignature    => [self::ReadyToClaim],
+            self::ReadyToClaim        => [self::Completed, self::Forfeited],
+            self::Completed           => [],
+            self::Forfeited           => [],
+            self::Cancelled           => [],
         };
     }
 
@@ -90,12 +127,13 @@ enum RequestStatusEnum: int
     public function notificationTrigger(): ?string
     {
         return match ($this) {
-            self::Processing       => 'request_processing',
-            self::PendingSignature => 'pending_signature',
-            self::ReadyToClaim     => 'ready_to_claim',
-            self::Completed        => 'request_completed',
-            self::Forfeited        => 'request_forfeited',
-            self::Cancelled        => null,
+            self::AwaitingSubmission => 'awaiting_submission',
+            self::Processing          => 'request_processing',
+            self::PendingSignature    => 'pending_signature',
+            self::ReadyToClaim        => 'ready_to_claim',
+            self::Completed           => 'request_completed',
+            self::Forfeited           => 'request_forfeited',
+            self::Cancelled           => null,
         };
     }
 }

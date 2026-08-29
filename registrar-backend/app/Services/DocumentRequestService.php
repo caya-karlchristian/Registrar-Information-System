@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\RequestStatusEnum;
+use App\Models\CertificationType;
 use App\Models\DocumentRequest;
+use App\Models\DocumentType;
 use App\Models\RequestHistory;
 use App\Models\SystemUser;
 use App\Contracts\DocumentRequestServiceInterface;
@@ -38,7 +40,11 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      */
     public function createRequest(SystemUser $user, array $validated): DocumentRequest
     {
-        $requestData = $this->buildRequestData($user, $validated);
+        $initialStatus = $this->requestRequiresSourceSubmission($validated)
+            ? RequestStatusEnum::AwaitingSubmission
+            : RequestStatusEnum::Processing;
+
+        $requestData = $this->buildRequestData($user, $validated, $initialStatus);
 
         $documentRequest = DocumentRequest::create($requestData);
 
@@ -122,6 +128,27 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             data:         ['request_id' => $documentRequest->request_id],
             requestId:    $documentRequest->request_id,
         );
+
+        // A request that started in AwaitingSubmission doesn't go through
+        // updateRequest()/notifyOwnerOfStatusChange() to reach that status
+        // — it's assigned at creation, above — so it needs its own
+        // notification here. The requirements checklist already sent
+        // above tells the student WHAT to bring (each CTC item's
+        // document_requirements text already says "source document
+        // required"); this one specifically flags that nothing will be
+        // processed until they do, since request_submitted alone reads as
+        // "your request is being worked on."
+        if ($initialStatus === RequestStatusEnum::AwaitingSubmission) {
+            $this->notificationService->send(
+                recipient:    $user,
+                triggerEvent: $initialStatus->notificationTrigger(),
+                data:         [
+                    'request_id'   => $documentRequest->request_id,
+                    'requirements' => $requirements,
+                ],
+                requestId:    $documentRequest->request_id,
+            );
+        }
 
         return $documentRequest;
     }
@@ -449,11 +476,54 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      *
      * @throws \RuntimeException
      */
-    private function buildRequestData(SystemUser $user, array $validated): array
+    /**
+     * Whether ANY document/certificate type in this request's submitted
+     * items has requires_source_submission = true — e.g. any CTC /
+     * Authentication Fee document_type row (see the 2026_08_29 logbook_
+     * category/CTC reconciliation migrations). If so, the whole request
+     * starts life in AwaitingSubmission rather than Processing.
+     *
+     * Deliberately request-level, not per-item: request_document/
+     * request_certificate have no status column of their own today (see
+     * the Phase 2 discussion this gating is a slice of — item-level
+     * status is a larger structural change than this flag alone
+     * justifies). A request that mixes a plain document with a CTC item
+     * gates the WHOLE request until the CTC item's source is submitted;
+     * splitting fast/slow items to progress independently is future
+     * work, not something this check attempts.
+     *
+     * Two whereIn() lookups instead of one query per item — this runs
+     * once per request creation, not once per line item, keeping it cheap
+     * regardless of how many documents/certificates are submitted.
+     */
+    private function requestRequiresSourceSubmission(array $validated): bool
+    {
+        $documentTypeIds = array_column($validated['documents'] ?? [], 'document_type_id');
+        if (!empty($documentTypeIds)) {
+            $needsSubmission = DocumentType::whereIn('document_type_id', $documentTypeIds)
+                ->where('requires_source_submission', true)
+                ->exists();
+
+            if ($needsSubmission) {
+                return true;
+            }
+        }
+
+        $certificateTypeIds = array_column($validated['certificates'] ?? [], 'certificate_type_id');
+        if (!empty($certificateTypeIds)) {
+            return CertificationType::whereIn('certificate_type_id', $certificateTypeIds)
+                ->where('requires_source_submission', true)
+                ->exists();
+        }
+
+        return false;
+    }
+
+    private function buildRequestData(SystemUser $user, array $validated, RequestStatusEnum $initialStatus): array
     {
         $base = [
             'user_id'            => $user->user_id,
-            'status_id'          => RequestStatusEnum::Processing->value,
+            'status_id'          => $initialStatus->value,
             'request_purpose_id' => $validated['request_purpose_id'],
             'or_number'          => $validated['or_number'] ?? null,
             'receipt_date'       => $validated['receipt_date'] ?? null,
@@ -558,11 +628,15 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         if ($targetStatus !== null) {
             $required[] = match ($targetStatus) {
                 RequestStatusEnum::Completed => 'Complete',
-                // ReadyToClaim, PendingSignature, Forfeited all require
-                // Process. Processing/Cancelled are unreachable at this
-                // point (allowedTransitions() already aborted on an
-                // illegal transition before this runs) — Process is
-                // still the safe default for them since it's the more
+                // ReadyToClaim, PendingSignature, and Forfeited all
+                // require Process — as does Processing itself, which
+                // (unlike before AwaitingSubmission existed) IS now a
+                // reachable target via AwaitingSubmission -> Processing
+                // (staff confirming a CTC/Authentication Fee source
+                // document has been received). Cancelled is unreachable
+                // (allowedTransitions() already aborted on an illegal
+                // transition before this runs). Process is the safe
+                // default across all of these since it's the more
                 // restrictive of the two dashboard write actions.
                 default => 'Process',
             };

@@ -264,6 +264,12 @@ class DatabaseSeeder extends Seeder
             ['status_id' => 9,  'status_name' => 'Returned'],
             ['status_id' => 10, 'status_name' => 'Archived'],
             ['status_id' => 11, 'status_name' => 'Draft'],
+            // See migration 2026_08_29_000004_add_awaiting_submission_status
+            // and RequestStatusEnum::AwaitingSubmission for the full
+            // reasoning. Lowercases to "awaiting submission" — not
+            // "pending" — so it does not collide with the exact-match
+            // "pending" lookup landmine documented above.
+            ['status_id' => 12, 'status_name' => 'Awaiting Submission'],
         ];
 
         foreach ($rows as $row) {
@@ -326,6 +332,21 @@ class DatabaseSeeder extends Seeder
                 'trigger_event'        => 'request_submitted',
                 'title'                => 'Request Submitted',
                 'message_template'     => 'Your document request has been successfully submitted.',
+                'audience'             => NotificationAudienceEnum::StudentAlumni->value,
+                'is_active'            => 1,
+            ],
+            [
+                // Fires from DocumentRequestService::createRequest() when
+                // the request starts in AwaitingSubmission (see
+                // RequestStatusEnum::AwaitingSubmission) — i.e. it
+                // contains at least one CTC/Authentication Fee item.
+                // Deliberately separate from request_submitted above:
+                // that one reads as "we're on it," this one needs to say
+                // "we can't start until you bring us something."
+                'notification_type_id' => 24,
+                'trigger_event'        => 'awaiting_submission',
+                'title'                => 'Source Document Required',
+                'message_template'     => 'Your request includes an item that requires you to submit the original source document before processing can begin. Please see the requirements list for details.',
                 'audience'             => NotificationAudienceEnum::StudentAlumni->value,
                 'is_active'            => 1,
             ],
