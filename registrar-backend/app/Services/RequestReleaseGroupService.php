@@ -173,8 +173,19 @@ class RequestReleaseGroupService
             // DocumentRequestService::updateRequest() applies at the
             // whole-request level, scoped here to just this group's own
             // certificate items.
+            //
+            // FIXED (was a no-op): this used to check
+            // whereNotNull('certificate_type_id'), a non-nullable column
+            // set once at request creation — it could never actually
+            // block anything. Now checks generated_at (see migration
+            // 2026_08_29_000010_add_generated_at_to_request_certificate),
+            // the same real, persisted signal the other two guards
+            // (DocumentRequestService::updateRequest() and
+            // RequestItemStatusService::guardCertificateGenerated()) were
+            // updated to use. This was the last of the three copies of
+            // this guard still on the old, non-functional check.
             $groupCertificates = RequestCertificate::where('request_release_group_id', $group->request_release_group_id)->get();
-            if ($groupCertificates->isNotEmpty() && $groupCertificates->whereNotNull('certificate_type_id')->isEmpty()) {
+            if ($groupCertificates->isNotEmpty() && $groupCertificates->whereNotNull('generated_at')->isEmpty()) {
                 abort(422, 'Certificate must be generated before marking as Ready to Claim.');
             }
 

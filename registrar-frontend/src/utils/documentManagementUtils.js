@@ -17,6 +17,14 @@ export const EMPTY_FORM = {
   // valid, common value, not a placeholder waiting to be filled in.
   logbook_category_id: "",
   requires_source_submission: false,
+  // Added for Phase 3 (claim-ticket grouping). Same nullability
+  // reasoning as logbook_category_id above — a NULL/"" track is the
+  // common "standard" track, not an unfinished value. See
+  // RequestReleaseGroupService::assignReleaseGroups() for what a
+  // non-null value here actually does: items whose type shares a
+  // fulfillment_track_id are grouped into one claim ticket, separate
+  // from items on a different (or no) track.
+  fulfillment_track_id: "",
 };
 
 export const FOLDER_COLORS = [

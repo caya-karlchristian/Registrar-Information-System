@@ -7,6 +7,7 @@ import {
   getPrograms,
   getSignatories,
   getLogbookCategories,
+  getFulfillmentTracks,
 } from "../services/api";
 import { useAuth } from "./AuthProvider";
 
@@ -74,6 +75,7 @@ export const ReferenceDataProvider = ({ children }) => {
   const [programs,        setPrograms]        = useState([]);
   const [signatories,     setSignatories]     = useState([]);
   const [logbookCategories, setLogbookCategories] = useState([]);
+  const [fulfillmentTracks, setFulfillmentTracks] = useState([]);
   const [loading,         setLoading]         = useState(true);
 
   useEffect(() => {
@@ -94,6 +96,7 @@ export const ReferenceDataProvider = ({ children }) => {
       setPrograms([]);
       setSignatories([]);
       setLogbookCategories([]);
+      setFulfillmentTracks([]);
       setLoading(false);
       return;
     }
@@ -110,6 +113,7 @@ export const ReferenceDataProvider = ({ children }) => {
         getPrograms(),
         getSignatories(),
         getLogbookCategories(),
+        getFulfillmentTracks(),
       ]);
       if (results[0].status === "fulfilled") setDocumentTypes(results[0].value.data ?? []);
       if (results[1].status === "fulfilled") setCertifications(results[1].value.data ?? []);
@@ -121,6 +125,7 @@ export const ReferenceDataProvider = ({ children }) => {
       // as [] — see the doc comment above.
       if (results[5].status === "fulfilled") setSignatories(results[5].value.data ?? []);
       if (results[6].status === "fulfilled") setLogbookCategories(results[6].value.data ?? []);
+      if (results[7].status === "fulfilled") setFulfillmentTracks(results[7].value.data ?? []);
       setLoading(false);
     };
 
@@ -170,6 +175,10 @@ export const ReferenceDataProvider = ({ children }) => {
   const logbookCategoryName = (id) =>
     logbookCategories.find((c) => Number(c.logbook_category_id) === Number(id))?.name;
 
+  /** Return the fulfillment track name for a given fulfillment_track_id, or undefined. */
+  const fulfillmentTrackName = (id) =>
+    fulfillmentTracks.find((t) => Number(t.fulfillment_track_id) === Number(id))?.name;
+
   /**
    * Re-fetch just the signatories list. Call this after create/update/delete
    * from an admin management screen so the rest of the app (e.g. the
@@ -203,6 +212,21 @@ export const ReferenceDataProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Re-fetch just the fulfillment tracks list. Same pattern and same
+   * reason as refreshLogbookCategories() — used after an inline create
+   * from DocumentManagement.jsx.
+   */
+  const refreshFulfillmentTracks = async () => {
+    try {
+      const res = await getFulfillmentTracks();
+      setFulfillmentTracks(res.data ?? []);
+    } catch {
+      // Leave the existing list as-is on failure, same reasoning as
+      // refreshSignatories().
+    }
+  };
+
   return (
     <ReferenceDataContext.Provider
       value={{
@@ -213,6 +237,7 @@ export const ReferenceDataProvider = ({ children }) => {
         programs,
         signatories,
         logbookCategories,
+        fulfillmentTracks,
         loading,
         docTypeName,
         certName,
@@ -221,8 +246,10 @@ export const ReferenceDataProvider = ({ children }) => {
         programName,
         signatoryById,
         logbookCategoryName,
+        fulfillmentTrackName,
         refreshSignatories,
         refreshLogbookCategories,
+        refreshFulfillmentTracks,
       }}
     >
       {children}

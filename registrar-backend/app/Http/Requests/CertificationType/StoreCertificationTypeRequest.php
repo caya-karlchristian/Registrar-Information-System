@@ -21,6 +21,12 @@ class StoreCertificationTypeRequest extends FormRequest
             'certificate_process_period'  => 'nullable|string|max:100',
             'access_id'                   => 'nullable|integer',
             'logbook_category_id'         => 'nullable|integer|exists:logbook_category,logbook_category_id',
+            // FIXED (gap found while wiring up admin UI for Phase 3 —
+            // fulfillment_track_id was added to the schema/model in
+            // migration 2026_08_29_000008 but never validated here, so it
+            // was silently stripped from every store/update request
+            // regardless of what the client sent).
+            'fulfillment_track_id'        => 'nullable|integer|exists:fulfillment_track,fulfillment_track_id',
             'requires_source_submission'  => 'nullable|boolean',
         ];
     }

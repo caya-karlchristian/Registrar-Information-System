@@ -152,6 +152,20 @@ export const createLogbookCategory = (data)      => api.post("/logbook-categorie
 export const updateLogbookCategory = (id, data)  => api.put(`/logbook-categories/${id}`, data);
 export const deleteLogbookCategory = (id)        => api.delete(`/logbook-categories/${id}`);
 
+// Fulfillment tracks (Phase 3 claim grouping) — same shape as Logbook
+// Category above. See FulfillmentTrackController: assigning a non-null
+// fulfillment_track_id to a document_type/certificate_type is what
+// actually makes RequestReleaseGroupService::assignReleaseGroups() split
+// a request into more than one claim ticket. Before this was wired into
+// DocumentManagement.jsx, no type in the system ever had a track
+// assigned — the whole grouping feature existed in code but was
+// unreachable in practice.
+export const getFulfillmentTracks  = ()          => api.get("/fulfillment-tracks");
+export const getFulfillmentTrack   = (id)        => api.get(`/fulfillment-tracks/${id}`);
+export const createFulfillmentTrack = (data)     => api.post("/fulfillment-tracks", data);
+export const updateFulfillmentTrack = (id, data) => api.put(`/fulfillment-tracks/${id}`, data);
+export const deleteFulfillmentTrack = (id)       => api.delete(`/fulfillment-tracks/${id}`);
+
 // -------------------------------------------------------
 // CERTIFICATIONS (read: all | write: Admin+)
 // -------------------------------------------------------

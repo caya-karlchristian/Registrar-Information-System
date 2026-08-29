@@ -53,6 +53,12 @@ class CertificationTypeController extends Controller
             // explicitly — they are not picked up automatically.
             'logbook_category_id',
             'requires_source_submission',
+            // FIXED (same bug, found again): fulfillment_track_id existed
+            // on the column, the model, and (as of this same change) the
+            // FormRequest validation rules — but was missing from this
+            // whitelist, so it was silently dropped from every response
+            // here even after being correctly saved to the DB.
+            'fulfillment_track_id',
         ];
     }
 

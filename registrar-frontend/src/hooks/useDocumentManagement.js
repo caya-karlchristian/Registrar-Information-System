@@ -56,6 +56,7 @@ export const useDocumentManagement = ({
       access_id: ACCESS_MAP_REVERSE[doc.access_id] ?? doc.access_id,
       logbook_category_id: doc.logbook_category_id ?? "",
       requires_source_submission: Boolean(doc.requires_source_submission),
+      fulfillment_track_id: doc.fulfillment_track_id ?? "",
     });
   };
 
@@ -71,6 +72,7 @@ export const useDocumentManagement = ({
       access_id: ACCESS_MAP_REVERSE[cert.access_id] ?? cert.access_id,
       logbook_category_id: cert.logbook_category_id ?? "",
       requires_source_submission: Boolean(cert.requires_source_submission),
+      fulfillment_track_id: cert.fulfillment_track_id ?? "",
     });
   };
 
@@ -139,6 +141,16 @@ export const useDocumentManagement = ({
         ? null
         : Number(form.logbook_category_id);
 
+    // Same nullability handling as logbook_category_id above —
+    // fulfillment_track_id is the field that actually enables Phase 3
+    // claim-ticket grouping (see RequestReleaseGroupService::
+    // assignReleaseGroups()); "" from an unselected dropdown means
+    // "standard track" (null), not an invalid value.
+    const normalizedFulfillmentTrackId =
+      form.fulfillment_track_id === "" || form.fulfillment_track_id === null
+        ? null
+        : Number(form.fulfillment_track_id);
+
     try {
       if (selectedType === "document") {
         const payload = {
@@ -146,6 +158,7 @@ export const useDocumentManagement = ({
           access_id: ACCESS_MAP[form.access_id] ?? form.access_id,
           logbook_category_id: normalizedLogbookCategoryId,
           requires_source_submission: Boolean(form.requires_source_submission),
+          fulfillment_track_id: normalizedFulfillmentTrackId,
         };
         if (isAdding) {
           const res = await createDocumentType(payload);
@@ -168,6 +181,7 @@ export const useDocumentManagement = ({
           access_id: ACCESS_MAP[form.access_id] ?? form.access_id,
           logbook_category_id: normalizedLogbookCategoryId,
           requires_source_submission: Boolean(form.requires_source_submission),
+          fulfillment_track_id: normalizedFulfillmentTrackId,
         };
         if (isAdding) {
           const res = await createCertification(payload);
