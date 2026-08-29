@@ -310,7 +310,30 @@ class DocumentRequestController extends Controller
             $consumedOverride = $verification['override'] ?? null;
         }
 
-        $documentRequest = $this->requestService->createRequest(Auth::user(), $validated);
+        // The isOrAlreadyUsed() pre-check above is a plain SELECT with no
+        // locking — it exists purely to fail fast with a friendly message
+        // in the common (non-racing) case. It cannot, by itself, prevent
+        // two near-simultaneous submissions of the same OR from both
+        // passing it before either INSERT commits. The
+        // document_request_or_number_unique DB constraint (see
+        // 2026_08_29_000009_add_unique_index_to_document_request_or_number)
+        // is what actually closes that race: whichever request wins the
+        // INSERT succeeds, the loser hits a 23000 duplicate-key violation
+        // here and gets the exact same user-facing message as the
+        // pre-check, instead of an uncaught 500.
+        try {
+            $documentRequest = $this->requestService->createRequest(Auth::user(), $validated);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23000' && !empty($validated['or_number'])) {
+                $message = 'This OR number has already been used for a previous request. Each Official Receipt can only be used once.';
+                return response()->json([
+                    'message' => $message,
+                    'errors'  => ['or_number' => [$message]],
+                ], 422);
+            }
+
+            throw $e;
+        }
 
         if ($consumedOverride !== null) {
             $this->consumeOverride($request, $consumedOverride, $documentRequest, Auth::user());

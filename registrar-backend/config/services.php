@@ -37,8 +37,13 @@ return [
         'api_key'     => env('CASHIER_API_KEY', ''),
         'url'         => env('CASHIER_API_URL', 'https://puptec.ojt-ims-bsit.net/api/verify-payment'),
         // single_use: when true, each OR number can only be used once.
-        // Set to false during development/testing to reuse OR numbers.
-        'single_use'  => env('CASHIER_SINGLE_USE', false),
+        // SECURE-BY-DEFAULT: defaults to true. A student/alumni's OR is
+        // a real payment; the default posture must be "one OR funds one
+        // request" without anyone having to remember to turn that on.
+        // Set CASHIER_SINGLE_USE=false only in local dev/testing .env
+        // files where the same fixture OR number needs to be reused
+        // across runs — never in a staging or production .env.
+        'single_use'  => env('CASHIER_SINGLE_USE', true),
     ],
 
     'slack' => [

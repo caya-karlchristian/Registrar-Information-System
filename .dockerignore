@@ -3,3 +3,6 @@ bootstrap/cache/packages.php
 vendor
 node_modules
 .git
+.env
+.env.*
+!.env.example

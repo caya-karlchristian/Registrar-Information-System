@@ -4,8 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\LogbookCategory\StoreLogbookCategoryRequest;
 use App\Http\Requests\LogbookCategory\UpdateLogbookCategoryRequest;
+use App\Models\AuditLog;
 use App\Models\LogbookCategory;
+use App\Models\SystemUser;
+use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * CRUD for the logbook_category lookup table — see that migration's
@@ -19,6 +24,8 @@ use Illuminate\Http\JsonResponse;
  */
 class LogbookCategoryController extends Controller
 {
+    public function __construct(private AuditLogger $auditLogger) {}
+
     /**
      * GET /api/logbook-categories
      *
@@ -66,6 +73,14 @@ class LogbookCategoryController extends Controller
 
         cache()->forget('logbook_categories.all');
 
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_LOGBOOK_CATEGORY_CREATED, [
+            'logbook_category_id' => $category->logbook_category_id,
+            'name'                => $category->name,
+        ]);
+
         return response()->json($category, 201);
     }
 
@@ -85,6 +100,14 @@ class LogbookCategoryController extends Controller
 
         cache()->forget('logbook_categories.all');
 
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_LOGBOOK_CATEGORY_UPDATED, [
+            'logbook_category_id' => $category->logbook_category_id,
+            'name'                => $category->name,
+        ]);
+
         return response()->json($category);
     }
 
@@ -97,7 +120,7 @@ class LogbookCategoryController extends Controller
      * exception, surfaced here as a 409 Conflict, same as
      * RequestPurposeController::destroy().
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
         $category = LogbookCategory::find($id);
 
@@ -119,6 +142,14 @@ class LogbookCategoryController extends Controller
         }
 
         cache()->forget('logbook_categories.all');
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_LOGBOOK_CATEGORY_DELETED, [
+            'logbook_category_id' => $category->logbook_category_id,
+            'name'                => $category->name,
+        ]);
 
         return response()->json(['message' => 'Logbook category deleted.']);
     }

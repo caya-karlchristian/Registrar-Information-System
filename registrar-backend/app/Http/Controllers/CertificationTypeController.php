@@ -97,6 +97,17 @@ class CertificationTypeController extends Controller
     {
         $cert = CertificationType::create($request->validated());
 
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_CERTIFICATE_TYPE_CREATED, [
+            'certificate_type_id'       => $cert->certificate_type_id,
+            'certificate_name'          => $cert->certificate_name,
+            'cashier_document_patterns' => $cert->cashier_document_patterns,
+            'fulfillment_track_id'      => $cert->fulfillment_track_id,
+            'logbook_category_id'       => $cert->logbook_category_id,
+        ]);
+
         return response()->json($this->freshRecord($cert->certificate_type_id), 201);
     }
 
@@ -107,12 +118,25 @@ class CertificationTypeController extends Controller
             return response()->json(['message' => 'Certification type not found'], 404);
         }
 
-        $cert->update($request->validated());
+        $validated = $request->validated();
+        $cert->update($validated);
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_CERTIFICATE_TYPE_UPDATED, [
+            'certificate_type_id'       => $cert->certificate_type_id,
+            'certificate_name'          => $cert->certificate_name,
+            'changed_fields'            => array_keys($validated),
+            'cashier_document_patterns' => $cert->cashier_document_patterns,
+            'fulfillment_track_id'      => $cert->fulfillment_track_id,
+            'logbook_category_id'       => $cert->logbook_category_id,
+        ]);
 
         return response()->json($this->freshRecord($id), 200);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $cert = CertificationType::find($id);
         if (!$cert) {
@@ -131,6 +155,14 @@ class CertificationTypeController extends Controller
 
             throw $e;
         }
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_CERTIFICATE_TYPE_DELETED, [
+            'certificate_type_id' => $cert->certificate_type_id,
+            'certificate_name'    => $cert->certificate_name,
+        ]);
 
         return response()->json(['message' => 'Certification type deleted'], 200);
     }
