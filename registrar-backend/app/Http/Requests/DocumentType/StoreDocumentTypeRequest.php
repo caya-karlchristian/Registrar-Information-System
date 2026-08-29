@@ -16,11 +16,13 @@ class StoreDocumentTypeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'document_name'           => 'required|string|max:100',
-            'document_description'    => 'nullable|string',
-            'document_requirements'   => 'nullable|string',
-            'document_process_period' => 'nullable|string|max:100',
-            'access_id'               => 'nullable|integer|exists:access_type,access_id',
+            'document_name'               => 'required|string|max:100',
+            'document_description'        => 'nullable|string',
+            'document_requirements'       => 'nullable|string',
+            'document_process_period'     => 'nullable|string|max:100',
+            'access_id'                   => 'nullable|integer|exists:access_type,access_id',
+            'logbook_category_id'         => 'nullable|integer|exists:logbook_category,logbook_category_id',
+            'requires_source_submission'  => 'nullable|boolean',
         ];
     }
 }

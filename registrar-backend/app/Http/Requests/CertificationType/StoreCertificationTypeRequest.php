@@ -16,10 +16,12 @@ class StoreCertificationTypeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'certificate_name'           => 'required|string|max:255',
-            'certificate_requirements'   => 'nullable|string',
-            'certificate_process_period' => 'nullable|string|max:100',
-            'access_id'                  => 'nullable|integer',
+            'certificate_name'            => 'required|string|max:255',
+            'certificate_requirements'    => 'nullable|string',
+            'certificate_process_period'  => 'nullable|string|max:100',
+            'access_id'                   => 'nullable|integer',
+            'logbook_category_id'         => 'nullable|integer|exists:logbook_category,logbook_category_id',
+            'requires_source_submission'  => 'nullable|boolean',
         ];
     }
 }
