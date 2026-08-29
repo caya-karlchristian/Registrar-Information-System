@@ -53,6 +53,19 @@ use Illuminate\Support\Facades\DB;
  *     these three against the raw Cashier list before relying on
  *     auto-matching for them.
  *
+ * SELF-CONTAINED DEPENDENCY: this migration inserts document_type rows
+ * with a hard access_id FK dependency on access_type (1=Student,
+ * 2=Alumni, 3=Both). Those three rows are normally seeded by
+ * DatabaseSeeder — but that only runs when someone remembers to add
+ * --seed, and this is a migration, not a seeder call. A plain
+ * `migrate:fresh` (no --seed) — the default a fresh environment, CI
+ * pipeline, or another dev's machine would reach for — hits document_type
+ * before access_type exists at all, and every insert below fails with an
+ * FK violation. ensureAccessTypesExist() below closes that gap directly:
+ * it upserts the same 3 fixed rows DatabaseSeeder already seeds, using
+ * the identical updateOrInsert-on-primary-key pattern, so it's a no-op
+ * wherever the seeder already ran and a real fix wherever it didn't.
+ *
  * SAFETY: refuses to delete certificate_type_id 7 if any request_certificate
  * row still references it (fails loudly with a clear message instead of
  * silently orphaning historical request data). If that happens, resolve
@@ -65,6 +78,17 @@ return new class extends Migration
 
     private const PENDING_PROCESS_PERIOD = 'Pending admin configuration - set via Document Management';
     private const PENDING_REQUIREMENTS = 'TODO (admin): confirm exact requirements for this certified-copy variant. Must include, at minimum, the original/photocopy of the source document being certified, proof of payment, and valid ID.';
+
+    /**
+     * Mirrors DatabaseSeeder's access_type rows exactly (1=Student,
+     * 2=Alumni, 3=Both) — see AccessType model docblock for the
+     * canonical mapping this migration and the seeder both rely on.
+     */
+    private const ACCESS_TYPES = [
+        ['access_id' => 1, 'access_name' => 'Student'],
+        ['access_id' => 2, 'access_name' => 'Alumni'],
+        ['access_id' => 3, 'access_name' => 'Both'],
+    ];
 
     /**
      * The 9 CTC / Authentication Fee source-document combinations, taken
@@ -86,6 +110,8 @@ return new class extends Migration
     public function up(): void
     {
         DB::transaction(function () {
+            $this->ensureAccessTypesExist();
+
             $ctcLogbookId = $this->firstOrCreateLogbookCategory(self::CTC_LOGBOOK_NAME);
             $completionLogbookId = $this->firstOrCreateLogbookCategory(self::COMPLETION_FEE_LOGBOOK_NAME);
 
@@ -139,6 +165,16 @@ return new class extends Migration
                 self::COMPLETION_FEE_LOGBOOK_NAME,
             ])->delete();
         });
+    }
+
+    private function ensureAccessTypesExist(): void
+    {
+        foreach (self::ACCESS_TYPES as $row) {
+            DB::table('access_type')->updateOrInsert(
+                ['access_id' => $row['access_id']],
+                ['access_name' => $row['access_name']]
+            );
+        }
     }
 
     private function firstOrCreateLogbookCategory(string $name): int
