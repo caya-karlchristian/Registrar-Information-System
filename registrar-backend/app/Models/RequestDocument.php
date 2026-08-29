@@ -13,8 +13,16 @@ class RequestDocument extends Model
 
     // number_of_copies is now per line item (per document type)
     // cap of 1–10 enforced at DB level via CHECK constraint
+    //
+    // status_id: added by migration 2026_08_29_000007_add_status_to_
+    // request_line_items — see RequestItemStatusService for how this is
+    // advanced and how it feeds document_request.status_id's derived
+    // aggregate. Never write this column directly outside that service;
+    // it owns the transition/permission/history/aggregate bookkeeping
+    // that a bare ->update(['status_id' => ...]) would silently skip.
     protected $casts = [
         'number_of_copies' => 'integer',
+        'status_id'        => 'integer',
     ];
 
     public function documentRequest()
@@ -25,5 +33,10 @@ class RequestDocument extends Model
     public function documentType()
     {
         return $this->belongsTo(DocumentType::class, 'document_type_id');
+    }
+
+    public function status()
+    {
+        return $this->belongsTo(RequestStatus::class, 'status_id');
     }
 }

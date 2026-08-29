@@ -181,6 +181,18 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show'])->middleware('module:dashboard,View');
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware(['role:3', 'module:dashboard,Process|Complete']);
+        // Item-level status — see RequestItemStatusService and
+        // DocumentRequestController::updateDocumentItemStatus()/
+        // updateCertificateItemStatus(). Same coarse role/module gate as
+        // the whole-request update() above; the Process-vs-Complete
+        // fine-grained check happens inside the service once the actual
+        // target status is known, same split as update() already uses.
+        Route::put('{documentRequest}/documents/{requestDocument}',
+            [DocumentRequestController::class, 'updateDocumentItemStatus'])
+            ->middleware(['role:3', 'module:dashboard,Process|Complete']);
+        Route::put('{documentRequest}/certificates/{requestCertificate}',
+            [DocumentRequestController::class, 'updateCertificateItemStatus'])
+            ->middleware(['role:3', 'module:dashboard,Process|Complete']);
         Route::patch('{documentRequest}/archive', [DocumentRequestController::class, 'archive'])->middleware('role:3');
         Route::patch('{documentRequest}/restore', [DocumentRequestController::class, 'restore'])->middleware('role:3');
         Route::delete('{documentRequest}', [DocumentRequestController::class, 'destroy'])->middleware('role:3');

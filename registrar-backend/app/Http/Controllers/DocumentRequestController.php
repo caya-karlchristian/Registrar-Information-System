@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\DocumentRequest;
+use App\Models\RequestCertificate;
+use App\Models\RequestDocument;
 use App\Models\SystemUser;
 use App\Models\AuditLog;
 use App\Models\CashierOrOverride;
@@ -12,7 +14,10 @@ use App\Http\Requests\DocumentRequest\ClaimDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\StoreDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\UpdateDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\VerifyOfficialReceiptRequest;
+use App\Http\Requests\RequestItem\UpdateRequestCertificateStatusRequest;
+use App\Http\Requests\RequestItem\UpdateRequestDocumentStatusRequest;
 use App\Services\DocumentRequestService;
+use App\Services\RequestItemStatusService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -60,6 +65,7 @@ class DocumentRequestController extends Controller
         private CashierDocumentSuggester        $documentSuggester,
         private AuditLogger                     $auditLogger,
         private NameMatcher                     $nameMatcher,
+        private RequestItemStatusService        $itemStatusService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -608,6 +614,60 @@ class DocumentRequestController extends Controller
         $documentRequest = $this->requestService->updateRequest($documentRequest, $validated);
 
         return response()->json($documentRequest->load(self::RELATIONS), 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // PUT /document-requests/{documentRequest}/documents/{requestDocument}
+    //
+    // Item-level status — advances ONE document line item without forcing
+    // every other item on the request through the same transition. See
+    // RequestItemStatusService for the transition/permission/history/
+    // aggregate logic; this method stays a thin adapter, same division of
+    // responsibility as update() above.
+    //
+    // Route-model binding resolves {requestDocument} globally by its own
+    // primary key, so it's possible (malformed URL, stale link) for it to
+    // belong to a DIFFERENT request than {documentRequest} — guarded
+    // explicitly here rather than trusting the URL nesting, since Laravel
+    // does not scope implicit bindings to a parent by default.
+    // -------------------------------------------------------------------------
+    public function updateDocumentItemStatus(
+        UpdateRequestDocumentStatusRequest $request,
+        DocumentRequest $documentRequest,
+        RequestDocument $requestDocument,
+    ) {
+        if ((int) $requestDocument->request_id !== (int) $documentRequest->request_id) {
+            abort(404, 'This document item does not belong to the specified request.');
+        }
+
+        $requestDocument = $this->itemStatusService->advanceDocumentItem(
+            $requestDocument,
+            (int) $request->validated('status_id'),
+        );
+
+        return response()->json($requestDocument->load(['documentType', 'status']), 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // PUT /document-requests/{documentRequest}/certificates/{requestCertificate}
+    //
+    // Mirrors updateDocumentItemStatus() exactly, for the certificate side.
+    // -------------------------------------------------------------------------
+    public function updateCertificateItemStatus(
+        UpdateRequestCertificateStatusRequest $request,
+        DocumentRequest $documentRequest,
+        RequestCertificate $requestCertificate,
+    ) {
+        if ((int) $requestCertificate->request_id !== (int) $documentRequest->request_id) {
+            abort(404, 'This certificate item does not belong to the specified request.');
+        }
+
+        $requestCertificate = $this->itemStatusService->advanceCertificateItem(
+            $requestCertificate,
+            (int) $request->validated('status_id'),
+        );
+
+        return response()->json($requestCertificate->load(['certificationType', 'status']), 200);
     }
 
     // -------------------------------------------------------------------------
