@@ -194,6 +194,15 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::put('{documentRequest}/certificates/{requestCertificate}',
             [DocumentRequestController::class, 'updateCertificateItemStatus'])
             ->middleware(['role:3', 'module:dashboard,Process|Complete']);
+        // Real print/generation signal — see DocumentRequestService::
+        // markCertificatesGenerated() and migration
+        // 2026_08_29_000010_add_generated_at_to_request_certificate. Gated
+        // the same as the item-status writes above: staff need at least
+        // Process access on the dashboard module to record a certificate
+        // as generated.
+        Route::post('{documentRequest}/mark-certificates-generated',
+            [DocumentRequestController::class, 'markCertificatesGenerated'])
+            ->middleware(['role:3', 'module:dashboard,Process|Complete']);
         Route::patch('{documentRequest}/archive', [DocumentRequestController::class, 'archive'])->middleware('role:3');
         Route::patch('{documentRequest}/restore', [DocumentRequestController::class, 'restore'])->middleware('role:3');
         Route::delete('{documentRequest}', [DocumentRequestController::class, 'destroy'])->middleware('role:3');

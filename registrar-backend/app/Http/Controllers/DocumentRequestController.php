@@ -701,6 +701,26 @@ class DocumentRequestController extends Controller
     }
 
     // -------------------------------------------------------------------------
+    // POST /document-requests/{documentRequest}/mark-certificates-generated
+    //
+    // Called from GenerateCertificate.jsx's print action — records the real,
+    // server-side "generated/printed" signal both ReadyToClaim guards now
+    // check (see DocumentRequestService::markCertificatesGenerated()).
+    // Replaces the client-only printedCertificateIds localStorage flag,
+    // which never reached the server.
+    // -------------------------------------------------------------------------
+    public function markCertificatesGenerated(DocumentRequest $documentRequest): JsonResponse
+    {
+        $this->documentRequestService->markCertificatesGenerated($documentRequest);
+
+        return response()->json([
+            'message'      => 'Certificate(s) marked as generated.',
+            'request_id'   => $documentRequest->request_id,
+            'certificates' => $documentRequest->fresh()->certificates,
+        ], 200);
+    }
+
+    // -------------------------------------------------------------------------
     // POST /document-requests/claim
     //
     // QR Code Claiming Policy v1.0. No {documentRequest} route param —

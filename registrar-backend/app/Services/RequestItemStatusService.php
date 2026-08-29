@@ -167,26 +167,19 @@ class RequestItemStatusService
      * per-item "Mark Ready to Claim" button could bypass a check the
      * whole-request button enforces.
      *
-     * IMPORTANT, flagged rather than silently carried over: this check
-     * is currently a no-op on BOTH paths. certificate_type_id is a
-     * non-nullable column set at request creation (see
-     * DocumentRequestService::createRequest()) — it is never null by
-     * the time staff can act on the item, so whereNotNull()/the
-     * equivalent single-row check here can never actually block
-     * anything. The real "has this certificate been printed/generated"
-     * state that the UI implies exists (printedCertificateIds in
-     * useStaffDashboard.js) lives ONLY in browser localStorage — it is
-     * never sent to the server, never persisted, and doesn't sync
-     * across staff devices or survive a cleared cache. There is no
-     * genuine server-side print/generation gate today, on either path.
-     *
-     * This method is written to be the single place that check lives
-     * once a real signal exists — if a generated_at (or similar)
-     * column is added to request_certificate and set by an actual
-     * print/generate action, swap the condition below for that column
-     * and both this method and the whole-request check in
-     * DocumentRequestService should be updated together so they can't
-     * drift out of parity again.
+     * FIXED (was a no-op on both paths): this used to check
+     * $item->certificate_type_id === null, but certificate_type_id is a
+     * non-nullable column set at request creation — it is never null by
+     * the time staff can act on the item, so the check could never
+     * actually block anything. Now reads generated_at (see migration
+     * 2026_08_29_000010_add_generated_at_to_request_certificate), a real
+     * persisted signal set by DocumentRequestService::
+     * markCertificatesGenerated() when staff actually print/generate the
+     * certificate — replacing the old client-only printedCertificateIds
+     * localStorage flag, which never reached the server. Both this check
+     * and DocumentRequestService::updateRequest()'s whole-request
+     * equivalent were updated together so they can't drift out of
+     * parity again.
      */
     private function guardCertificateGenerated(RequestCertificate $item, RequestStatusEnum $targetStatus): void
     {
@@ -194,7 +187,7 @@ class RequestItemStatusService
             return;
         }
 
-        if ($item->certificate_type_id === null) {
+        if ($item->generated_at === null) {
             abort(422, 'Certificate must be generated before marking as Ready to Claim.');
         }
     }

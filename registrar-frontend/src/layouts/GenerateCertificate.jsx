@@ -3,7 +3,7 @@ import InputGroup from "../components/InputGroup.jsx";
 import { useTheme } from "../context/ThemeContext";
 import { useReferenceData } from "../context/ReferenceDataContext";
 import { PrinterIcon } from "@heroicons/react/24/solid";
-import { getAcademicRecords, getCertifications, getCertificationLayouts } from "../services/api";
+import { getAcademicRecords, getCertifications, getCertificationLayouts, markCertificatesGenerated } from "../services/api";
 import { CertHeader, CertFooter, getTodayDate } from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import DropDown from "../components/DropDown.jsx";
@@ -396,9 +396,24 @@ useEffect(() => {
     };
     window.addEventListener("afterprint", handleAfterPrint, { once: true });
 
-    if (onCertificatePrinted && initialData?.requestId) {
+    if (initialData?.requestId) {
       const requestId = initialData.requestId;
-      onCertificatePrinted(requestId);
+
+      // Real, server-side "generated" signal — see
+      // DocumentRequestService::markCertificatesGenerated(). This is what
+      // the ReadyToClaim guards actually check now; the localStorage-based
+      // onCertificatePrinted callback below is kept only as an optimistic
+      // client-side hint for the dashboard's own filtering/highlighting,
+      // it no longer gates anything by itself. Fire-and-forget: a failure
+      // here shouldn't block the print the staff member already completed,
+      // but is surfaced so it isn't silently lost.
+      markCertificatesGenerated(requestId).catch((err) => {
+        console.error("Failed to record certificate as generated:", err);
+      });
+
+      if (onCertificatePrinted) {
+        onCertificatePrinted(requestId);
+      }
     }
   };
 

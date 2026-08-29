@@ -330,6 +330,16 @@ export const updateRequestDocumentStatus = (requestId, requestDocumentId, status
 export const updateRequestCertificateStatus = (requestId, requestCertificateId, statusId) =>
   api.put(`/document-requests/${requestId}/certificates/${requestCertificateId}`, { status_id: statusId });
 
+// Real print/generation signal — replaces the old printedCertificateIds
+// localStorage-only flag (see useStaffDashboard.js), which never reached
+// the server and so could never actually gate the "must be generated
+// before Ready to Claim" checks. Called from GenerateCertificate.jsx's
+// print action; marks every not-yet-generated certificate on the request
+// (see DocumentRequestService::markCertificatesGenerated() for why it's
+// request-scoped rather than per-item).
+export const markCertificatesGenerated = (requestId) =>
+  api.post(`/document-requests/${requestId}/mark-certificates-generated`);
+
 // -------------------------------------------------------
 // REQUEST HISTORY (read-only from the frontend)
 // -------------------------------------------------------

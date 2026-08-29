@@ -293,12 +293,22 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                 // Only enforce the print-first rule when this request actually
                 // includes certificate items. Document-only requests skip this guard.
                 if ($submittedCertCount > 0) {
-                    // All certificate items must have been generated before claiming.
-                    // Currently: if the row exists it has been generated (the modal
-                    // creates the row). Adjust this condition if a "generated" flag
-                    // is added to the model later.
+                    // FIXED (was a no-op): this used to check
+                    // whereNotNull('certificate_type_id'), which is a
+                    // non-nullable column set once at request creation — it
+                    // is never null, so this could never actually block
+                    // anything. Now checks generated_at (see migration
+                    // 2026_08_29_000010_add_generated_at_to_request_certificate),
+                    // set by markCertificatesGenerated() below when staff
+                    // actually print/generate the certificate — a real
+                    // persisted signal, replacing the client-only
+                    // printedCertificateIds localStorage flag that never
+                    // reached the server. Kept in parity with
+                    // RequestItemStatusService::guardCertificateGenerated(),
+                    // which enforces the same rule at the per-item level —
+                    // update both together if this condition ever changes.
                     $generatedCount = $documentRequest->certificates()
-                        ->whereNotNull('certificate_type_id')
+                        ->whereNotNull('generated_at')
                         ->count();
 
                     if ($generatedCount === 0) {
@@ -372,6 +382,53 @@ class DocumentRequestService implements DocumentRequestServiceInterface
     // had the same "writes a status the dashboard counts, never
     // invalidates the cache" gap (QA bugs #4/#9/#14). See that trait's
     // docblock for the full reasoning.
+
+    // -------------------------------------------------------------------------
+    // Mark certificates generated (real print/generation signal)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Records that this request's certificate(s) have actually been
+     * generated/printed — the real signal the "must be generated before
+     * ReadyToClaim" guards in updateRequest() and
+     * RequestItemStatusService::guardCertificateGenerated() now check,
+     * replacing the old certificate_type_id no-op and the client-only
+     * printedCertificateIds localStorage flag that never reached the
+     * server (see migration
+     * 2026_08_29_000010_add_generated_at_to_request_certificate).
+     *
+     * Called from GenerateCertificate.jsx's print action. That screen
+     * doesn't currently identify which specific request_certificate row
+     * it's printing for — a request may in principle carry more than
+     * one — so this marks every not-yet-generated certificate row on the
+     * request, matching the granularity the whole-request guard already
+     * checks at ("at least one certificate item generated"). If the
+     * print flow is later wired to a specific request_certificate_id,
+     * prefer a narrower per-item call through
+     * RequestItemStatusService/a dedicated per-item endpoint instead of
+     * widening this method.
+     *
+     * Deliberately idempotent and side-effect-free beyond the column
+     * write: re-printing an already-generated certificate just leaves
+     * its original generated_at timestamp alone (whereNull scopes the
+     * update), so this is safe to call on every print click without
+     * needing the caller to track whether it already fired.
+     */
+    public function markCertificatesGenerated(DocumentRequest $documentRequest): void
+    {
+        DB::transaction(function () use ($documentRequest) {
+            $documentRequest = DocumentRequest::lockForUpdate()
+                ->findOrFail($documentRequest->request_id);
+
+            if ($documentRequest->is_archived) {
+                abort(422, 'This request is archived and is read-only. Restore it first.');
+            }
+
+            $documentRequest->certificates()
+                ->whereNull('generated_at')
+                ->update(['generated_at' => now()]);
+        });
+    }
 
     // -------------------------------------------------------------------------
     // Claim (QR scan / manual claim_code)
