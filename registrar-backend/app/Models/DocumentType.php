@@ -12,7 +12,7 @@ class DocumentType extends Model
     protected $fillable = [
         'document_name', 'document_description', 'document_requirements', 'document_process_period',
         'access_id', 'cashier_document_patterns', 'is_archived', 'archived_on', 'archived_by',
-        'logbook_category_id', 'requires_source_submission',
+        'logbook_category_id', 'requires_source_submission', 'fulfillment_track_id',
     ];
 
     protected $casts = [
@@ -35,6 +35,15 @@ class DocumentType extends Model
     public function logbookCategory()
     {
         return $this->belongsTo(LogbookCategory::class, 'logbook_category_id');
+    }
+
+    // fulfillment_track_id: added by migration 2026_08_29_000008_add_
+    // fulfillment_tracks_and_release_groups — see RequestReleaseGroupService,
+    // which groups a request's line items into separate claim tickets when
+    // they span more than one track. NULL = the implicit "standard" track.
+    public function fulfillmentTrack()
+    {
+        return $this->belongsTo(FulfillmentTrack::class, 'fulfillment_track_id');
     }
 
     // Named archivedByUser() (not archivedBy()) so it serializes to

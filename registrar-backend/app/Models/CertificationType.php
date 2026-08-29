@@ -19,7 +19,7 @@ class CertificationType extends Model
         'layout_header_left_url', 'layout_header_right_url', 'layout_footer_urls',
         'layout_header_logo_size', 'layout_footer_logo_size',
         'cashier_document_patterns', 'is_archived', 'archived_on', 'archived_by',
-        'logbook_category_id', 'requires_source_submission',
+        'logbook_category_id', 'requires_source_submission', 'fulfillment_track_id',
     ];
 
     protected $casts = [
@@ -115,6 +115,12 @@ class CertificationType extends Model
     public function logbookCategory()
     {
         return $this->belongsTo(LogbookCategory::class, 'logbook_category_id');
+    }
+
+    // See DocumentType::fulfillmentTrack() — identical convention.
+    public function fulfillmentTrack()
+    {
+        return $this->belongsTo(FulfillmentTrack::class, 'fulfillment_track_id');
     }
 
     // Named archivedByUser() (not archivedBy()) so it serializes to

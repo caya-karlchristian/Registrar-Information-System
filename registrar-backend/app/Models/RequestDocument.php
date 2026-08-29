@@ -23,6 +23,7 @@ class RequestDocument extends Model
     protected $casts = [
         'number_of_copies' => 'integer',
         'status_id'        => 'integer',
+        'request_release_group_id' => 'integer',
     ];
 
     public function documentRequest()
@@ -38,5 +39,14 @@ class RequestDocument extends Model
     public function status()
     {
         return $this->belongsTo(RequestStatus::class, 'status_id');
+    }
+
+    // request_release_group_id: added by migration 2026_08_29_000008 —
+    // null on most rows (single-track requests never get a group at all,
+    // see RequestReleaseGroupService). Never write this column directly
+    // outside that service, same rule as status_id above.
+    public function releaseGroup()
+    {
+        return $this->belongsTo(RequestReleaseGroup::class, 'request_release_group_id');
     }
 }

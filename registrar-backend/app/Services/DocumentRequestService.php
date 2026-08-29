@@ -27,6 +27,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
     public function __construct(
         private NotificationServiceInterface $notificationService,
         private BusinessCalendarService $businessCalendarService,
+        private RequestReleaseGroupService $releaseGroupService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -48,19 +49,61 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
         $documentRequest = DocumentRequest::create($requestData);
 
+        // BUG FIX (per-item status was never set at creation): every
+        // request_document/request_certificate row created below used to
+        // be left with status_id = NULL, invisible to
+        // RequestItemStatusService::recomputeAggregateStatus()'s
+        // whereNotNull('status_id') filter — meaning a brand-new
+        // request's items didn't participate in their own aggregate
+        // until a staff member happened to touch one manually.
+        //
+        // Fixed by resolving each item's OWN initial status here — same
+        // AwaitingSubmission-vs-Processing decision
+        // requestRequiresSourceSubmission() already makes for the whole
+        // request, just applied per item instead of once. A single
+        // whereIn() per type table keeps this to two extra queries
+        // regardless of how many line items are submitted.
+        $documentTypeIds    = array_column($validated['documents'] ?? [], 'document_type_id');
+        $certificateTypeIds = array_column($validated['certificates'] ?? [], 'certificate_type_id');
+
+        $documentTypeMeta = $documentTypeIds
+            ? DocumentType::whereIn('document_type_id', $documentTypeIds)->get()->keyBy('document_type_id')
+            : collect();
+
+        $certificateTypeMeta = $certificateTypeIds
+            ? CertificationType::whereIn('certificate_type_id', $certificateTypeIds)->get()->keyBy('certificate_type_id')
+            : collect();
+
         foreach ($validated['documents'] ?? [] as $doc) {
+            $requiresSubmission = (bool) ($documentTypeMeta[$doc['document_type_id']]->requires_source_submission ?? false);
+
             $documentRequest->documents()->create([
                 'document_type_id' => $doc['document_type_id'],
                 'number_of_copies' => $doc['number_of_copies'],
+                'status_id'        => $requiresSubmission
+                    ? RequestStatusEnum::AwaitingSubmission->value
+                    : RequestStatusEnum::Processing->value,
             ]);
         }
 
         foreach ($validated['certificates'] ?? [] as $cert) {
+            $requiresSubmission = (bool) ($certificateTypeMeta[$cert['certificate_type_id']]->requires_source_submission ?? false);
+
             $documentRequest->certificates()->create([
                 'certificate_type_id' => $cert['certificate_type_id'],
                 'number_of_copies'    => $cert['number_of_copies'] ?? 1,
+                'status_id'           => $requiresSubmission
+                    ? RequestStatusEnum::AwaitingSubmission->value
+                    : RequestStatusEnum::Processing->value,
             ]);
         }
+
+        // Phase 3 — group into per-track claim tickets IF the items
+        // actually span more than one fulfillment_track. Must run after
+        // every item above has its status_id set (see that method's
+        // docblock) and before the notification block below, since
+        // nothing downstream reads release-group data yet.
+        $this->releaseGroupService->assignReleaseGroups($documentRequest);
 
         // ── Build per-item requirements list ─────────────────────────────────
         // Load relations fresh so we always have the latest document/cert data
@@ -320,6 +363,16 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      */
     public function claimRequest(array $credential): DocumentRequest
     {
+        // Phase 3 — a scanned uuid/claim_code might belong to a
+        // request_release_group ticket rather than the request itself.
+        // Checked first: group tickets and request tickets are drawn
+        // from the same alphabet/uuid format, so there's no way to tell
+        // them apart except by which table actually has the row.
+        $releaseGroup = $this->releaseGroupService->findByCredential($credential);
+        if ($releaseGroup) {
+            return $this->releaseGroupService->claimReleaseGroup($releaseGroup);
+        }
+
         // Plain lookup, no lock here on purpose: updateRequest() below
         // re-fetches by request_id under lockForUpdate() and re-validates
         // everything (archived, transition-allowed) against the committed
@@ -339,6 +392,21 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             // Deliberately generic — doesn't reveal whether a uuid or
             // claim_code was the invalid part of the payload.
             abort(404, 'No matching request found for that code.');
+        }
+
+        // Phase 3 guard: once a request has been split into release
+        // groups, the request-level ticket stops being a meaningful
+        // "claim everything" action UNTIL every group has already been
+        // individually claimed (at which point document_request.
+        // status_id is already Completed via the aggregate, and the
+        // transition guard below rejects it naturally with "already
+        // completed" — no special case needed for that path). Blocking
+        // it explicitly here, rather than letting it silently complete
+        // only whichever groups happen to be ready, avoids an ambiguous
+        // partial claim on a single ticket.
+        $groupState = $this->releaseGroupService->groupCompletionState($documentRequest);
+        if ($groupState['hasGroups'] && !$groupState['allCompleted']) {
+            abort(422, 'This request has separate release tickets for its items — scan the specific ticket for what is being claimed.');
         }
 
         // Reuses the exact same guarded path a manual admin status change

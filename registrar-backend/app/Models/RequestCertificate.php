@@ -16,6 +16,7 @@ class RequestCertificate extends Model
     // RequestItemStatusService, which owns every write to this column.
     protected $casts = [
         'status_id' => 'integer',
+        'request_release_group_id' => 'integer',
     ];
 
     public function documentRequest()
@@ -31,5 +32,11 @@ class RequestCertificate extends Model
     public function status()
     {
         return $this->belongsTo(RequestStatus::class, 'status_id');
+    }
+
+    // See RequestDocument::releaseGroup() — identical convention.
+    public function releaseGroup()
+    {
+        return $this->belongsTo(RequestReleaseGroup::class, 'request_release_group_id');
     }
 }
