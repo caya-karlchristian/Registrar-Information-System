@@ -129,6 +129,7 @@ class RequestItemStatusService
             $this->guardArchived($documentRequest);
 
             $targetStatus = $this->validateTransition($item->status_id, $targetStatusId);
+            $this->guardCertificateGenerated($item, $targetStatus);
             $this->authorizeItemStatusChange($targetStatus);
 
             $oldStatusId = $item->status_id;
@@ -156,6 +157,45 @@ class RequestItemStatusService
         // restoreRequest() first.
         if ($documentRequest->is_archived) {
             abort(422, 'This request is archived and is read-only. Restore it first.');
+        }
+    }
+
+    /**
+     * Mirrors the "certificate must be generated before ReadyToClaim"
+     * guard DocumentRequestService::updateRequest() applies at the
+     * whole-request level — added here for parity, since without it the
+     * per-item "Mark Ready to Claim" button could bypass a check the
+     * whole-request button enforces.
+     *
+     * IMPORTANT, flagged rather than silently carried over: this check
+     * is currently a no-op on BOTH paths. certificate_type_id is a
+     * non-nullable column set at request creation (see
+     * DocumentRequestService::createRequest()) — it is never null by
+     * the time staff can act on the item, so whereNotNull()/the
+     * equivalent single-row check here can never actually block
+     * anything. The real "has this certificate been printed/generated"
+     * state that the UI implies exists (printedCertificateIds in
+     * useStaffDashboard.js) lives ONLY in browser localStorage — it is
+     * never sent to the server, never persisted, and doesn't sync
+     * across staff devices or survive a cleared cache. There is no
+     * genuine server-side print/generation gate today, on either path.
+     *
+     * This method is written to be the single place that check lives
+     * once a real signal exists — if a generated_at (or similar)
+     * column is added to request_certificate and set by an actual
+     * print/generate action, swap the condition below for that column
+     * and both this method and the whole-request check in
+     * DocumentRequestService should be updated together so they can't
+     * drift out of parity again.
+     */
+    private function guardCertificateGenerated(RequestCertificate $item, RequestStatusEnum $targetStatus): void
+    {
+        if ($targetStatus !== RequestStatusEnum::ReadyToClaim) {
+            return;
+        }
+
+        if ($item->certificate_type_id === null) {
+            abort(422, 'Certificate must be generated before marking as Ready to Claim.');
         }
     }
 

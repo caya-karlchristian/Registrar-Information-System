@@ -47,63 +47,84 @@ class DocumentRequestService implements DocumentRequestServiceInterface
 
         $requestData = $this->buildRequestData($user, $validated, $initialStatus);
 
-        $documentRequest = DocumentRequest::create($requestData);
-
-        // BUG FIX (per-item status was never set at creation): every
-        // request_document/request_certificate row created below used to
-        // be left with status_id = NULL, invisible to
-        // RequestItemStatusService::recomputeAggregateStatus()'s
-        // whereNotNull('status_id') filter — meaning a brand-new
-        // request's items didn't participate in their own aggregate
-        // until a staff member happened to touch one manually.
+        // BUG FIX (createRequest was never transactional): the parent
+        // document_request row, every request_document/request_certificate
+        // child row, and Phase 3's release-group assignment used to be
+        // separate, unwrapped writes. If item creation failed partway
+        // through (bad type id slipping past validation, a DB hiccup,
+        // a deadlock on a concurrent request), the result was a
+        // document_request row with SOME or NONE of its line items —
+        // silently orphaned, no error surfaced to the student, and
+        // nothing to roll it back. Wrapping the whole write path in one
+        // transaction makes request creation all-or-nothing: either the
+        // request and every one of its items (and its release groups)
+        // exist together, or none of them do and the caller gets a
+        // clean exception instead of a half-created request.
         //
-        // Fixed by resolving each item's OWN initial status here — same
-        // AwaitingSubmission-vs-Processing decision
-        // requestRequiresSourceSubmission() already makes for the whole
-        // request, just applied per item instead of once. A single
-        // whereIn() per type table keeps this to two extra queries
-        // regardless of how many line items are submitted.
-        $documentTypeIds    = array_column($validated['documents'] ?? [], 'document_type_id');
-        $certificateTypeIds = array_column($validated['certificates'] ?? [], 'certificate_type_id');
+        // Notifications deliberately stay OUTSIDE this transaction (see
+        // below) — they're an external side effect, not a DB write, and
+        // should only fire once the request is durably committed.
+        $documentRequest = DB::transaction(function () use ($user, $validated, $requestData) {
+            $documentRequest = DocumentRequest::create($requestData);
 
-        $documentTypeMeta = $documentTypeIds
-            ? DocumentType::whereIn('document_type_id', $documentTypeIds)->get()->keyBy('document_type_id')
-            : collect();
+            // BUG FIX (per-item status was never set at creation): every
+            // request_document/request_certificate row created below used to
+            // be left with status_id = NULL, invisible to
+            // RequestItemStatusService::recomputeAggregateStatus()'s
+            // whereNotNull('status_id') filter — meaning a brand-new
+            // request's items didn't participate in their own aggregate
+            // until a staff member happened to touch one manually.
+            //
+            // Fixed by resolving each item's OWN initial status here — same
+            // AwaitingSubmission-vs-Processing decision
+            // requestRequiresSourceSubmission() already makes for the whole
+            // request, just applied per item instead of once. A single
+            // whereIn() per type table keeps this to two extra queries
+            // regardless of how many line items are submitted.
+            $documentTypeIds    = array_column($validated['documents'] ?? [], 'document_type_id');
+            $certificateTypeIds = array_column($validated['certificates'] ?? [], 'certificate_type_id');
 
-        $certificateTypeMeta = $certificateTypeIds
-            ? CertificationType::whereIn('certificate_type_id', $certificateTypeIds)->get()->keyBy('certificate_type_id')
-            : collect();
+            $documentTypeMeta = $documentTypeIds
+                ? DocumentType::whereIn('document_type_id', $documentTypeIds)->get()->keyBy('document_type_id')
+                : collect();
 
-        foreach ($validated['documents'] ?? [] as $doc) {
-            $requiresSubmission = (bool) ($documentTypeMeta[$doc['document_type_id']]->requires_source_submission ?? false);
+            $certificateTypeMeta = $certificateTypeIds
+                ? CertificationType::whereIn('certificate_type_id', $certificateTypeIds)->get()->keyBy('certificate_type_id')
+                : collect();
 
-            $documentRequest->documents()->create([
-                'document_type_id' => $doc['document_type_id'],
-                'number_of_copies' => $doc['number_of_copies'],
-                'status_id'        => $requiresSubmission
-                    ? RequestStatusEnum::AwaitingSubmission->value
-                    : RequestStatusEnum::Processing->value,
-            ]);
-        }
+            foreach ($validated['documents'] ?? [] as $doc) {
+                $requiresSubmission = (bool) ($documentTypeMeta[$doc['document_type_id']]->requires_source_submission ?? false);
 
-        foreach ($validated['certificates'] ?? [] as $cert) {
-            $requiresSubmission = (bool) ($certificateTypeMeta[$cert['certificate_type_id']]->requires_source_submission ?? false);
+                $documentRequest->documents()->create([
+                    'document_type_id' => $doc['document_type_id'],
+                    'number_of_copies' => $doc['number_of_copies'],
+                    'status_id'        => $requiresSubmission
+                        ? RequestStatusEnum::AwaitingSubmission->value
+                        : RequestStatusEnum::Processing->value,
+                ]);
+            }
 
-            $documentRequest->certificates()->create([
-                'certificate_type_id' => $cert['certificate_type_id'],
-                'number_of_copies'    => $cert['number_of_copies'] ?? 1,
-                'status_id'           => $requiresSubmission
-                    ? RequestStatusEnum::AwaitingSubmission->value
-                    : RequestStatusEnum::Processing->value,
-            ]);
-        }
+            foreach ($validated['certificates'] ?? [] as $cert) {
+                $requiresSubmission = (bool) ($certificateTypeMeta[$cert['certificate_type_id']]->requires_source_submission ?? false);
 
-        // Phase 3 — group into per-track claim tickets IF the items
-        // actually span more than one fulfillment_track. Must run after
-        // every item above has its status_id set (see that method's
-        // docblock) and before the notification block below, since
-        // nothing downstream reads release-group data yet.
-        $this->releaseGroupService->assignReleaseGroups($documentRequest);
+                $documentRequest->certificates()->create([
+                    'certificate_type_id' => $cert['certificate_type_id'],
+                    'number_of_copies'    => $cert['number_of_copies'] ?? 1,
+                    'status_id'           => $requiresSubmission
+                        ? RequestStatusEnum::AwaitingSubmission->value
+                        : RequestStatusEnum::Processing->value,
+                ]);
+            }
+
+            // Phase 3 — group into per-track claim tickets IF the items
+            // actually span more than one fulfillment_track. Must run after
+            // every item above has its status_id set (see that method's
+            // docblock) and before the notification block below, since
+            // nothing downstream reads release-group data yet.
+            $this->releaseGroupService->assignReleaseGroups($documentRequest);
+
+            return $documentRequest;
+        });
 
         // ── Build per-item requirements list ─────────────────────────────────
         // Load relations fresh so we always have the latest document/cert data
