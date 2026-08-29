@@ -42,6 +42,17 @@ class CertificationTypeController extends Controller
             'is_archived',
             'archived_on',
             'archived_by',
+            // Added alongside the 2026_08_29 logbook_category /
+            // requires_source_submission migration — without these two
+            // here, every response from this controller (index, show,
+            // store, update, layouts) would silently drop both columns
+            // even though they're set correctly in the DB and validated
+            // correctly by Store/UpdateCertificationTypeRequest. This
+            // whitelist is the only thing standing between the DB row
+            // and the JSON response, so new columns must be added here
+            // explicitly — they are not picked up automatically.
+            'logbook_category_id',
+            'requires_source_submission',
         ];
     }
 

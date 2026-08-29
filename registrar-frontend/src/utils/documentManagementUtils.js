@@ -10,6 +10,13 @@ export const EMPTY_FORM = {
   document_requirements: "",
   document_process_period: "",
   access_id: "",
+  // Added alongside the 2026_08_29 logbook_category / CTC reconciliation
+  // work. logbook_category_id is nullable — most types don't collapse
+  // with anything else and log under their own name (see the
+  // logbook_category migration docblock), so "" (→ null on submit) is a
+  // valid, common value, not a placeholder waiting to be filled in.
+  logbook_category_id: "",
+  requires_source_submission: false,
 };
 
 export const FOLDER_COLORS = [

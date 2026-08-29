@@ -144,6 +144,15 @@ export const archiveDocumentType = (id, reason) => api.patch(`/document-types/${
 export const restoreDocumentType = (id)      => api.patch(`/document-types/${id}/restore`);
 
 // -------------------------------------------------------
+// LOGBOOK CATEGORIES (read: all | write: Admin+)
+// -------------------------------------------------------
+export const getLogbookCategories  = ()          => api.get("/logbook-categories");
+export const getLogbookCategory    = (id)        => api.get(`/logbook-categories/${id}`);
+export const createLogbookCategory = (data)      => api.post("/logbook-categories", data);
+export const updateLogbookCategory = (id, data)  => api.put(`/logbook-categories/${id}`, data);
+export const deleteLogbookCategory = (id)        => api.delete(`/logbook-categories/${id}`);
+
+// -------------------------------------------------------
 // CERTIFICATIONS (read: all | write: Admin+)
 // -------------------------------------------------------
 export const getCertifications         = ()          => api.get("/certifications");

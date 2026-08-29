@@ -18,6 +18,7 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AiQueryController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\RequestPurposeController;
+use App\Http\Controllers\LogbookCategoryController;
 use App\Http\Controllers\UnmatchedCashierItemController;
 use App\Http\Controllers\CashierOrOverrideController;
 use App\Http\Controllers\AlumniSystemController;
@@ -258,6 +259,8 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     Route::get('request-statuses/{id}',      [RequestStatusController::class, 'show']);
     Route::get('request-purposes',      [RequestPurposeController::class, 'index']);
     Route::get('request-purposes/{id}', [RequestPurposeController::class, 'show']);
+    Route::get('logbook-categories',      [LogbookCategoryController::class, 'index']);
+    Route::get('logbook-categories/{id}', [LogbookCategoryController::class, 'show']);
     Route::get('programs', [ProgramController::class, 'index']);
 
     // Admin only (role 3 — superadmin bypasses via RoleMiddleware)
@@ -303,6 +306,10 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::post('request-purposes',        [RequestPurposeController::class, 'store']);
         Route::put('request-purposes/{id}',    [RequestPurposeController::class, 'update']);
         Route::delete('request-purposes/{id}', [RequestPurposeController::class, 'destroy']);
+
+        Route::post('logbook-categories',        [LogbookCategoryController::class, 'store']);
+        Route::put('logbook-categories/{id}',    [LogbookCategoryController::class, 'update']);
+        Route::delete('logbook-categories/{id}', [LogbookCategoryController::class, 'destroy']);
 
         // Unmatched cashier receipt labels — admin review screen backing
         // the naming-drift fix from CashierDocumentSuggester. See
