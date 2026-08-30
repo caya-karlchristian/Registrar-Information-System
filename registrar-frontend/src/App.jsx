@@ -196,6 +196,7 @@ const App = () => {
                     <Route path="business-calendar" element={<BusinessCalendarManagement />} />
                     <Route path="cashier-overrides" element={<CashierOrOverrideManagement />} />
                     <Route path="inbox" element={<InboxCenter />} />
+                    <Route path="profile" element={<ProfilePage userType="superAdmin" />} />
                   </Route>
 
                   <Route path="*" element={<Navigate to="/" replace />} />

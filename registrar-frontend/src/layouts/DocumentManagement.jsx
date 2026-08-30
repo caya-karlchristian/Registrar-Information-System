@@ -4,6 +4,7 @@ import InputGroup from "../components/InputGroup";
 import ProcessPeriodInput from "../components/ProcessPeriodInput.jsx";
 import VoiceTextareaInput from "../components/VoiceTextareaInput.jsx";
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
+import DropdownGroup from "../components/DropDown.jsx";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
@@ -387,85 +388,98 @@ const DocumentManagement = ({
               see the logbook_category migration docblock. Only types
               that genuinely share a logbook line with others (e.g. every
               "Certified True Copy of X" variant) need one assigned. */}
-          <div className="flex flex-col gap-1.5 w-full">
-            <span className={`text-sm font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
-              Logbook Category
-            </span>
-            {!addingCategory ? (
-              <div className="flex gap-2">
-                <select
-                  name="logbook_category_id"
-                  value={form.logbook_category_id}
-                  onChange={handleChange}
-                  className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors cursor-pointer ${
-                    isDark
-                      ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb]"
-                      : "bg-white border-gray-200 text-gray-700"
-                  }`}
-                >
-                  <option value="">None — log under this item's own name</option>
-                  {logbookCategories.map((cat) => (
-                    <option key={cat.logbook_category_id} value={cat.logbook_category_id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setAddingCategory(true)}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-colors cursor-pointer ${
-                    isDark
-                      ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  + New Category
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="e.g. Certified True Copy of Records"
-                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors ${
-                      isDark
-                        ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] placeholder-[#6b6b6b]"
-                        : "bg-white border-gray-200 text-gray-700 placeholder-gray-400"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    disabled={categorySaving}
-                    onClick={handleCreateCategory}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 ${
-                      isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"
-                    }`}
-                  >
-                    {categorySaving ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddingCategory(false);
-                      setNewCategoryName("");
-                      setCategoryError("");
-                    }}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                      isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    Cancel
-                  </button>
+          {/* 2-Column Grid Row for Logbook Category & Fulfillment Track */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+            {/* Logbook Category */}
+            <div className="flex flex-col gap-1.5 w-full">
+              <label className={`text-sm font-medium ${isDark ? "text-[#e4e6eb]" : "text-gray-700"}`}>
+                Logbook category
+              </label>
+              {!addingCategory ? (
+                <div className="flex flex-col gap-1.5 w-full">
+                  <div className="flex items-center gap-2 w-full">
+                    <div className="flex-1">
+                      <DropdownGroup
+                        name="logbook_category_id"
+                        value={
+                          logbookCategories.find((c) => String(c.logbook_category_id) === String(form.logbook_category_id))?.name ||
+                          "None"
+                        }
+                        onChange={(e) => {
+                          const selectedName = e.target.value;
+                          const matched = logbookCategories.find((c) => c.name === selectedName);
+                          setForm((prev) => ({
+                            ...prev,
+                            logbook_category_id: matched ? matched.logbook_category_id : "",
+                          }));
+                        }}
+                        options={[
+                          "None",
+                          ...logbookCategories.map((c) => c.name),
+                        ]}
+                        labelColor={isDark ? "text-[#b0b3b8]" : "text-gray-600"}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAddingCategory(true)}
+                      className={`px-4 py-3 rounded-lg text-sm font-medium border whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                        isDark
+                          ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]"
+                          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 shadow-xs"
+                      }`}
+                    >
+                      + New
+                    </button>
+                  </div>
+                  <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    {form.logbook_category_id
+                      ? `Logged under ${logbookCategories.find((c) => String(c.logbook_category_id) === String(form.logbook_category_id))?.name || 'this category'}.`
+                      : "Logged under this item's own name."}
+                  </p>
                 </div>
-                {categoryError && (
-                  <span className="text-xs text-red-400">{categoryError}</span>
-                )}
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="flex flex-col gap-2 w-full">
+                  <div className="flex gap-2 w-full">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="e.g. Certified True Copy of Records"
+                      className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors ${
+                        isDark
+                          ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] placeholder-[#6b6b6b]"
+                          : "bg-white border-gray-200 text-gray-700 placeholder-gray-400"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      disabled={categorySaving}
+                      onClick={handleCreateCategory}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 ${
+                        isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"
+                      }`}
+                    >
+                      {categorySaving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingCategory(false);
+                        setNewCategoryName("");
+                        setCategoryError("");
+                      }}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                        isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {categoryError && <span className="text-xs text-red-400">{categoryError}</span>}
+                </div>
+              )}
+            </div>
 
           {/* Fulfillment Track — nullable FK, same shape and defaulting
               as Logbook Category above. NULL means "standard track": the
@@ -475,96 +489,110 @@ const DocumentManagement = ({
               RequestReleaseGroupService::assignReleaseGroups(), which
               only splits a request into more than one claim ticket when
               its items span more than one distinct track. */}
-          <div className="flex flex-col gap-1.5 w-full">
-            <span className={`text-sm font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
-              Fulfillment Track
-            </span>
-            {!addingTrack ? (
-              <div className="flex gap-2">
-                <select
-                  name="fulfillment_track_id"
-                  value={form.fulfillment_track_id}
-                  onChange={handleChange}
-                  className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors cursor-pointer ${
-                    isDark
-                      ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb]"
-                      : "bg-white border-gray-200 text-gray-700"
-                  }`}
-                >
-                  <option value="">Standard — claim together with everything else</option>
-                  {fulfillmentTracks.map((track) => (
-                    <option key={track.fulfillment_track_id} value={track.fulfillment_track_id}>
-                      {track.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setAddingTrack(true)}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold border whitespace-nowrap transition-colors cursor-pointer ${
-                    isDark
-                      ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]"
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  + New Track
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newTrackName}
-                    onChange={(e) => setNewTrackName(e.target.value)}
-                    placeholder="e.g. Awaiting Submission"
-                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors ${
-                      isDark
-                        ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] placeholder-[#6b6b6b]"
-                        : "bg-white border-gray-200 text-gray-700 placeholder-gray-400"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    disabled={trackSaving}
-                    onClick={handleCreateTrack}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 ${
-                      isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"
-                    }`}
-                  >
-                    {trackSaving ? "Saving..." : "Save"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddingTrack(false);
-                      setNewTrackName("");
-                      setTrackError("");
-                    }}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                      isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    Cancel
-                  </button>
+            <div className="flex flex-col gap-1.5 w-full">
+              <label className={`text-sm font-medium ${isDark ? "text-[#e4e6eb]" : "text-gray-700"}`}>
+                Fulfillment track
+              </label>
+              {!addingTrack ? (
+                <div className="flex flex-col gap-1.5 w-full">
+                  <div className="flex items-center gap-2 w-full">
+                    <div className="flex-1">
+                      <DropdownGroup
+                        name="fulfillment_track_id"
+                        value={
+                          fulfillmentTracks.find((t) => String(t.fulfillment_track_id) === String(form.fulfillment_track_id))?.name ||
+                          "Standard"
+                        }
+                        onChange={(e) => {
+                          const selectedName = e.target.value;
+                          const matched = fulfillmentTracks.find((t) => t.name === selectedName);
+                          setForm((prev) => ({
+                            ...prev,
+                            fulfillment_track_id: matched ? matched.fulfillment_track_id : "",
+                          }));
+                        }}
+                        options={[
+                          "Standard",
+                          ...fulfillmentTracks.map((t) => t.name),
+                        ]}
+                        labelColor={isDark ? "text-[#b0b3b8]" : "text-gray-600"}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAddingTrack(true)}
+                      className={`px-4 py-3 rounded-lg text-sm font-medium border whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                        isDark
+                          ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]"
+                          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 shadow-xs"
+                      }`}
+                    >
+                      + New
+                    </button>
+                  </div>
+                  <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    {form.fulfillment_track_id
+                      ? `Claimed under ${fulfillmentTracks.find((t) => String(t.fulfillment_track_id) === String(form.fulfillment_track_id))?.name || 'this track'}.`
+                      : "Claimed together with everything else."}
+                  </p>
                 </div>
-                {trackError && (
-                  <span className="text-xs text-red-400">{trackError}</span>
-                )}
-              </div>
-            )}
+              ) : (
+                <div className="flex flex-col gap-2 w-full">
+                  <div className="flex gap-2 w-full">
+                    <input
+                      type="text"
+                      value={newTrackName}
+                      onChange={(e) => setNewTrackName(e.target.value)}
+                      placeholder="e.g. Awaiting Submission"
+                      className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors ${
+                        isDark
+                          ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] placeholder-[#6b6b6b]"
+                          : "bg-white border-gray-200 text-gray-700 placeholder-gray-400"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      disabled={trackSaving}
+                      onClick={handleCreateTrack}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 ${
+                        isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"
+                      }`}
+                    >
+                      {trackSaving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingTrack(false);
+                        setNewTrackName("");
+                        setTrackError("");
+                      }}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                        isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {trackError && <span className="text-xs text-red-400">{trackError}</span>}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Divider line */}
+          <div className={`h-px w-full my-1 ${isDark ? "bg-[#3e4042]" : "bg-gray-200"}`} />
 
           {/* requires_source_submission — the CTC / Authentication Fee case.
               Gates the request into RequestStatusEnum::AwaitingSubmission
               at creation instead of the usual Processing (see
               DocumentRequestService::createRequest() on the backend). */}
-          <div className="flex items-center justify-between gap-3 w-full">
+          <div className="flex items-center justify-between gap-3 w-full pt-1">
             <div className="flex flex-col">
-              <span className={`text-sm font-medium ${isDark ? "text-[#b0b3b8]" : "text-gray-600"}`}>
-                Requires Source Submission
+              <span className={`text-sm font-medium ${isDark ? "text-[#e4e6eb]" : "text-gray-800"}`}>
+                Requires source submission
               </span>
-              <span className={`text-xs ${isDark ? "text-[#6b6b6b]" : "text-gray-400"}`}>
+              <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                 Client must hand over the physical source document before staff can start processing.
               </span>
             </div>

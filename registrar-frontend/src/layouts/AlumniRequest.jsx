@@ -214,12 +214,12 @@ const AlumniRequestForm = () => {
           </div>
         </div>
       ) : (
-        <main
+        <div
           ref={formRef}
           style={{
             scrollMarginTop: `${headerHeight + 20}px`,
           }}
-          className="max-w-4xl mx-auto space-y-6 pt-2 sm:pt-4 pb-12 animate-fadeIn"
+          className="max-w-auto mx-auto space-y-6 pt-2 sm:pt-4 pb-12 animate-fadeIn"
         >
           {/* Top Stepper Progress */}
           <StepProgress
@@ -673,7 +673,7 @@ const AlumniRequestForm = () => {
               </button>
             </div>
           </form>
-        </main>
+        </div>
       )}
       <SubmitConfirmationModal
         isOpen={showConfirmModal}

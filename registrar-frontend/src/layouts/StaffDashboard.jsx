@@ -395,77 +395,9 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                 language="en-US"
               />
             </div>
-            <div className="relative shrink-0">
-              <DashboardDropdown
-                isOpen={sortDropdownOpen}
-                setIsOpen={setSortDropdownOpen}
-                dropdownRef={sortDropdownRef}
-                align="right"
-                isIconButton
-                trigger={
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
-                  </svg>
-                }
-                sections={[
-                  {
-                    title: 'Sort by',
-                    items: [
-                      { label: 'Date & Time', field: 'Date & Time' },
-                      { label: 'Status', field: 'Status' },
-                      { label: 'Classification', field: 'Classification' }
-                    ].map(opt => {
-                      let isSelected = false;
-                      if (opt.field === 'Date & Time') {
-                        isSelected = sortOrder === 'Recent Requests' || sortOrder === 'Old Requests';
-                      } else if (opt.field === 'Classification') {
-                        isSelected = sortOrder === 'Classification Asc' || sortOrder === 'Classification Desc';
-                      } else if (opt.field === 'Status') {
-                        isSelected = sortOrder === 'Status Asc' || sortOrder === 'Status Desc';
-                      }
-                      return {
-                        label: opt.label,
-                        isSelected,
-                        onClick: () => {
-                          if (opt.field === 'Date & Time') setSortOrder('Recent Requests');
-                          else if (opt.field === 'Classification') setSortOrder('Classification Asc');
-                          else if (opt.field === 'Status') setSortOrder('Status Asc');
-                        }
-                      };
-                    })
-                  },
-                  {
-                    title: 'Direction',
-                    items: [
-                      { label: 'Ascending', dir: 'asc', icon: ArrowUpIcon },
-                      { label: 'Descending', dir: 'desc', icon: ArrowDownIcon }
-                    ].map(opt => {
-                      const isAsc = sortOrder === 'Old Requests' || sortOrder === 'Classification Asc' || sortOrder === 'Status Asc';
-                      const isSelected = (opt.dir === 'asc' && isAsc) || (opt.dir === 'desc' && !isAsc);
-                      return {
-                        label: opt.label,
-                        isSelected,
-                        icon: opt.icon,
-                        onClick: () => {
-                          if (opt.dir === 'asc') {
-                            if (sortOrder === 'Recent Requests') setSortOrder('Old Requests');
-                            else if (sortOrder === 'Classification Desc') setSortOrder('Classification Asc');
-                            else if (sortOrder === 'Status Desc') setSortOrder('Status Asc');
-                          } else {
-                            if (sortOrder === 'Old Requests') setSortOrder('Recent Requests');
-                            else if (sortOrder === 'Classification Asc') setSortOrder('Classification Desc');
-                            else if (sortOrder === 'Status Asc') setSortOrder('Status Desc');
-                          }
-                        }
-                      };
-                    })
-                  }
-                ]}
-              />
-            </div>
           </div>
         )}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
           {(filterStatus !== 'All' || filterClassification !== 'All' || filterDocument !== 'All' || sortOrder !== 'Recent Requests' || searchTerm.trim() !== '') && (
             <button
               type="button"
@@ -481,7 +413,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                 setClassificationDropdownOpen(false);
                 setDocumentDropdownOpen(false);
               }}
-              className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold transition-colors border shadow-sm flex items-center justify-center shrink-0
+              className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors border shadow-xs flex items-center justify-center shrink-0 whitespace-nowrap cursor-pointer
               ${isDark
                   ? 'bg-[#1f1f1f] text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]'
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900'

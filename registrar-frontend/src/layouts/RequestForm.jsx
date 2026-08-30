@@ -567,7 +567,7 @@ const RequestForm = () => {
             </div>
           </div>
         ) : (
-          <main
+          <div
             ref={formRef}
             style={{
               scrollMarginTop: `${headerHeight + 20}px`,
@@ -961,7 +961,7 @@ const RequestForm = () => {
                 </button>
               </div>
             </form>
-          </main>
+          </div>
         )}
         <SubmitConfirmationModal
           isOpen={showConfirmModal}

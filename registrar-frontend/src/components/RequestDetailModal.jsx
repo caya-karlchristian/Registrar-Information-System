@@ -139,12 +139,12 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
   const hasReleaseGroups = releaseGroups.length > 0;
 
   return createPortal(
-    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-99999 flex items-center p-4">
       <div
         className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`}
         onClick={onClose}
       />
-      <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl lg:max-w-4xl max-h-[calc(100vh-32px)] overflow-hidden flex flex-col print:w-full print:max-w-none print:shadow-none print:rounded-none ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
+      <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl lg:max-w-4xl max-h-[calc(100vh-64px)] overflow-hidden flex flex-col print:w-full print:max-w-none print:shadow-none print:rounded-none ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
 
 
         {/* Header */}

@@ -107,6 +107,18 @@ const faqData = [
     answer: "Go to 'Dashboard' from your dashboard. Each request displays a real-time status: Pending, Under Review, Processing, Ready for Release, or Completed. You will also receive email notifications whenever your request status is updated.",
     category: "Document Process",
   },
+  {
+    id: 30,
+    question: "How do I report a technical issue or system bug?",
+    answer: "If you encounter an error or technical bug while using the Registrar Information System (RIS), you can contact technical support at taguig.registrar@pup.edu.ph or taguig@pup.edu.ph. Please include your full name, student number, a description of the issue, and a screenshot of any error messages.",
+    category: "Technical Support",
+  },
+  {
+    id: 31,
+    question: "What browsers are recommended for RIS?",
+    answer: "RIS is optimized for modern web browsers including Google Chrome, Mozilla Firefox, Microsoft Edge, and Apple Safari. Ensure your browser is updated to the latest version for the best experience.",
+    category: "Technical Support",
+  },
 ];
 
 const FAQPage = () => {
@@ -126,10 +138,10 @@ const FAQPage = () => {
   const toggleAccordion = (id) => setOpenId((prev) => (prev === id ? null : id));
 
   return (
-    <div className={`min-h-screen font-sans pb-20 ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : ''}`}>
+    <div className={`min-h-screen font-sans ${isDark ? 'bg-[#18191a] text-[#e4e6eb]' : ''}`}>
       <div className="max-w-lg mx-auto ">
         {/* Search Bar */}
-        <div className="max-w-2xl mx-auto mb-16">
+        <div className="max-w-2xl mx-auto mb-4">
           <VoiceSearchInput
             value={searchQuery}
             onChange={setSearchQuery}

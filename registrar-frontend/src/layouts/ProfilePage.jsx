@@ -11,8 +11,12 @@ const ROLE_CONFIG = {
     idLabel: "Student Number ID #",
     showId: true
   },
-  admin : {
+  admin: {
     sectionTitle: "Admin Information",
+    showId: false
+  },
+  superAdmin: {
+    sectionTitle: "Super Admin Information",
     showId: false
   },
   alumni: {
@@ -53,7 +57,8 @@ const formatSuffix = (value) => {
 const ProfilePage = ({ userType = "student" }) => {
 
   const { user } = useAuth();
-  const config = ROLE_CONFIG[userType];
+  const effectiveUserType = (user?.role_id === 4 || userType === "superAdmin") ? "superAdmin" : userType;
+  const config = ROLE_CONFIG[effectiveUserType] || ROLE_CONFIG[userType] || ROLE_CONFIG.student;
 
   const { isDark } = useTheme();
 
@@ -81,7 +86,7 @@ const ProfilePage = ({ userType = "student" }) => {
       });
     }
 
-    else if (user.role_id === 3 && user.admin_profile) {
+    else if ((user.role_id === 3 || user.role_id === 4) && user.admin_profile) {
       setProfileData({
         firstName: user.admin_profile.first_name || "",
         middleName: user.admin_profile.middle_name || "",
@@ -97,6 +102,17 @@ const ProfilePage = ({ userType = "student" }) => {
         middleName: user.alumni_profile.middle_name || "",
         lastName: user.alumni_profile.last_name || "",
         suffix: user.alumni_profile.suffix || "",
+        email: user.email || ""
+      });
+    }
+
+    else {
+      const parts = (user.name || user.email?.split('@')[0] || 'Super Admin').split(' ');
+      setProfileData({
+        firstName: user.first_name || parts[0] || "Super",
+        middleName: user.middle_name || (parts.length > 2 ? parts[1] : ""),
+        lastName: user.last_name || (parts.length > 1 ? parts[parts.length - 1] : "Admin"),
+        suffix: user.suffix || "",
         email: user.email || ""
       });
     }
@@ -149,8 +165,8 @@ const ProfilePage = ({ userType = "student" }) => {
                 <p className="text-sm font-medium opacity-90">{profileData.email}</p>
                 
                 {/* Role Badge */}
-                <span className="inline-block px-2 py-0.5 rounded bg-[#eebc48] text-[#4a1010] text-xs font-bold uppercase tracking-wider mt-1">
-                  {userType}
+                <span className="inline-block px-2.5 py-0.5 rounded bg-[#eebc48] text-[#4a1010] text-xs font-bold uppercase tracking-wider mt-1">
+                  {effectiveUserType === "superAdmin" ? "Super Admin" : effectiveUserType}
                 </span>
               </div>
             </div>
