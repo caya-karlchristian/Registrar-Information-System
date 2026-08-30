@@ -2,6 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "../context/ThemeContext";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
+import DashboardDropdown from "../components/DashboardDropdown.jsx";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ArrowsUpDownIcon,
+} from "@heroicons/react/24/outline";
 import {
   getCashierOverrides,
   createCashierOverride,
@@ -34,9 +41,28 @@ const CashierOrOverrideManagement = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef(null);
+
+  const [sortField, setSortField] = useState("created_at");
+  const [sortOrder, setSortOrder] = useState("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [detailsItem, setDetailsItem] = useState(null); // override row, or null
   const [revokeConfirm, setRevokeConfirm] = useState({ open: false, item: null });
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+        setStatusDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const loadOverrides = useCallback(async (page = 1) => {
     try {
@@ -119,6 +145,43 @@ const CashierOrOverrideManagement = () => {
     return o.user.email;
   };
 
+  const STATUS_FILTERS = ["All", "Active", "Used", "Revoked"];
+
+  const handleFilterChange = () => setCurrentPage(1);
+
+  const filtered = React.useMemo(() => {
+    return overrides
+      .filter((o) => {
+        const st = statusOf(o).label;
+        const query = search.trim().toLowerCase();
+        const matchesSearch =
+          !query ||
+          String(o.or_number || "").toLowerCase().includes(query) ||
+          String(o.user?.email || "").toLowerCase().includes(query) ||
+          String(o.created_by_user?.email || "").toLowerCase().includes(query);
+        const matchesStatus = statusFilter === "All" || st === statusFilter;
+        return matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => {
+        if (sortField === "or_number") {
+          const valA = String(a.or_number || "");
+          const valB = String(b.or_number || "");
+          return sortOrder === "asc"
+            ? valA.localeCompare(valB, undefined, { numeric: true })
+            : valB.localeCompare(valA, undefined, { numeric: true });
+        } else {
+          const dateA = new Date(a.created_at || 0);
+          const dateB = new Date(b.created_at || 0);
+          return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+        }
+      });
+  }, [overrides, search, statusFilter, sortField, sortOrder]);
+
+  const PER_PAGE = 7;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+
   return (
     <div className={`font-sans rounded-2xl p-4 sm:px-6 ${cardClasses}`}>
       {/* Top bar */}
@@ -134,7 +197,7 @@ const CashierOrOverrideManagement = () => {
         <div className="flex items-center gap-3 shrink-0">
           <div className={`inline-flex rounded-full p-1 ${isDark ? "bg-[#242526] border border-[#3e4042]" : "bg-gray-100 border border-gray-200"}`}>
             <button
-              onClick={() => setShowHistory(false)}
+              onClick={() => { setShowHistory(false); handleFilterChange(); }}
               className={`text-sm font-semibold px-4 py-2 rounded-full transition-all cursor-pointer ${
                 !showHistory ? activeTabClasses : subtleText
               }`}
@@ -142,7 +205,7 @@ const CashierOrOverrideManagement = () => {
               Active
             </button>
             <button
-              onClick={() => setShowHistory(true)}
+              onClick={() => { setShowHistory(true); handleFilterChange(); }}
               className={`text-sm font-semibold px-4 py-2 rounded-full transition-all cursor-pointer ${
                 showHistory ? activeTabClasses : subtleText
               }`}
@@ -153,24 +216,118 @@ const CashierOrOverrideManagement = () => {
 
           <button
             onClick={() => setCreateModalOpen(true)}
-            className={`text-sm font-semibold px-4 py-2.5 rounded-full transition-all cursor-pointer ${accentBtn}`}
+            className={`text-sm font-bold px-4 py-2.5 rounded-full transition-all cursor-pointer shadow ${
+              isDark
+                ? "bg-yellow-400 text-gray-900 hover:bg-yellow-300"
+                : "bg-pup-dark-maroon text-white hover:bg-[#3a0303]"
+            }`}
           >
-            + New Override
+            + New override
           </button>
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table & Search Header */}
       <div className={`rounded-xl border overflow-hidden ${rowBorder}`}>
-        <table className="w-full text-sm">
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b ${isDark ? 'border-[#3e4042] bg-[#1a1a1c]/20' : 'border-gray-200 bg-gray-50/50'}`}>
+          <div className="w-full sm:max-w-md">
+            <VoiceSearchInput
+              value={search}
+              onChange={(val) => { setSearch(val); handleFilterChange(); }}
+              placeholder="Search by OR number or student email"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-3 ml-auto">
+            <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+              {safePage} of {totalPages}
+            </span>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto w-full scrollbar-thin">
+          <table className="w-full min-w-[650px] text-sm">
           <thead>
-            <tr className={`text-left ${isDark ? "bg-[#242526]" : "bg-gray-50"}`}>
-              <th className="px-4 py-3 font-semibold">OR Number</th>
-              <th className="px-4 py-3 font-semibold">Student</th>
-              <th className="px-4 py-3 font-semibold">Created By</th>
-              <th className="px-4 py-3 font-semibold">Status</th>
-              <th className="px-4 py-3 font-semibold">Created</th>
-              <th className="px-4 py-3 font-semibold text-right">Actions</th>
+            <tr className={`text-center ${isDark ? "bg-[#242526]" : "bg-gray-50 border-b border-gray-100"}`}>
+              {/* OR Number Header (Sortable) */}
+              <th className="px-4 py-3 text-center font-semibold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sortField === "or_number") {
+                      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+                    } else {
+                      setSortField("or_number");
+                      setSortOrder("asc");
+                    }
+                    handleFilterChange();
+                  }}
+                  className={`flex items-center justify-center gap-1 mx-auto text-xs uppercase font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}
+                >
+                  <span>OR number</span>
+                  {sortField === "or_number" ? (
+                    sortOrder === "asc" ? <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" /> : <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-3.5 h-3.5 text-gray-400 opacity-50" />
+                  )}
+                </button>
+              </th>
+
+              <th className={`px-4 py-3 text-center font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Student</th>
+              <th className={`px-4 py-3 text-center font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Created by</th>
+
+              {/* Status Header with Column Dropdown Filter */}
+              <th className="px-4 py-3 text-center font-semibold">
+                <DashboardDropdown
+                  isOpen={statusDropdownOpen}
+                  setIsOpen={setStatusDropdownOpen}
+                  dropdownRef={statusDropdownRef}
+                  align="center"
+                  trigger={
+                    <span className={statusFilter !== 'All' ? (isDark ? 'text-yellow-400 font-bold' : 'text-[#8b0000] font-bold') : (isDark ? 'text-[#b0b3b8]' : 'text-gray-500')}>
+                      Status
+                    </span>
+                  }
+                  sections={[
+                    {
+                      title: 'Filter by Status',
+                      items: STATUS_FILTERS.map(option => ({
+                        label: option,
+                        isSelected: statusFilter === option,
+                        onClick: () => {
+                          setStatusFilter(option);
+                          handleFilterChange();
+                        }
+                      }))
+                    }
+                  ]}
+                />
+              </th>
+
+              {/* Created Header (Sortable) */}
+              <th className="px-4 py-3 text-center font-semibold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sortField === "created_at") {
+                      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+                    } else {
+                      setSortField("created_at");
+                      setSortOrder("desc");
+                    }
+                    handleFilterChange();
+                  }}
+                  className={`flex items-center justify-center gap-1 mx-auto text-xs uppercase font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}
+                >
+                  <span>Created</span>
+                  {sortField === "created_at" ? (
+                    sortOrder === "asc" ? <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" /> : <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-3.5 h-3.5 text-gray-400 opacity-50" />
+                  )}
+                </button>
+              </th>
+
+              <th className={`px-4 py-3 text-center font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -180,27 +337,22 @@ const CashierOrOverrideManagement = () => {
                   Loading…
                 </td>
               </tr>
-            ) : overrides.length === 0 ? (
+            ) : paginated.length === 0 ? (
               <tr>
                 <td colSpan={6} className={`px-4 py-8 text-center ${subtleText}`}>
-                  {showHistory ? "No overrides have been created yet." : "No active overrides right now."}
+                  {showHistory ? "No overrides found." : "No active overrides matching your filters."}
                 </td>
               </tr>
             ) : (
-              overrides.map((o) => {
+              paginated.map((o) => {
                 const status = statusOf(o);
                 const isActive = !o.used_at && !o.revoked_at;
                 return (
-                  <tr key={o.override_id} className={`border-t ${rowBorder}`}>
+                  <tr key={o.override_id} className={`border-t text-center transition-colors ${isDark ? 'border-[#3e4042] hover:bg-[#2a2a2f]' : 'border-gray-100 hover:bg-gray-50'}`}>
                     <td className="px-4 py-3 font-medium">{o.or_number}</td>
                     <td className="px-4 py-3">{studentLabel(o)}</td>
                     <td className={`px-4 py-3 ${subtleText}`}>
                       {o.created_by_user?.email ?? "—"}
-                      {o.created_by_role && (
-                        <span className={`ml-2 text-[11px] uppercase tracking-wide ${subtleText}`}>
-                          {o.created_by_role.replace("_", " ")}
-                        </span>
-                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={badgeClasses(status.tone)}>{status.label}</span>
@@ -208,7 +360,7 @@ const CashierOrOverrideManagement = () => {
                     <td className={`px-4 py-3 ${subtleText}`}>
                       {o.created_at ? new Date(o.created_at).toLocaleDateString() : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                    <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
                       <button
                         onClick={() => setDetailsItem(o)}
                         className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-all cursor-pointer ${
@@ -232,28 +384,39 @@ const CashierOrOverrideManagement = () => {
             )}
           </tbody>
         </table>
-      </div>
+        </div>
 
-      {/* Pagination */}
-      {meta.last_page > 1 && (
-        <div className="flex justify-center items-center gap-4 mt-4 text-sm">
+        {/* Pagination Controls */}
+        <div className={`flex items-center justify-center gap-1 px-4 py-4 border-t ${isDark ? 'border-[#3e4042]' : 'border-gray-100'}`}>
           <button
-            disabled={meta.current_page <= 1 || loading}
-            onClick={() => loadOverrides(meta.current_page - 1)}
-            className={`px-3 py-1.5 rounded-lg border disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${rowBorder}`}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={safePage === 1}
+            className={`flex items-center gap-1 text-sm px-2 py-1 disabled:opacity-40 cursor-pointer ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
           >
             Previous
           </button>
-          <span className={subtleText}>Page {meta.current_page} of {meta.last_page}</span>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <button
+              key={p}
+              onClick={() => setCurrentPage(p)}
+              className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                safePage === p
+                  ? (isDark ? 'bg-yellow-400 text-gray-900 font-bold' : 'bg-pup-dark-maroon text-white font-bold')
+                  : (isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-500 hover:bg-gray-100')
+              }`}
+            >
+              {p}
+            </button>
+          ))}
           <button
-            disabled={meta.current_page >= meta.last_page || loading}
-            onClick={() => loadOverrides(meta.current_page + 1)}
-            className={`px-3 py-1.5 rounded-lg border disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${rowBorder}`}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safePage === totalPages}
+            className={`flex items-center gap-1 text-sm px-2 py-1 disabled:opacity-40 cursor-pointer ${isDark ? 'text-[#b0b3b8] hover:text-white' : 'text-gray-500 hover:text-gray-800'}`}
           >
             Next
           </button>
         </div>
-      )}
+      </div>
 
       {createModalOpen && (
         <CreateOverrideModal
@@ -373,7 +536,7 @@ const DetailsModal = ({ item, isDark, rowBorder, subtleText, statusOf, badgeClas
         <dl className={`grid grid-cols-2 gap-y-2 text-xs ${subtleText} mb-6`}>
           <dt>Created by</dt>
           <dd className="text-right">
-            {item.created_by_user?.email ?? "—"} ({(item.created_by_role || "unknown").replace("_", " ")})
+            {item.created_by_user?.email ?? "—"}
           </dd>
           <dt>Created at</dt>
           <dd className="text-right">{item.created_at ? new Date(item.created_at).toLocaleString() : "—"}</dd>
