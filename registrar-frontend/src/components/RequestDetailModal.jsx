@@ -139,7 +139,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
   const hasReleaseGroups = releaseGroups.length > 0;
 
   return createPortal(
-    <div className="fixed inset-0 z-99999 flex items-center p-4">
+    <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
       <div
         className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`}
         onClick={onClose}

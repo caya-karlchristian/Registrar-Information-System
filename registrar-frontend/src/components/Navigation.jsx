@@ -9,7 +9,7 @@ import {
   BriefcaseIcon,
   UserIcon,
   AcademicCapIcon,
-  ShieldCheckIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider";
 import { useTheme } from "../context/ThemeContext";
@@ -183,7 +183,8 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
   };
 
   const isParentActive = (item) => {
-    const basePath = item.to.split('?')[0];
+    const basePath = item.to?.split('?')[0];
+    return Boolean(basePath && location.pathname.includes(basePath));
   };
 
   const fullName = useMemo(() => {
@@ -275,7 +276,7 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
         {!isCompact && (
           <h3 className={`text-xs font-semibold px-4 pt-2 pb-1.5 select-none tracking-wide ${mobile
             ? 'text-sky-300 font-bold uppercase tracking-widest text-[11px]'
-            : (isDark ? 'text-gray-400' : 'text-gray-600 uppercase tracking-wider')
+            : (isDark ? 'text-gray-400 uppercase tracking-wider' : 'text-gray-600 uppercase tracking-wider')
             }`}>
             {section.title}
           </h3>
@@ -307,10 +308,10 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                         } ${parentActive
                           ? (mobile
                             ? 'bg-black/35 text-white font-bold shadow-sm'
-                            : (isDark ? 'bg-[#611825] text-white font-medium shadow-sm' : 'bg-pup-dark-maroon text-white font-bold shadow-md'))
+                            : (isDark ? 'bg-[#611825] text-white font-bold shadow-sm' : 'bg-pup-dark-maroon text-white font-bold shadow-md'))
                           : (mobile
                             ? 'text-white/85 hover:text-white hover:bg-white/10 font-semibold'
-                            : (isDark ? 'text-[#e4e6eb] hover:bg-white/5 font-medium' : 'text-[#700000] hover:bg-black/5 font-bold'))
+                            : (isDark ? 'text-[#e4e6eb] hover:bg-white/5 font-bold' : 'text-[#700000] hover:bg-black/5 font-bold'))
                         }`}
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
@@ -369,10 +370,10 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                             className={`block py-2 px-3 rounded-lg text-sm transition-all duration-200 outline-none ${childActive
                               ? (mobile
                                 ? 'bg-black/40 text-white font-bold shadow-xs'
-                                : (isDark ? 'bg-[#4c121e] text-white font-medium shadow-xs border border-red-950/40' : 'bg-[#5c0000] text-white font-bold shadow-xs'))
+                                : (isDark ? 'bg-[#4c121e] text-white font-bold shadow-xs border border-red-950/40' : 'bg-[#5c0000] text-white font-bold shadow-xs'))
                               : (mobile
                                 ? 'text-white/80 hover:text-white hover:bg-white/10 font-semibold'
-                                : (isDark ? 'text-neutral-300 hover:text-white hover:bg-white/5 font-normal' : 'text-gray-700 hover:text-[#700000] hover:bg-black/5 font-semibold'))
+                                : (isDark ? 'text-neutral-300 hover:text-white hover:bg-white/5 font-bold' : 'text-gray-700 hover:text-[#700000] hover:bg-black/5 font-semibold'))
                               }`}
                           >
                             {child.name}
@@ -398,10 +399,10 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                   ${isActive
                     ? (mobile
                       ? 'bg-black/35 text-white font-bold shadow-sm'
-                      : (isDark ? 'bg-[#611825] text-white font-medium shadow-sm' : 'bg-pup-dark-maroon text-white font-bold shadow-md'))
+                      : (isDark ? 'bg-[#611825] text-white font-bold shadow-sm' : 'bg-pup-dark-maroon text-white font-bold shadow-md'))
                     : (mobile
                       ? 'text-white/85 hover:text-white hover:bg-white/10 font-semibold'
-                      : (isDark ? 'text-[#e4e6eb] hover:bg-white/5 font-medium' : 'text-[#700000] hover:bg-black/5 font-bold'))
+                      : (isDark ? 'text-[#e4e6eb] hover:bg-white/5 font-bold' : 'text-[#700000] hover:bg-black/5 font-bold'))
                   }
                 `}
               >
@@ -461,15 +462,58 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
       >
         <div className="w-full overflow-hidden rounded-b-lg shadow-[0_18px_42px_rgba(0,0,0,0.3)]">
           <div className={isDark ? 'bg-[#18191a]' : 'bg-[#7a0000]'}>
-            <nav className={`px-4 py-4 max-h-[70vh] overflow-y-auto ${isDark ? 'bg-[#141414]' : 'bg-[#5c0000]'}`}>
+            <nav className={`px-4 py-3 max-h-[70vh] overflow-y-auto space-y-3 ${isDark ? 'bg-[#141414]' : 'bg-[#5c0000]'}`}>
+              {/* Mobile User Profile & Switch Role Bar */}
+              <div className={`pb-3 border-b flex items-center justify-between gap-3 ${isDark ? 'border-neutral-800' : 'border-white/20'}`}>
+                <div
+                  onClick={() => {
+                    if (onItemClick) onItemClick();
+                    if (role === 'superAdmin') navigate('/super-admin/profile');
+                    else if (role === 'staff') navigate('/staff/profile');
+                    else if (role === 'student') navigate('/student/profile');
+                    else if (role === 'alumni') navigate('/alumni/profile');
+                  }}
+                  className="flex items-center gap-3.5 min-w-0 cursor-pointer flex-1"
+                >
+                  <div className="flex items-center justify-center w-11 h-11 rounded-full font-bold text-white bg-pup-dark-maroon shrink-0 text-sm">
+                    {initials}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-semibold text-base text-white truncate leading-snug">
+                      {fullName}
+                    </span>
+                    <span className="text-xs text-gray-400 truncate leading-tight">
+                      {config.profileLabel(user) || user?.email}
+                    </span>
+                  </div>
+                </div>
+
+                {canUseSwitcher && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onItemClick) onItemClick();
+                      setIsSwitchModalOpen(true);
+                    }}
+                    className={`p-2.5 rounded-xl border transition-all cursor-pointer ${isDark
+                      ? 'bg-[#242526] hover:bg-[#3a3b3c] border-[#3e4042] text-white'
+                      : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+                      }`}
+                    title="Switch Role"
+                  >
+                    <ArrowPathIcon className="w-5 h-5 shrink-0" />
+                  </button>
+                )}
+              </div>
+
               {renderSections(true)}
             </nav>
             <button
               onClick={handleLogoutClick}
-              className={`group flex w-full items-center justify-between px-5 py-4 text-[16px] font-bold text-white transition-all duration-200 ${isDark ? 'bg-[#242526] hover:bg-[#3a3b3c] active:bg-[#4e4f50]' : 'bg-[#4f0000] hover:bg-[#640000] active:bg-[#750000]'}`}
+              className={`group flex w-full items-center justify-between px-5 py-4 text-[16px] font-bold text-white transition-all duration-200 ${isDark ? 'bg-[#4f0000] hover:bg-[#640000] active:bg-[#750000]' : 'bg-[#4f0000] hover:bg-[#640000] active:bg-[#750000]'}`}
             >
               <span>LOGOUT</span>
-              <ArrowRightStartOnRectangleIcon className={`h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5 ${isDark ? 'text-[#b0b3b8]' : 'text-white/85'}`} />
+              <ArrowRightStartOnRectangleIcon className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5 text-white/85" />
             </button>
           </div>
         </div>
@@ -589,7 +633,7 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                         className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-900'
                           }`}
                       >
-                        <ShieldCheckIcon className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#b91c1c]' : 'text-[#700000]'}`} />
+                        <ArrowPathIcon className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#b91c1c]' : 'text-[#700000]'}`} />
                         <span>Switch role</span>
                       </button>
                     )}
@@ -603,11 +647,11 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
                         setIsProfileMenuOpen(false);
                         handleLogoutClick();
                       }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${isDark ? 'hover:bg-rose-500/10 text-rose-300' : 'hover:bg-red-50 text-red-600'
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${isDark ? 'hover:bg-red-950/40 text-red-400' : 'hover:bg-red-50 text-[#700000]'
                         }`}
                     >
-                      <ArrowRightStartOnRectangleIcon className="w-4 h-4 shrink-0 text-rose-400" />
-                      <span className="text-rose-300">Log out</span>
+                      <ArrowRightStartOnRectangleIcon className={`w-4 h-4 shrink-0 ${isDark ? 'text-red-400' : 'text-[#700000]'}`} />
+                      <span className={isDark ? 'text-red-400' : 'text-[#700000]'}>Log out</span>
                     </button>
                   </div>
                 </div>
