@@ -11,8 +11,6 @@ import {
   DocumentTextIcon,
   MapPinIcon,
   EllipsisHorizontalIcon,
-  ChevronUpIcon,
-  ChevronDownIcon,
   ArrowTopRightOnSquareIcon,
   InformationCircleIcon,
 } from '@heroicons/react/24/outline';
@@ -22,7 +20,6 @@ import { useNotificationsContext as useNotifications } from '../context/Notifica
 import { useTheme } from '../context/ThemeContext';
 import { InboxListSkeleton, InboxPreviewSkeleton } from '../components/LoadingSkeleton';
 import ClaimTicket from '../components/ClaimTicket';
-import RequirementsListCard from '../components/RequirementsListCard';
 import qrCode from '../assets/qrcode.png';
 // CATEGORY_MAP lives in src/constants/notificationCategories.js
 // InboxCenter only uses the .category label from each entry.
@@ -316,17 +313,6 @@ const InboxCenter = () => {
                 >
                   Unread
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setFilterTab('requests')}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shrink-0 ${filterTab === 'requests'
-                    ? (isDark ? 'bg-pup-yellow text-pup-maroon font-bold' : 'bg-pup-maroon text-white font-bold')
-                    : (isDark ? 'bg-[#3a3b3c] text-[#b0b3b8] hover:bg-[#4e4f50] hover:text-[#e4e6eb]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')
-                    }`}
-                >
-                  Requests
-                </button>
               </div>
 
               {/* Mail list container */}
@@ -445,30 +431,6 @@ const InboxCenter = () => {
                   <div className={`flex-1 overflow-y-auto p-4 md:p-6 space-y-4 ${isDark ? 'bg-[#1a1b1e]' : 'bg-gray-50'}`}>
                     <div className="space-y-4">
 
-                      {/* ── Document Request Progress (like in request details modal) ── */}
-                      {progress !== null && (
-                        <div className={`rounded-lg border px-4 py-4 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white'}`}>
-                          <p className={`text-[11px] font-bold uppercase tracking-widest mb-3 ${isDark ? 'text-pup-yellow' : 'text-[#800000]'}`}>
-                            Document Request Progress
-                          </p>
-                          <div className="w-full">
-                            <div className={`rounded-full h-2.5 overflow-hidden ${isDark ? 'bg-[#3a3b3c]' : 'bg-gray-100'}`}>
-                              <div
-                                className="bg-pup-yellow h-2.5 rounded-full transition-all duration-500 ease-out"
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mt-2">
-                              <p className={`font-bold text-xs sm:text-sm wrap-break-word ${isDark ? 'text-white' : 'text-pup-maroon'}`}>
-                                {getProgressLabel(progress)}
-                              </p>
-                              <span className={`text-xs font-semibold ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                                {progress}%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
 
                       {/* ── Pending Signature Notice Box ── */}
                       {isPendingSignature && (
@@ -484,13 +446,6 @@ const InboxCenter = () => {
                         </div>
                       )}
 
-                      {/* ── Requirements List (collapsible card component) ── */}
-                      <RequirementsListCard
-                        requirementsList={requirementsList}
-                        isChecklistOpen={isChecklistOpen}
-                        onToggle={() => setIsChecklistOpen(!isChecklistOpen)}
-                        isDark={isDark}
-                      />
                       {/* ── Claim ticket ──
                         QR Code Claiming Policy v1.0 §3.2 access point 3
                         (inbox). uuid/claim_code are populated on both
@@ -550,11 +505,11 @@ const InboxCenter = () => {
                             }`}>
                             <img
                               src={qrCode}
-                              alt="PUP SINTA feedback form"
+                              alt="PUP SINTA"
                               className="w-28 h-28 sm:w-32 sm:h-32 object-contain bg-white p-2 rounded-2xl shadow-sm"
                             />
                             <p className={`text-xs mt-3 font-medium ${isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}`}>
-                              PUP SINTA feedback form
+                              PUP SINTA
                             </p>
                           </div>
 
