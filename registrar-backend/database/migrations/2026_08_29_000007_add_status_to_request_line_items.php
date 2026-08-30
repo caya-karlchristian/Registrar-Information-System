@@ -432,3 +432,4 @@ return new class extends Migration
             || str_contains(strtolower($e->getMessage()), 'duplicate key on write or update');
     }
 };
+
