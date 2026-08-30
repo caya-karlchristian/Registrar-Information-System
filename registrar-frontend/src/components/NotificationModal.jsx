@@ -168,16 +168,21 @@ const NotificationModal = ({ isOpen, onClose }) => {
     <>
       <div className="fixed inset-0 z-40 bg-transparent" onClick={onClose} />
 
-      <div className={`
-        absolute top-full right-3 w-[min(350px,calc(100vw-1rem))]
-        rounded-[1.25rem] overflow-hidden
-        border z-50 mt-2
-        animate-in fade-in slide-in-from-top-3 duration-200
-        sm:right-4 sm:w-95 sm:rounded-3xl
-        ${isDark
-          ? 'bg-[#242526] border-[#3e4042] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] ring-1 ring-white/5'
-          : 'bg-pup-dark-maroon border-white/10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] ring-1 ring-white/5'}
-      `}>
+      <div
+        style={{
+          top: `${headerHeight + 12}px`,
+        }}
+        className={`
+          fixed left-1/2 -translate-x-1/2 md:left-auto md:right-5 md:translate-x-0
+          w-[calc(100vw-24px)] md:w-95
+          rounded-[1.25rem] sm:rounded-3xl overflow-hidden
+          border z-50
+          animate-in fade-in slide-in-from-top-2 md:slide-in-from-right-4 duration-200
+          ${isDark
+            ? 'bg-[#242526] border-[#3e4042] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] ring-1 ring-white/5'
+            : 'bg-pup-dark-maroon border-white/10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] ring-1 ring-white/5'}
+        `}
+      >
         {/* Header */}
         <div className={`px-4 py-4 border-b sm:p-5 ${isDark ? 'bg-[#1a1b1e] border-[#3e4042]' : 'bg-[#510400] border-white/5'}`}>
           <div className="flex justify-between items-center mb-3 sm:mb-4">
