@@ -101,10 +101,21 @@ const RequestForm = () => {
   const [unresolvedItems, setUnresolvedItems] = useState([]);
   const [autoFilledNames, setAutoFilledNames] = useState([]);
 
+  // documentTypes comes exclusively from GET /document-types (the
+  // document_type table) — every row here is already a genuine document
+  // by construction. A previous version additionally excluded any row
+  // whose name started with "certif", on the assumption that "Certificate"
+  // in the name meant it truly belonged in the certifications API instead.
+  // That assumption broke once the Cashier's Office master document list
+  // added real, Type=Document rows named "Certified True Copy - X" (CTC)
+  // and "Certification Fee - X" (Completion Fee correction) — those are
+  // legitimate documents, not certificates, and the name-based guess was
+  // silently hiding all of them from the selectable list, the requirements
+  // lookup, and the final submit's ID resolution. Access control alone
+  // (STUDENT_ACCESS_IDS) is the correct and sufficient filter here.
   const availableDocs = useMemo(() => {
     return documentTypes
-      .filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id))
-      .filter(doc => !doc.document_name.toLowerCase().startsWith("certif"));
+      .filter(doc => STUDENT_ACCESS_IDS.includes(doc.access_id));
   }, [documentTypes]);
 
   const availableCertifications = useMemo(() => {
@@ -176,8 +187,22 @@ const RequestForm = () => {
     // cashier API earlier now (see handleVerifyOr, triggered when leaving
     // the OR-verification step) — this final step only has copies left
     // to check before confirming.
+    // Note: formData.documentsRequested only ever contains document_type
+    // names — never certificate_type names. It's populated exclusively by
+    // (a) CashierDocumentSuggester's `documents` array on OR verification,
+    // and (b) handleCombinedItemsChange's structural membership check
+    // against availableDocs/documentOptions when the student edits the
+    // selection manually. Neither path can put a certificate name in here.
+    // A previous version filtered this array by `!name.includes("certif")`
+    // to guess which entries were "really" certificates — that heuristic
+    // broke the moment a legitimate DOCUMENT type was named with the word
+    // "Certificate" in it (e.g. the "Certified True Copy - X" family,
+    // which the Cashier's master list explicitly classifies as
+    // Type=Document, not Certificate) — those items would silently vanish
+    // from copy validation, the requirements panel, and the final submit
+    // payload. Trust the array's actual contents instead of re-guessing
+    // from the string.
     const hasInvalidDocCopy = (formData.documentsRequested || [])
-      .filter((doc) => !doc.toLowerCase().includes("certif"))
       .some((doc) => {
         const copies = Number(formData.documentCopies?.[doc] || 1);
         return !Number.isInteger(copies) || copies < 1 || copies > 10;
@@ -406,7 +431,6 @@ const RequestForm = () => {
       or_number: formData.receiptNumber,
       receipt_date: formData.dateOfPayment,
       documents: formData.documentsRequested
-        .filter(name => !name.toLowerCase().includes("certif"))
         .map(name => {
           const id = docByName[name]?.document_type_id
             ?? Object.keys({}).find(key => docTypeName(key) === name);
@@ -777,7 +801,11 @@ const RequestForm = () => {
                         Number of copies per document / certificate
                       </h3>
                       <div className="space-y-3 max-h-44 overflow-y-auto pr-2 custom-scrollbar">
-                        {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => (
+                        {/* formData.documentsRequested contains only document
+                            names by construction — see handlePreSubmit's
+                            comment for why we no longer re-filter it by a
+                            "certif" substring guess. */}
+                        {formData.documentsRequested.map((doc, index) => (
                           <div key={`doc-copy-${index}`} className="flex items-center justify-between gap-4 py-1">
                             <label className="text-white text-sm font-medium flex-1">
                               {doc}
@@ -841,7 +869,7 @@ const RequestForm = () => {
                         <span className="text-xs font-bold uppercase tracking-wider text-[#FFC72C] px-1">
                           Document Requirements
                         </span>
-                        {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => {
+                        {formData.documentsRequested.map((doc, index) => {
                           const docData = docByName[doc];
                           const requirements = docData?.requirementsParsed ?? [];
 

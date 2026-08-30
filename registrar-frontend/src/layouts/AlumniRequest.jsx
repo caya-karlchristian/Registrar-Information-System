@@ -437,10 +437,18 @@ const AlumniRequestForm = () => {
                       Number of copies per document / certificate
                     </h3>
                     <div className="space-y-3 max-h-44 overflow-y-auto pr-2 custom-scrollbar">
-                      {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif"))
-                        .length > 0 &&
+                      {/* formData.documentsRequested contains only document
+                          names by construction — populated exclusively by
+                          CashierDocumentSuggester's `documents` array and
+                          handleCombinedItemsChange's structural membership
+                          check against availableDocs. A previous version
+                          filtered this by `!name.includes("certif")` to
+                          guess which entries were "really" certificates;
+                          that broke once legitimate Type=Document rows
+                          named "Certified True Copy - X" existed, which
+                          would silently vanish from this list. */}
+                      {formData.documentsRequested.length > 0 &&
                         formData.documentsRequested
-                          .filter((doc) => !doc.toLowerCase().includes("certif"))
                           .map((doc, index) => (
                             <div key={`doc-copy-${index}`} className="flex items-center justify-between gap-4 py-1">
                               <label className="text-white text-sm font-medium flex-1">{doc}</label>
@@ -518,7 +526,7 @@ const AlumniRequestForm = () => {
                       <span className="text-xs font-bold uppercase tracking-wider text-[#FFC72C] px-1">
                         Document Requirements
                       </span>
-                      {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => {
+                      {formData.documentsRequested.map((doc, index) => {
                         const docData = availableDocs.find((d) => d.document_name === doc);
                         const requirements = docData?.document_requirements
                           ? Array.isArray(docData.document_requirements)

@@ -44,10 +44,16 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   const [unresolvedItems, setUnresolvedItems] = useState([]);
   const [autoFilledNames, setAutoFilledNames] = useState([]);
 
+  // documentTypes comes exclusively from GET /document-types (the
+  // document_type table) — every row here is already a genuine document
+  // by construction. See RequestForm.jsx's identical availableDocs
+  // comment for why filtering further by a "certif" name guess is wrong:
+  // it silently hides legitimate Type=Document rows like "Certified True
+  // Copy - X" (CTC). Access control alone (ALUMNI_ACCESS_IDS) is the
+  // correct and sufficient filter here.
   const availableDocs = useMemo(() => {
     return documentTypes
-      .filter((doc) => ALUMNI_ACCESS_IDS.includes(doc.access_id))
-      .filter((doc) => !doc.document_name.toLowerCase().startsWith("certif"));
+      .filter((doc) => ALUMNI_ACCESS_IDS.includes(doc.access_id));
   }, [documentTypes]);
 
 
@@ -344,8 +350,11 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     // cashier API earlier now (see handleVerifyOr, triggered when leaving
     // the OR-verification step) — this final step only has copies left
     // to check before confirming.
+    // Note: formData.documentsRequested only ever contains document_type
+    // names — never certificate_type names. See RequestForm.jsx's
+    // identical comment for the full rationale on why this array is no
+    // longer re-filtered by a "certif" substring guess.
     const hasInvalidDocCopy = (formData.documentsRequested || [])
-      .filter((doc) => !doc.toLowerCase().includes("certif"))
       .some((doc) => {
         const copies = Number(formData.documentCopies?.[doc] || 1);
         return !Number.isInteger(copies) || copies < 1 || copies > 10;
@@ -407,7 +416,6 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
       or_number: formData.receiptNumber,
       receipt_date: formData.dateOfPayment,
       documents: formData.documentsRequested
-        .filter((name) => !name.toLowerCase().includes("certif"))
         .map((name) => {
           const dbDoc = availableDocs.find((d) => d.document_name === name);
           const id =
