@@ -646,7 +646,9 @@ const UserManagement = () => {
           {pageNumbers().map((p, i) => (
             <button key={i} onClick={() => typeof p === "number" && setCurrentPage(p)} disabled={p === "..."}
               className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors
-                ${safePage === p ? 'bg-yellow-400 text-white' : (isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-500 hover:bg-gray-100')}
+                ${safePage === p
+                  ? (isDark ? 'bg-yellow-400 text-gray-900 font-bold' : 'bg-pup-dark-maroon text-white font-bold')
+                  : (isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-500 hover:bg-gray-100')}
                 ${p === "..." ? "cursor-default pointer-events-none" : ""}`}>
               {p}
             </button>
