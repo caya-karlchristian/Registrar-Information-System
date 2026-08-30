@@ -28,7 +28,7 @@ export const ROLE_CONFIG = {
         ],
       },
       {
-        title: 'Management',
+        title: 'Student services',
         items: [
           { name: 'Document Lists', to: 'lists', icon: TableCellsIcon },
           { name: 'Student Requests', to: 'request', icon: ClipboardDocumentCheckIcon },
@@ -49,7 +49,7 @@ export const ROLE_CONFIG = {
         ],
       },
       {
-        title: 'Management',
+        title: 'Alumni Services',
         items: [
           { name: 'Document Lists', to: 'lists', icon: TableCellsIcon },
           { name: 'Alumni Request', to: 'request', icon: AcademicCapIcon },
