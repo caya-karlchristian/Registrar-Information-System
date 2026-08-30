@@ -70,7 +70,9 @@ const RequestForm = () => {
     purposes,
     docTypeName,
     purposeName,
-    certName
+    certName,
+    refreshDocumentTypes,
+    refreshCertifications
   } = useReferenceData();
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -230,21 +232,25 @@ const RequestForm = () => {
       const newCertCopies = {};
 
       (suggestions.documents || []).forEach((doc) => {
-        // Prefer the name from the live reference-data list (availableDocs)
-        // over whatever the backend echoed back — they should always agree
-        // since both come from the same document_type table, but this
-        // guards against staleness between the two requests, and it's what
-        // documentOptions/MultiSelectDropdown expects to match against.
-        const known = availableDocs.find((d) => d.document_type_id === doc.document_type_id);
-        const name = known?.document_name ?? doc.document_name;
+        // Trust the name the backend just echoed back — it comes from
+        // CashierDocumentSuggester querying document_type live, at the
+        // moment of this exact request, so it is always at least as fresh
+        // as (and often fresher than) availableDocs. availableDocs comes
+        // from ReferenceDataContext, which is fetched exactly ONCE per
+        // session (on login) and never re-fetched on navigation — so if an
+        // admin renames/fixes a document_type mid-session, every open tab
+        // keeps showing the old name here until the user logs out and back
+        // in, even against a brand-new OR. Previously this preferred the
+        // stale `known` name over the fresh backend one, which is backwards.
+        const name = doc.document_name;
         if (!name) return;
         suggestedDocNames.push(name);
         newDocCopies[name] = doc.number_of_copies || 1;
       });
 
       (suggestions.certificates || []).forEach((cert) => {
-        const known = availableCertifications.find((c) => c.certificate_type_id === cert.certificate_type_id);
-        const name = known?.certificate_name ?? cert.certificate_name;
+        // Same reasoning as documents above — trust the fresh backend name.
+        const name = cert.certificate_name;
         if (!name) return;
         suggestedCertNames.push(name);
         newCertCopies[name] = cert.number_of_copies || 1;
@@ -299,6 +305,16 @@ const RequestForm = () => {
     }
 
     setErrorMessage("");
+
+    // Refresh document/certificate types before verifying — these are
+    // otherwise only fetched once per session (on login), so an admin
+    // fixing a name/pattern mid-session would otherwise stay invisible to
+    // this tab indefinitely. Fire-and-forget: verification itself doesn't
+    // wait on this, but by the time verifyOrMutation's onSuccess processes
+    // suggestions, availableDocs/documentOptions should already be current.
+    refreshDocumentTypes();
+    refreshCertifications();
+
     verifyOrMutation.mutate({
       or_number: formData.receiptNumber.trim(),
       receipt_date: formData.dateOfPayment,

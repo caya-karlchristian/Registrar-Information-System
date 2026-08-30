@@ -19,6 +19,8 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     purposes: referencePurposes,
     docTypeName,
     certName,
+    refreshDocumentTypes,
+    refreshCertifications,
   } = useReferenceData();
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -193,21 +195,22 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
       const newCertCopies = {};
 
       (suggestions.documents || []).forEach((doc) => {
-        // Prefer the name from the live reference-data list (availableDocs)
-        // over whatever the backend echoed back — they should always agree
-        // since both come from the same document_type table, but this
-        // guards against staleness between the two requests, and it's what
-        // documentOptions/MultiSelectDropdown expects to match against.
-        const known = availableDocs.find((d) => d.document_type_id === doc.document_type_id);
-        const name = known?.document_name ?? doc.document_name;
+        // Trust the name the backend just echoed back — see RequestForm.jsx's
+        // identical fix for the full rationale: availableDocs comes from
+        // ReferenceDataContext, fetched once per session on login, and
+        // previously overrode the backend's fresh name with that stale
+        // snapshot. handleVerifyOr now calls refreshDocumentTypes()/
+        // refreshCertifications() before this mutation fires, so
+        // availableDocs/documentOptions should also be current by now —
+        // but the name used here no longer depends on that timing at all.
+        const name = doc.document_name;
         if (!name) return;
         suggestedDocNames.push(name);
         newDocCopies[name] = doc.number_of_copies || 1;
       });
 
       (suggestions.certificates || []).forEach((cert) => {
-        const known = availableCertifications.find((c) => c.certificate_type_id === cert.certificate_type_id);
-        const name = known?.certificate_name ?? cert.certificate_name;
+        const name = cert.certificate_name;
         if (!name) return;
         suggestedCertNames.push(name);
         newCertCopies[name] = cert.number_of_copies || 1;
@@ -262,6 +265,13 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     }
 
     setErrorMessage("");
+
+    // See RequestForm.jsx's handleVerifyOr for the full rationale — refresh
+    // reference data before verifying so a mid-session admin fix to a
+    // document/certificate type is picked up rather than served stale.
+    refreshDocumentTypes();
+    refreshCertifications();
+
     verifyOrMutation.mutate({
       or_number: formData.receiptNumber.trim(),
       receipt_date: formData.dateOfPayment,

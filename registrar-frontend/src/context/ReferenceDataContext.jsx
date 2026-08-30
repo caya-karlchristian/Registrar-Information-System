@@ -180,6 +180,40 @@ export const ReferenceDataProvider = ({ children }) => {
     fulfillmentTracks.find((t) => Number(t.fulfillment_track_id) === Number(id))?.name;
 
   /**
+   * Re-fetch just the document types list. documentTypes is otherwise only
+   * fetched once per session (on login — see the main useEffect above), so
+   * any admin fix to a document_type's name/patterns made mid-session is
+   * invisible to already-open tabs until they log out and back in. Call
+   * this right before an OR-verification flow reads availableDocs/
+   * documentOptions (see RequestForm.jsx / AlumniRequest.jsx), so a
+   * suggested match's name and its selectable checkbox option always agree
+   * with the current DB row, not a stale login-time snapshot.
+   */
+  const refreshDocumentTypes = async () => {
+    try {
+      const res = await getDocumentTypes();
+      setDocumentTypes(res.data ?? []);
+    } catch {
+      // Leave the existing list as-is on failure, same reasoning as
+      // refreshSignatories() below.
+    }
+  };
+
+  /**
+   * Re-fetch just the certifications list. Same staleness reasoning and
+   * same call sites as refreshDocumentTypes() above.
+   */
+  const refreshCertifications = async () => {
+    try {
+      const res = await getCertifications();
+      setCertifications(res.data ?? []);
+    } catch {
+      // Leave the existing list as-is on failure, same reasoning as
+      // refreshSignatories() below.
+    }
+  };
+
+  /**
    * Re-fetch just the signatories list. Call this after create/update/delete
    * from an admin management screen so the rest of the app (e.g. the
    * certificate signee dropdown) sees the change without a full reload of
@@ -250,6 +284,8 @@ export const ReferenceDataProvider = ({ children }) => {
         refreshSignatories,
         refreshLogbookCategories,
         refreshFulfillmentTracks,
+        refreshDocumentTypes,
+        refreshCertifications,
       }}
     >
       {children}
