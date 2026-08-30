@@ -456,13 +456,6 @@ export const CalendarGridView = ({
                     }`}>
                       {day.dayNumber}
                     </span>
-                    {isTodayCell && (
-                      <span className={`text-[8px] sm:text-[9px] uppercase tracking-wider px-1 rounded-sm font-bold ${
-                        isDark ? "bg-yellow-400/20 text-yellow-400" : "bg-pup-dark-maroon/10 text-pup-dark-maroon"
-                      }`}>
-                        Today
-                      </span>
-                    )}
                   </div>
 
                   {/* Desktop text-based capsule */}
