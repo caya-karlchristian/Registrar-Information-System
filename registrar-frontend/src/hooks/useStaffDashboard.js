@@ -320,5 +320,8 @@ export const useStaffDashboard = (viewMode) => {
     handleBulkReady,
     handleBulkDone,
     handleCertificatePrinted,
+    queryClient,
+    setUpdatingId,
+    updatingId,
   };
 };

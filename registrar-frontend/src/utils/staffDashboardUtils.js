@@ -302,11 +302,16 @@ export const filterAndSortRequests = (requests, { filterStatus, filterClassifica
           d.toLowerCase().includes(filterDocument.toLowerCase()) ||
           filterDocument.toLowerCase().includes(d.toLowerCase())
         ));
+      const term = searchTerm.trim().toLowerCase();
       const matchesSearch =
-        searchTerm.trim() === '' ||
-        r.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.studentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.id.toString().includes(searchTerm);
+        term === '' ||
+        r.studentName.toLowerCase().includes(term) ||
+        r.studentNumber.toLowerCase().includes(term) ||
+        r.id.toString().includes(term) ||
+        (r.statusName && r.statusName.toLowerCase().includes(term)) ||
+        (r.certName && r.certName.toLowerCase().includes(term)) ||
+        (r.documentDetailsArray && r.documentDetailsArray.some(d => d.toLowerCase().includes(term)));
+
       return matchesStatus && matchesClassification && matchesDocument && matchesSearch;
     })
     .sort((a, b) => {
