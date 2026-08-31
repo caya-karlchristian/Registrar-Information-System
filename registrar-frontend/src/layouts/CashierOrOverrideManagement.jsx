@@ -5,15 +5,17 @@ import ErrorToast from "../components/ErrorToast.jsx";
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import DashboardDropdown from "../components/DashboardDropdown.jsx";
 import {
+  CashierOverrideDetailsModal,
+  CreateCashierOverrideModal,
+} from "../components/CashierOrOverrideModals.jsx";
+import {
   ChevronDownIcon,
   ChevronUpIcon,
-  ArrowsUpDownIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import {
   getCashierOverrides,
-  createCashierOverride,
   revokeCashierOverride,
-  searchCashierOverrideUsers,
 } from "../services/api";
 
 /**
@@ -35,11 +37,11 @@ const CashierOrOverrideManagement = () => {
 
   const [showHistory, setShowHistory] = useState(false);
   const [overrides, setOverrides] = useState([]);
-  const [meta, setMeta] = useState({ current_page: 1, last_page: 1 });
   const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [, setMeta] = useState({ current_page: 1, last_page: 1 });
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -89,12 +91,13 @@ const CashierOrOverrideManagement = () => {
     loadOverrides(1);
   }, [loadOverrides]);
 
-  const handleCreated = (override) => {
-    setCreateModalOpen(false);
-    setSuccessMsg(`Override created for OR #${override.or_number} — the student can now submit normally.`);
-    if (!showHistory) {
+  const handleCreated = (newOverride) => {
+    if (newOverride) {
+      setOverrides((prev) => [newOverride, ...prev]);
+    } else {
       loadOverrides(1);
     }
+    setSuccessMsg("Cashier OR override created successfully.");
   };
 
   const handleRevokeConfirm = async () => {
@@ -120,9 +123,6 @@ const CashierOrOverrideManagement = () => {
   const cardClasses = isDark ? "bg-[#18191a] text-[#e4e6eb]" : "bg-white text-gray-900";
   const rowBorder = isDark ? "border-[#3e4042]" : "border-gray-200";
   const subtleText = isDark ? "text-[#b0b3b8]" : "text-gray-500";
-  const accentBtn = isDark
-    ? "bg-yellow-400 text-gray-900 hover:bg-yellow-300"
-    : "bg-pup-dark-maroon text-white hover:bg-pup-maroon";
   const activeTabClasses = isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white";
 
   const statusOf = (o) => {
@@ -153,6 +153,9 @@ const CashierOrOverrideManagement = () => {
     return overrides
       .filter((o) => {
         const st = statusOf(o).label;
+        const matchesTab = showHistory
+          ? (st === "Used" || st === "Revoked")
+          : (st === "Active");
         const query = search.trim().toLowerCase();
         const matchesSearch =
           !query ||
@@ -160,7 +163,7 @@ const CashierOrOverrideManagement = () => {
           String(o.user?.email || "").toLowerCase().includes(query) ||
           String(o.created_by_user?.email || "").toLowerCase().includes(query);
         const matchesStatus = statusFilter === "All" || st === statusFilter;
-        return matchesSearch && matchesStatus;
+        return matchesTab && matchesSearch && matchesStatus;
       })
       .sort((a, b) => {
         if (sortField === "or_number") {
@@ -175,7 +178,7 @@ const CashierOrOverrideManagement = () => {
           return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
         }
       });
-  }, [overrides, search, statusFilter, sortField, sortOrder]);
+  }, [overrides, search, statusFilter, sortField, sortOrder, showHistory]);
 
   const PER_PAGE = 7;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
@@ -189,7 +192,7 @@ const CashierOrOverrideManagement = () => {
         <div>
           <h2 className="text-lg font-bold">Cashier OR Overrides</h2>
           <p className={`text-xs mt-1 max-w-xl ${subtleText}`}>
-            A scoped, audited bypass for one OR number + student pair — use this when a real receipt
+            A scoped, audited bypass for one OR number + student/alumni pair — use this when a real receipt
             keeps getting rejected by the Cashier API. It never disables verification for anyone else.
           </p>
         </div>
@@ -227,14 +230,13 @@ const CashierOrOverrideManagement = () => {
         </div>
       </div>
 
-      {/* Table & Search Header */}
-      <div className={`rounded-xl border overflow-hidden ${rowBorder}`}>
-        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b ${isDark ? 'border-[#3e4042] bg-[#1a1a1c]/20' : 'border-gray-200 bg-gray-50/50'}`}>
+      <div className={`rounded-xl border ${rowBorder}`}>
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b rounded-t-xl ${isDark ? 'border-[#3e4042] bg-[#1a1a1c]/20' : 'border-gray-200 bg-gray-50/50'}`}>
           <div className="w-full sm:max-w-md">
             <VoiceSearchInput
               value={search}
               onChange={(val) => { setSearch(val); handleFilterChange(); }}
-              placeholder="Search by OR number or student email"
+              placeholder="Search by OR number or email"
             />
           </div>
           <div className="flex items-center justify-end gap-3 ml-auto">
@@ -244,8 +246,8 @@ const CashierOrOverrideManagement = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto w-full scrollbar-thin">
-          <table className="w-full min-w-[650px] text-sm">
+        <div className="overflow-x-auto w-full scrollbar-thin min-h-85">
+          <table className="w-full min-w-162.5 text-sm">
           <thead>
             <tr className={`text-center ${isDark ? "bg-[#242526]" : "bg-gray-50 border-b border-gray-100"}`}>
               {/* OR Number Header (Sortable) */}
@@ -419,11 +421,9 @@ const CashierOrOverrideManagement = () => {
       </div>
 
       {createModalOpen && (
-        <CreateOverrideModal
+        <CreateCashierOverrideModal
           isDark={isDark}
-          rowBorder={rowBorder}
           subtleText={subtleText}
-          accentBtn={accentBtn}
           onClose={() => setCreateModalOpen(false)}
           onCreated={handleCreated}
           onError={(msg) => setErrorMsg(msg)}
@@ -431,7 +431,7 @@ const CashierOrOverrideManagement = () => {
       )}
 
       {detailsItem && (
-        <DetailsModal
+        <CashierOverrideDetailsModal
           item={detailsItem}
           isDark={isDark}
           rowBorder={rowBorder}
@@ -444,26 +444,48 @@ const CashierOrOverrideManagement = () => {
 
       {/* Revoke confirmation */}
       {revokeConfirm.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 backdrop-blur-[2px] bg-black/50">
-          <div className={`rounded-xl shadow-xl w-full max-w-sm p-6 ${isDark ? "bg-[#242526] border border-[#3e4042] text-[#e4e6eb]" : "bg-white border border-gray-100 text-gray-900"}`}>
-            <h3 className="text-lg font-bold mb-2">Revoke this override?</h3>
-            <p className={`text-sm mb-6 ${subtleText}`}>
-              OR <strong>#{revokeConfirm.item?.or_number}</strong> will no longer bypass Cashier API
-              verification. The student will need a new override, or the OR to actually verify normally,
-              to submit their request.
-            </p>
-            <div className="flex justify-end gap-3">
+        <div className="fixed inset-0 z-9999 flex items-center justify-center pt-16 sm:pt-4 pb-4 px-3 sm:px-4 backdrop-blur-sm bg-black/60 overflow-y-auto">
+          <div className={`relative z-9999 w-full max-w-md my-auto rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] overflow-hidden border flex flex-col animate-in fade-in zoom-in duration-200 ${
+            isDark ? "bg-[#242526] border-[#3e4042] text-[#e4e6eb]" : "bg-white border-[#800000]/20 text-gray-900"
+          }`}>
+            <div className={`px-4 py-4 sm:px-6 sm:py-5 border-b-4 shrink-0 ${isDark ? 'bg-[#1f1f1f] border-[#b98b00]' : 'bg-[#800000] border-[#FFD700]'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <span className="text-[10px] sm:text-xs text-amber-200 font-bold uppercase tracking-wider block">Confirm Action</span>
+                  <h3 className="text-lg sm:text-xl text-white font-black uppercase tracking-tighter mt-0.5">Revoke Override?</h3>
+                </div>
+                <button
+                  onClick={() => setRevokeConfirm({ open: false, item: null })}
+                  className="p-1 rounded hover:opacity-90 shrink-0 text-white cursor-pointer"
+                  title="Close"
+                >
+                  <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6">
+              <p className={`text-xs sm:text-sm ${subtleText}`}>
+                OR <strong className={isDark ? "text-white" : "text-gray-900"}>#{revokeConfirm.item?.or_number}</strong> will no longer bypass Cashier API
+                verification. The student will need a new override, or the OR to actually verify normally,
+                to submit their request.
+              </p>
+            </div>
+
+            <div className={`px-4 py-3 sm:px-6 sm:py-4 border-t-2 shrink-0 flex justify-end gap-3 ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200'}`}>
               <button
                 onClick={() => setRevokeConfirm({ open: false, item: null })}
                 disabled={actionLoading}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${rowBorder}`}
+                className={`px-4 py-1.5 sm:px-5 sm:py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors duration-150 cursor-pointer disabled:opacity-50 ${
+                  isDark ? 'text-[#f5c542] hover:bg-[#2a2a2a]' : 'text-[#800000] hover:bg-gray-200'
+                }`}
               >
                 Cancel
               </button>
               <button
                 onClick={handleRevokeConfirm}
                 disabled={actionLoading}
-                className="text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer disabled:opacity-50 bg-red-600 text-white hover:bg-red-700"
+                className="px-5 py-2 rounded-md font-bold text-xs uppercase tracking-widest transition-colors duration-150 shadow-sm cursor-pointer disabled:opacity-50 bg-red-600 text-white hover:bg-red-700"
               >
                 {actionLoading ? "Revoking..." : "Revoke"}
               </button>
@@ -474,386 +496,6 @@ const CashierOrOverrideManagement = () => {
 
       <SuccessToast message={successMsg} onClose={() => setSuccessMsg("")} />
       <ErrorToast message={errorMsg} onClose={() => setErrorMsg("")} />
-    </div>
-  );
-};
-
-/**
- * Read-only detail view — reason and verified_items are the actual
- * justification an admin gave for bypassing a money-facing check, so
- * this screen is where a second reviewer (or the same admin later)
- * would go to see exactly what was recorded, without needing to join
- * into the audit log directly.
- */
-const DetailsModal = ({ item, isDark, rowBorder, subtleText, statusOf, badgeClasses, onClose }) => {
-  const status = statusOf(item);
-  const items = Array.isArray(item.verified_items) ? item.verified_items : [];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 backdrop-blur-[2px] bg-black/50">
-      <div className={`rounded-xl shadow-xl w-full max-w-lg p-6 ${isDark ? "bg-[#242526] border border-[#3e4042] text-[#e4e6eb]" : "bg-white border border-gray-100 text-gray-900"}`}>
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-bold">OR #{item.or_number}</h3>
-            <p className={`text-xs mt-0.5 ${subtleText}`}>{item.user?.email ?? `User #${item.user_id}`}</p>
-          </div>
-          <span className={badgeClasses(status.tone)}>{status.label}</span>
-        </div>
-
-        <div className={`text-sm mb-4 p-3 rounded-lg ${isDark ? "bg-[#1a1b1e]" : "bg-gray-50"}`}>
-          <div className={`text-xs font-semibold uppercase tracking-wide mb-1 ${subtleText}`}>Reason</div>
-          <p className="whitespace-pre-wrap">{item.reason}</p>
-        </div>
-
-        {items.length > 0 && (
-          <div className="mb-4">
-            <div className={`text-xs font-semibold uppercase tracking-wide mb-2 ${subtleText}`}>
-              Verified Items (as read off the physical receipt)
-            </div>
-            <div className={`rounded-lg border overflow-hidden ${rowBorder}`}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className={isDark ? "bg-[#1a1b1e]" : "bg-gray-50"}>
-                    <th className="px-3 py-2 text-left font-semibold">Document</th>
-                    <th className="px-3 py-2 text-left font-semibold">Qty</th>
-                    <th className="px-3 py-2 text-left font-semibold">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((it, idx) => (
-                    <tr key={idx} className={`border-t ${rowBorder}`}>
-                      <td className="px-3 py-2">{it.document}</td>
-                      <td className="px-3 py-2">{it.quantity}</td>
-                      <td className="px-3 py-2">{it.amount || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        <dl className={`grid grid-cols-2 gap-y-2 text-xs ${subtleText} mb-6`}>
-          <dt>Created by</dt>
-          <dd className="text-right">
-            {item.created_by_user?.email ?? "—"}
-          </dd>
-          <dt>Created at</dt>
-          <dd className="text-right">{item.created_at ? new Date(item.created_at).toLocaleString() : "—"}</dd>
-          {item.used_at && (
-            <>
-              <dt>Used at</dt>
-              <dd className="text-right">{new Date(item.used_at).toLocaleString()}</dd>
-            </>
-          )}
-          {item.revoked_at && (
-            <>
-              <dt>Revoked by</dt>
-              <dd className="text-right">{item.revoked_by_user?.email ?? "—"}</dd>
-              <dt>Revoked at</dt>
-              <dd className="text-right">{new Date(item.revoked_at).toLocaleString()}</dd>
-            </>
-          )}
-        </dl>
-
-        <div className="flex justify-end">
-          <button
-            onClick={onClose}
-            className={`text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer ${rowBorder}`}
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/**
- * Create-override form. The student picker is a debounced typeahead
- * against /cashier-overrides/search-users rather than a free-typed
- * user_id — an admin at the counter has a name or a receipt, not a
- * database id.
- */
-const CreateOverrideModal = ({ isDark, rowBorder, subtleText, accentBtn, onClose, onCreated, onError }) => {
-  const [orNumber, setOrNumber] = useState("");
-  const [reason, setReason] = useState("");
-  const [items, setItems] = useState([]); // { document, quantity, amount }
-
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [showResults, setShowResults] = useState(false);
-
-  const [submitting, setSubmitting] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({});
-  const debounceRef = useRef(null);
-
-  useEffect(() => {
-    if (selectedUser || query.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    setSearching(true);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await searchCashierOverrideUsers(query.trim());
-        setResults(res.data?.data ?? []);
-        setShowResults(true);
-      } catch (err) {
-        console.error("Student search failed:", err);
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
-    return () => clearTimeout(debounceRef.current);
-  }, [query, selectedUser]);
-
-  const pickUser = (u) => {
-    setSelectedUser(u);
-    setQuery(`${u.full_name} — ${u.email}`);
-    setShowResults(false);
-  };
-
-  const clearUser = () => {
-    setSelectedUser(null);
-    setQuery("");
-    setResults([]);
-  };
-
-  const addItemRow = () => setItems((prev) => [...prev, { document: "", quantity: 1, amount: "" }]);
-  const removeItemRow = (idx) => setItems((prev) => prev.filter((_, i) => i !== idx));
-  const updateItemRow = (idx, key, value) =>
-    setItems((prev) => prev.map((row, i) => (i === idx ? { ...row, [key]: value } : row)));
-
-  const handleSubmit = async () => {
-    setFieldErrors({});
-
-    if (!selectedUser) {
-      setFieldErrors({ user_id: "Search for and select the student first." });
-      return;
-    }
-    if (!orNumber.trim()) {
-      setFieldErrors({ or_number: "OR number is required." });
-      return;
-    }
-    if (reason.trim().length < 10) {
-      setFieldErrors({ reason: "Give a real reason (at least 10 characters) — this bypasses a money-facing check." });
-      return;
-    }
-
-    const cleanedItems = items
-      .filter((row) => row.document.trim() !== "")
-      .map((row) => ({
-        document: row.document.trim(),
-        quantity: Number(row.quantity) || 1,
-        amount: row.amount?.trim() || undefined,
-      }));
-
-    try {
-      setSubmitting(true);
-      const res = await createCashierOverride({
-        or_number: orNumber.trim(),
-        user_id: selectedUser.user_id,
-        reason: reason.trim(),
-        verified_items: cleanedItems.length > 0 ? cleanedItems : undefined,
-      });
-      onCreated(res.data);
-    } catch (err) {
-      console.error("Failed to create cashier OR override:", err);
-      const apiErrors = err?.response?.data?.errors;
-      if (apiErrors) {
-        setFieldErrors(
-          Object.fromEntries(Object.entries(apiErrors).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]))
-        );
-      } else {
-        onError(err?.response?.data?.message || "Couldn't create this override. Please try again.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const inputClasses = `w-full p-2.5 rounded-lg border text-sm ${
-    isDark ? "bg-[#1a1b1e] border-[#3e4042] text-white" : "bg-white border-gray-300 text-gray-900"
-  }`;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 backdrop-blur-[2px] bg-black/50 overflow-y-auto">
-      <div className={`rounded-xl shadow-xl w-full max-w-lg p-6 my-auto ${isDark ? "bg-[#242526] border border-[#3e4042] text-[#e4e6eb]" : "bg-white border border-gray-100 text-gray-900"}`}>
-        <h3 className="text-lg font-bold mb-1">New Cashier OR Override</h3>
-        <p className={`text-sm mb-5 ${subtleText}`}>
-          Scoped to this one OR number and student only — every other request still goes through the
-          normal Cashier API check.
-        </p>
-
-        <div className="space-y-4">
-          {/* Student picker */}
-          <div className="relative">
-            <label className="text-xs font-semibold uppercase tracking-wide mb-1 block">Student</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSelectedUser(null);
-                }}
-                onFocus={() => results.length > 0 && setShowResults(true)}
-                placeholder="Search by name or email…"
-                className={inputClasses}
-              />
-              {selectedUser && (
-                <button
-                  type="button"
-                  onClick={clearUser}
-                  className={`absolute right-2 top-1/2 -translate-y-1/2 text-xs cursor-pointer ${subtleText}`}
-                >
-                  Change
-                </button>
-              )}
-            </div>
-            {showResults && !selectedUser && (
-              <div className={`absolute z-10 w-full mt-1 rounded-lg border shadow-lg max-h-52 overflow-y-auto ${isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white border-gray-200"}`}>
-                {searching ? (
-                  <div className={`px-3 py-2.5 text-sm ${subtleText}`}>Searching…</div>
-                ) : results.length === 0 ? (
-                  <div className={`px-3 py-2.5 text-sm ${subtleText}`}>
-                    {query.trim().length < 2 ? "Type at least 2 characters…" : "No matching student or alumni account."}
-                  </div>
-                ) : (
-                  results.map((u) => (
-                    <button
-                      key={u.user_id}
-                      type="button"
-                      onClick={() => pickUser(u)}
-                      className={`w-full text-left px-3 py-2.5 text-sm cursor-pointer ${isDark ? "hover:bg-[#242526]" : "hover:bg-gray-50"}`}
-                    >
-                      <div className="font-medium">{u.full_name}</div>
-                      <div className={`text-xs ${subtleText}`}>{u.email} · {u.role_name}</div>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-            {fieldErrors.user_id && <p className="text-xs text-red-500 mt-1">{fieldErrors.user_id}</p>}
-          </div>
-
-          {/* OR Number */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide mb-1 block">OR Number</label>
-            <input
-              type="text"
-              value={orNumber}
-              onChange={(e) => setOrNumber(e.target.value)}
-              placeholder="e.g. 0234891"
-              maxLength={50}
-              className={inputClasses}
-            />
-            {fieldErrors.or_number && <p className="text-xs text-red-500 mt-1">{fieldErrors.or_number}</p>}
-          </div>
-
-          {/* Reason */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide mb-1 block">Reason</label>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-              maxLength={1000}
-              placeholder={`e.g. "Verified physical receipt at the counter — cashier system typo'd the middle name, OR itself is genuine."`}
-              className={inputClasses}
-            />
-            <p className={`text-xs mt-1 ${subtleText}`}>{reason.trim().length}/10 characters minimum</p>
-            {fieldErrors.reason && <p className="text-xs text-red-500 mt-1">{fieldErrors.reason}</p>}
-          </div>
-
-          {/* Verified items */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold uppercase tracking-wide">
-                Verified Items <span className={subtleText}>(optional, recommended)</span>
-              </label>
-              <button
-                type="button"
-                onClick={addItemRow}
-                className={`text-xs font-semibold cursor-pointer ${isDark ? "text-yellow-400" : "text-pup-dark-maroon"}`}
-              >
-                + Add item
-              </button>
-            </div>
-            <p className={`text-xs mb-2 ${subtleText}`}>
-              What you physically read off the receipt. Item/quantity matching still applies against these
-              values — this only bypasses the OR-lookup, not the copy count check.
-            </p>
-            {items.length > 0 && (
-              <div className="space-y-2">
-                {items.map((row, idx) => (
-                  <div
-                    key={idx}
-                    className="grid gap-2 items-start"
-                    style={{ gridTemplateColumns: "1fr 72px 96px 24px" }}
-                  >
-                    <input
-                      type="text"
-                      value={row.document}
-                      onChange={(e) => updateItemRow(idx, "document", e.target.value)}
-                      placeholder="Document label"
-                      className={inputClasses}
-                      style={{ minWidth: 0, width: "100%" }}
-                    />
-                    <input
-                      type="number"
-                      min={1}
-                      max={999}
-                      value={row.quantity}
-                      onChange={(e) => updateItemRow(idx, "quantity", e.target.value)}
-                      className={inputClasses}
-                      style={{ minWidth: 0, width: "100%" }}
-                    />
-                    <input
-                      type="text"
-                      value={row.amount}
-                      onChange={(e) => updateItemRow(idx, "amount", e.target.value)}
-                      placeholder="Amount"
-                      className={inputClasses}
-                      style={{ minWidth: 0, width: "100%" }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeItemRow(idx)}
-                      className="text-red-500 text-sm cursor-pointer px-1 py-2"
-                      aria-label="Remove item"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className={`text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${rowBorder}`}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className={`text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer disabled:opacity-50 ${accentBtn}`}
-          >
-            {submitting ? "Creating..." : "Create Override"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

@@ -108,7 +108,7 @@ const DashboardDropdown = ({
 
       {isOpen && (
         <div
-          className={`absolute ${alignClasses[align]} ${width} rounded-xl shadow-lg border z-50 overflow-hidden text-left ${
+          className={`absolute ${alignClasses[align]} ${width} rounded-xl shadow-2xl border z-99999 overflow-hidden text-left ${
             isDark ? 'bg-[#1f1f1f] text-[#e4e6eb]' : 'bg-white text-gray-700'
           }`}
           style={{
@@ -237,7 +237,7 @@ const DashboardDropdown = ({
           </div>
 
           {/* Gold bottom accent */}
-          <div className="h-1 w-full bg-gradient-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
+          <div className="h-1 w-full bg-linear-to-r from-[#FFD700] via-[#FFC72C] to-[#FFD700]" />
         </div>
       )}
     </div>
