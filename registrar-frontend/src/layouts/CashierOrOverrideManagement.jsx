@@ -4,6 +4,7 @@ import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
 import DashboardDropdown from "../components/DashboardDropdown.jsx";
+import ConfirmationModal from "../components/ConfirmationModal.jsx";
 import {
   CashierOverrideDetailsModal,
   CreateCashierOverrideModal,
@@ -11,7 +12,6 @@ import {
 import {
   ChevronDownIcon,
   ChevronUpIcon,
-  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import {
   getCashierOverrides,
@@ -40,7 +40,7 @@ const CashierOrOverrideManagement = () => {
   const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [actionLoading, setActionLoading] = useState(false);
+  const [, setActionLoading] = useState(false);
   const [, setMeta] = useState({ current_page: 1, last_page: 1 });
 
   const [search, setSearch] = useState("");
@@ -102,6 +102,7 @@ const CashierOrOverrideManagement = () => {
 
   const handleRevokeConfirm = async () => {
     const { item } = revokeConfirm;
+    if (!item) return;
     try {
       setActionLoading(true);
       await revokeCashierOverride(item.override_id);
@@ -442,57 +443,16 @@ const CashierOrOverrideManagement = () => {
         />
       )}
 
-      {/* Revoke confirmation */}
-      {revokeConfirm.open && (
-        <div className="fixed inset-0 z-9999 flex items-center justify-center pt-16 sm:pt-4 pb-4 px-3 sm:px-4 backdrop-blur-sm bg-black/60 overflow-y-auto">
-          <div className={`relative z-9999 w-full max-w-md my-auto rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] overflow-hidden border flex flex-col animate-in fade-in zoom-in duration-200 ${
-            isDark ? "bg-[#242526] border-[#3e4042] text-[#e4e6eb]" : "bg-white border-[#800000]/20 text-gray-900"
-          }`}>
-            <div className={`px-4 py-4 sm:px-6 sm:py-5 border-b-4 shrink-0 ${isDark ? 'bg-[#1f1f1f] border-[#b98b00]' : 'bg-[#800000] border-[#FFD700]'}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <span className="text-[10px] sm:text-xs text-amber-200 font-bold uppercase tracking-wider block">Confirm Action</span>
-                  <h3 className="text-lg sm:text-xl text-white font-black uppercase tracking-tighter mt-0.5">Revoke Override?</h3>
-                </div>
-                <button
-                  onClick={() => setRevokeConfirm({ open: false, item: null })}
-                  className="p-1 rounded hover:opacity-90 shrink-0 text-white cursor-pointer"
-                  title="Close"
-                >
-                  <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-6">
-              <p className={`text-xs sm:text-sm ${subtleText}`}>
-                OR <strong className={isDark ? "text-white" : "text-gray-900"}>#{revokeConfirm.item?.or_number}</strong> will no longer bypass Cashier API
-                verification. The student will need a new override, or the OR to actually verify normally,
-                to submit their request.
-              </p>
-            </div>
-
-            <div className={`px-4 py-3 sm:px-6 sm:py-4 border-t-2 shrink-0 flex justify-end gap-3 ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-gray-50 border-gray-200'}`}>
-              <button
-                onClick={() => setRevokeConfirm({ open: false, item: null })}
-                disabled={actionLoading}
-                className={`px-4 py-1.5 sm:px-5 sm:py-2 text-xs font-bold uppercase tracking-widest rounded transition-colors duration-150 cursor-pointer disabled:opacity-50 ${
-                  isDark ? 'text-[#f5c542] hover:bg-[#2a2a2a]' : 'text-[#800000] hover:bg-gray-200'
-                }`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRevokeConfirm}
-                disabled={actionLoading}
-                className="px-5 py-2 rounded-md font-bold text-xs uppercase tracking-widest transition-colors duration-150 shadow-sm cursor-pointer disabled:opacity-50 bg-red-600 text-white hover:bg-red-700"
-              >
-                {actionLoading ? "Revoking..." : "Revoke"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Revoke confirmation modal using system ConfirmationModal */}
+      <ConfirmationModal
+        isOpen={revokeConfirm.open}
+        onClose={() => setRevokeConfirm({ open: false, item: null })}
+        onConfirm={handleRevokeConfirm}
+        title="Revoke Override?"
+        message={`OR #${revokeConfirm.item?.or_number} will no longer bypass Cashier API verification. The student will need a new override, or the OR to verify normally, to submit their request.`}
+        type="danger"
+        confirmText="Revoke"
+      />
 
       <SuccessToast message={successMsg} onClose={() => setSuccessMsg("")} />
       <ErrorToast message={errorMsg} onClose={() => setErrorMsg("")} />

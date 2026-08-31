@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../context/ThemeContext";
 import { useReferenceData } from "../context/ReferenceDataContext";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import DropdownGroup from "../components/DropDown.jsx";
+import ConfirmationModal from "../components/ConfirmationModal.jsx";
 import {
   getUnmatchedCashierItems,
   resolveUnmatchedCashierItem,
@@ -45,6 +48,43 @@ const UnmatchedCashierItemsManagement = () => {
     () => (certifications || []).filter((c) => !c.is_archived),
     [certifications]
   );
+
+  const combinedTargetOptions = useMemo(() => {
+    const docs = activeDocumentTypes.map((d) => ({
+      label: d.document_name,
+      kind: "document",
+      id: String(d.document_type_id),
+    }));
+    const certs = activeCertifications.map((c) => ({
+      label: `${c.certificate_name} (Certificate)`,
+      kind: "certificate",
+      id: String(c.certificate_type_id),
+    }));
+    return [...docs, ...certs];
+  }, [activeDocumentTypes, activeCertifications]);
+
+  const selectedCombinedItem = useMemo(() => {
+    if (!resolveModal.targetId) return null;
+    return combinedTargetOptions.find(
+      (opt) => opt.kind === resolveModal.targetKind && String(opt.id) === String(resolveModal.targetId)
+    );
+  }, [combinedTargetOptions, resolveModal.targetKind, resolveModal.targetId]);
+
+  const selectedCombinedLabel = selectedCombinedItem ? selectedCombinedItem.label : "";
+
+  const handleDropdownSelect = (e) => {
+    const chosenLabel = e?.target?.value;
+    const found = combinedTargetOptions.find((opt) => opt.label === chosenLabel);
+    if (found) {
+      setResolveModal((s) => ({
+        ...s,
+        targetKind: found.kind,
+        targetId: found.id,
+      }));
+    } else {
+      setResolveModal((s) => ({ ...s, targetId: "" }));
+    }
+  };
 
   const loadItems = useCallback(async (page = 1) => {
     try {
@@ -107,6 +147,7 @@ const UnmatchedCashierItemsManagement = () => {
 
   const handleDismissConfirm = async () => {
     const { item } = dismissConfirm;
+    if (!item) return;
     try {
       setActionLoading(true);
       await dismissUnmatchedCashierItem(item.unmatched_cashier_item_id);
@@ -254,102 +295,86 @@ const UnmatchedCashierItemsManagement = () => {
 
       {/* Resolve modal */}
       {resolveModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 backdrop-blur-[2px] bg-black/50">
-          <div className={`rounded-xl shadow-xl w-full max-w-md p-6 ${isDark ? "bg-[#242526] border border-[#3e4042] text-[#e4e6eb]" : "bg-white border border-gray-100 text-gray-900"}`}>
-            <h3 className="text-lg font-bold mb-1">Resolve Receipt Label</h3>
-            <p className={`text-sm mb-4 ${subtleText}`}>
-              Attach <strong>"{resolveModal.item?.raw_label}"</strong> to the correct type. Future receipts
-              using this exact label will auto-match to it.
-            </p>
-
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setResolveModal((s) => ({ ...s, targetKind: "document", targetId: "" }))}
-                className={`flex-1 text-sm font-semibold py-2 rounded-lg border cursor-pointer ${
-                  resolveModal.targetKind === "document"
-                    ? isDark ? "bg-yellow-400 text-gray-900 border-yellow-400" : "bg-pup-dark-maroon text-white border-pup-dark-maroon"
-                    : `${rowBorder} ${subtleText}`
-                }`}
-              >
-                Document
-              </button>
-              <button
-                onClick={() => setResolveModal((s) => ({ ...s, targetKind: "certificate", targetId: "" }))}
-                className={`flex-1 text-sm font-semibold py-2 rounded-lg border cursor-pointer ${
-                  resolveModal.targetKind === "certificate"
-                    ? isDark ? "bg-yellow-400 text-gray-900 border-yellow-400" : "bg-pup-dark-maroon text-white border-pup-dark-maroon"
-                    : `${rowBorder} ${subtleText}`
-                }`}
-              >
-                Certificate
-              </button>
-            </div>
-
-            <select
-              value={resolveModal.targetId}
-              onChange={(e) => setResolveModal((s) => ({ ...s, targetId: e.target.value }))}
-              className={`w-full p-2.5 rounded-lg border text-sm mb-6 ${isDark ? "bg-[#1a1b1e] border-[#3e4042] text-white" : "bg-white border-gray-300 text-gray-900"}`}
+        <div className="fixed inset-0 z-9999 flex items-center justify-center pt-16 sm:pt-4 pb-4 px-3 sm:px-4 backdrop-blur-sm bg-black/60 overflow-y-auto">
+          <div
+            className={`relative z-9999 w-full max-w-md my-auto rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] border flex flex-col animate-in fade-in zoom-in duration-200 ${
+              isDark ? "bg-[#242526] border-[#3e4042] text-[#e4e6eb]" : "bg-white border-[#800000]/20 text-gray-900"
+            }`}
+          >
+            {/* Top Header Banner matching CashierOrOverrideModals.jsx */}
+            <div
+              className={`px-4 py-4 sm:px-6 sm:py-5 border-b-4 shrink-0 rounded-t-xl overflow-hidden ${
+                isDark ? "bg-[#1f1f1f] border-[#b98b00]" : "bg-[#800000] border-[#FFD700]"
+              }`}
             >
-              <option value="">Select {resolveModal.targetKind === "document" ? "a document type" : "a certificate type"}...</option>
-              {(resolveModal.targetKind === "document" ? activeDocumentTypes : activeCertifications).map((t) => (
-                <option
-                  key={resolveModal.targetKind === "document" ? t.document_type_id : t.certificate_type_id}
-                  value={resolveModal.targetKind === "document" ? t.document_type_id : t.certificate_type_id}
+              <div className="flex items-center justify-between gap-2 sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] sm:text-xs text-amber-200 font-bold uppercase tracking-wider block">
+                    Unmatched Cashier Item
+                  </span>
+                  <h3 className="text-lg sm:text-xl text-white font-black uppercase tracking-tighter mt-0.5 truncate">
+                    Resolve Receipt Label
+                  </h3>
+                </div>
+                <button
+                  onClick={closeResolveModal}
+                  className="p-1 rounded hover:opacity-90 shrink-0 text-white cursor-pointer"
+                  title="Close"
                 >
-                  {resolveModal.targetKind === "document" ? t.document_name : t.certificate_name}
-                </option>
-              ))}
-            </select>
+                  <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              </div>
+            </div>
 
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={closeResolveModal}
-                disabled={actionLoading}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${rowBorder}`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleResolveSubmit}
-                disabled={actionLoading}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer disabled:opacity-50 ${isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"}`}
-              >
-                {actionLoading ? "Resolving..." : "Resolve"}
-              </button>
+            <div className="p-4 sm:p-6 space-y-4">
+              <p className={`text-xs sm:text-sm font-normal leading-relaxed ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                Attach receipt label <strong className={isDark ? "text-white" : "text-gray-900"}>"{resolveModal.item?.raw_label}"</strong> to a document or certificate type:
+              </p>
+
+              <div>
+                <DropdownGroup
+                  label="Document / Certificate Type"
+                  name="targetId"
+                  value={selectedCombinedLabel}
+                  onChange={handleDropdownSelect}
+                  options={combinedTargetOptions.map((opt) => opt.label)}
+                  labelColor={isDark ? "text-[#e4e6eb]" : "text-gray-700"}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={closeResolveModal}
+                  disabled={actionLoading}
+                  className={`text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${rowBorder}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleResolveSubmit}
+                  disabled={actionLoading}
+                  className={`text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer disabled:opacity-50 shadow-md transition-all active:scale-95 ${
+                    isDark ? "bg-yellow-400 text-gray-900 hover:bg-yellow-300" : "bg-pup-dark-maroon text-white hover:bg-pup-maroon"
+                  }`}
+                >
+                  {actionLoading ? "Resolving..." : "Resolve"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Dismiss confirmation */}
-      {dismissConfirm.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 backdrop-blur-[2px] bg-black/50">
-          <div className={`rounded-xl shadow-xl w-full max-w-sm p-6 ${isDark ? "bg-[#242526] border border-[#3e4042] text-[#e4e6eb]" : "bg-white border border-gray-100 text-gray-900"}`}>
-            <h3 className="text-lg font-bold mb-2">Dismiss this label?</h3>
-            <p className={`text-sm mb-6 ${subtleText}`}>
-              <strong>"{dismissConfirm.item?.raw_label}"</strong> will be marked resolved without attaching it to
-              any document or certificate type — use this for labels that aren't a real document, like a one-off
-              fee line. It won't be suggested to future auto-attach, but it's removed from this queue.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDismissConfirm({ open: false, item: null })}
-                disabled={actionLoading}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${rowBorder}`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDismissConfirm}
-                disabled={actionLoading}
-                className="text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer disabled:opacity-50 bg-red-600 text-white hover:bg-red-700"
-              >
-                {actionLoading ? "Dismissing..." : "Dismiss"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Dismiss confirmation modal using system ConfirmationModal */}
+      <ConfirmationModal
+        isOpen={dismissConfirm.open}
+        onClose={() => setDismissConfirm({ open: false, item: null })}
+        onConfirm={handleDismissConfirm}
+        title="Dismiss Receipt Label?"
+        message={`"${dismissConfirm.item?.raw_label}" will be marked resolved without attaching it to any document or certificate type.`}
+        type="danger"
+        confirmText="Dismiss"
+      />
 
       <SuccessToast message={successMsg} onClose={() => setSuccessMsg("")} />
       <ErrorToast message={errorMsg} onClose={() => setErrorMsg("")} />

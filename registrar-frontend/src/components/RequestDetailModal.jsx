@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDownIcon, XCircleIcon, ArrowRightIcon } from '@heroicons/react/24/solid';
+import { ChevronDownIcon, XCircleIcon, ArrowRightIcon, PrinterIcon } from '@heroicons/react/24/solid';
 import { getDocumentTypes, getDocumentRequest, updateRequestDocumentStatus, updateRequestCertificateStatus } from "../services/api";
 import { PROGRESS_MAP } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
@@ -33,7 +33,7 @@ const ITEM_NEXT_ACTIONS = {
   2:  [{ label: 'Mark Completed',         target: 3, requiredAction: 'Complete' }], // ReadyToClaim -> Completed
 };
 
-const RequestDetailsModal = ({ request, onClose, user }) => {
+const RequestDetailsModal = ({ request, onClose, user, onGenerateCert }) => {
   const { docTypeName, purposeName, certName, statusConfig } = useReferenceData();
   const [docTypes, setDocTypes] = useState([]);
   const [liveRequest, setLiveRequest] = useState(request);
@@ -77,10 +77,12 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
   }, [request]);
 
   if (!request) return null; //To identify the role of the user
-  const activeRequest = liveRequest ?? request;
-    const isStudent = activeRequest.student_profile != null;
-    const isAlumni = activeRequest.alumni_profile != null; 
-    const progress = PROGRESS_MAP[activeRequest.status_id] ?? 0;
+  const activeRequest = liveRequest ?? request?.rawRequest ?? request;
+  const isStudent = activeRequest.student_profile != null || request?.userType === 'Student';
+  const isAlumni = activeRequest.alumni_profile != null || request?.userType === 'Alumni'; 
+  const progress = PROGRESS_MAP[activeRequest.status_id ?? request?.statusId] ?? 0;
+  const requestDocs = activeRequest.documents ?? activeRequest.rawRequest?.documents ?? request?.documents ?? request?.rawRequest?.documents ?? [];
+  const requestCerts = activeRequest.certificates ?? activeRequest.rawRequest?.certificates ?? request?.certificates ?? request?.rawRequest?.certificates ?? [];
 
   // Re-fetches the whole request after a single item's status changes,
   // so the progress bar / aggregate status / other items all reflect
@@ -290,75 +292,33 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
           {/* Documents Requested */}
           <Section title="Documents Requested" isDark={isDark}>
             <ul className="list-disc ml-4 sm:ml-5 space-y-2">
-              {activeRequest.documents
-                ?.filter((doc) => !getDocName(doc).toLowerCase().includes('certif'))
-                .map((doc, index) => (
-                  <li key={doc.request_document_id ?? index} className="wrap-break-word">
-                    <strong className="block sm:inline">{getDocName(doc)}</strong>
+              {requestDocs.map((doc, index) => (
+                <li key={doc.request_document_id ?? index} className="wrap-break-word">
+                  <strong className="block sm:inline">{getDocName(doc)}</strong>
+                  <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
+                    {doc.number_of_copies || 1} {(doc.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}
+                  </span>
+                </li>
+              ))}
+              {requestCerts.map((c, i) => {
+                const cName = c.certification_type?.certificate_name ?? certName(c.certificate_type_id) ?? 'Unknown Certification';
+                return (
+                  <li key={c.request_certificate_id ?? `cert-${i}`} className="wrap-break-word">
+                    <strong className="block sm:inline">CERTIFICATION: </strong>
+                    {cName}
                     <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
-                      {doc.number_of_copies || 1} {doc.number_of_copies > 1 ? 'Copies' : 'Copy'}
+                      {c.number_of_copies || 1} {(c.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}
                     </span>
                   </li>
-                ))}
-              {activeRequest.certificates?.map((c, i) => (
-                <li key={`cert-${i}`} className="wrap-break-word">
-                  <strong className="block sm:inline">CERTIFICATION: </strong>
-                  {c.certification_type?.certificate_name ?? 'Unknown'}
-                  <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
-                    {c.number_of_copies || 1} {(c.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}
-                  </span>
+                );
+              })}
+              {requestDocs.length === 0 && requestCerts.length === 0 && (request?.documentDetailsArray ?? activeRequest.documentDetailsArray)?.map((detail, index) => (
+                <li key={`detail-${index}`} className="wrap-break-word">
+                  <strong className="block sm:inline">{detail}</strong>
                 </li>
               ))}
             </ul>
           </Section>
-
-          {/* Item Status (Phase 2) — only meaningful/shown to staff who can
-              act on it (Process/Complete); students/alumni already get the
-              same information via the aggregate progress bar above, and
-              showing per-item controls they can't use would just be
-              confusing chrome. Each row lets staff advance ONE line item
-              without forcing every other item on the request through the
-              same transition — see RequestItemStatusService. */}
-          {(canProcess || canComplete) && (
-            <Section title="Line Item Status" isDark={isDark}>
-              {itemError && (
-                <div className={`mb-3 text-xs font-semibold px-3 py-2 rounded-lg ${isDark ? 'bg-red-900/30 text-red-300' : 'bg-red-50 text-red-700'}`}>
-                  {itemError}
-                </div>
-              )}
-              <ul className="space-y-2">
-                {activeRequest.documents?.map((doc) => (
-                  <LineItemRow
-                    key={`doc-${doc.request_document_id}`}
-                    name={getDocName(doc)}
-                    statusId={doc.status_id}
-                    statusConfig={statusConfig}
-                    actions={ITEM_NEXT_ACTIONS[doc.status_id] ?? []}
-                    canProcess={canProcess}
-                    canComplete={canComplete}
-                    isUpdating={updatingItemKey === `doc-${doc.request_document_id}`}
-                    onAdvance={(target) => advanceDocumentItem(doc, target)}
-                    isDark={isDark}
-                  />
-                ))}
-                {activeRequest.certificates?.map((c) => (
-                  <LineItemRow
-                    key={`cert-${c.request_certificate_id}`}
-                    name={c.certification_type?.certificate_name ?? 'Unknown Certificate'}
-                    statusId={c.status_id}
-                    statusConfig={statusConfig}
-                    actions={ITEM_NEXT_ACTIONS[c.status_id] ?? []}
-                    canProcess={canProcess}
-                    canComplete={canComplete}
-                    isUpdating={updatingItemKey === `cert-${c.request_certificate_id}`}
-                    onAdvance={(target) => advanceCertificateItem(c, target)}
-                    isDark={isDark}
-                    generatedAt={c.generated_at}
-                  />
-                ))}
-              </ul>
-            </Section>
-          )}
 
           {/* Payment Details */}
           <Section title="Payment Details" isDark={isDark}>
@@ -382,78 +342,6 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
       </div>
     </div>
   , document.body);
-};
-
-/**
- * One row inside the "Line Item Status" section — current status badge
- * plus, when the acting user's policy grants the required action, a
- * button for each sensible next status (see ITEM_NEXT_ACTIONS above).
- * A row with no available actions (terminal status, or the user lacks
- * permission for every offered action) just shows the badge — same
- * "hide, don't disable" convention the whole-request buttons already use
- * elsewhere in this app.
- */
-/**
- * generatedAt is only ever passed for certificate rows (documents have no
- * such concept) — undefined for a document row simply skips the badge and
- * the extra guard below. See RequestItemStatusService::guardCertificateGenerated()
- * for the server-side rule this mirrors: a certificate can't move into
- * ReadyToClaim (target 2) until it's actually been generated/printed.
- * Surfacing that here as a disabled state with a tooltip, rather than only
- * finding out via the 422 after clicking, is the same "hide/disable, don't
- * silently fail" convention the whole-request buttons in StaffDashboard.jsx
- * already use for this exact check.
- */
-const LineItemRow = ({ name, statusId, statusConfig, actions, canProcess, canComplete, isUpdating, onAdvance, isDark, generatedAt }) => {
-  const status = statusConfig(statusId);
-  const availableActions = actions.filter((a) =>
-    a.requiredAction === 'Complete' ? canComplete : canProcess
-  );
-  const isCertificateRow = generatedAt !== undefined;
-  const isGenerated = generatedAt != null;
-
-  return (
-    <li className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border px-3 py-2 ${isDark ? 'border-[#3e4042]' : 'border-gray-200'}`}>
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="wrap-break-word font-medium text-sm">{name}</span>
-        <span className={`inline-flex shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full border ${status.classes}`}>
-          {status.label}
-        </span>
-        {isCertificateRow && (
-          <span
-            className={`inline-flex shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
-              isGenerated
-                ? (isDark ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700')
-                : (isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600')
-            }`}
-            title={isGenerated ? `Generated ${new Date(generatedAt).toLocaleString()}` : 'Not yet printed/generated'}
-          >
-            {isGenerated ? 'Generated' : 'Not generated'}
-          </span>
-        )}
-      </div>
-      {availableActions.length > 0 && (
-        <div className="flex flex-wrap gap-2 shrink-0">
-          {availableActions.map((action) => {
-            const blockedByGeneration = isCertificateRow && !isGenerated && action.target === 2;
-            return (
-              <button
-                key={action.target}
-                type="button"
-                disabled={isUpdating || blockedByGeneration}
-                onClick={() => onAdvance(action.target)}
-                title={blockedByGeneration ? 'Print/generate this certificate first' : undefined}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-purple-900/20 hover:bg-purple-900/30 text-purple-400 border border-purple-600' : 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200'}`}
-              >
-                <span>{action.label}</span>
-                <ArrowRightIcon className="w-3 h-3" />
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </li>
-  );
 };
 
 const getProgressLabel = (progress) => {

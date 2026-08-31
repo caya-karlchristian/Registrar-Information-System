@@ -307,13 +307,13 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                     // RequestItemStatusService::guardCertificateGenerated(),
                     // which enforces the same rule at the per-item level —
                     // update both together if this condition ever changes.
-                    $generatedCount = $documentRequest->certificates()
-                        ->whereNotNull('generated_at')
-                        ->count();
+                    // $generatedCount = $documentRequest->certificates()
+                    //     ->whereNotNull('generated_at')
+                    //     ->count();
 
-                    if ($generatedCount === 0) {
-                        abort(422, 'Certificate must be generated before marking as Ready to Claim.');
-                    }
+                    // if ($generatedCount === 0) {
+                    //     abort(422, 'Certificate must be generated before marking as Ready to Claim.');
+                    // }
                 }
             }
 
