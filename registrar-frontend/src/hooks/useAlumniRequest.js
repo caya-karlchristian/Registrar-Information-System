@@ -227,15 +227,15 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
         }
       });
 
-      setSuggestedDocIds((prev) => ({ ...prev, ...docIdMap }));
-      setSuggestedCertIds((prev) => ({ ...prev, ...certIdMap }));
+      setSuggestedDocIds(docIdMap);
+      setSuggestedCertIds(certIdMap);
 
       setFormData((prev) => ({
         ...prev,
-        documentsRequested: Array.from(new Set([...(prev.documentsRequested || []), ...suggestedDocNames])),
-        certification: Array.from(new Set([...(prev.certification || []), ...suggestedCertNames])),
-        documentCopies: { ...prev.documentCopies, ...newDocCopies },
-        certCopies: { ...prev.certCopies, ...newCertCopies },
+        documentsRequested: suggestedDocNames,
+        certification: suggestedCertNames,
+        documentCopies: newDocCopies,
+        certCopies: newCertCopies,
       }));
 
       setAutoFilledNames([...suggestedDocNames, ...suggestedCertNames]);
