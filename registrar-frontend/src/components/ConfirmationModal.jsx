@@ -2,7 +2,7 @@ import React from 'react';
 import { ExclamationTriangleIcon, ArrowRightStartOnRectangleIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import { useTheme } from "../context/ThemeContext";
 
-const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, type = 'default' }) => {
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, type = 'default', confirmText, confirmLabel, buttonLabel }) => {
   if (!isOpen) return null;
 
   const { isDark } = useTheme();
@@ -15,7 +15,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, type = 
       ? (isDark ? 'bg-yellow-900/20 text-yellow-300' : 'bg-yellow-100 text-yellow-600')
       : (isDark ? 'bg-blue-900/20 text-blue-300' : 'bg-blue-100 text-blue-600');
   const btnClass  = isDanger ? 'bg-red-600 hover:bg-red-700' : isConfirm ? 'bg-[#800000] hover:bg-[#3a0303]' : 'bg-blue-600 hover:bg-blue-700';
-  const btnLabel  = isDanger ? 'Delete' : isConfirm ? 'Confirm' : 'Logout';
+  const btnLabel  = confirmText || confirmLabel || buttonLabel || (isDanger ? 'Delete' : isConfirm ? 'Confirm' : 'Logout');
 
   return (
     <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
