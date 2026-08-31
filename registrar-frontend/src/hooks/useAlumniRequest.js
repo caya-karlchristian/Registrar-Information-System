@@ -43,6 +43,8 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   // re-verifies from scratch regardless of how an item got onto the form.
   const [unresolvedItems, setUnresolvedItems] = useState([]);
   const [autoFilledNames, setAutoFilledNames] = useState([]);
+  const [suggestedDocIds, setSuggestedDocIds] = useState({});
+  const [suggestedCertIds, setSuggestedCertIds] = useState({});
 
   // documentTypes comes exclusively from GET /document-types (the
   // document_type table) — every row here is already a genuine document
@@ -53,12 +55,11 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   // correct and sufficient filter here.
   const availableDocs = useMemo(() => {
     return documentTypes
-      .filter((doc) => ALUMNI_ACCESS_IDS.includes(doc.access_id));
+      .filter((doc) => ALUMNI_ACCESS_IDS.includes(Number(doc.access_id)));
   }, [documentTypes]);
 
-
   const availableCertifications = useMemo(() => {
-    return certifications.filter((cert) => ALUMNI_ACCESS_IDS.includes(cert.access_id));
+    return certifications.filter((cert) => ALUMNI_ACCESS_IDS.includes(Number(cert.access_id)));
   }, [certifications]);
 
   const availablePurposes = referencePurposes;
@@ -142,10 +143,14 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     const selectedList = e.target.value || [];
 
     const newDocs = selectedList.filter((name) =>
-      documentOptions.includes(name) || availableDocs.some((d) => d.document_name === name)
+      documentOptions.includes(name) ||
+      availableDocs.some((d) => d.document_name === name) ||
+      documentTypes.some((d) => d.document_name === name)
     );
     const newCerts = selectedList.filter((name) =>
-      certificationOptions.includes(name) || availableCertifications.some((c) => c.certificate_name === name)
+      certificationOptions.includes(name) ||
+      availableCertifications.some((c) => c.certificate_name === name) ||
+      certifications.some((c) => c.certificate_name === name)
     );
 
     setFormData((prev) => {
@@ -199,20 +204,17 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
       const suggestedCertNames = [];
       const newDocCopies = {};
       const newCertCopies = {};
+      const docIdMap = {};
+      const certIdMap = {};
 
       (suggestions.documents || []).forEach((doc) => {
-        // Trust the name the backend just echoed back — see RequestForm.jsx's
-        // identical fix for the full rationale: availableDocs comes from
-        // ReferenceDataContext, fetched once per session on login, and
-        // previously overrode the backend's fresh name with that stale
-        // snapshot. handleVerifyOr now calls refreshDocumentTypes()/
-        // refreshCertifications() before this mutation fires, so
-        // availableDocs/documentOptions should also be current by now —
-        // but the name used here no longer depends on that timing at all.
         const name = doc.document_name;
         if (!name) return;
         suggestedDocNames.push(name);
         newDocCopies[name] = doc.number_of_copies || 1;
+        if (doc.document_type_id) {
+          docIdMap[name] = doc.document_type_id;
+        }
       });
 
       (suggestions.certificates || []).forEach((cert) => {
@@ -220,14 +222,16 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
         if (!name) return;
         suggestedCertNames.push(name);
         newCertCopies[name] = cert.number_of_copies || 1;
+        if (cert.certificate_type_id) {
+          certIdMap[name] = cert.certificate_type_id;
+        }
       });
+
+      setSuggestedDocIds((prev) => ({ ...prev, ...docIdMap }));
+      setSuggestedCertIds((prev) => ({ ...prev, ...certIdMap }));
 
       setFormData((prev) => ({
         ...prev,
-        // Merge rather than replace: if the alumni goes Back and forward
-        // again after manually adding something, a re-verify shouldn't
-        // wipe out a manual pick — everything here is still fully
-        // editable on the next step regardless of how it got added.
         documentsRequested: Array.from(new Set([...(prev.documentsRequested || []), ...suggestedDocNames])),
         certification: Array.from(new Set([...(prev.certification || []), ...suggestedCertNames])),
         documentCopies: { ...prev.documentCopies, ...newDocCopies },
@@ -249,7 +253,7 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     },
   });
 
-  const handleVerifyOr = () => {
+  const handleVerifyOr = async () => {
     if (!(formData.receiptNumber || '').trim()) {
       setErrorMessage("Please enter the Official Receipt Number.");
       return;
@@ -272,11 +276,7 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
 
     setErrorMessage("");
 
-    // See RequestForm.jsx's handleVerifyOr for the full rationale — refresh
-    // reference data before verifying so a mid-session admin fix to a
-    // document/certificate type is picked up rather than served stale.
-    refreshDocumentTypes();
-    refreshCertifications();
+    await Promise.all([refreshDocumentTypes(), refreshCertifications()]);
 
     verifyOrMutation.mutate({
       or_number: formData.receiptNumber.trim(),
@@ -392,41 +392,46 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
   });
 
   const handleSubmit = (e) => {
-    if (e) e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
 
     const selectedPurpose = availablePurposes.find(
-      (p) => p.purpose_name === formData.purposeOfRequest
-    );
-    const purposeId =
-      selectedPurpose?.request_purpose_id ??
-      referencePurposes.find((p) => p.purpose_name === formData.purposeOfRequest)
-        ?.request_purpose_id;
+      (p) => p.purpose_name === formData.purposeOfRequest || Number(p.request_purpose_id) === Number(formData.purposeOfRequest)
+    ) ?? referencePurposes.find((p) => p.purpose_name === formData.purposeOfRequest || Number(p.request_purpose_id) === Number(formData.purposeOfRequest));
+
+    const purposeId = selectedPurpose?.request_purpose_id;
 
     // Map all selected certification names to their IDs
-    const certificates = formData.certification
-      .map((name) => ({
-        certificate_type_id: availableCertifications.find((c) => c.certificate_name === name)
-          ?.certificate_type_id,
-        number_of_copies: parseInt(formData.certCopies[name]) || 1,
-      }))
+    const certificates = (formData.certification || [])
+      .map((name) => {
+        const certObj = availableCertifications.find((c) => c.certificate_name === name)
+          ?? certifications.find((c) => c.certificate_name === name);
+        const id = suggestedCertIds[name] ?? certObj?.certificate_type_id;
+
+        return {
+          certificate_type_id: id,
+          number_of_copies: parseInt(formData.certCopies[name]) || 1,
+        };
+      })
       .filter((c) => c.certificate_type_id);
+
+    const documents = (formData.documentsRequested || [])
+      .map((name) => {
+        const docObj = availableDocs.find((d) => d.document_name === name)
+          ?? documentTypes.find((d) => d.document_name === name);
+        const id = suggestedDocIds[name] ?? docObj?.document_type_id;
+
+        return {
+          document_type_id: id,
+          number_of_copies: parseInt(formData.documentCopies[name]) || 1,
+        };
+      })
+      .filter((doc) => doc.document_type_id);
 
     const payload = {
       request_purpose_id: purposeId,
       or_number: formData.receiptNumber,
       receipt_date: formData.dateOfPayment,
-      documents: formData.documentsRequested
-        .map((name) => {
-          const dbDoc = availableDocs.find((d) => d.document_name === name);
-          const id =
-            dbDoc?.document_type_id ??
-            Object.keys(DOC_TYPE_MAP).find((key) => docTypeName(key) === name);
-          return {
-            document_type_id: id,
-            number_of_copies: parseInt(formData.documentCopies[name]) || 1,
-          };
-        })
-        .filter((doc) => doc.document_type_id),
+      documents: documents,
       certificates: certificates,
     };
 
@@ -460,6 +465,8 @@ export const useAlumniRequest = ({ showProfileStep = false }) => {
     verifyOrMutation.reset();
     setUnresolvedItems([]);
     setAutoFilledNames([]);
+    setSuggestedDocIds({});
+    setSuggestedCertIds({});
   };
 
   const isLoading = mutation.isPending;
