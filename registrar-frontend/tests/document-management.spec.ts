@@ -31,7 +31,7 @@ test.describe('Document and Certificate Management E2E Tests', () => {
     });
 
     // 3. Mock /api/certifications
-    await page.route('**/api/certifications', async (route) => {
+    await page.route('**/api/certifications*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -49,7 +49,7 @@ test.describe('Document and Certificate Management E2E Tests', () => {
     });
 
     // 4. Mock /api/certifications/layouts
-    await page.route('**/api/certifications/layouts', async (route) => {
+    await page.route('**/api/certifications/layouts*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -58,7 +58,7 @@ test.describe('Document and Certificate Management E2E Tests', () => {
     });
 
     // 5. Mock /api/document-types
-    await page.route('**/api/document-types', async (route) => {
+    await page.route('**/api/document-types*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -192,7 +192,7 @@ test.describe('Document and Certificate Management E2E Tests', () => {
     let postRequestPayload: any = null;
 
     // Intercept POST request
-    await page.route('**/api/certifications', async (route) => {
+    await page.route('**/api/certifications*', async (route) => {
       if (route.request().method() === 'POST') {
         postRequestPayload = route.request().postDataJSON();
         await route.fulfill({
