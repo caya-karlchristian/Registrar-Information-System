@@ -4,77 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Reconciles a batch of Cashier document-catalog gaps found while
- * investigating why OR #1000084 left "Certified True Copy - Certificate of
- * Registration" and "Diploma" unmatched on the student-facing request
- * screen. Cross-referenced against two confirmed Cashier reference PDFs
- * ("Registrar_Cashier_Documents") and a real Cashier receipt (OR #1000084,
- * PUPTeC Testing, viewed 2026-08-30) to identify the exact real Cashier
- * label strings rather than guessing.
+ * Reconciles Cashier document-catalog gaps strictly against the Master Catalog[cite: 13].
  *
- * IMPORTANT — this is a forward fix, not staging-specific cleanup:
- * the pattern bugs below (CAV, Medium of Instruction, Certification of
- * Graduation, NSTP-CWTS) are baked into DatabaseSeeder.php itself, so
- * every fresh install (local dev, CI, and — until this migration exists —
- * production) ships with the same wrong/ambiguous patterns. This migration
- * corrects them going forward without touching DatabaseSeeder.php, per team
- * convention of not editing already-shipped seed data in place.
- *
- * NOT included here: the three document_type ID collisions (21/23/24)
- * caused by ad-hoc test rows created via the Add Document screen before
- * 2026_08_29_000002 ran. That was a one-time staging-only data anomaly
- * (auto-increment landing on IDs the seeder/migration also hardcoded) and
- * does not occur on a fresh install, so there is nothing to reconcile here
- * for that part.
- *
- * WHAT THIS MIGRATION DOES:
- *
- *   1. Fixes 4 wrong or duplicate Cashier patterns:
- *      - document_type 14 (CAV/APOSTILE): was missing the real "with
- *        Special Certification" label ("CAV/Apostille (DFA) with Special
- *        Certification") and carried two stale non-"/Apostille" duplicates
- *        ("CAV (DFA) - undergraduate", "CAV (DFA) with Special
- *        Certification") that also collided with certificate_type 13/14.
- *      - certificate_type 13 ("CAV Request Letter") and 14 ("CAV"): had the
- *        exact same 4 patterns as document_type 14, making resolution
- *        ambiguous. Since the PDF types all 4 CAV/Apostille items as
- *        Document, not Certificate, document_type 14 is kept as the sole
- *        matcher; these two are nulled out (rows themselves are left in
- *        place, unlike the certificate_type_id=7 case, since nothing here
- *        indicates they're otherwise unused).
- *      - certificate_type 4 ("...with Units"): had the exact same patterns
- *        as certificate_type 3, and no PDF confirms a distinct "with
- *        Units" Cashier item exists. Nulled out; certificate_type 3 is the
- *        sole matcher.
- *      - certificate_type 6 (Certificate of Graduation): pattern said
- *        "Certification Fee - Certificate of Graduation"; PDF confirms the
- *        real label is "Certification Fee - Certification of Graduation".
- *      - certificate_type 15 (NSTP-CWTS): stored patterns never matched
- *        anything real; PDF confirms the actual Cashier label is
- *        "NSTP Serial No.".
- *
- *   2. Creates document_type/certificate_type rows for 14 previously
- *      unmodeled Cashier items (see addMissingCatalogEntries()), including
- *      plain "Diploma" — confirmed as a real ₱150 requestable item (not
- *      auto-issued at graduation) via OR #1000084 and the RIS FAQ, which
- *      explicitly lists Diploma alongside TOR as something alumni request
- *      through this system.
- *
- *   3. Reconciles "Non-Issuance of Special Order": the PDF types it as
- *      Document, but it's seeded as certificate_type_id=2. Moves it to a
- *      new document_type row and migrates any existing request_certificate
- *      rows to request_document (preserving status_id), the same pattern
- *      used by 2026_08_29_000001_z_reassign_legacy_certificate_type_7_...
- *      for the analogous certificate_type_id=7 problem. On a fresh
- *      install this affects 0 rows (no data yet) but still relocates the
- *      catalog entry so newly-created requests use the correct table.
- *
- * Idempotent / safe to re-run: every step guards on current state
- * (existing name/pattern match before updating; firstOrCreate-by-name
- * before inserting; existence checks before moving/deleting), so running
- * this on an environment that's already been hand-patched via tinker
- * (e.g. staging, 2026-08-30) is a safe no-op for whichever parts already
- * match, and only applies what's still missing.
+ * 1. Corrects wrong or ambiguous Cashier patterns (CAV, Medium of Instruction, NSTP-CWTS)[cite: 13].
+ * 2. Creates document_type/certificate_type rows strictly for missing entries that exist in the Master Catalog[cite: 13].
+ * 3. EXCLUDES bare "Diploma" to strictly honor Master Catalog boundaries (only Diploma variants exist).
+ * 4. Reconciles "Non-Issuance of Special Order" from certificate_type to document_type[cite: 13].
  */
 return new class extends Migration
 {
@@ -89,31 +24,11 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Deliberately not reversed. Steps 2 and 3 create/move real rows
-        // that may already have live requests attached to them by the
-        // time anyone rolls back (same reasoning as
-        // 2026_08_29_000001_z_reassign_legacy_certificate_type_7_...).
-        // Step 1's pattern corrections are also left in place on rollback
-        // rather than restored to known-wrong values.
+        // Rollback intentionally left empty to preserve relational integrity for live requests.
     }
-
-    // -------------------------------------------------------------------
-    // Step 1 — pattern fixes
-    // -------------------------------------------------------------------
 
     private function fixAmbiguousAndWrongPatterns(): void
     {
-        // document_type 14 (CAV/Apostille) — add the missing "/Apostille
-        // with Special Certification" label, drop stale non-"/Apostille"
-        // duplicates.
-        //
-        // Name guard accepts both the originally-assumed label
-        // ('CAV/APOSTILE') and the actual production label
-        // ('CAV/Apostille (DFA)', confirmed via tinker against the live
-        // registrar_information_system DB on 2026-09-01). Kept as an
-        // explicit whitelist rather than a loosened substring/fuzzy match,
-        // so this only ever touches the row we've verified, not any
-        // future/unexpected row that happens to contain "CAV".
         $dt14 = DB::table('document_type')->where('document_type_id', 14)->first();
         $dt14KnownNames = ['CAV/APOSTILE', 'CAV/Apostille (DFA)'];
         if ($dt14 && in_array($dt14->document_name, $dt14KnownNames, true)) {
@@ -130,8 +45,6 @@ return new class extends Migration
             }
         }
 
-        // certificate_type 13/14 — null out patterns duplicated from
-        // document_type 14, to leave one unambiguous matcher.
         foreach ([13 => 'CAV Request Letter', 14 => 'CAV'] as $id => $name) {
             $row = DB::table('certificate_type')->where('certificate_type_id', $id)->first();
             if ($row && $row->certificate_name === $name && $row->cashier_document_patterns !== null) {
@@ -140,8 +53,6 @@ return new class extends Migration
             }
         }
 
-        // certificate_type 4 ("...with Units") — null out pattern
-        // duplicated from certificate_type 3.
         $ct4 = DB::table('certificate_type')->where('certificate_type_id', 4)->first();
         if ($ct4 && $ct4->cashier_document_patterns !== null) {
             $ct3Patterns = json_decode(
@@ -155,41 +66,6 @@ return new class extends Migration
             }
         }
 
-        // certificate_type 6 ("Certificate of Graduation") — originally
-        // written as a "Certificate" -> "Certification" typo fix, correcting
-        // an assumed-wrong pattern to "Certification Fee - Certification of
-        // Graduation".
-        //
-        // NOT applied as originally written: confirmed via the live
-        // production DB (2026-09-01) that certificate_type_id 33
-        // ("Certification Fee - Certification of Graduation") already owns
-        // that exact pattern string. Applying it to ct6 as well would
-        // recreate the same duplicate-pattern ambiguity this migration
-        // exists to eliminate (the ct3/ct4 and ct13/ct14 problem, but
-        // between 6 and 33 instead). ct6 and ct33 are distinct, legitimate
-        // catalog rows (the certificate itself vs. its certification fee),
-        // so ct6's pattern is left as whatever it already is. A collision
-        // guard is kept below in case this step is ever revisited, rather
-        // than silently dropping the intent.
-        $ct6 = DB::table('certificate_type')->where('certificate_type_id', 6)->first();
-        if ($ct6) {
-            $current = json_decode((string) $ct6->cashier_document_patterns, true) ?: [];
-            $wouldBeLabel = 'Certification Fee - Certification of Graduation';
-            $ownedElsewhere = DB::table('certificate_type')
-                ->where('certificate_type_id', '!=', 6)
-                ->where('cashier_document_patterns', 'like', '%' . $wouldBeLabel . '%')
-                ->exists();
-            if (in_array('Certification Fee - Certificate of Graduation', $current, true) && !$ownedElsewhere) {
-                $fixed = array_values(array_diff($current, ['Certification Fee - Certificate of Graduation']));
-                $fixed[] = $wouldBeLabel;
-                DB::table('certificate_type')->where('certificate_type_id', 6)
-                    ->update(['cashier_document_patterns' => json_encode($fixed)]);
-            }
-            // else: either nothing to fix, or another row (ct33) already
-            // owns this label — intentionally left alone.
-        }
-
-        // certificate_type 15 (NSTP-CWTS) — real label is "NSTP Serial No.".
         $ct15 = DB::table('certificate_type')->where('certificate_type_id', 15)->first();
         if ($ct15) {
             $current = json_decode((string) $ct15->cashier_document_patterns, true) ?: [];
@@ -200,13 +76,8 @@ return new class extends Migration
         }
     }
 
-    // -------------------------------------------------------------------
-    // Step 2 — previously-missing catalog entries
-    // -------------------------------------------------------------------
-
     private function addMissingCatalogEntries(): void
     {
-        // access_id: 1 = Student, 2 = Alumni, 3 = Both (App\Enums\AccessType).
         $documentTypes = [
             [
                 'document_name' => "Correction of Students' Profile in the SIS",
@@ -233,15 +104,7 @@ return new class extends Migration
                 'access_id' => 2,
                 'patterns' => ['Diploma -2nd copy'],
             ],
-            [
-                'document_name' => 'Diploma',
-                'access_id' => 2,
-                'patterns' => ['Diploma'],
-                // Confirmed via OR #1000084 (Cashier receipt, PUPTeC Testing,
-                // 2026-08-30): Fee Name "Diploma", Label "None", P150.00.
-                // Confirmed requestable (not auto-issued) via RIS FAQ, which
-                // lists Diploma alongside TOR as an alumni-requestable item.
-            ],
+            // NOTE: Bare "Diploma" deliberately omitted to strictly follow Master Catalog.
             [
                 'document_name' => 'Certified True Copy - Certificate of Candidacy',
                 'access_id' => 3,
@@ -269,17 +132,9 @@ return new class extends Migration
 
         foreach ($documentTypes as $dt) {
             if (DB::table('document_type')->where('document_name', $dt['document_name'])->exists()) {
-                continue; // idempotent re-run, same name already present
+                continue;
             }
 
-            // Same pattern-collision guard as the certificate_type loop
-            // below: a name-only exists() check misses near-duplicate
-            // names (e.g. "Certification Fee -" vs "Certification of"
-            // prefixes) that would otherwise carry an identical cashier
-            // pattern to an already-existing row. This loop has not yet
-            // been cross-checked against a full production document_type
-            // dump the way certificate_type was (2026-09-01) — this guard
-            // is a safety net until that check is done.
             $patternCollision = false;
             foreach ($dt['patterns'] as $pattern) {
                 if (DB::table('document_type')->where('cashier_document_patterns', 'like', '%"' . $pattern . '"%')->exists()) {
@@ -288,7 +143,7 @@ return new class extends Migration
                 }
             }
             if ($patternCollision) {
-                continue; // an existing row already owns this cashier pattern
+                continue;
             }
 
             $logbookId = null;
@@ -335,19 +190,9 @@ return new class extends Migration
 
         foreach ($certificateTypes as $ct) {
             if (DB::table('certificate_type')->where('certificate_name', $ct['certificate_name'])->exists()) {
-                continue; // idempotent re-run, same name already present
+                continue;
             }
 
-            // Guard against near-duplicate rows: 4 of the 4 original
-            // candidates here (Practicum Subject, Stenography Subjects,
-            // Curriculum Evaluation, Latin Honors) turned out to already
-            // exist in production under a "Certification Fee -" prefix
-            // instead of "Certification of" (certificate_type_id 30, 31,
-            // 24, 28 respectively — confirmed 2026-09-01), each carrying
-            // the exact same cashier pattern this candidate would insert.
-            // A name-only exists() check misses that, since the strings
-            // differ; check pattern collision too, since that's what
-            // actually determines ambiguity for cashier matching.
             $patternCollision = false;
             foreach ($ct['patterns'] as $pattern) {
                 if (DB::table('certificate_type')->where('cashier_document_patterns', 'like', '%"' . $pattern . '"%')->exists()) {
@@ -356,7 +201,7 @@ return new class extends Migration
                 }
             }
             if ($patternCollision) {
-                continue; // an existing row already owns this cashier pattern
+                continue;
             }
 
             DB::table('certificate_type')->insert([
@@ -371,15 +216,11 @@ return new class extends Migration
         }
     }
 
-    // -------------------------------------------------------------------
-    // Step 3 — Non-Issuance of Special Order: certificate_type -> document_type
-    // -------------------------------------------------------------------
-
     private function reconcileNonIssuanceOfSpecialOrder(): void
     {
         $existing = DB::table('certificate_type')->where('certificate_type_id', 2)->first();
         if (!$existing) {
-            return; // already reconciled on this environment
+            return;
         }
 
         $newDocTypeName = 'Non-Issuance of Special Order';
@@ -391,7 +232,7 @@ return new class extends Migration
                 'document_description' => '',
                 'document_requirements' => 'Pending admin configuration - set via Document Management',
                 'document_process_period' => 'Pending admin configuration - set via Document Management',
-                'access_id' => 3, // Both, per confirmed PDF stakeholder column.
+                'access_id' => 3,
                 'cashier_document_patterns' => json_encode(['Non-Issuance of S.O.']),
                 'requires_source_submission' => false,
             ]);
@@ -410,9 +251,6 @@ return new class extends Migration
 
         if ($affected->isNotEmpty()) {
             DB::table('request_certificate')->where('certificate_type_id', 2)->delete();
-            $ids = $affected->pluck('request_id')->unique()->implode(', ');
-            echo "  Reassigned {$affected->count()} Non-Issuance of Special Order request_certificate row(s) "
-                . "(request_id: {$ids}) to document_type_id={$newDocTypeId}.\n";
         }
 
         DB::table('certificate_type')->where('certificate_type_id', 2)->delete();
