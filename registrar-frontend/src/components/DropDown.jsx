@@ -3,18 +3,36 @@ import PropTypes from 'prop-types';
 import { ChevronDownIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '../context/ThemeContext';
 
-const DropdownGroup = ({ label, name, value, onChange, options, required = false, labelColor = 'text-white' }) => {
+const DropdownGroup = ({ label, name, value, onChange, options, required = false, labelColor = 'text-white', direction = 'auto' }) => {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [openUpward, setOpenUpward] = useState(false);
   const ref = useRef(null);
   const inputRef = useRef(null);
   const { isDark } = useTheme();
 
-  // Clear search term when dropdown closes / auto-focus search input when it opens
+  // Clear search term & auto-detect vertical direction when dropdown opens
   useEffect(() => {
     if (!open) {
       setSearchTerm("");
+      setOpenUpward(false);
     } else {
+      if (ref.current) {
+        const rect = ref.current.getBoundingClientRect();
+        const scrollParent = ref.current.closest('.overflow-y-auto, .overflow-auto, modal');
+        let bottomLimit = window.innerHeight;
+        if (scrollParent) {
+          const parentRect = scrollParent.getBoundingClientRect();
+          bottomLimit = parentRect.bottom;
+        }
+        const spaceBelow = bottomLimit - rect.bottom;
+        const dropdownMenuHeight = 220;
+        if (spaceBelow < dropdownMenuHeight && rect.top > dropdownMenuHeight) {
+          setOpenUpward(true);
+        } else {
+          setOpenUpward(false);
+        }
+      }
       const timer = setTimeout(() => {
         inputRef.current?.focus();
       }, 50);
@@ -38,17 +56,22 @@ const DropdownGroup = ({ label, name, value, onChange, options, required = false
     setOpen(false);
   };
 
+  const safeOptions = Array.isArray(options) ? options : [];
   const filteredOptions = searchTerm === ''
-    ? options
-    : options.filter((option) => option.toLowerCase().includes(searchTerm.toLowerCase()));
+    ? safeOptions
+    : safeOptions.filter((option) => String(option ?? '').toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const isUp = direction === 'up' || (direction === 'auto' && openUpward);
 
   return (
     <div className="w-full group relative" ref={ref}>
       {/* Label */}
-      <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-[#e4e6eb]' : labelColor}`}>
-        {label}
-        {required && <span className={isDark ? 'text-[#FFC72C]' : 'text-red-500'} title="Required"> *</span>}
-      </label>
+      {label && (
+        <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-[#e4e6eb]' : labelColor}`}>
+          {label}
+          {required && <span className={isDark ? 'text-[#FFC72C]' : 'text-red-500'} title="Required"> *</span>}
+        </label>
+      )}
 
       {/* Trigger Button / Input */}
       <div className="relative">
@@ -97,7 +120,7 @@ const DropdownGroup = ({ label, name, value, onChange, options, required = false
         {/* Dropdown Menu */}
         {open && (
           <div
-            className={`absolute z-50 mt-1.5 w-full rounded-xl overflow-hidden ${isDark ? 'bg-[#1f1f1f]' : 'bg-white'}`}
+            className={`absolute z-[9999] ${isUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} w-full rounded-xl overflow-hidden ${isDark ? 'bg-[#1f1f1f]' : 'bg-white'}`}
             style={{ boxShadow: '0 8px 32px -4px rgba(0,0,0,0.18), 0 2px 8px -2px rgba(0,0,0,0.10)', border: '1px solid #FFC72C' }}
           >
             <ul className="max-h-56 overflow-y-auto py-1 dropdown-scroll">
@@ -140,13 +163,14 @@ const DropdownGroup = ({ label, name, value, onChange, options, required = false
 };
 
 DropdownGroup.propTypes = {
-  label: PropTypes.string.isRequired,
+  label: PropTypes.string,
   name: PropTypes.string.isRequired,
-  value: PropTypes.string.isRequired,
+  value: PropTypes.string,
   onChange: PropTypes.func.isRequired,
-  options: PropTypes.arrayOf(PropTypes.string).isRequired,
+  options: PropTypes.arrayOf(PropTypes.string),
   required: PropTypes.bool,
   labelColor: PropTypes.string,
+  direction: PropTypes.string,
 };
 
 export default DropdownGroup;

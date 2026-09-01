@@ -140,12 +140,47 @@ const DocumentManagement = ({
   };
 
   // Filter lists by search query and active status
-  const filteredDocs = documents.filter(
-    (d) => d.document_name.toLowerCase().includes(search.toLowerCase()) && !d.is_archived
-  );
-  const filteredCerts = certifications.filter(
-    (c) => c.certificate_name.toLowerCase().includes(search.toLowerCase()) && !c.is_archived
-  );
+  const searchTerm = search.trim().toLowerCase();
+
+  const filteredDocs = (documents || []).filter((d) => {
+    if (d.is_archived) return false;
+    if (!searchTerm) return true;
+
+    const name = String(d?.document_name ?? "").toLowerCase();
+    const reqs = String(d?.document_requirements ?? "").toLowerCase();
+    const desc = String(d?.document_description ?? "").toLowerCase();
+    const period = String(d?.document_process_period ?? "").toLowerCase();
+    const patterns = Array.isArray(d?.cashier_document_patterns)
+      ? d.cashier_document_patterns.join(" ").toLowerCase()
+      : String(d?.cashier_document_patterns ?? "").toLowerCase();
+
+    return (
+      name.includes(searchTerm) ||
+      reqs.includes(searchTerm) ||
+      desc.includes(searchTerm) ||
+      period.includes(searchTerm) ||
+      patterns.includes(searchTerm)
+    );
+  });
+
+  const filteredCerts = (certifications || []).filter((c) => {
+    if (c.is_archived) return false;
+    if (!searchTerm) return true;
+
+    const name = String(c?.certificate_name ?? "").toLowerCase();
+    const reqs = String(c?.certificate_requirements ?? "").toLowerCase();
+    const period = String(c?.certificate_process_period ?? "").toLowerCase();
+    const patterns = Array.isArray(c?.cashier_document_patterns)
+      ? c.cashier_document_patterns.join(" ").toLowerCase()
+      : String(c?.cashier_document_patterns ?? "").toLowerCase();
+
+    return (
+      name.includes(searchTerm) ||
+      reqs.includes(searchTerm) ||
+      period.includes(searchTerm) ||
+      patterns.includes(searchTerm)
+    );
+  });
 
   return (
     <div className={`font-sans rounded-2xl p-4 sm:px-6 ${isDark ? "bg-[#18191a] text-[#e4e6eb]" : "bg-white text-gray-900"}`}>

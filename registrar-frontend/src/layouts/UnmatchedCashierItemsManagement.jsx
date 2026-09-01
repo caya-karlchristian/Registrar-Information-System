@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { XMarkIcon, FunnelIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../context/ThemeContext";
 import { useReferenceData } from "../context/ReferenceDataContext";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import DropdownGroup from "../components/DropDown.jsx";
 import ConfirmationModal from "../components/ConfirmationModal.jsx";
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
+import DashboardDropdown from "../components/DashboardDropdown.jsx";
 import {
   getUnmatchedCashierItems,
   resolveUnmatchedCashierItem,
@@ -33,6 +35,9 @@ const UnmatchedCashierItemsManagement = () => {
   const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState("last_seen_at");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   // { open, item, targetKind: 'document' | 'certificate', targetId }
   const [resolveModal, setResolveModal] = useState({ open: false, item: null, targetKind: "document", targetId: "" });
@@ -162,6 +167,46 @@ const UnmatchedCashierItemsManagement = () => {
     }
   };
 
+  const filteredItems = useMemo(() => {
+    let result = [...items];
+
+    const term = search.trim().toLowerCase();
+    if (term) {
+      result = result.filter((item) => {
+        const label = String(item.raw_label ?? "").toLowerCase();
+        const resolver = item.resolved_by_user
+          ? String(
+              item.resolved_by_user.email ??
+                `${item.resolved_by_user.admin_profile?.first_name ?? ""} ${item.resolved_by_user.admin_profile?.last_name ?? ""}`
+            ).toLowerCase()
+          : "";
+        return label.includes(term) || resolver.includes(term);
+      });
+    }
+
+    result.sort((a, b) => {
+      let valA = a[sortField];
+      let valB = b[sortField];
+
+      if (sortField === "last_seen_at") {
+        valA = new Date(a.last_seen_at || 0).getTime();
+        valB = new Date(b.last_seen_at || 0).getTime();
+      } else if (sortField === "raw_label") {
+        valA = String(a.raw_label || "").toLowerCase();
+        valB = String(b.raw_label || "").toLowerCase();
+      } else if (sortField === "occurrence_count") {
+        valA = Number(a.occurrence_count || 0);
+        valB = Number(b.occurrence_count || 0);
+      }
+
+      if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+      if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [items, search, sortField, sortOrder]);
+
   const cardClasses = isDark
     ? "bg-[#18191a] text-[#e4e6eb]"
     : "bg-white text-gray-900";
@@ -206,12 +251,51 @@ const UnmatchedCashierItemsManagement = () => {
 
       {/* Table */}
       <div className={`rounded-xl border overflow-hidden ${rowBorder}`}>
+        {/* Search Header Bar */}
+        <div className={`p-4 border-b ${isDark ? 'border-[#3e4042] bg-[#1a1a1c]/20' : 'border-gray-200 bg-gray-50/50'}`}>
+          <div className="w-full sm:max-w-md">
+            <VoiceSearchInput
+              value={search}
+              onChange={(val) => setSearch(val)}
+              placeholder="Search by receipt label or resolver..."
+            />
+          </div>
+        </div>
+
         <table className="w-full text-sm">
           <thead>
             <tr className={`text-left ${isDark ? "bg-[#242526]" : "bg-gray-50"}`}>
               <th className="px-4 py-3 font-semibold">Receipt Label</th>
               <th className="px-4 py-3 font-semibold">Occurrences</th>
-              <th className="px-4 py-3 font-semibold">Last Seen</th>
+
+              {/* Last Seen Header (Sortable) */}
+              <th className="px-4 py-3 font-semibold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sortField === "last_seen_at") {
+                      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+                    } else {
+                      setSortField("last_seen_at");
+                      setSortOrder("desc");
+                    }
+                  }}
+                  className={`flex items-center gap-1 text-xs font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${
+                    isDark ? "text-[#b0b3b8]" : "text-gray-500"
+                  }`}
+                >
+                  <span>Last Seen</span>
+                  {sortField === "last_seen_at" ? (
+                    sortOrder === "asc" ? (
+                      <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" />
+                    ) : (
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
+                    )
+                  ) : (
+                    <ChevronDownIcon className="w-3.5 h-3.5 text-gray-400 opacity-50" />
+                  )}
+                </button>
+              </th>
               {showResolved && <th className="px-4 py-3 font-semibold">Resolved By</th>}
               {!showResolved && <th className="px-4 py-3 font-semibold text-right">Actions</th>}
             </tr>
@@ -219,18 +303,18 @@ const UnmatchedCashierItemsManagement = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className={`px-4 py-8 text-center ${subtleText}`}>
+                <td colSpan={showResolved ? 4 : 4} className={`px-4 py-8 text-center ${subtleText}`}>
                   Loading...
                 </td>
               </tr>
-            ) : items.length === 0 ? (
+            ) : filteredItems.length === 0 ? (
               <tr>
-                <td colSpan={4} className={`px-4 py-8 text-center ${subtleText}`}>
-                  {showResolved ? "No resolved items yet." : "Nothing unresolved right now — all clear!"}
+                <td colSpan={showResolved ? 4 : 4} className={`px-4 py-8 text-center ${subtleText}`}>
+                  {search.trim() ? "No items matching search." : showResolved ? "No resolved items yet." : "Nothing unresolved right now — all clear!"}
                 </td>
               </tr>
             ) : (
-              items.map((item) => (
+              filteredItems.map((item) => (
                 <tr key={item.unmatched_cashier_item_id} className={`border-t ${rowBorder}`}>
                   <td className="px-4 py-3 font-medium">{item.raw_label}</td>
                   <td className="px-4 py-3">{item.occurrence_count}</td>
