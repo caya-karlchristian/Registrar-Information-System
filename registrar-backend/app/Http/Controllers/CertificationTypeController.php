@@ -81,12 +81,26 @@ class CertificationTypeController extends Controller
         );
     }
 
-    public function index()
+    /**
+     * List certification types.
+     *
+     * Excludes archived items by default — see DocumentTypeController::
+     * index() for the full rationale; this endpoint has the identical
+     * shared-audience problem via getCertifications() in api.js.
+     */
+    public function index(Request $request)
     {
-        return response()->json(
-            CertificationType::query()->select($this->certColumns())->get(),
-            200
-        );
+        $includeArchived = $request->boolean('include_archived')
+            && Auth::user()
+            && in_array((int) Auth::user()->role_id, [3, 4], true);
+
+        $query = CertificationType::query()->select($this->certColumns());
+
+        if (!$includeArchived) {
+            $query->where('is_archived', false);
+        }
+
+        return response()->json($query->get(), 200);
     }
 
     public function show($id)

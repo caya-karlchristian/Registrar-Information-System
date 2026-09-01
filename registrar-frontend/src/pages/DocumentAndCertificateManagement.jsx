@@ -48,8 +48,8 @@ const DocumentAndCertificateManagement = () => {
       try {
         setLoading(true);
         const [docsRes, certsRes, layoutsRes] = await Promise.all([
-          getDocumentTypes(),
-          getCertifications(),
+          getDocumentTypes(true),
+          getCertifications(true),
           getCertificationLayouts()
         ]);
         // Trust the real is_archived/archived_on values from the API now
