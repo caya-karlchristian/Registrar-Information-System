@@ -18,8 +18,6 @@ use Laravel\Sanctum\Sanctum;
 uses(RefreshDatabase::class);
 
 // ── Local helpers ────────────────────────────────────────────────────────
-// Self-contained on purpose (not reused from other test files) — see
-// AlumniProvisioningTest.php's helper docblock for why.
 
 function suffixTestMakeAdmin(): SystemUser
 {
@@ -28,11 +26,6 @@ function suffixTestMakeAdmin(): SystemUser
     return $admin;
 }
 
-/**
- * A raw OGOS flat-student payload as actually returned by
- * GET /integrations/students/profile?email= — including the real
- * `suffixName` key (confirmed via Postman capture, 2026-08-13).
- */
 function suffixTestOgosPayload(array $overrides = []): array
 {
     return array_merge([
@@ -49,11 +42,6 @@ function suffixTestOgosPayload(array $overrides = []): array
     ], $overrides);
 }
 
-/**
- * Mocks OgosClient so OgosStudentService::provisionStudentData() runs its
- * full happy path (student + personal-info + addresses all "succeed") for
- * a given user's email.
- */
 function suffixTestMockOgosSuccess(string $email, array $payloadOverrides = []): void
 {
     $dto = OgosStudentDTO::fromArray(suffixTestOgosPayload(array_merge(['email' => $email], $payloadOverrides)));
@@ -81,10 +69,25 @@ function suffixTestSeedCashierRefData(): array
         RequestStatus::firstOrCreate(['status_id' => $id], ['status_name' => $name]);
     }
     $purpose = RequestPurpose::firstOrCreate(['request_purpose_id' => 1], ['purpose_name' => 'DFA']);
-    $docType = DocumentType::firstOrCreate(
-        ['document_type_id' => 1],
-        ['document_name' => 'Transcript of Records', 'document_description' => '', 'document_process_period' => 5, 'access_id' => 1]
-    );
+
+    // Retrieve or update ID 1 so its name and patterns explicitly match mock receipt lines
+    $docType = DocumentType::where('document_type_id', 1)->first();
+    if ($docType) {
+        $docType->update([
+            'document_name' => 'Transcript of Records',
+            'cashier_document_patterns' => json_encode(['Transcript of Records']),
+        ]);
+    } else {
+        $docType = DocumentType::create([
+            'document_type_id'          => 1,
+            'document_name'             => 'Transcript of Records',
+            'document_description'      => '',
+            'document_process_period'   => 5,
+            'access_id'                 => 1,
+            'cashier_document_patterns' => json_encode(['Transcript of Records']),
+        ]);
+    }
+
     return compact('purpose', 'docType');
 }
 
@@ -114,8 +117,7 @@ test('OgosStudentDTO treats a missing suffixName key as no suffix', function () 
 });
 
 // ═════════════════════════════════════════════════════════════════════════
-// SYNC — OgosStudentService writes the parsed suffix onto student_profile,
-// treating it as source-of-truth like first/middle/last name.
+// SYNC — OgosStudentService writes the parsed suffix onto student_profile
 // ═════════════════════════════════════════════════════════════════════════
 
 test('OGOS login sync writes the suffix onto a new student_profile row', function () {
@@ -141,9 +143,6 @@ test('OGOS login sync updates the suffix on an existing student_profile row', fu
 
 test('OGOS login sync clears suffix when OGOS reports none', function () {
     $user = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT]);
-    // OGOS is the source of truth for this field, same as first/last name —
-    // a previously-synced suffix that no longer appears upstream (e.g. a
-    // data correction on OGOS's side) should follow, not linger stale.
     StudentProfile::factory()->create(['user_id' => $user->user_id, 'suffix' => 'Jr.']);
 
     suffixTestMockOgosSuccess($user->email, ['suffixName' => '']);
@@ -154,11 +153,7 @@ test('OGOS login sync clears suffix when OGOS reports none', function () {
 });
 
 // ═════════════════════════════════════════════════════════════════════════
-// END-TO-END — the suffix now actually reaches NameMatcher's candidates,
-// which is what the cashier OR verification flow depends on. This is the
-// scenario from the bug report: OGOS sends "Jr.", the OR is on file
-// exactly as the Cashier admin typed it, and RIS must generate a candidate
-// that includes the suffix to find a match.
+// END-TO-END — cashier OR verification with suffix
 // ═════════════════════════════════════════════════════════════════════════
 
 test('a suffixed student can be OR-verified once their suffix has synced from OGOS', function () {
@@ -180,9 +175,6 @@ test('a suffixed student can be OR-verified once their suffix has synced from OG
     Sanctum::actingAs($user);
     ['purpose' => $purpose, 'docType' => $docType] = suffixTestSeedCashierRefData();
 
-    // Simulates the real OR from the bug report — filed on the Cashier
-    // side with the suffix folded into the last-name slot, exactly the
-    // format NameMatcher's 2026-08-13 fix generates a candidate for.
     Http::fake(function ($request) {
         $body = $request->data();
 
@@ -194,7 +186,9 @@ test('a suffixed student can be OR-verified once their suffix has synced from OG
                     'receipt_number'   => 1234567,
                     'customer_name'    => 'NONO JR., JOEGE C.',
                     'transaction_date' => now()->toDateTimeString(),
-                    'items'            => [],
+                    'items'            => [
+                        ['document' => 'Transcript of Records', 'quantity' => 1]
+                    ],
                 ],
             ], 200);
         }
@@ -217,10 +211,7 @@ test('a suffixed student can be OR-verified once their suffix has synced from OG
 });
 
 // ═════════════════════════════════════════════════════════════════════════
-// STAFF OVERRIDE — still needed for the window between account creation
-// and a student's first successful OGOS sync (or while OGOS is down), and
-// still validated the same way regardless of where the value ultimately
-// comes from.
+// STAFF OVERRIDE
 // ═════════════════════════════════════════════════════════════════════════
 
 test('admin can set a suffix when updating a student profile', function () {
@@ -261,6 +252,6 @@ test('suffix is rejected past the column width', function () {
     $profile = StudentProfile::factory()->create();
 
     $this->putJson("/api/students/{$profile->student_profile_id}", [
-        'suffix' => str_repeat('X', 21), // student_profile.suffix is varchar(20)
+        'suffix' => str_repeat('X', 21),
     ])->assertStatus(422);
 });
