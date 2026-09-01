@@ -70,6 +70,21 @@ use Illuminate\Support\Facades\DB;
  * row still references it (fails loudly with a clear message instead of
  * silently orphaning historical request data). If that happens, resolve
  * or reassign those requests first, then re-run.
+ *
+ * PRODUCTION-SAFETY FIX (2026-09-01): splitCompletionFeeRow() and
+ * insertCtcDocumentTypes() previously checked idempotency by hardcoded
+ * document_type_id (10/19/20 and 21-29) and inserted rows at those exact
+ * IDs. On an environment where these items were already reconciled by
+ * hand under DIFFERENT auto-increment IDs (e.g. production, patched
+ * directly via tinker before this migration existed), those ID-based
+ * checks would find nothing at IDs 19-29 and happily insert brand-new
+ * DUPLICATE rows for names that already exist elsewhere in the table.
+ * Both methods now resolve idempotency by document_name — the Master
+ * Catalog's RIS column is the authoritative key for "does this item
+ * already exist", never the numeric ID — so this is safe to run whether
+ * the target rows already exist under any ID, don't exist yet, or exist
+ * partially. down() is updated to match: it now removes rows by name
+ * instead of by the IDs this migration no longer guarantees.
  */
 return new class extends Migration
 {
@@ -96,16 +111,22 @@ return new class extends Migration
      * AccessType's seeded convention: 1 = Student, 2 = Alumni, 3 = Both.
      */
     private const CTC_DOCUMENT_TYPES = [
-        ['id' => 21, 'name' => 'Authentication Fee - Diploma', 'access_id' => 2],
-        ['id' => 22, 'name' => 'Authentication Fee - Transcript & Diploma', 'access_id' => 2],
-        ['id' => 23, 'name' => 'Authentication Fee - Transcript of Records', 'access_id' => 2],
-        ['id' => 24, 'name' => 'Certified True Copy - Certificate of Registration', 'access_id' => 1],
-        ['id' => 25, 'name' => 'Certified True Copy - Certificate of Candidacy', 'access_id' => 3],
-        ['id' => 26, 'name' => 'Certified True Copy - Certificate of Graduation', 'access_id' => 3],
-        ['id' => 27, 'name' => 'Certified True Copy - Diploma', 'access_id' => 2],
-        ['id' => 28, 'name' => 'Certified True Copy - Informative Copy of Grades', 'access_id' => 2],
-        ['id' => 29, 'name' => 'Certified True Copy - Transcript of Records', 'access_id' => 3],
+        ['name' => 'Authentication Fee - Diploma', 'access_id' => 2],
+        ['name' => 'Authentication Fee - Transcript & Diploma', 'access_id' => 2],
+        ['name' => 'Authentication Fee - Transcript of Records', 'access_id' => 2],
+        ['name' => 'Certified True Copy - Certificate of Registration', 'access_id' => 1],
+        ['name' => 'Certified True Copy - Certificate of Candidacy', 'access_id' => 3],
+        ['name' => 'Certified True Copy - Certificate of Graduation', 'access_id' => 3],
+        ['name' => 'Certified True Copy - Diploma', 'access_id' => 2],
+        ['name' => 'Certified True Copy - Informative Copy of Grades', 'access_id' => 2],
+        ['name' => 'Certified True Copy - Transcript of Records', 'access_id' => 3],
     ];
+
+    /** The two rows split off from the legacy combined document_type_id 10 row. */
+    private const COMPLETION_FEE_SPLIT_NAMES = ['Completion of Incomplete Grade', 'Late Reporting of Grade'];
+
+    /** document_name the legacy combined row is repurposed into (kept, never deleted). */
+    private const COMPLETION_FEE_BASE_NAME = 'Correction of Entry of Grade';
 
     public function up(): void
     {
@@ -124,15 +145,21 @@ return new class extends Migration
     public function down(): void
     {
         DB::transaction(function () {
-            // Remove the 9 CTC rows.
+            // Remove the 9 CTC rows, by name (their IDs are no longer
+            // guaranteed to be 21-29 — see class docblock's 2026-09-01 note).
             DB::table('document_type')
-                ->whereIn('document_type_id', array_column(self::CTC_DOCUMENT_TYPES, 'id'))
+                ->whereIn('document_name', array_column(self::CTC_DOCUMENT_TYPES, 'name'))
                 ->delete();
 
-            // Remove the split-off Completion Fee rows, restore the original id=10 row.
-            DB::table('document_type')->whereIn('document_type_id', [19, 20])->delete();
+            // Remove the split-off Completion Fee rows, by name.
             DB::table('document_type')
-                ->where('document_type_id', 10)
+                ->whereIn('document_name', self::COMPLETION_FEE_SPLIT_NAMES)
+                ->delete();
+
+            // Restore the original combined row (found by its current,
+            // post-split name — see class docblock's 2026-09-01 note).
+            DB::table('document_type')
+                ->where('document_name', self::COMPLETION_FEE_BASE_NAME)
                 ->update([
                     'document_name' => "Correction of Entry of Grade,\nCompletion of Incomplete Grade,\nLate Reporting of Grade",
                     'cashier_document_patterns' => null,
@@ -209,61 +236,109 @@ return new class extends Migration
         DB::table('certificate_type')->where('certificate_type_id', 7)->delete();
     }
 
+    /**
+     * Splits the legacy combined "Correction of Entry of Grade / Completion
+     * of Incomplete Grade / Late Reporting of Grade" row into three rows.
+     *
+     * Idempotency is resolved by document_name, never by ID: an environment
+     * may already have "Completion of Incomplete Grade" and
+     * "Late Reporting of Grade" as their own rows under IDs this migration
+     * did not create (e.g. hand-reconciled production data), in which case
+     * this is a no-op for those names.
+     */
     private function splitCompletionFeeRow(int $completionLogbookId): void
     {
-        $original = DB::table('document_type')->where('document_type_id', 10)->first();
-        if (!$original || $original->document_name === 'Correction of Entry of Grade') {
-            // Already migrated, or the row doesn't exist in this environment — skip.
-            return;
+        $splitNamesAlreadyExist = DB::table('document_type')
+            ->whereIn('document_name', self::COMPLETION_FEE_SPLIT_NAMES)
+            ->pluck('document_name')
+            ->all();
+
+        // Repurpose the legacy combined row into the "base" split name, if
+        // it still exists under its legacy combined name. Matched by name,
+        // not by the historical id=10 — that id is not guaranteed on every
+        // environment (e.g. an environment seeded fresh after this
+        // reconciliation already existed).
+        $legacyCombinedNames = [
+            "Correction of Entry of Grade,\nCompletion of Incomplete Grade,\nLate Reporting of Grade",
+            'Correction of Entry of Grade, Completion of Incomplete Grade, Late Reporting of Grade',
+        ];
+        $legacyRow = DB::table('document_type')
+            ->whereIn('document_name', $legacyCombinedNames)
+            ->first();
+
+        if ($legacyRow) {
+            DB::table('document_type')->where('document_type_id', $legacyRow->document_type_id)->update([
+                'document_name' => self::COMPLETION_FEE_BASE_NAME,
+                'cashier_document_patterns' => json_encode([
+                    'Correction of Entry of Grade',
+                    'Completion Fee (correction of entry)',
+                ]),
+                'logbook_category_id' => $completionLogbookId,
+            ]);
         }
 
-        DB::table('document_type')->where('document_type_id', 10)->update([
-            'document_name' => 'Correction of Entry of Grade',
-            'cashier_document_patterns' => json_encode([
-                'Correction of Entry of Grade',
-                'Completion Fee (correction of entry)',
-            ]),
-            'logbook_category_id' => $completionLogbookId,
-        ]);
+        // Look up a row (the just-repurposed legacy row, or a
+        // pre-existing/hand-reconciled one) to use as the template for
+        // requirements/process period/access_id on the newly-created rows.
+        $template = DB::table('document_type')->where('document_name', self::COMPLETION_FEE_BASE_NAME)->first();
 
+        // Nullsafe throughout: $template is null on an environment that
+        // never had the legacy combined row at all (e.g. a fresh DB where
+        // this reconciliation is effectively creating these rows for the
+        // first time) — falls back to the same placeholder text the CTC
+        // rows use rather than dereferencing a null object.
         $shared = [
-            'document_description' => $original->document_description ?? '',
-            'document_requirements' => $original->document_requirements,
-            'document_process_period' => $original->document_process_period,
-            'access_id' => $original->access_id,
+            'document_description' => $template?->document_description ?? '',
+            'document_requirements' => $template?->document_requirements ?? self::PENDING_REQUIREMENTS,
+            'document_process_period' => $template?->document_process_period ?? self::PENDING_PROCESS_PERIOD,
+            'access_id' => $template?->access_id ?? 1, // Student, per Master Catalog STAKEHOLDER column.
             'logbook_category_id' => $completionLogbookId,
             'requires_source_submission' => false,
         ];
 
-        DB::table('document_type')->insert([
-            array_merge($shared, [
-                'document_type_id' => 19,
-                'document_name' => 'Completion of Incomplete Grade',
-                'cashier_document_patterns' => json_encode(['Completion of Incomplete Grade']),
-            ]),
-            array_merge($shared, [
-                'document_type_id' => 20,
-                'document_name' => 'Late Reporting of Grade',
-                'cashier_document_patterns' => json_encode(['Late Reporting of Grade']),
-            ]),
-        ]);
+        $newRows = [
+            'Completion of Incomplete Grade' => ['Completion of Incomplete Grade'],
+            // Cashier pattern intentionally left as an empty array here, not
+            // guessed: per 2026_08_29_000006, "Late Reporting of Grade" has
+            // no real Cashier item behind it — a deliberate, documented
+            // team decision, not an oversight. Do not add a pattern here.
+            'Late Reporting of Grade' => [],
+        ];
+
+        foreach ($newRows as $name => $patterns) {
+            if (in_array($name, $splitNamesAlreadyExist, true)) {
+                continue; // idempotent re-run / already hand-reconciled elsewhere
+            }
+
+            DB::table('document_type')->insert(array_merge($shared, [
+                'document_name' => $name,
+                'cashier_document_patterns' => json_encode($patterns),
+            ]));
+        }
     }
 
+    /**
+     * Inserts the 9 CTC / Authentication Fee document_type rows.
+     *
+     * Idempotency is resolved by document_name, never by ID: on a database
+     * where these already exist under different auto-increment IDs (e.g.
+     * hand-reconciled production data), this correctly finds them and
+     * skips, instead of inserting duplicates.
+     */
     private function insertCtcDocumentTypes(int $ctcLogbookId): void
     {
-        $existingIds = DB::table('document_type')
-            ->whereIn('document_type_id', array_column(self::CTC_DOCUMENT_TYPES, 'id'))
-            ->pluck('document_type_id')
+        $existingNames = DB::table('document_type')
+            ->whereIn('document_name', array_column(self::CTC_DOCUMENT_TYPES, 'name'))
+            ->pluck('document_name')
             ->all();
 
         $rows = [];
         foreach (self::CTC_DOCUMENT_TYPES as $ctc) {
-            if (in_array($ctc['id'], $existingIds, true)) {
-                continue; // idempotency guard for partial re-runs
+            if (in_array($ctc['name'], $existingNames, true)) {
+                continue; // idempotency guard — already exists under some ID
             }
 
             $rows[] = [
-                'document_type_id' => $ctc['id'],
                 'document_name' => $ctc['name'],
                 'document_description' => '',
                 'document_requirements' => self::PENDING_REQUIREMENTS,

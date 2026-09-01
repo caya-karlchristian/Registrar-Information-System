@@ -29,6 +29,22 @@ use Illuminate\Support\Facades\DB;
  * seedCertificateTypes() instead, which is now the single source of truth
  * for those rows' patterns.
  *
+ * PRODUCTION-SAFETY FIX (2026-09-01): certificate_type_id 4, 13, and 14
+ * were still listed below with the exact ambiguous/duplicate patterns that
+ * migration 2026_08_30_000000_reconcile_cashier_document_catalog_gaps
+ * deliberately nulled out (they duplicated document_type 14's CAV/Apostille
+ * patterns and certificate_type 3's Medium-of-Instruction patterns,
+ * making resolution ambiguous). certificate_type_id 6 and 15 were still
+ * listed with the pre-correction wrong Cashier label text that same
+ * migration fixed (a "Certificate"/"Certification" typo on 6, and a
+ * never-real guessed label on 15). Since this seeder runs on every
+ * `db:seed`/`migrate:fresh --seed` AFTER that migration, it was silently
+ * re-breaking exactly what the migration fixed. IDs 4, 6, 13, 14, and 15
+ * are removed/corrected below for the same reason 7/10/15(document) were
+ * already excluded — edit
+ * 2026_08_30_000000_reconcile_cashier_document_catalog_gaps.php instead if
+ * these patterns ever need to change again; do not re-add them here.
+ *
  * To update patterns after a cashier fee rename:
  *   1. Edit the array below (or update via the admin CRUD endpoint).
  *   2. Re-run: php artisan db:seed --class=CashierDocumentPatternsSeeder
@@ -163,13 +179,12 @@ class CashierDocumentPatternsSeeder extends Seeder
                 'Certification Fee - English as Medium of Instruction',
             ],
 
-            // Certification of Medium of Instruction with Units
-            // Same cashier fees as ID 3 — different RIS variant, same payment.
-            4 => [
-                'English as Medium of Instruction',
-                'Certification Fee - Medium of Instruction',
-                'Certification Fee - English as Medium of Instruction',
-            ],
+            // certificate_type_id 4 ("Certification of Medium of
+            // Instruction with Units") intentionally NOT listed here — see
+            // class docblock's 2026-09-01 note. Its Cashier patterns were
+            // an exact duplicate of certificate_type 3's, which
+            // 2026_08_30_000000 nulled out to leave certificate_type 3 as
+            // the sole unambiguous matcher. Do not re-add.
 
             // Certificate of Attendance
             // Confirmed 2026-08-25: not a Registrar item per the final
@@ -178,9 +193,12 @@ class CashierDocumentPatternsSeeder extends Seeder
             5 => null,
 
             // Certificate of Graduation
+            // Corrected 2026-08-30 (2026_08_30_000000): the second pattern
+            // was a "Certificate"/"Certification" typo against the real
+            // Cashier label confirmed via the reference PDF.
             6 => [
                 'Certificate of Graduation - 2nd copy',
-                'Certification Fee - Certificate of Graduation',
+                'Certification Fee - Certification of Graduation',
             ],
 
             // certificate_type_id 7 intentionally NOT listed here — see class
@@ -214,27 +232,21 @@ class CashierDocumentPatternsSeeder extends Seeder
             // Certificate of Ladderized Course — no cashier equivalent
             12 => null,
 
-            // CAV Request Letter
-            13 => [
-                'CAV (CHED)',
-                'CAV (DFA) - undergraduate',
-                'CAV (DFA) with Special Certification',
-                'CAV/Apostille (DFA)',
-            ],
-
-            // CAV — same pool as ID 13
-            14 => [
-                'CAV (CHED)',
-                'CAV (DFA) - undergraduate',
-                'CAV (DFA) with Special Certification',
-                'CAV/Apostille (DFA)',
-            ],
+            // certificate_type_id 13 ("CAV Request Letter") and 14 ("CAV")
+            // intentionally NOT listed here — see class docblock's
+            // 2026-09-01 note. Both carried the exact same 4 patterns as
+            // document_type 14 (CAV/APOSTILE), making resolution
+            // ambiguous. The Cashier reference PDF types all 4 CAV/
+            // Apostille items as Document, not Certificate, so
+            // 2026_08_30_000000 kept document_type 14 as the sole matcher
+            // and nulled these two out. Do not re-add.
 
             // Certification of NSTP-CWTS
-            // Only appears as a labelled cashier fee.
+            // Corrected 2026-08-30 (2026_08_30_000000): the two patterns
+            // below never matched any real Cashier item. The confirmed
+            // real Cashier label (per reference PDF) is "NSTP Serial No.".
             15 => [
-                'Certification Fee - NSTP-CWTS',
-                'Certification Fee - Certification of NSTP-CWTS',
+                'NSTP Serial No.',
             ],
 
             // Endorsement Letter

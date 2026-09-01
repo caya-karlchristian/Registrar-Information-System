@@ -103,11 +103,20 @@ return new class extends Migration
 
     private function fixAmbiguousAndWrongPatterns(): void
     {
-        // document_type 14 (CAV/APOSTILE) — add the missing "/Apostille
+        // document_type 14 (CAV/Apostille) — add the missing "/Apostille
         // with Special Certification" label, drop stale non-"/Apostille"
         // duplicates.
+        //
+        // Name guard accepts both the originally-assumed label
+        // ('CAV/APOSTILE') and the actual production label
+        // ('CAV/Apostille (DFA)', confirmed via tinker against the live
+        // registrar_information_system DB on 2026-09-01). Kept as an
+        // explicit whitelist rather than a loosened substring/fuzzy match,
+        // so this only ever touches the row we've verified, not any
+        // future/unexpected row that happens to contain "CAV".
         $dt14 = DB::table('document_type')->where('document_type_id', 14)->first();
-        if ($dt14 && $dt14->document_name === 'CAV/APOSTILE') {
+        $dt14KnownNames = ['CAV/APOSTILE', 'CAV/Apostille (DFA)'];
+        if ($dt14 && in_array($dt14->document_name, $dt14KnownNames, true)) {
             $current = json_decode((string) $dt14->cashier_document_patterns, true) ?: [];
             $correct = [
                 'CAV (CHED)',
@@ -146,16 +155,38 @@ return new class extends Migration
             }
         }
 
-        // certificate_type 6 — "Certificate" -> "Certification" typo fix.
+        // certificate_type 6 ("Certificate of Graduation") — originally
+        // written as a "Certificate" -> "Certification" typo fix, correcting
+        // an assumed-wrong pattern to "Certification Fee - Certification of
+        // Graduation".
+        //
+        // NOT applied as originally written: confirmed via the live
+        // production DB (2026-09-01) that certificate_type_id 33
+        // ("Certification Fee - Certification of Graduation") already owns
+        // that exact pattern string. Applying it to ct6 as well would
+        // recreate the same duplicate-pattern ambiguity this migration
+        // exists to eliminate (the ct3/ct4 and ct13/ct14 problem, but
+        // between 6 and 33 instead). ct6 and ct33 are distinct, legitimate
+        // catalog rows (the certificate itself vs. its certification fee),
+        // so ct6's pattern is left as whatever it already is. A collision
+        // guard is kept below in case this step is ever revisited, rather
+        // than silently dropping the intent.
         $ct6 = DB::table('certificate_type')->where('certificate_type_id', 6)->first();
         if ($ct6) {
             $current = json_decode((string) $ct6->cashier_document_patterns, true) ?: [];
-            if (in_array('Certification Fee - Certificate of Graduation', $current, true)) {
+            $wouldBeLabel = 'Certification Fee - Certification of Graduation';
+            $ownedElsewhere = DB::table('certificate_type')
+                ->where('certificate_type_id', '!=', 6)
+                ->where('cashier_document_patterns', 'like', '%' . $wouldBeLabel . '%')
+                ->exists();
+            if (in_array('Certification Fee - Certificate of Graduation', $current, true) && !$ownedElsewhere) {
                 $fixed = array_values(array_diff($current, ['Certification Fee - Certificate of Graduation']));
-                $fixed[] = 'Certification Fee - Certification of Graduation';
+                $fixed[] = $wouldBeLabel;
                 DB::table('certificate_type')->where('certificate_type_id', 6)
                     ->update(['cashier_document_patterns' => json_encode($fixed)]);
             }
+            // else: either nothing to fix, or another row (ct33) already
+            // owns this label — intentionally left alone.
         }
 
         // certificate_type 15 (NSTP-CWTS) — real label is "NSTP Serial No.".
@@ -238,7 +269,26 @@ return new class extends Migration
 
         foreach ($documentTypes as $dt) {
             if (DB::table('document_type')->where('document_name', $dt['document_name'])->exists()) {
-                continue; // idempotent re-run
+                continue; // idempotent re-run, same name already present
+            }
+
+            // Same pattern-collision guard as the certificate_type loop
+            // below: a name-only exists() check misses near-duplicate
+            // names (e.g. "Certification Fee -" vs "Certification of"
+            // prefixes) that would otherwise carry an identical cashier
+            // pattern to an already-existing row. This loop has not yet
+            // been cross-checked against a full production document_type
+            // dump the way certificate_type was (2026-09-01) — this guard
+            // is a safety net until that check is done.
+            $patternCollision = false;
+            foreach ($dt['patterns'] as $pattern) {
+                if (DB::table('document_type')->where('cashier_document_patterns', 'like', '%"' . $pattern . '"%')->exists()) {
+                    $patternCollision = true;
+                    break;
+                }
+            }
+            if ($patternCollision) {
+                continue; // an existing row already owns this cashier pattern
             }
 
             $logbookId = null;
@@ -285,7 +335,28 @@ return new class extends Migration
 
         foreach ($certificateTypes as $ct) {
             if (DB::table('certificate_type')->where('certificate_name', $ct['certificate_name'])->exists()) {
-                continue; // idempotent re-run
+                continue; // idempotent re-run, same name already present
+            }
+
+            // Guard against near-duplicate rows: 4 of the 4 original
+            // candidates here (Practicum Subject, Stenography Subjects,
+            // Curriculum Evaluation, Latin Honors) turned out to already
+            // exist in production under a "Certification Fee -" prefix
+            // instead of "Certification of" (certificate_type_id 30, 31,
+            // 24, 28 respectively — confirmed 2026-09-01), each carrying
+            // the exact same cashier pattern this candidate would insert.
+            // A name-only exists() check misses that, since the strings
+            // differ; check pattern collision too, since that's what
+            // actually determines ambiguity for cashier matching.
+            $patternCollision = false;
+            foreach ($ct['patterns'] as $pattern) {
+                if (DB::table('certificate_type')->where('cashier_document_patterns', 'like', '%"' . $pattern . '"%')->exists()) {
+                    $patternCollision = true;
+                    break;
+                }
+            }
+            if ($patternCollision) {
+                continue; // an existing row already owns this cashier pattern
             }
 
             DB::table('certificate_type')->insert([
