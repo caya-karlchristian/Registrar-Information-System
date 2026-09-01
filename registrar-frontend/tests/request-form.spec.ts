@@ -117,7 +117,7 @@ test.describe('Student Request Form E2E Tests', () => {
           valid: true,
           is_mock: true,
           suggestions: {
-            documents: [{ document_type_id: 1, number_of_copies: 1 }],
+            documents: [{ document_type_id: 1, document_name: 'Transcript of Records', number_of_copies: 1 }],
             certificates: [],
             unresolved: [
               { label: 'CAV/Apostille (DFA) - undergraduate', amount: '620.00', quantity: 1 },
@@ -130,7 +130,7 @@ test.describe('Student Request Form E2E Tests', () => {
     });
 
     // 8. Mock form submission endpoint
-    await page.route('**/api/document-requests', async (route) => {
+    await page.route(/\/api\/document-requests$/, async (route) => {
       if (route.request().method() === 'POST') {
         await route.fulfill({
           status: 200,
@@ -215,7 +215,7 @@ test.describe('Student Request Form E2E Tests', () => {
 
   test('Pressing Enter on OR input verifies OR and advances to next step instead of submitting form', async ({ page }) => {
     let postRequestSubmitted = false;
-    await page.route('**/api/document-requests', async (route) => {
+    await page.route(/\/api\/document-requests$/, async (route) => {
       if (route.request().method() === 'POST') {
         postRequestSubmitted = true;
         await route.fulfill({
@@ -247,7 +247,7 @@ test.describe('Student Request Form E2E Tests', () => {
     await page.getByPlaceholder('XXXXXXX').press('Enter');
 
     // Should verify OR and advance to Step 3, without submitting the entire request
-    await expect(page.getByText('Documents', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Select documents' })).toBeVisible();
     await expect(page.getByText(/Auto-filled from OR #1234567/)).toBeVisible();
     expect(postRequestSubmitted).toBe(false);
   });

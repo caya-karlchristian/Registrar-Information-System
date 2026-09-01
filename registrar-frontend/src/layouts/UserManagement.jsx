@@ -249,7 +249,7 @@ const UserManagement = () => {
       // filtering now, not the raw (base-identity) role_id — for a
       // student-staff row those are two different roles entirely.
       const grantRoleName = ROLE_MAP[u.admin_grant?.role_id] || "";
-      const isSecondaryGrant = !!u.admin_grant?.is_secondary;
+      const isSecondaryGrant = !!u.admin_grant?.is_secondary && u.admin_grant?.role_id !== 4;
       const identityName = u.base_role_name || "";
       const fullName = formatName(u) || "";
       const matchSearch =
@@ -539,7 +539,6 @@ const UserManagement = () => {
                   // target's raw role_id, not any secondary grant.
                   const isBaseSuperAdmin = user.base_role_id === 4;
                   const grantRoleName = ROLE_MAP[user.admin_grant?.role_id] || `Role ${user.admin_grant?.role_id ?? "—"}`;
-                  const isStudentStaff = !!user.admin_grant?.is_secondary;
                   const policy = getUserPolicy(user);
 
                   return (
@@ -557,24 +556,11 @@ const UserManagement = () => {
                           {user.base_role_name || `Role ${user.base_role_id}`}
                         </span>
                       </td>
-                      {/* Administrative role granted, with a "Student Staff"
-                        tag when it's a secondary grant on a non-admin base
-                        identity — the core legibility requirement here. */}
+                      {/* Administrative role granted */}
                       <td className="px-4 py-3">
-                        <div className="flex flex-col items-center justify-center gap-1">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(grantRoleName, isDark)}`}>
-                            {grantRoleName}
-                          </span>
-                          {isStudentStaff && (
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap ${
-                              isDark
-                                ? 'bg-[#8B0000]/20 text-[#ffb3b3] border-[#8B0000]/30'
-                                : 'bg-[#8B0000]/10 text-[#8B0000] border-[#8B0000]/20'
-                            }`}>
-                              Student Staff
-                            </span>
-                          )}
-                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getRoleBadgeClasses(grantRoleName, isDark)}`}>
+                          {grantRoleName}
+                        </span>
                       </td>
                       {/* Policy in effect for the administrative grant above —
                         NOT the same as base identity, see getUserPolicy(). */}
@@ -646,7 +632,9 @@ const UserManagement = () => {
           {pageNumbers().map((p, i) => (
             <button key={i} onClick={() => typeof p === "number" && setCurrentPage(p)} disabled={p === "..."}
               className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors
-                ${safePage === p ? 'bg-yellow-400 text-white' : (isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-500 hover:bg-gray-100')}
+                ${safePage === p
+                  ? (isDark ? 'bg-yellow-400 text-gray-900 font-bold' : 'bg-pup-dark-maroon text-white font-bold')
+                  : (isDark ? 'text-[#b0b3b8] hover:bg-[#2a2a2f]' : 'text-gray-500 hover:bg-gray-100')}
                 ${p === "..." ? "cursor-default pointer-events-none" : ""}`}>
               {p}
             </button>

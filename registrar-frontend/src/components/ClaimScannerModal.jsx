@@ -4,13 +4,11 @@ import jsQR from 'jsqr';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   XCircleIcon,
-  CameraIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { claimDocumentRequest } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
-import { useAlertToast } from '../context/AlertToastContext';
 import { formatName } from '../utils/formatters';
 
 /**
@@ -54,9 +52,8 @@ const SCAN_INTERVAL_MS = 200; // ~5 scans/sec — plenty for a static QR, kind t
 const ClaimScannerModal = ({ open, onClose }) => {
   const { isDark } = useTheme();
   const queryClient = useQueryClient();
-  const { showError } = useAlertToast();
 
-  // 'scanning' | 'submitting' | 'success' | 'error'
+  // 'scanning' | 'submitting' | 'success'
   const [phase, setPhase] = useState('scanning');
   const [mode, setMode] = useState('scan'); // 'scan' | 'manual'
   const [claimedRequest, setClaimedRequest] = useState(null);
@@ -116,8 +113,7 @@ const ClaimScannerModal = ({ open, onClose }) => {
       }
 
       setErrorMessage(finalMsg);
-      showError(finalMsg);
-      setPhase('error');
+      setPhase('scanning');
     } finally {
       submittingRef.current = false;
     }
@@ -169,11 +165,7 @@ const ClaimScannerModal = ({ open, onClose }) => {
           if (code?.data) {
             const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code.data);
             if (!isUuid) {
-              stopCamera();
-              const msg = "Invalid QR code. Please scan a valid ticket QR code.";
-              setErrorMessage(msg);
-              showError(msg);
-              setPhase('error');
+              setErrorMessage("Invalid QR code format. Please scan a valid ticket QR code.");
             } else {
               submitCredential({ uuid: code.data });
             }
@@ -189,7 +181,6 @@ const ClaimScannerModal = ({ open, onClose }) => {
           ? 'Camera access was denied. Allow camera access, or use the code field below instead.'
           : 'Camera unavailable. Use the code field below instead.';
         setCameraError(msg);
-        showError(msg);
       }
     };
 
@@ -296,7 +287,6 @@ const ClaimScannerModal = ({ open, onClose }) => {
         {/* Header */}
         <div className={`relative px-5 py-4 flex justify-between items-center shrink-0 ${isDark ? 'bg-[#3a3b3c]' : 'bg-pup-maroon'}`}>
           <div className="flex items-center gap-2">
-            {/* Custom bracket scanner icon */}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-white">
               <path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M4 16v2a2 2 0 0 0 2 2h2M16 20h2a2 2 0 0 0 2-2v-2M4 12h16" />
             </svg>
@@ -306,7 +296,7 @@ const ClaimScannerModal = ({ open, onClose }) => {
             type="button"
             onClick={handleClose}
             aria-label="Close scanner"
-            className="text-white hover:text-yellow-200 transition"
+            className="text-white hover:text-yellow-200 transition cursor-pointer"
           >
             <XCircleIcon className="w-7 h-7" />
           </button>
@@ -334,14 +324,14 @@ const ClaimScannerModal = ({ open, onClose }) => {
                 <button
                   type="button"
                   onClick={resetToScanning}
-                  className="flex-1 px-4 py-2 rounded-lg bg-pup-maroon text-white text-sm font-bold hover:bg-pup-dark-maroon transition-colors"
+                  className="flex-1 px-4 py-2 rounded-lg bg-pup-maroon text-white text-sm font-bold hover:bg-pup-dark-maroon transition-colors cursor-pointer"
                 >
                   Scan Next
                 </button>
                 <button
                   type="button"
                   onClick={handleClose}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${isDark ? 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold transition-colors cursor-pointer ${isDark ? 'bg-[#3a3b3c] text-white hover:bg-[#4e4f50]' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
                 >
                   Done
                 </button>
@@ -351,11 +341,11 @@ const ClaimScannerModal = ({ open, onClose }) => {
             <div className="flex flex-col h-full">
               {/* Tabs selector */}
               {phase !== 'submitting' && (
-                <div className={`flex border-b mb-6 ${isDark ? 'border-zinc-800' : 'border-gray-200'}`}>
+                <div className={`flex border-b mb-4 ${isDark ? 'border-zinc-800' : 'border-gray-200'}`}>
                   <button
                     type="button"
-                    onClick={() => setMode('scan')}
-                    className={`flex-1 pb-3 text-sm font-semibold transition-all relative border-b-2 -mb-0.5 focus:outline-none ${
+                    onClick={() => { setMode('scan'); setErrorMessage(''); }}
+                    className={`flex-1 pb-3 text-sm font-semibold transition-all relative border-b-2 -mb-0.5 focus:outline-none cursor-pointer ${
                       mode === 'scan'
                         ? isDark ? 'text-pup-yellow border-pup-yellow font-bold' : 'text-pup-maroon border-pup-maroon font-bold'
                         : isDark
@@ -367,8 +357,8 @@ const ClaimScannerModal = ({ open, onClose }) => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMode('manual')}
-                    className={`flex-1 pb-3 text-sm font-semibold transition-all relative border-b-2 -mb-0.5 focus:outline-none ${
+                    onClick={() => { setMode('manual'); setErrorMessage(''); }}
+                    className={`flex-1 pb-3 text-sm font-semibold transition-all relative border-b-2 -mb-0.5 focus:outline-none cursor-pointer ${
                       mode === 'manual'
                         ? isDark ? 'text-pup-yellow border-pup-yellow font-bold' : 'text-pup-maroon border-pup-maroon font-bold'
                         : isDark
@@ -377,6 +367,25 @@ const ClaimScannerModal = ({ open, onClose }) => {
                     }`}
                   >
                     Enter Claim Code
+                  </button>
+                </div>
+              )}
+
+              {/* In-Modal Error Alert Banner below tabs */}
+              {errorMessage && (
+                <div className={`p-3 rounded-xl mb-4 flex items-start gap-2.5 text-xs font-semibold border ${
+                  isDark
+                    ? 'bg-red-950/40 border-red-800/50 text-red-300'
+                    : 'bg-red-50 border-red-200 text-red-700'
+                }`}>
+                  <ExclamationTriangleIcon className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
+                  <div className="flex-1 leading-snug">{errorMessage}</div>
+                  <button
+                    type="button"
+                    onClick={() => setErrorMessage('')}
+                    className="text-gray-400 hover:text-gray-600 font-bold ml-1 cursor-pointer text-base leading-none"
+                  >
+                    ×
                   </button>
                 </div>
               )}
@@ -413,18 +422,6 @@ const ClaimScannerModal = ({ open, onClose }) => {
                         <p className="text-white text-xs">{cameraError}</p>
                       </div>
                     )}
-                    {phase === 'error' && (
-                      <div className="text-center px-6 z-10 flex flex-col items-center justify-center h-full w-full">
-                        <ExclamationTriangleIcon className="w-12 h-12 text-[#ef4444] stroke-[1.5] mx-auto mb-4" />
-                        <button
-                          type="button"
-                          onClick={resetToScanning}
-                          className="px-5 py-2.5 rounded-xl bg-[#7a0f12] hover:bg-[#660000] text-white text-sm font-bold shadow-md transition-all duration-200 active:scale-95 focus:outline-none"
-                        >
-                          Try Scanning Again
-                        </button>
-                      </div>
-                    )}
                     <canvas ref={canvasRef} className="hidden" />
                   </div>
 
@@ -433,14 +430,12 @@ const ClaimScannerModal = ({ open, onClose }) => {
                     Point your QR code at the camera. If the camera isn't working, switch to the "Enter Claim Code" tab.
                   </p>
 
-
-
                   {/* Cancel Button */}
                   <div className="flex justify-start">
                     <button
                       type="button"
                       onClick={handleClose}
-                      className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 ${
+                      className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer ${
                         isDark
                           ? 'bg-[#242526] text-white hover:bg-zinc-800 border border-zinc-800'
                           : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'
@@ -495,14 +490,12 @@ const ClaimScannerModal = ({ open, onClose }) => {
                     ))}
                   </div>
 
-
-
                   {/* Cancel and Verify buttons */}
                   <div className="flex justify-between items-center pt-2">
                     <button
                       type="button"
                       onClick={handleClose}
-                      className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 ${
+                      className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-200 cursor-pointer ${
                         isDark
                           ? 'bg-[#242526] text-white hover:bg-zinc-800 border border-zinc-800'
                           : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300'

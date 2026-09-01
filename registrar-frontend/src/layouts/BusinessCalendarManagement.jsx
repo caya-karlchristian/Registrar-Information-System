@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   XMarkIcon,
   CalendarDaysIcon,
@@ -61,9 +62,15 @@ const getTodayDateString = () => {
  */
 const BusinessCalendarManagement = () => {
   const { isDark } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // ---- Switcher View Mode state ----
-  const [viewMode, setViewMode] = useState("grid"); // 'grid' | 'list'
+  // ---- Switcher View Mode state derived from URL ----
+  const tabFromUrl = searchParams.get("tab")?.toLowerCase();
+  const viewMode = (tabFromUrl === "list" || tabFromUrl === "schedule-list") ? "list" : "grid";
+
+  const handleTabSwitch = (newTab) => {
+    setSearchParams({ tab: newTab === "list" ? "Schedule-List" : "calendar" });
+  };
   const [activeTab, setActiveTab] = useState("exceptions"); // 'exceptions' | 'overrides'
 
   // ---- Calendar grid / date navigation state ----
@@ -488,14 +495,14 @@ const BusinessCalendarManagement = () => {
     <main className={`min-h-screen p-4 sm:p-6 ${isDark ? "bg-[#18191a] text-[#e4e6eb]" : "text-gray-900"}`}>
       <div className="mx-auto max-w-5xl">
 
-        {/* Centered Switcher Pill */}
-        <div className="flex justify-center mx-4 sm:mx-6 mb-6">
+        {/* Centered Switcher Pill (Hidden on mobile) */}
+        <div className="hidden md:flex justify-center mx-4 sm:mx-6 mb-6">
           <div className={`inline-flex px-8 py-3.5 rounded-full transition-all duration-300 hover:-translate-y-0.5 gap-8 items-center ${isDark
             ? 'bg-[#242526] border border-[#3e4042] shadow-[0_2px_8px_rgba(0,0,0,0.2)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]'
             : 'bg-white border border-gray-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)]'
             }`}>
             <button
-              onClick={() => setViewMode("grid")}
+              onClick={() => handleTabSwitch("calendar")}
               className={`text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${viewMode === "grid"
                 ? isDark
                   ? "text-yellow-400 font-bold"
@@ -508,7 +515,7 @@ const BusinessCalendarManagement = () => {
               Business Calendar
             </button>
             <button
-              onClick={() => setViewMode("list")}
+              onClick={() => handleTabSwitch("list")}
               className={`text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${viewMode === "list"
                 ? isDark
                   ? "text-yellow-400 font-bold"

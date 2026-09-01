@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\DocumentRequest;
+use App\Models\RequestCertificate;
+use App\Models\RequestDocument;
 use App\Models\SystemUser;
 use App\Models\AuditLog;
 use App\Models\CashierOrOverride;
@@ -12,7 +14,10 @@ use App\Http\Requests\DocumentRequest\ClaimDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\StoreDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\UpdateDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\VerifyOfficialReceiptRequest;
+use App\Http\Requests\RequestItem\UpdateRequestCertificateStatusRequest;
+use App\Http\Requests\RequestItem\UpdateRequestDocumentStatusRequest;
 use App\Services\DocumentRequestService;
+use App\Services\RequestItemStatusService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -49,8 +54,15 @@ class DocumentRequestController extends Controller
         'status',
         'requestPurpose',
         'documents.documentType',
+        'documents.status',
         'certificates.certificationType',
+        'certificates.status',
         'archivedByUser',
+        // Phase 3 — see DocumentRequest::releaseGroups(). Nearly always
+        // empty; only populated for requests whose items span more than
+        // one fulfillment_track. Loading fulfillmentTrack alongside it
+        // so the frontend can label each ticket without a second call.
+        'releaseGroups.fulfillmentTrack',
     ];
 
     public function __construct(
@@ -60,6 +72,7 @@ class DocumentRequestController extends Controller
         private CashierDocumentSuggester        $documentSuggester,
         private AuditLogger                     $auditLogger,
         private NameMatcher                     $nameMatcher,
+        private RequestItemStatusService        $itemStatusService,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -297,7 +310,30 @@ class DocumentRequestController extends Controller
             $consumedOverride = $verification['override'] ?? null;
         }
 
-        $documentRequest = $this->requestService->createRequest(Auth::user(), $validated);
+        // The isOrAlreadyUsed() pre-check above is a plain SELECT with no
+        // locking — it exists purely to fail fast with a friendly message
+        // in the common (non-racing) case. It cannot, by itself, prevent
+        // two near-simultaneous submissions of the same OR from both
+        // passing it before either INSERT commits. The
+        // document_request_or_number_unique DB constraint (see
+        // 2026_08_29_000009_add_unique_index_to_document_request_or_number)
+        // is what actually closes that race: whichever request wins the
+        // INSERT succeeds, the loser hits a 23000 duplicate-key violation
+        // here and gets the exact same user-facing message as the
+        // pre-check, instead of an uncaught 500.
+        try {
+            $documentRequest = $this->requestService->createRequest(Auth::user(), $validated);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23000' && !empty($validated['or_number'])) {
+                $message = 'This OR number has already been used for a previous request. Each Official Receipt can only be used once.';
+                return response()->json([
+                    'message' => $message,
+                    'errors'  => ['or_number' => [$message]],
+                ], 422);
+            }
+
+            throw $e;
+        }
 
         if ($consumedOverride !== null) {
             $this->consumeOverride($request, $consumedOverride, $documentRequest, Auth::user());
@@ -608,6 +644,93 @@ class DocumentRequestController extends Controller
         $documentRequest = $this->requestService->updateRequest($documentRequest, $validated);
 
         return response()->json($documentRequest->load(self::RELATIONS), 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // PUT /document-requests/{documentRequest}/documents/{requestDocument}
+    //
+    // Item-level status — advances ONE document line item without forcing
+    // every other item on the request through the same transition. See
+    // RequestItemStatusService for the transition/permission/history/
+    // aggregate logic; this method stays a thin adapter, same division of
+    // responsibility as update() above.
+    //
+    // Route-model binding resolves {requestDocument} globally by its own
+    // primary key, so it's possible (malformed URL, stale link) for it to
+    // belong to a DIFFERENT request than {documentRequest} — guarded
+    // explicitly here rather than trusting the URL nesting, since Laravel
+    // does not scope implicit bindings to a parent by default.
+    // -------------------------------------------------------------------------
+    public function updateDocumentItemStatus(
+        UpdateRequestDocumentStatusRequest $request,
+        DocumentRequest $documentRequest,
+        RequestDocument $requestDocument,
+    ) {
+        if ((int) $requestDocument->request_id !== (int) $documentRequest->request_id) {
+            abort(404, 'This document item does not belong to the specified request.');
+        }
+
+        $requestDocument = $this->itemStatusService->advanceDocumentItem(
+            $requestDocument,
+            (int) $request->validated('status_id'),
+        );
+
+        return response()->json($requestDocument->load(['documentType', 'status']), 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // PUT /document-requests/{documentRequest}/certificates/{requestCertificate}
+    //
+    // Mirrors updateDocumentItemStatus() exactly, for the certificate side.
+    // -------------------------------------------------------------------------
+    public function updateCertificateItemStatus(
+        UpdateRequestCertificateStatusRequest $request,
+        DocumentRequest $documentRequest,
+        RequestCertificate $requestCertificate,
+    ) {
+        if ((int) $requestCertificate->request_id !== (int) $documentRequest->request_id) {
+            abort(404, 'This certificate item does not belong to the specified request.');
+        }
+
+        $requestCertificate = $this->itemStatusService->advanceCertificateItem(
+            $requestCertificate,
+            (int) $request->validated('status_id'),
+        );
+
+        return response()->json($requestCertificate->load(['certificationType', 'status']), 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /document-requests/{documentRequest}/mark-certificates-generated
+    //
+    // Called from GenerateCertificate.jsx's print action — records the real,
+    // server-side "generated/printed" signal both ReadyToClaim guards now
+    // check (see DocumentRequestService::markCertificatesGenerated()).
+    // Replaces the client-only printedCertificateIds localStorage flag,
+    // which never reached the server.
+    //
+    // Optional request_certificate_id (validated inline — this is a single
+    // nullable field, not worth its own FormRequest class) scopes the write
+    // to one line item when the frontend can resolve which certificate it
+    // just printed; omitted, it falls back to marking every ungenerated
+    // certificate on the request, same as before per-item targeting existed.
+    // -------------------------------------------------------------------------
+    public function markCertificatesGenerated(Request $request, DocumentRequest $documentRequest): JsonResponse
+    {
+        $validated = $request->validate([
+            'request_certificate_id' => 'sometimes|nullable|integer|exists:request_certificate,request_certificate_id',
+        ]);
+
+        $this->documentRequestService->markCertificatesGenerated(
+            $documentRequest,
+            $validated['request_certificate_id'] ?? null
+        );
+
+        return response()->json([
+            'message'      => 'Certificate(s) marked as generated.',
+            'request_id'   => $documentRequest->request_id,
+            'certificates' => $documentRequest->fresh()->certificates,
+        ], 200);
     }
 
     // -------------------------------------------------------------------------

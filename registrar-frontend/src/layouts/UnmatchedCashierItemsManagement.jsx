@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { XMarkIcon, FunnelIcon, ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../context/ThemeContext";
 import { useReferenceData } from "../context/ReferenceDataContext";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
+import DropdownGroup from "../components/DropDown.jsx";
+import ConfirmationModal from "../components/ConfirmationModal.jsx";
+import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
+import DashboardDropdown from "../components/DashboardDropdown.jsx";
 import {
   getUnmatchedCashierItems,
   resolveUnmatchedCashierItem,
@@ -30,6 +35,9 @@ const UnmatchedCashierItemsManagement = () => {
   const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState("last_seen_at");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   // { open, item, targetKind: 'document' | 'certificate', targetId }
   const [resolveModal, setResolveModal] = useState({ open: false, item: null, targetKind: "document", targetId: "" });
@@ -45,6 +53,43 @@ const UnmatchedCashierItemsManagement = () => {
     () => (certifications || []).filter((c) => !c.is_archived),
     [certifications]
   );
+
+  const combinedTargetOptions = useMemo(() => {
+    const docs = activeDocumentTypes.map((d) => ({
+      label: d.document_name,
+      kind: "document",
+      id: String(d.document_type_id),
+    }));
+    const certs = activeCertifications.map((c) => ({
+      label: `${c.certificate_name} (Certificate)`,
+      kind: "certificate",
+      id: String(c.certificate_type_id),
+    }));
+    return [...docs, ...certs];
+  }, [activeDocumentTypes, activeCertifications]);
+
+  const selectedCombinedItem = useMemo(() => {
+    if (!resolveModal.targetId) return null;
+    return combinedTargetOptions.find(
+      (opt) => opt.kind === resolveModal.targetKind && String(opt.id) === String(resolveModal.targetId)
+    );
+  }, [combinedTargetOptions, resolveModal.targetKind, resolveModal.targetId]);
+
+  const selectedCombinedLabel = selectedCombinedItem ? selectedCombinedItem.label : "";
+
+  const handleDropdownSelect = (e) => {
+    const chosenLabel = e?.target?.value;
+    const found = combinedTargetOptions.find((opt) => opt.label === chosenLabel);
+    if (found) {
+      setResolveModal((s) => ({
+        ...s,
+        targetKind: found.kind,
+        targetId: found.id,
+      }));
+    } else {
+      setResolveModal((s) => ({ ...s, targetId: "" }));
+    }
+  };
 
   const loadItems = useCallback(async (page = 1) => {
     try {
@@ -107,6 +152,7 @@ const UnmatchedCashierItemsManagement = () => {
 
   const handleDismissConfirm = async () => {
     const { item } = dismissConfirm;
+    if (!item) return;
     try {
       setActionLoading(true);
       await dismissUnmatchedCashierItem(item.unmatched_cashier_item_id);
@@ -120,6 +166,46 @@ const UnmatchedCashierItemsManagement = () => {
       setActionLoading(false);
     }
   };
+
+  const filteredItems = useMemo(() => {
+    let result = [...items];
+
+    const term = search.trim().toLowerCase();
+    if (term) {
+      result = result.filter((item) => {
+        const label = String(item.raw_label ?? "").toLowerCase();
+        const resolver = item.resolved_by_user
+          ? String(
+              item.resolved_by_user.email ??
+                `${item.resolved_by_user.admin_profile?.first_name ?? ""} ${item.resolved_by_user.admin_profile?.last_name ?? ""}`
+            ).toLowerCase()
+          : "";
+        return label.includes(term) || resolver.includes(term);
+      });
+    }
+
+    result.sort((a, b) => {
+      let valA = a[sortField];
+      let valB = b[sortField];
+
+      if (sortField === "last_seen_at") {
+        valA = new Date(a.last_seen_at || 0).getTime();
+        valB = new Date(b.last_seen_at || 0).getTime();
+      } else if (sortField === "raw_label") {
+        valA = String(a.raw_label || "").toLowerCase();
+        valB = String(b.raw_label || "").toLowerCase();
+      } else if (sortField === "occurrence_count") {
+        valA = Number(a.occurrence_count || 0);
+        valB = Number(b.occurrence_count || 0);
+      }
+
+      if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+      if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [items, search, sortField, sortOrder]);
 
   const cardClasses = isDark
     ? "bg-[#18191a] text-[#e4e6eb]"
@@ -165,12 +251,51 @@ const UnmatchedCashierItemsManagement = () => {
 
       {/* Table */}
       <div className={`rounded-xl border overflow-hidden ${rowBorder}`}>
+        {/* Search Header Bar */}
+        <div className={`p-4 border-b ${isDark ? 'border-[#3e4042] bg-[#1a1a1c]/20' : 'border-gray-200 bg-gray-50/50'}`}>
+          <div className="w-full sm:max-w-md">
+            <VoiceSearchInput
+              value={search}
+              onChange={(val) => setSearch(val)}
+              placeholder="Search by receipt label or resolver..."
+            />
+          </div>
+        </div>
+
         <table className="w-full text-sm">
           <thead>
             <tr className={`text-left ${isDark ? "bg-[#242526]" : "bg-gray-50"}`}>
               <th className="px-4 py-3 font-semibold">Receipt Label</th>
               <th className="px-4 py-3 font-semibold">Occurrences</th>
-              <th className="px-4 py-3 font-semibold">Last Seen</th>
+
+              {/* Last Seen Header (Sortable) */}
+              <th className="px-4 py-3 font-semibold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sortField === "last_seen_at") {
+                      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+                    } else {
+                      setSortField("last_seen_at");
+                      setSortOrder("desc");
+                    }
+                  }}
+                  className={`flex items-center gap-1 text-xs font-bold hover:text-[#800000] dark:hover:text-[#FFC72C] transition-colors focus:outline-none cursor-pointer ${
+                    isDark ? "text-[#b0b3b8]" : "text-gray-500"
+                  }`}
+                >
+                  <span>Last Seen</span>
+                  {sortField === "last_seen_at" ? (
+                    sortOrder === "asc" ? (
+                      <ChevronUpIcon className="w-3.5 h-3.5 text-blue-500" />
+                    ) : (
+                      <ChevronDownIcon className="w-3.5 h-3.5 text-blue-500" />
+                    )
+                  ) : (
+                    <ChevronDownIcon className="w-3.5 h-3.5 text-gray-400 opacity-50" />
+                  )}
+                </button>
+              </th>
               {showResolved && <th className="px-4 py-3 font-semibold">Resolved By</th>}
               {!showResolved && <th className="px-4 py-3 font-semibold text-right">Actions</th>}
             </tr>
@@ -178,18 +303,18 @@ const UnmatchedCashierItemsManagement = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className={`px-4 py-8 text-center ${subtleText}`}>
+                <td colSpan={showResolved ? 4 : 4} className={`px-4 py-8 text-center ${subtleText}`}>
                   Loading...
                 </td>
               </tr>
-            ) : items.length === 0 ? (
+            ) : filteredItems.length === 0 ? (
               <tr>
-                <td colSpan={4} className={`px-4 py-8 text-center ${subtleText}`}>
-                  {showResolved ? "No resolved items yet." : "Nothing unresolved right now — all clear!"}
+                <td colSpan={showResolved ? 4 : 4} className={`px-4 py-8 text-center ${subtleText}`}>
+                  {search.trim() ? "No items matching search." : showResolved ? "No resolved items yet." : "Nothing unresolved right now — all clear!"}
                 </td>
               </tr>
             ) : (
-              items.map((item) => (
+              filteredItems.map((item) => (
                 <tr key={item.unmatched_cashier_item_id} className={`border-t ${rowBorder}`}>
                   <td className="px-4 py-3 font-medium">{item.raw_label}</td>
                   <td className="px-4 py-3">{item.occurrence_count}</td>
@@ -254,102 +379,86 @@ const UnmatchedCashierItemsManagement = () => {
 
       {/* Resolve modal */}
       {resolveModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 backdrop-blur-[2px] bg-black/50">
-          <div className={`rounded-xl shadow-xl w-full max-w-md p-6 ${isDark ? "bg-[#242526] border border-[#3e4042] text-[#e4e6eb]" : "bg-white border border-gray-100 text-gray-900"}`}>
-            <h3 className="text-lg font-bold mb-1">Resolve Receipt Label</h3>
-            <p className={`text-sm mb-4 ${subtleText}`}>
-              Attach <strong>"{resolveModal.item?.raw_label}"</strong> to the correct type. Future receipts
-              using this exact label will auto-match to it.
-            </p>
-
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setResolveModal((s) => ({ ...s, targetKind: "document", targetId: "" }))}
-                className={`flex-1 text-sm font-semibold py-2 rounded-lg border cursor-pointer ${
-                  resolveModal.targetKind === "document"
-                    ? isDark ? "bg-yellow-400 text-gray-900 border-yellow-400" : "bg-pup-dark-maroon text-white border-pup-dark-maroon"
-                    : `${rowBorder} ${subtleText}`
-                }`}
-              >
-                Document
-              </button>
-              <button
-                onClick={() => setResolveModal((s) => ({ ...s, targetKind: "certificate", targetId: "" }))}
-                className={`flex-1 text-sm font-semibold py-2 rounded-lg border cursor-pointer ${
-                  resolveModal.targetKind === "certificate"
-                    ? isDark ? "bg-yellow-400 text-gray-900 border-yellow-400" : "bg-pup-dark-maroon text-white border-pup-dark-maroon"
-                    : `${rowBorder} ${subtleText}`
-                }`}
-              >
-                Certificate
-              </button>
-            </div>
-
-            <select
-              value={resolveModal.targetId}
-              onChange={(e) => setResolveModal((s) => ({ ...s, targetId: e.target.value }))}
-              className={`w-full p-2.5 rounded-lg border text-sm mb-6 ${isDark ? "bg-[#1a1b1e] border-[#3e4042] text-white" : "bg-white border-gray-300 text-gray-900"}`}
+        <div className="fixed inset-0 z-9999 flex items-center justify-center pt-16 sm:pt-4 pb-4 px-3 sm:px-4 backdrop-blur-sm bg-black/60 overflow-y-auto">
+          <div
+            className={`relative z-9999 w-full max-w-md my-auto rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] border flex flex-col animate-in fade-in zoom-in duration-200 ${
+              isDark ? "bg-[#242526] border-[#3e4042] text-[#e4e6eb]" : "bg-white border-[#800000]/20 text-gray-900"
+            }`}
+          >
+            {/* Top Header Banner matching CashierOrOverrideModals.jsx */}
+            <div
+              className={`px-4 py-4 sm:px-6 sm:py-5 border-b-4 shrink-0 rounded-t-xl overflow-hidden ${
+                isDark ? "bg-[#1f1f1f] border-[#b98b00]" : "bg-[#800000] border-[#FFD700]"
+              }`}
             >
-              <option value="">Select {resolveModal.targetKind === "document" ? "a document type" : "a certificate type"}...</option>
-              {(resolveModal.targetKind === "document" ? activeDocumentTypes : activeCertifications).map((t) => (
-                <option
-                  key={resolveModal.targetKind === "document" ? t.document_type_id : t.certificate_type_id}
-                  value={resolveModal.targetKind === "document" ? t.document_type_id : t.certificate_type_id}
+              <div className="flex items-center justify-between gap-2 sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] sm:text-xs text-amber-200 font-bold uppercase tracking-wider block">
+                    Unmatched Cashier Item
+                  </span>
+                  <h3 className="text-lg sm:text-xl text-white font-black uppercase tracking-tighter mt-0.5 truncate">
+                    Resolve Receipt Label
+                  </h3>
+                </div>
+                <button
+                  onClick={closeResolveModal}
+                  className="p-1 rounded hover:opacity-90 shrink-0 text-white cursor-pointer"
+                  title="Close"
                 >
-                  {resolveModal.targetKind === "document" ? t.document_name : t.certificate_name}
-                </option>
-              ))}
-            </select>
+                  <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              </div>
+            </div>
 
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={closeResolveModal}
-                disabled={actionLoading}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${rowBorder}`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleResolveSubmit}
-                disabled={actionLoading}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer disabled:opacity-50 ${isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"}`}
-              >
-                {actionLoading ? "Resolving..." : "Resolve"}
-              </button>
+            <div className="p-4 sm:p-6 space-y-4">
+              <p className={`text-xs sm:text-sm font-normal leading-relaxed ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                Attach receipt label <strong className={isDark ? "text-white" : "text-gray-900"}>"{resolveModal.item?.raw_label}"</strong> to a document or certificate type:
+              </p>
+
+              <div>
+                <DropdownGroup
+                  label="Document / Certificate Type"
+                  name="targetId"
+                  value={selectedCombinedLabel}
+                  onChange={handleDropdownSelect}
+                  options={combinedTargetOptions.map((opt) => opt.label)}
+                  labelColor={isDark ? "text-[#e4e6eb]" : "text-gray-700"}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={closeResolveModal}
+                  disabled={actionLoading}
+                  className={`text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${rowBorder}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleResolveSubmit}
+                  disabled={actionLoading}
+                  className={`text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer disabled:opacity-50 shadow-md transition-all active:scale-95 ${
+                    isDark ? "bg-yellow-400 text-gray-900 hover:bg-yellow-300" : "bg-pup-dark-maroon text-white hover:bg-pup-maroon"
+                  }`}
+                >
+                  {actionLoading ? "Resolving..." : "Resolve"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Dismiss confirmation */}
-      {dismissConfirm.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 backdrop-blur-[2px] bg-black/50">
-          <div className={`rounded-xl shadow-xl w-full max-w-sm p-6 ${isDark ? "bg-[#242526] border border-[#3e4042] text-[#e4e6eb]" : "bg-white border border-gray-100 text-gray-900"}`}>
-            <h3 className="text-lg font-bold mb-2">Dismiss this label?</h3>
-            <p className={`text-sm mb-6 ${subtleText}`}>
-              <strong>"{dismissConfirm.item?.raw_label}"</strong> will be marked resolved without attaching it to
-              any document or certificate type — use this for labels that aren't a real document, like a one-off
-              fee line. It won't be suggested to future auto-attach, but it's removed from this queue.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDismissConfirm({ open: false, item: null })}
-                disabled={actionLoading}
-                className={`text-sm font-semibold px-4 py-2 rounded-lg border cursor-pointer disabled:opacity-50 ${rowBorder}`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDismissConfirm}
-                disabled={actionLoading}
-                className="text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer disabled:opacity-50 bg-red-600 text-white hover:bg-red-700"
-              >
-                {actionLoading ? "Dismissing..." : "Dismiss"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Dismiss confirmation modal using system ConfirmationModal */}
+      <ConfirmationModal
+        isOpen={dismissConfirm.open}
+        onClose={() => setDismissConfirm({ open: false, item: null })}
+        onConfirm={handleDismissConfirm}
+        title="Dismiss Receipt Label?"
+        message={`"${dismissConfirm.item?.raw_label}" will be marked resolved without attaching it to any document or certificate type.`}
+        type="danger"
+        confirmText="Dismiss"
+      />
 
       <SuccessToast message={successMsg} onClose={() => setSuccessMsg("")} />
       <ErrorToast message={errorMsg} onClose={() => setErrorMsg("")} />

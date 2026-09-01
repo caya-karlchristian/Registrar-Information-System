@@ -1,14 +1,17 @@
-import React from "react";
+import React, { useState } from "react";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import InputGroup from "../components/InputGroup";
 import ProcessPeriodInput from "../components/ProcessPeriodInput.jsx";
 import VoiceTextareaInput from "../components/VoiceTextareaInput.jsx";
 import VoiceSearchInput from "../components/VoiceSearchInput.jsx";
+import DropdownGroup from "../components/DropDown.jsx";
 import SuccessToast from "../components/SuccessToast.jsx";
 import ErrorToast from "../components/ErrorToast.jsx";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.jsx";
 import { useTheme } from "../context/ThemeContext";
+import { useReferenceData } from "../context/ReferenceDataContext";
 import { useDocumentManagement } from "../hooks/useDocumentManagement";
+import { createLogbookCategory, createFulfillmentTrack } from "../services/api";
 import {
   EXCLUSIVE_FOR,
   FOLDER_COLORS,
@@ -17,6 +20,7 @@ import {
   ManagementCard,
   ManagementCarousel,
 } from "../components/DocumentManagementComponents";
+import { EnabledSwitch } from "../components/BusinessCalendarComponents.jsx";
 
 const DocumentManagement = ({
   documents,
@@ -28,6 +32,28 @@ const DocumentManagement = ({
   onArchiveCert,
 }) => {
   const { isDark } = useTheme();
+  const { logbookCategories, refreshLogbookCategories, fulfillmentTracks, refreshFulfillmentTracks } = useReferenceData();
+
+  // Inline "add a new logbook category" flow — lets an admin create the
+  // umbrella label (e.g. "Certified True Copy of Records") right from
+  // this form the first time they need it, instead of requiring a
+  // separate admin screen just to seed rows into logbook_category.
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categorySaving, setCategorySaving] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
+
+  // Same inline-create pattern as Logbook Category above, for
+  // fulfillment_track. Until this existed, no document/certificate type
+  // could ever be assigned a non-null track from the UI — the only way
+  // was a direct DB write, which meant RequestReleaseGroupService::
+  // assignReleaseGroups() never had more than one bucket to work with
+  // and Phase 3 claim-ticket grouping never actually triggered for any
+  // real request.
+  const [addingTrack, setAddingTrack] = useState(false);
+  const [newTrackName, setNewTrackName] = useState("");
+  const [trackSaving, setTrackSaving] = useState(false);
+  const [trackError, setTrackError] = useState("");
 
   const {
     search,
@@ -65,13 +91,96 @@ const DocumentManagement = ({
     onArchiveCert,
   });
 
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) {
+      setCategoryError("Category name is required.");
+      return;
+    }
+    setCategorySaving(true);
+    setCategoryError("");
+    try {
+      const res = await createLogbookCategory({ name });
+      const created = res?.data;
+      await refreshLogbookCategories();
+      if (created?.logbook_category_id) {
+        setForm((prev) => ({ ...prev, logbook_category_id: created.logbook_category_id }));
+      }
+      setNewCategoryName("");
+      setAddingCategory(false);
+    } catch (err) {
+      setCategoryError(err.response?.data?.message || "Failed to create category.");
+    } finally {
+      setCategorySaving(false);
+    }
+  };
+
+  const handleCreateTrack = async () => {
+    const name = newTrackName.trim();
+    if (!name) {
+      setTrackError("Track name is required.");
+      return;
+    }
+    setTrackSaving(true);
+    setTrackError("");
+    try {
+      const res = await createFulfillmentTrack({ name });
+      const created = res?.data;
+      await refreshFulfillmentTracks();
+      if (created?.fulfillment_track_id) {
+        setForm((prev) => ({ ...prev, fulfillment_track_id: created.fulfillment_track_id }));
+      }
+      setNewTrackName("");
+      setAddingTrack(false);
+    } catch (err) {
+      setTrackError(err.response?.data?.message || "Failed to create track.");
+    } finally {
+      setTrackSaving(false);
+    }
+  };
+
   // Filter lists by search query and active status
-  const filteredDocs = documents.filter(
-    (d) => d.document_name.toLowerCase().includes(search.toLowerCase()) && !d.is_archived
-  );
-  const filteredCerts = certifications.filter(
-    (c) => c.certificate_name.toLowerCase().includes(search.toLowerCase()) && !c.is_archived
-  );
+  const searchTerm = search.trim().toLowerCase();
+
+  const filteredDocs = (documents || []).filter((d) => {
+    if (d.is_archived) return false;
+    if (!searchTerm) return true;
+
+    const name = String(d?.document_name ?? "").toLowerCase();
+    const reqs = String(d?.document_requirements ?? "").toLowerCase();
+    const desc = String(d?.document_description ?? "").toLowerCase();
+    const period = String(d?.document_process_period ?? "").toLowerCase();
+    const patterns = Array.isArray(d?.cashier_document_patterns)
+      ? d.cashier_document_patterns.join(" ").toLowerCase()
+      : String(d?.cashier_document_patterns ?? "").toLowerCase();
+
+    return (
+      name.includes(searchTerm) ||
+      reqs.includes(searchTerm) ||
+      desc.includes(searchTerm) ||
+      period.includes(searchTerm) ||
+      patterns.includes(searchTerm)
+    );
+  });
+
+  const filteredCerts = (certifications || []).filter((c) => {
+    if (c.is_archived) return false;
+    if (!searchTerm) return true;
+
+    const name = String(c?.certificate_name ?? "").toLowerCase();
+    const reqs = String(c?.certificate_requirements ?? "").toLowerCase();
+    const period = String(c?.certificate_process_period ?? "").toLowerCase();
+    const patterns = Array.isArray(c?.cashier_document_patterns)
+      ? c.cashier_document_patterns.join(" ").toLowerCase()
+      : String(c?.cashier_document_patterns ?? "").toLowerCase();
+
+    return (
+      name.includes(searchTerm) ||
+      reqs.includes(searchTerm) ||
+      period.includes(searchTerm) ||
+      patterns.includes(searchTerm)
+    );
+  });
 
   return (
     <div className={`font-sans rounded-2xl p-4 sm:px-6 ${isDark ? "bg-[#18191a] text-[#e4e6eb]" : "bg-white text-gray-900"}`}>
@@ -306,6 +415,229 @@ const DocumentManagement = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* Logbook Category — nullable FK. Most document/certificate
+              types don't collapse with anything else, so "None" (log
+              under this row's own name) is the common, valid default —
+              see the logbook_category migration docblock. Only types
+              that genuinely share a logbook line with others (e.g. every
+              "Certified True Copy of X" variant) need one assigned. */}
+          {/* 2-Column Grid Row for Logbook Category & Fulfillment Track */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+            {/* Logbook Category */}
+            <div className="flex flex-col gap-1.5 w-full">
+              <label className={`text-sm font-medium ${isDark ? "text-[#e4e6eb]" : "text-gray-700"}`}>
+                Logbook category
+              </label>
+              {!addingCategory ? (
+                <div className="flex flex-col gap-1.5 w-full">
+                  <div className="flex items-center gap-2 w-full">
+                    <div className="flex-1">
+                      <DropdownGroup
+                        name="logbook_category_id"
+                        value={
+                          logbookCategories.find((c) => String(c.logbook_category_id) === String(form.logbook_category_id))?.name ||
+                          "None"
+                        }
+                        onChange={(e) => {
+                          const selectedName = e.target.value;
+                          const matched = logbookCategories.find((c) => c.name === selectedName);
+                          setForm((prev) => ({
+                            ...prev,
+                            logbook_category_id: matched ? matched.logbook_category_id : "",
+                          }));
+                        }}
+                        options={[
+                          "None",
+                          ...logbookCategories.map((c) => c.name),
+                        ]}
+                        labelColor={isDark ? "text-[#b0b3b8]" : "text-gray-600"}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAddingCategory(true)}
+                      className={`px-4 py-3 rounded-lg text-sm font-medium border whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                        isDark
+                          ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]"
+                          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 shadow-xs"
+                      }`}
+                    >
+                      + New
+                    </button>
+                  </div>
+                  <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    {form.logbook_category_id
+                      ? `Logged under ${logbookCategories.find((c) => String(c.logbook_category_id) === String(form.logbook_category_id))?.name || 'this category'}.`
+                      : "Logged under this item's own name."}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 w-full">
+                  <div className="flex gap-2 w-full">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="e.g. Certified True Copy of Records"
+                      className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors ${
+                        isDark
+                          ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] placeholder-[#6b6b6b]"
+                          : "bg-white border-gray-200 text-gray-700 placeholder-gray-400"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      disabled={categorySaving}
+                      onClick={handleCreateCategory}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 ${
+                        isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"
+                      }`}
+                    >
+                      {categorySaving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingCategory(false);
+                        setNewCategoryName("");
+                        setCategoryError("");
+                      }}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                        isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {categoryError && <span className="text-xs text-red-400">{categoryError}</span>}
+                </div>
+              )}
+            </div>
+
+          {/* Fulfillment Track — nullable FK, same shape and defaulting
+              as Logbook Category above. NULL means "standard track": the
+              overwhelming majority of types should stay this way. Only
+              assign a track when this type's items genuinely need to be
+              claimable separately from a request's other items — see
+              RequestReleaseGroupService::assignReleaseGroups(), which
+              only splits a request into more than one claim ticket when
+              its items span more than one distinct track. */}
+            <div className="flex flex-col gap-1.5 w-full">
+              <label className={`text-sm font-medium ${isDark ? "text-[#e4e6eb]" : "text-gray-700"}`}>
+                Fulfillment track
+              </label>
+              {!addingTrack ? (
+                <div className="flex flex-col gap-1.5 w-full">
+                  <div className="flex items-center gap-2 w-full">
+                    <div className="flex-1">
+                      <DropdownGroup
+                        name="fulfillment_track_id"
+                        value={
+                          fulfillmentTracks.find((t) => String(t.fulfillment_track_id) === String(form.fulfillment_track_id))?.name ||
+                          "Standard"
+                        }
+                        onChange={(e) => {
+                          const selectedName = e.target.value;
+                          const matched = fulfillmentTracks.find((t) => t.name === selectedName);
+                          setForm((prev) => ({
+                            ...prev,
+                            fulfillment_track_id: matched ? matched.fulfillment_track_id : "",
+                          }));
+                        }}
+                        options={[
+                          "Standard",
+                          ...fulfillmentTracks.map((t) => t.name),
+                        ]}
+                        labelColor={isDark ? "text-[#b0b3b8]" : "text-gray-600"}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAddingTrack(true)}
+                      className={`px-4 py-3 rounded-lg text-sm font-medium border whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                        isDark
+                          ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] hover:bg-[#2a2a2f]"
+                          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 shadow-xs"
+                      }`}
+                    >
+                      + New
+                    </button>
+                  </div>
+                  <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    {form.fulfillment_track_id
+                      ? `Claimed under ${fulfillmentTracks.find((t) => String(t.fulfillment_track_id) === String(form.fulfillment_track_id))?.name || 'this track'}.`
+                      : "Claimed together with everything else."}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 w-full">
+                  <div className="flex gap-2 w-full">
+                    <input
+                      type="text"
+                      value={newTrackName}
+                      onChange={(e) => setNewTrackName(e.target.value)}
+                      placeholder="e.g. Awaiting Submission"
+                      className={`flex-1 px-4 py-2.5 rounded-lg text-sm border transition-colors ${
+                        isDark
+                          ? "bg-[#1f1f1f] border-[#3e4042] text-[#e4e6eb] placeholder-[#6b6b6b]"
+                          : "bg-white border-gray-200 text-gray-700 placeholder-gray-400"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      disabled={trackSaving}
+                      onClick={handleCreateTrack}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-50 ${
+                        isDark ? "bg-yellow-400 text-gray-900" : "bg-pup-dark-maroon text-white"
+                      }`}
+                    >
+                      {trackSaving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingTrack(false);
+                        setNewTrackName("");
+                        setTrackError("");
+                      }}
+                      className={`px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                        isDark ? "text-[#b0b3b8] hover:bg-[#2a2a2f]" : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {trackError && <span className="text-xs text-red-400">{trackError}</span>}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Divider line */}
+          <div className={`h-px w-full my-1 ${isDark ? "bg-[#3e4042]" : "bg-gray-200"}`} />
+
+          {/* requires_source_submission — the CTC / Authentication Fee case.
+              Gates the request into RequestStatusEnum::AwaitingSubmission
+              at creation instead of the usual Processing (see
+              DocumentRequestService::createRequest() on the backend). */}
+          <div className="flex items-center justify-between gap-3 w-full pt-1">
+            <div className="flex flex-col">
+              <span className={`text-sm font-medium ${isDark ? "text-[#e4e6eb]" : "text-gray-800"}`}>
+                Requires source submission
+              </span>
+              <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                Client must hand over the physical source document before staff can start processing.
+              </span>
+            </div>
+            <EnabledSwitch
+              isDark={isDark}
+              enabled={Boolean(form.requires_source_submission)}
+              onToggle={() =>
+                setForm((prev) => ({ ...prev, requires_source_submission: !prev.requires_source_submission }))
+              }
+            />
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-end gap-3 pt-2">

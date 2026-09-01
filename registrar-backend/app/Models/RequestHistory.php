@@ -18,7 +18,14 @@ class RequestHistory extends Model
     // when changed_by is null, it's the only way to tell "automated
     // transition" (processed_by_email = 'system') apart from "the acting
     // user's account was later deleted" (processed_by_email = null too).
-    protected $fillable = ['request_id', 'old_status_id', 'new_status_id', 'changed_at', 'changed_by', 'processed_by_email', 'minutes_processed', 'business_minutes'];
+    // request_document_id / request_certificate_id: added by migration
+    // 2026_08_29_000007_add_status_to_request_line_items. Both nullable;
+    // exactly one is ever set on a given row, never both — a row with
+    // both null is a whole-request transition (every row before this
+    // migration, and every future bulk transition written by
+    // DocumentRequestService or RequestItemStatusService's own
+    // recomputeAggregateStatus()). See that migration's docblock.
+    protected $fillable = ['request_id', 'request_document_id', 'request_certificate_id', 'old_status_id', 'new_status_id', 'changed_at', 'changed_by', 'processed_by_email', 'minutes_processed', 'business_minutes'];
 
     // changed_at is stored as a naive UTC DATETIME column (app.timezone =
     // UTC). Without this cast, Eloquent returns/serializes it as a raw
@@ -36,6 +43,16 @@ class RequestHistory extends Model
     public function request()
     {
         return $this->belongsTo(DocumentRequest::class, 'request_id');
+    }
+
+    public function requestDocument()
+    {
+        return $this->belongsTo(RequestDocument::class, 'request_document_id');
+    }
+
+    public function requestCertificate()
+    {
+        return $this->belongsTo(RequestCertificate::class, 'request_certificate_id');
     }
 
     public function oldStatus()

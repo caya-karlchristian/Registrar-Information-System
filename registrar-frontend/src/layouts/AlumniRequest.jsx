@@ -15,7 +15,8 @@ import OrValidationErrorModal from "../components/OrValidationErrorModal.jsx";
 import qrCode from "../assets/qrcode.png";
 import { useTheme } from "../context/ThemeContext";
 import { useAlumniRequest } from "../hooks/useAlumniRequest";
-import { getTodayDate } from "../utils/helpers";
+import { useScrollToTop } from "../hooks/useScrollToTop";
+import { getTodayDate, useHeaderResponsiveState } from "../utils/helpers";
 import {
   InformationCircleIcon,
   ExclamationTriangleIcon,
@@ -26,8 +27,8 @@ import {
 
 const AlumniRequestForm = () => {
   const { isDark } = useTheme();
+  const { headerHeight } = useHeaderResponsiveState();
   const navigate = useNavigate();
-  const formRef = useRef(null);
 
   const {
     currentStep,
@@ -123,11 +124,7 @@ const AlumniRequestForm = () => {
     }
   };
 
-  useEffect(() => {
-    if (formRef.current) {
-      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [currentStep]);
+  const { targetRef: formRef } = useScrollToTop([currentStep, isSubmitted]);
 
   return (
     <div className="relative min-h-screen pb-20 z-10">
@@ -217,12 +214,24 @@ const AlumniRequestForm = () => {
           </div>
         </div>
       ) : (
-        <div ref={formRef} className="max-w-4xl mx-auto">
+        <div
+          ref={formRef}
+          style={{
+            scrollMarginTop: `${headerHeight + 20}px`,
+          }}
+          className="max-w-auto mx-auto space-y-6 pt-2 sm:pt-4 pb-12 animate-fadeIn"
+        >
           {/* Top Stepper Progress */}
           <StepProgress
             steps={wizardSteps}
             currentStep={currentStep}
             isDark={isDark}
+            onStepClick={(stepId) => {
+              if (stepId < currentStep) {
+                setErrorMessage("");
+                setCurrentStep(stepId);
+              }
+            }}
           />
 
           {/* Main Form Card */}
@@ -428,10 +437,18 @@ const AlumniRequestForm = () => {
                       Number of copies per document / certificate
                     </h3>
                     <div className="space-y-3 max-h-44 overflow-y-auto pr-2 custom-scrollbar">
-                      {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif"))
-                        .length > 0 &&
+                      {/* formData.documentsRequested contains only document
+                          names by construction — populated exclusively by
+                          CashierDocumentSuggester's `documents` array and
+                          handleCombinedItemsChange's structural membership
+                          check against availableDocs. A previous version
+                          filtered this by `!name.includes("certif")` to
+                          guess which entries were "really" certificates;
+                          that broke once legitimate Type=Document rows
+                          named "Certified True Copy - X" existed, which
+                          would silently vanish from this list. */}
+                      {formData.documentsRequested.length > 0 &&
                         formData.documentsRequested
-                          .filter((doc) => !doc.toLowerCase().includes("certif"))
                           .map((doc, index) => (
                             <div key={`doc-copy-${index}`} className="flex items-center justify-between gap-4 py-1">
                               <label className="text-white text-sm font-medium flex-1">{doc}</label>
@@ -509,7 +526,7 @@ const AlumniRequestForm = () => {
                       <span className="text-xs font-bold uppercase tracking-wider text-[#FFC72C] px-1">
                         Document Requirements
                       </span>
-                      {formData.documentsRequested.filter((doc) => !doc.toLowerCase().includes("certif")).map((doc, index) => {
+                      {formData.documentsRequested.map((doc, index) => {
                         const docData = availableDocs.find((d) => d.document_name === doc);
                         const requirements = docData?.document_requirements
                           ? Array.isArray(docData.document_requirements)

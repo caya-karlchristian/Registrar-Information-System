@@ -5,12 +5,16 @@ import ThemeToggle from "../components/ThemeToggle.jsx";
 import LogoImage from "../assets/puplogoimage.png";
 import { useNotificationsContext as useNotifications } from "../context/NotificationsContext";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthProvider";
 
 
 function Header({ onMenuClick }) {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const { unreadCount } = useNotifications();
   const { isDark } = useTheme();
+  const { user } = useAuth();
+
+  const isSuperAdmin = user?.role_id === 4 || user?.role === 'superAdmin' || user?.role_name === 'super_admin' || user?.active_role === 'super_admin';
 
   const headerStyle = {
     backgroundColor: isDark ? '#242526' : '#660000',
@@ -39,20 +43,22 @@ function Header({ onMenuClick }) {
         </div>
         <div className="relative flex items-center space-x-2 lg:space-x-3">
           <ThemeToggle showLabel={false} />
-          {/* Notification Bell */}
-          <button
-            className="p-2 hover:bg-red-900 dark:hover:bg-[#ffffff44] rounded-full transition-all duration-200 relative group backdrop-blur-sm"
-            onClick={() => setIsNotifOpen(!isNotifOpen)}
-            title="Notifications"
-          >
-            <BellIcon className="w-8 h-8 text-white group-hover:scale-110 transition-transform duration-200" />
+          {/* Notification Bell (Hidden for Super Admin) */}
+          {!isSuperAdmin && (
+            <button
+              className="p-2 hover:bg-red-900 dark:hover:bg-[#ffffff44] rounded-full transition-all duration-200 relative group backdrop-blur-sm"
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              title="Notifications"
+            >
+              <BellIcon className="w-8 h-8 text-white group-hover:scale-110 transition-transform duration-200" />
 
-            {unreadCount > 0 && (
-              <span className="absolute top-0 right-0 flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-red-600 dark:bg-red-500 border-2 border-white text-[10px] font-bold text-white shadow-lg dark:shadow-red-500/50">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </button>
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-red-600 dark:bg-red-500 border-2 border-white text-[10px] font-bold text-white shadow-lg dark:shadow-red-500/50">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
           
           <button
             className="p-2 hover:bg-red-900 dark:hover:bg-[#ffffff44] rounded-full transition-all duration-200 lg:hidden text-white backdrop-blur-sm"
@@ -64,10 +70,12 @@ function Header({ onMenuClick }) {
         </div>
       </div>
 
-      <NotificationModal
-        isOpen={isNotifOpen}
-        onClose={() => setIsNotifOpen(false)}
-      />
+      {!isSuperAdmin && (
+        <NotificationModal
+          isOpen={isNotifOpen}
+          onClose={() => setIsNotifOpen(false)}
+        />
+      )}
     </header>
   );
 }

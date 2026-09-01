@@ -16,25 +16,16 @@ uses(RefreshDatabase::class);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Create a SystemUser with a Sanctum token and act as them.
- * Returns the user so tests can reference it.
- */
 function makeUser(int $roleId): SystemUser
 {
     $user = SystemUser::factory()->create(['role_id' => $roleId, 'status' => 'Activated']);
 
-    // See tests/Pest.php::grantFullDashboardAccess() — a plain admin has
-    // zero dashboard access without an attached policy since Work Item #1.
     grantFullDashboardAccess($user);
 
     Sanctum::actingAs($user);
     return $user;
 }
 
-/**
- * Seed the minimum reference rows needed for document request tests.
- */
 function seedReferenceData(): array
 {
     $status  = RequestStatus::firstOrCreate(['status_id' => 1], ['status_name' => 'Processing']);
@@ -42,17 +33,22 @@ function seedReferenceData(): array
     RequestStatus::firstOrCreate(['status_id' => 3], ['status_name' => 'Completed']);
     RequestStatus::firstOrCreate(['status_id' => 4], ['status_name' => 'Forfeited']);
     RequestStatus::firstOrCreate(['status_id' => 5], ['status_name' => 'Cancelled']);
+    RequestStatus::firstOrCreate(['status_id' => 12], ['status_name' => 'Awaiting Submission']);
+
     $purpose = RequestPurpose::firstOrCreate(['request_purpose_id' => 1], ['purpose_name' => 'DFA']);
     $docType = DocumentType::firstOrCreate(
         ['document_type_id' => 1],
-        ['document_name' => 'Transcript of Records', 'document_description' => '', 'document_process_period' => 5, 'access_id' => 1]
+        [
+            'document_name'              => 'Transcript of Records',
+            'document_description'       => '',
+            'document_process_period'    => 5,
+            'access_id'                  => 1,
+            'requires_source_submission' => true,
+        ]
     );
     return compact('status', 'purpose', 'docType');
 }
 
-/**
- * Create a student user with the minimum profile rows needed to submit a request.
- */
 function makeStudentWithProfile(): SystemUser
 {
     $user    = makeUser(SystemUser::ROLE_STUDENT);
@@ -103,14 +99,6 @@ test('GET /me for admin returns role_name = admin', function () {
 // ═════════════════════════════════════════════════════════════════════════════
 
 test('student can submit a document request', function () {
-    // Without this, CASHIER_API_KEY can leak in from the local .env via
-    // docker-compose.local.yml's env_file: .env on the backend service —
-    // phpunit.xml's <env> block doesn't list CASHIER_API_KEY, so it isn't
-    // forced back to empty the way APP_ENV etc. are. That flips
-    // CashierService into live mode and this OR number, which isn't a
-    // real receipt, gets rejected as NOT_FOUND instead of accepted.
-    // Every other cashier-touching test in this suite sets this
-    // explicitly for the same reason — see CashierTest.php, RisGapTest.php.
     config(['services.cashier.api_key' => '']);
 
     $user = makeStudentWithProfile();
@@ -130,7 +118,7 @@ test('student can submit a document request', function () {
 
     $response->assertCreated()
              ->assertJsonPath('user_id', $user->user_id)
-             ->assertJsonPath('status.status_id', RequestStatusEnum::Processing->value);
+             ->assertJsonPath('status.status_id', RequestStatusEnum::AwaitingSubmission->value);
 
     $this->assertDatabaseHas('document_request', ['user_id' => $user->user_id]);
 });
@@ -154,10 +142,8 @@ test('student cannot update a document request status', function () {
     $student = makeStudentWithProfile();
     seedReferenceData();
 
-    // Create a request owned by this student
     $request = DocumentRequest::factory()->create(['user_id' => $student->user_id]);
 
-    // Students are role 1/2 — PUT is restricted to role 3 (admin)
     $this->putJson("/api/document-requests/{$request->request_id}", [
         'status_id' => RequestStatusEnum::ReadyToClaim->value,
     ])->assertStatus(403);
@@ -180,7 +166,6 @@ test('student cannot access system-users endpoint', function () {
 // ═════════════════════════════════════════════════════════════════════════════
 
 test('admin can update document request status to ready-to-claim', function () {
-    // Create the student whose request will be updated
     $student = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'status' => 'Activated']);
     $profile = StudentProfile::factory()->create(['user_id' => $student->user_id]);
     StudentAcademicRecord::factory()->create(['student_profile_id' => $profile->student_profile_id]);
@@ -192,7 +177,6 @@ test('admin can update document request status to ready-to-claim', function () {
         'status_id' => RequestStatusEnum::Processing->value,
     ]);
 
-    // Switch to admin
     makeUser(SystemUser::ROLE_ADMIN);
 
     $this->putJson("/api/document-requests/{$docRequest->request_id}", [
@@ -207,11 +191,6 @@ test('admin can update document request status to ready-to-claim', function () {
 });
 
 test('admin can view analytics overview', function () {
-    // Since the default-policy fallback fix (Policy::DEFAULT_NAME now
-    // resolves to the zero-access "No Access" policy instead of silently
-    // granting "Registrar Staff"), a plain admin with no policy_id no
-    // longer has analytics access by default. Explicitly attach a policy
-    // that grants it, matching how a real admin would be provisioned.
     $policy = Policy::create([
         'name'        => 'Test Analytics Access',
         'permissions' => ['analytics' => ['Access']],

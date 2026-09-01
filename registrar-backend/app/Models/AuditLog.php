@@ -72,6 +72,35 @@ class AuditLog extends Model
     public const ACTION_CERTIFICATE_TYPE_ARCHIVED = 'certificate_type_archived';
     public const ACTION_CERTIFICATE_TYPE_RESTORED = 'certificate_type_restored';
 
+    // Document / certificate type management — create/update/delete.
+    // Distinct from the archive/restore actions above: these cover the
+    // money-facing fields on these rows (cashier_document_patterns —
+    // the regex CashierDocumentMatcher/CashierDocumentSuggester use to
+    // reconcile a paid receipt line against a requested item —  plus
+    // fulfillment_track_id and logbook_category_id) that, until now,
+    // could be changed via store()/update()/destroy() with no audit
+    // trail at all.
+    public const ACTION_DOCUMENT_TYPE_CREATED     = 'document_type_created';
+    public const ACTION_DOCUMENT_TYPE_UPDATED     = 'document_type_updated';
+    public const ACTION_DOCUMENT_TYPE_DELETED     = 'document_type_deleted';
+    public const ACTION_CERTIFICATE_TYPE_CREATED  = 'certificate_type_created';
+    public const ACTION_CERTIFICATE_TYPE_UPDATED  = 'certificate_type_updated';
+    public const ACTION_CERTIFICATE_TYPE_DELETED  = 'certificate_type_deleted';
+
+    // Logbook category lookup table (see LogbookCategoryController) —
+    // previously unaudited entirely, same gap as document/certificate
+    // type create/update/delete above.
+    public const ACTION_LOGBOOK_CATEGORY_CREATED = 'logbook_category_created';
+    public const ACTION_LOGBOOK_CATEGORY_UPDATED = 'logbook_category_updated';
+    public const ACTION_LOGBOOK_CATEGORY_DELETED = 'logbook_category_deleted';
+
+    // Fulfillment track lookup table (see FulfillmentTrackController) —
+    // new admin screen; audited from the start rather than repeating
+    // the gap the two lookup tables above had.
+    public const ACTION_FULFILLMENT_TRACK_CREATED = 'fulfillment_track_created';
+    public const ACTION_FULFILLMENT_TRACK_UPDATED = 'fulfillment_track_updated';
+    public const ACTION_FULFILLMENT_TRACK_DELETED = 'fulfillment_track_deleted';
+
     // Announcement archiving (distinct from the enable/disable toggle,
     // which is not audit-logged — see the Announcement Archive policy)
     public const ACTION_ANNOUNCEMENT_ARCHIVED = 'announcement_archived';

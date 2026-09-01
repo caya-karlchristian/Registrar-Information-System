@@ -10,6 +10,21 @@ export const EMPTY_FORM = {
   document_requirements: "",
   document_process_period: "",
   access_id: "",
+  // Added alongside the 2026_08_29 logbook_category / CTC reconciliation
+  // work. logbook_category_id is nullable — most types don't collapse
+  // with anything else and log under their own name (see the
+  // logbook_category migration docblock), so "" (→ null on submit) is a
+  // valid, common value, not a placeholder waiting to be filled in.
+  logbook_category_id: "",
+  requires_source_submission: false,
+  // Added for Phase 3 (claim-ticket grouping). Same nullability
+  // reasoning as logbook_category_id above — a NULL/"" track is the
+  // common "standard" track, not an unfinished value. See
+  // RequestReleaseGroupService::assignReleaseGroups() for what a
+  // non-null value here actually does: items whose type shares a
+  // fulfillment_track_id are grouped into one claim ticket, separate
+  // from items on a different (or no) track.
+  fulfillment_track_id: "",
 };
 
 export const FOLDER_COLORS = [

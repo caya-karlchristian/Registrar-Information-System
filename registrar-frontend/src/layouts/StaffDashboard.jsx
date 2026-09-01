@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   CheckCircleIcon,
   EyeIcon,
@@ -6,8 +6,11 @@ import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ClockIcon,
+  PrinterIcon,
 } from '@heroicons/react/24/solid';
 import { CheckIcon, ArrowUpIcon, ArrowDownIcon, ArchiveBoxIcon, EllipsisVerticalIcon, QrCodeIcon } from '@heroicons/react/24/outline';
+import { updateRequestDocumentStatus, updateRequestCertificateStatus } from '../services/api';
 import RequestDetailsModal from '../components/RequestDetailModal';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import LoadingOverlay from '../components/LoadingOverlay.jsx';
@@ -61,11 +64,10 @@ const RowActionsDropdown = ({
     };
   }, [isOpen]);
 
-  // Work Item #1: Generate Certificate is a prep step toward setting
-  // Ready/Awaiting-Signature — gating it behind Process keeps a
-  // Student Staff account from printing a certificate for a status
-  // change it isn't allowed to make anyway.
-  const showGenerateCert = canProcess && !req.isArchived && req.isCertificate && req.statusId === resolvedStatusIds.PENDING;
+  // TEMPORARILY DISABLED: Guard for Generate Certificate button.
+  // Temporarily allowing Generate Certificate action for all active non-archived requests for testing/manual override.
+  const showGenerateCert = canProcess && !req.isArchived;
+  // Previously: const showGenerateCert = canProcess && !req.isArchived && (req.isCertificate || req.hasCertificates || (req.certificates && req.certificates.length > 0)) && req.statusId !== resolvedStatusIds.COMPLETED;
   const isUpdating = updatingId === req.id;
 
   return (
@@ -175,7 +177,7 @@ const RowActionsDropdown = ({
 
 const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim }) => {
   const { isDark } = useTheme();
-  const { showError } = useAlertToast();
+  const { showError, showSuccess } = useAlertToast();
   const { user } = useAuth();
 
   // Work Item #1 — Granular Per-Action Permissions: UX layer only —
@@ -218,7 +220,11 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
     setFilterClassification,
     classificationDropdownOpen,
     setClassificationDropdownOpen,
-    printedCertificateIds,
+    filterDocument,
+    setFilterDocument,
+    documentDropdownOpen,
+    setDocumentDropdownOpen,
+    documentOptions,
     resolvedStatusIds,
     requestStatuses,
     handleStatusUpdate,
@@ -229,12 +235,199 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
     handleRestoreSelected,
     handleArchiveOne,
     handleRestoreOne,
-    markCertificateAsPrinted,
+    handleBulkReady,
+    handleBulkDone,
+    handleCertificatePrinted,
+    queryClient,
+    setUpdatingId,
   } = useStaffDashboard(viewMode);
+
+  const [expandedRowIds, setExpandedRowIds] = useState(new Set());
+
+  const toggleRowExpand = (id) => {
+    setExpandedRowIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleItemStatusUpdate = async (reqId, item, targetStatusId) => {
+    setUpdatingId(reqId);
+    try {
+      if (item.type === 'doc') {
+        await updateRequestDocumentStatus(reqId, item.id, targetStatusId);
+      } else if (item.type === 'cert') {
+        await updateRequestCertificateStatus(reqId, item.id, targetStatusId);
+      }
+      queryClient.invalidateQueries({ queryKey: ['documentRequests'] });
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to update item status.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const getSubItems = (req) => {
+    const raw = req.rawRequest || req;
+    const items = [];
+    if (raw.documents && raw.documents.length > 0) {
+      raw.documents.forEach((d) => {
+        const name = d.document_type?.document_name || d.document_name || 'Document';
+        const qty = Number(d.number_of_copies) || 1;
+        items.push({
+          type: 'doc',
+          id: d.request_document_id,
+          name,
+          qty,
+          statusId: d.status_id,
+          item: d,
+        });
+      });
+    }
+    if (raw.certificates && raw.certificates.length > 0) {
+      raw.certificates.forEach((c) => {
+        const certName = c.certification_type?.certificate_name;
+        const name = certName ? `Certification: ${certName}` : 'Certificate';
+        const qty = Number(c.number_of_copies) || 1;
+        items.push({
+          type: 'cert',
+          id: c.request_certificate_id,
+          name,
+          qty,
+          statusId: c.status_id,
+          generatedAt: c.generated_at,
+          item: c,
+        });
+      });
+    }
+    if (items.length === 0 && req.documentDetailsArray) {
+      req.documentDetailsArray.forEach((title, idx) => {
+        items.push({
+          type: 'doc',
+          id: `fallback-${idx}`,
+          name: title,
+          qty: 1,
+          statusId: req.statusId,
+        });
+      });
+    }
+    return items;
+  };
+
+  const getSummaryStatusPill = (req) => {
+    const items = getSubItems(req);
+
+    if (items.length === 0) {
+      return <StatusBadge status={req.statusName} />;
+    }
+
+    if (items.length === 1) {
+      const singleItem = items[0];
+      const itemStatusId = singleItem.statusId;
+      if (itemStatusId === resolvedStatusIds.COMPLETED) return <StatusBadge status="Completed" />;
+      if (itemStatusId === resolvedStatusIds.READY) return <StatusBadge status="Ready to Claim" />;
+      if (itemStatusId === resolvedStatusIds.PENDING_SIGNATURE) return <StatusBadge status="Pending Signature" />;
+      if (itemStatusId === resolvedStatusIds.AWAITING_SUBMISSION) return <StatusBadge status="Awaiting Submission" />;
+      return <StatusBadge status={req.statusName || 'Processing'} />;
+    }
+
+    // Pure, derived rollup status computation from child line items:
+    const completedCount = items.filter(i => i.statusId === resolvedStatusIds.COMPLETED).length;
+    const readyCount = items.filter(i => i.statusId === resolvedStatusIds.READY).length;
+    const pendingSigCount = items.filter(i => i.statusId === resolvedStatusIds.PENDING_SIGNATURE).length;
+    const totalCount = items.length;
+
+    // 1. All children Completed -> "Completed"
+    if (completedCount === totalCount) {
+      return <StatusBadge status="Completed" />;
+    }
+
+    // 2. All children Ready (or combination of Ready + Completed) -> "Ready to Claim"
+    if (completedCount + readyCount === totalCount) {
+      return <StatusBadge status="Ready to Claim" />;
+    }
+
+    // 3. All items pending signature -> "Pending Signature"
+    if (pendingSigCount > 0 && (pendingSigCount + readyCount + completedCount === totalCount)) {
+      return <StatusBadge status="Pending Signature" />;
+    }
+
+    // 4. Any child still Processing/Pending -> "X of Y Processing"
+    const doneCount = completedCount + readyCount;
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${
+        isDark ? 'bg-yellow-900/20 text-yellow-400 border-yellow-600' : 'bg-yellow-100 text-yellow-700 border-yellow-200'
+      }`}>
+        {doneCount > 0 ? `${doneCount} of ${totalCount} Processing` : `Processing (${totalCount} docs)`}
+      </span>
+    );
+  };
+
+  const handleBulkReadyClick = () => {
+    if (selectedIds.length === 0) return;
+
+    const eligibleRequests = requests.filter(
+      r => selectedIds.includes(r.id) &&
+      !r.isArchived &&
+      (r.statusId === resolvedStatusIds.PENDING || r.statusId === resolvedStatusIds.PENDING_SIGNATURE)
+    );
+
+    if (eligibleRequests.length === 0) {
+      showError('None of the selected requests can be marked as Ready to Claim.');
+      return;
+    }
+
+    // TEMPORARILY DISABLED: Guard requiring certificate generation before marking requests as Ready.
+    // const unprintedCert = eligibleRequests.find(
+    //   r => r.isCertificate && !r.certificatesGenerated
+    // );
+    // if (unprintedCert) {
+    //   showError('You need to process or print the certificate first for selected certificate requests.');
+    //   return;
+    // }
+
+    const targetIds = eligibleRequests.map(r => r.id);
+    handleBulkReady(targetIds, {
+      onSuccess: () => {
+        showSuccess(`Successfully marked ${targetIds.length} request(s) as Ready to Claim.`);
+      },
+      onError: (err) => {
+        showError('Error updating status: ' + (err?.response?.data?.message || err.message));
+      },
+    });
+  };
+
+  const handleBulkDoneClick = () => {
+    if (selectedIds.length === 0) return;
+
+    const eligibleRequests = requests.filter(
+      r => selectedIds.includes(r.id) &&
+      !r.isArchived &&
+      r.statusId === resolvedStatusIds.READY
+    );
+
+    if (eligibleRequests.length === 0) {
+      showError('None of the selected requests can be marked as Done (requests must be Ready for Pickup first).');
+      return;
+    }
+
+    const targetIds = eligibleRequests.map(r => r.id);
+    handleBulkDone(targetIds, {
+      onSuccess: () => {
+        showSuccess(`Successfully marked ${targetIds.length} request(s) as Done.`);
+      },
+      onError: (err) => {
+        showError('Error updating status: ' + (err?.response?.data?.message || err.message));
+      },
+    });
+  };
 
   const sortDropdownRef = useRef(null);
   const statusDropdownRef = useRef(null);
   const classificationDropdownRef = useRef(null);
+  const documentDropdownRef = useRef(null);
 
   const handleSort = (field) => {
     if (field === 'Date & Time') {
@@ -284,40 +477,39 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard title="New Requests"       count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length}    color="yellow" />
-          <StatCard title="Processing"         count={requests.filter(r => r.statusName?.toLowerCase() === 'processing').length} color="blue" />
-          <StatCard title="Awaiting Signature" count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING_SIGNATURE).length} color="amber" />
-          <StatCard title="Ready for Pickup"   count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length}       color="green" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <StatCard title="New Requests"        count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING).length}    color="yellow" />
+          <StatCard title="Awaiting Submission" count={requests.filter(r => r.statusId === resolvedStatusIds.AWAITING_SUBMISSION).length} color="orange" />
+          <StatCard title="Processing"          count={requests.filter(r => r.statusName?.toLowerCase() === 'processing').length} color="blue" />
+          <StatCard title="Awaiting Signature"  count={requests.filter(r => r.statusId === resolvedStatusIds.PENDING_SIGNATURE).length} color="amber" />
+          <StatCard title="Ready for Pickup"    count={requests.filter(r => r.statusId === resolvedStatusIds.READY).length}       color="green" />
         </div>
       )}
 
       {/* ---------------- TOOLBAR ---------------- */}
       <div className={isEmbedded ? "mb-6 flex flex-col md:flex-row gap-4 justify-between items-center w-full" : `p-4 rounded-xl shadow-sm mb-6 flex flex-col md:flex-row gap-4 justify-between items-center ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white border border-gray-100'}`}>
-        
         {selectedIds.length > 0 ? (
           <div className={`flex flex-wrap items-center gap-3 p-2 rounded-lg border w-full md:w-auto ${isDark ? 'bg-[#1f1f1f] border-[#3e4042]' : 'bg-blue-50/30 border-blue-100'}`}>
             <span className={`font-bold text-sm ml-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{selectedIds.length} Selected</span>
-            <button 
-              onClick={handleDeleteSelected}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
-            >
-              <TrashIcon className="w-4 h-4" /> Delete Selected
-            </button>
-            {viewMode === 'archived' ? (
-              <button 
-                onClick={handleRestoreSelected}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
-              >
-                <CheckIcon className="w-4 h-4" /> Restore Selected
-              </button>
-            ) : (
-              <button 
-                onClick={handleArchiveSelected}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
-              >
-                <ArchiveBoxIcon className="w-4 h-4" /> Archive Selected
-              </button>
+            {viewMode !== 'archived' && (
+              <>
+                {canProcess && (
+                  <button 
+                    onClick={handleBulkReadyClick}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" /> Mark Ready
+                  </button>
+                )}
+                {canComplete && (
+                  <button 
+                    onClick={handleBulkDoneClick}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" /> Mark Done
+                  </button>
+                )}
+              </>
             )}
           </div>
         ) : (
@@ -330,91 +522,25 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                 language="en-US"
               />
             </div>
-            <div className="relative shrink-0">
-              <DashboardDropdown
-                isOpen={sortDropdownOpen}
-                setIsOpen={setSortDropdownOpen}
-                dropdownRef={sortDropdownRef}
-                align="right"
-                isIconButton
-                trigger={
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
-                  </svg>
-                }
-                sections={[
-                  {
-                    title: 'Sort by',
-                    items: [
-                      { label: 'Date & Time', field: 'Date & Time' },
-                      { label: 'Status', field: 'Status' },
-                      { label: 'Classification', field: 'Classification' }
-                    ].map(opt => {
-                      let isSelected = false;
-                      if (opt.field === 'Date & Time') {
-                        isSelected = sortOrder === 'Recent Requests' || sortOrder === 'Old Requests';
-                      } else if (opt.field === 'Classification') {
-                        isSelected = sortOrder === 'Classification Asc' || sortOrder === 'Classification Desc';
-                      } else if (opt.field === 'Status') {
-                        isSelected = sortOrder === 'Status Asc' || sortOrder === 'Status Desc';
-                      }
-                      return {
-                        label: opt.label,
-                        isSelected,
-                        onClick: () => {
-                          if (opt.field === 'Date & Time') setSortOrder('Recent Requests');
-                          else if (opt.field === 'Classification') setSortOrder('Classification Asc');
-                          else if (opt.field === 'Status') setSortOrder('Status Asc');
-                        }
-                      };
-                    })
-                  },
-                  {
-                    title: 'Direction',
-                    items: [
-                      { label: 'Ascending', dir: 'asc', icon: ArrowUpIcon },
-                      { label: 'Descending', dir: 'desc', icon: ArrowDownIcon }
-                    ].map(opt => {
-                      const isAsc = sortOrder === 'Old Requests' || sortOrder === 'Classification Asc' || sortOrder === 'Status Asc';
-                      const isSelected = (opt.dir === 'asc' && isAsc) || (opt.dir === 'desc' && !isAsc);
-                      return {
-                        label: opt.label,
-                        isSelected,
-                        icon: opt.icon,
-                        onClick: () => {
-                          if (opt.dir === 'asc') {
-                            if (sortOrder === 'Recent Requests') setSortOrder('Old Requests');
-                            else if (sortOrder === 'Classification Desc') setSortOrder('Classification Asc');
-                            else if (sortOrder === 'Status Desc') setSortOrder('Status Asc');
-                          } else {
-                            if (sortOrder === 'Old Requests') setSortOrder('Recent Requests');
-                            else if (sortOrder === 'Classification Asc') setSortOrder('Classification Desc');
-                            else if (sortOrder === 'Status Asc') setSortOrder('Status Desc');
-                          }
-                        }
-                      };
-                    })
-                  }
-                ]}
-              />
-            </div>
           </div>
         )}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          {(filterStatus !== 'All' || filterClassification !== 'All' || sortOrder !== 'Recent Requests' || searchTerm.trim() !== '') && (
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          {(filterStatus !== 'All' || filterClassification !== 'All' || filterDocument !== 'All' || sortOrder !== 'Recent Requests' || searchTerm.trim() !== '') && (
             <button
               type="button"
               onClick={() => {
                 setFilterStatus('All');
                 setFilterClassification('All');
+                setFilterDocument('All');
                 setSortOrder('Recent Requests');
                 setSearchTerm('');
                 setSelectedIds([]);
                 setSortDropdownOpen(false);
                 setStatusDropdownOpen(false);
                 setClassificationDropdownOpen(false);
+                setDocumentDropdownOpen(false);
               }}
-              className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-semibold transition-colors border shadow-sm flex items-center justify-center shrink-0
+              className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors border shadow-xs flex items-center justify-center shrink-0 whitespace-nowrap cursor-pointer
               ${isDark
                   ? 'bg-[#1f1f1f] text-[#b0b3b8] border-[#3e4042] hover:bg-[#2a2a2f] hover:text-[#e4e6eb]'
                   : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-900'
@@ -424,11 +550,55 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
             </button>
           )}
 
+          {viewMode === 'archived' ? (
+            <button
+              type="button"
+              disabled={selectedIds.length === 0}
+              onClick={handleRestoreSelected}
+              title={selectedIds.length > 0 ? `Restore ${selectedIds.length} selected request(s)` : 'Select requests to restore'}
+              className={`p-2 rounded-lg transition-all border flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                isDark
+                  ? 'bg-[#1f1f1f] text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#2a2a2f] border-[#3e4042]'
+                  : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-gray-200 shadow-xs'
+              }`}
+            >
+              <CheckIcon className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={selectedIds.length === 0}
+              onClick={handleArchiveSelected}
+              title={selectedIds.length > 0 ? `Archive ${selectedIds.length} selected request(s)` : 'Select requests to archive'}
+              className={`p-2 rounded-lg transition-all border flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+                isDark
+                  ? 'bg-[#1f1f1f] text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#2a2a2f] border-[#3e4042]'
+                  : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-gray-200 shadow-xs'
+              }`}
+            >
+              <ArchiveBoxIcon className="w-5 h-5" />
+            </button>
+          )}
+
+          <button
+            type="button"
+            disabled={selectedIds.length === 0}
+            onClick={handleDeleteSelected}
+            title={selectedIds.length > 0 ? `Delete ${selectedIds.length} selected request(s)` : 'Select requests to delete'}
+            className={`p-2 rounded-lg transition-all border flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
+              isDark
+                ? 'bg-[#1f1f1f] text-[#b0b3b8] hover:text-[#e4e6eb] hover:bg-[#2a2a2f] border-[#3e4042]'
+                : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-gray-200 shadow-xs'
+            }`}
+          >
+            <TrashIcon className="w-5 h-5" />
+          </button>
+
           {viewMode === 'active' && onScanToClaim && (
             <button
               type="button"
               onClick={onScanToClaim}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pup-maroon text-white text-sm font-bold hover:bg-pup-dark-maroon transition-all active:scale-95 shadow-sm shrink-0"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pup-maroon text-white text-sm font-bold hover:bg-pup-dark-maroon transition-all active:scale-95 shadow-sm shrink-0 cursor-pointer"
             >
               <QrCodeIcon className="w-5 h-5" />
               <span>Scan to Claim</span>
@@ -471,7 +641,26 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                   ]}
                 />
               </Th>
-              <Th center>Document</Th>
+              <Th center>
+                <DashboardDropdown
+                  isOpen={documentDropdownOpen}
+                  setIsOpen={setDocumentDropdownOpen}
+                  dropdownRef={documentDropdownRef}
+                  align="center"
+                  width="w-64"
+                  trigger={<span>Document</span>}
+                  sections={[
+                    {
+                      title: 'Filter by Document',
+                      items: documentOptions.map(option => ({
+                        label: option,
+                        isSelected: filterDocument === option,
+                        onClick: () => setFilterDocument(option)
+                      }))
+                    }
+                  ]}
+                />
+              </Th>
               <Th center>
                 <button
                   type="button"
@@ -539,137 +728,264 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                 </td>
               </tr>
             ) : (
-              currentItems.map((req, idx) => (
-                <tr key={req.id} className={`transition-colors ${isDark ? 'hover:bg-[#3a3b3c]' : 'hover:bg-gray-50'} ${selectedIds.includes(req.id) ? (isDark ? 'bg-blue-900/15' : 'bg-blue-50') : ''}`}>
-                  <td className="px-6 py-4 text-center">
-                    <input 
-                      type="checkbox" 
-                      className={`w-4 h-4 rounded cursor-pointer ${isDark ? 'border-[#4e4f50] bg-[#242526]' : 'border-gray-300'}`}
-                      checked={selectedIds.includes(req.id)}
-                      onChange={() => handleSelectOne(req.id)}
-                    />
-                  </td>
-                  <Td center>
-                    <span className="font-semibold text-xs text-gray-500 dark:text-gray-400">
-                      {indexOfFirstItem + idx + 1}
-                    </span>
-                  </Td>
-                  <Td>
-                    <div className="font-bold text-center">{req.studentName}</div>
-                  </Td>
-                  <Td center>
-                    <span className="text-xs font-bold tracking-wide">
-                      {req.userType.toUpperCase()}
-                    </span>
-                  </Td>
-                  <Td>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-medium">
-                        {req.documentDetailsArray[0]}
-                      </span>
+              currentItems.map((req, idx) => {
+                const isExpanded = expandedRowIds.has(req.id);
+                const subItems = getSubItems(req);
+                const isMultiItem = subItems.length > 1;
 
-                      {req.documentDetailsArray.length > 1 && (
-                        <span className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>
-                          +{req.documentDetailsArray.length - 1} more
-                        </span>
-                      )}
-                    </div>
-                  </Td>
-                  <Td center>
-                    <div className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>{req.date}</div>
-                    <div className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>{req.time}</div>
-                  </Td>
-                  <Td center><span className={isDark ? 'font-semibold text-[#e4e6eb]' : 'font-semibold text-gray-700'}>{req.copies}</span></Td>
-                  <Td center><StatusBadge status={req.statusName} /></Td>
-                  <td className={`px-6 py-4 text-sm ${isDark ? 'text-[#e4e6eb]' : 'text-inherit'} w-[320px] min-w-[320px]`}>
-                    <div className="flex items-center justify-end gap-2 w-full">
-                      {/* Work Item #1: "Awaiting Signature" and "Ready" both set a
-                          Process-only status (PendingSignature / ReadyToClaim) —
-                          hidden entirely when the acting admin's policy lacks
-                          Process, e.g. a Student Staff account. */}
-                      {canProcess && !req.isArchived && req.statusId === resolvedStatusIds.PENDING && (
-                        <button
-                          disabled={updatingId === req.id}
-                          onClick={() => {
-                            if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
-                              showError('You need to process or print the certificate first.');
-                              return;
-                            }
-                            handleStatusUpdate(req.id, resolvedStatusIds.PENDING_SIGNATURE);
-                          }}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
-                            req.isCertificate && !printedCertificateIds.includes(req.id)
-                              ? 'opacity-40 filter blur-[0.5px] cursor-pointer'
-                              : ''
-                          } ${isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-200'}`}
-                          title={
-                            req.isCertificate && !printedCertificateIds.includes(req.id)
-                              ? 'Print the certificate first before sending it for signature'
-                              : "Registrar's part is done — send this to an external office for signature. Stops the registrar's own processing-time clock and starts tracking the signing office's turnaround separately."
-                          }
-                        >
-                          <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
-                            isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-white text-amber-700'
-                          }`}>
-                            <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
+                return (
+                  <React.Fragment key={req.id}>
+                    <tr className={`transition-colors ${isDark ? 'hover:bg-[#3a3b3c]' : 'hover:bg-gray-50'} ${selectedIds.includes(req.id) ? (isDark ? 'bg-blue-900/15' : 'bg-blue-50') : ''}`}>
+                      <td className="px-6 py-4 text-center">
+                        <input 
+                          type="checkbox" 
+                          className={`w-4 h-4 rounded cursor-pointer ${isDark ? 'border-[#4e4f50] bg-[#242526]' : 'border-gray-300'}`}
+                          checked={selectedIds.includes(req.id)}
+                          onChange={() => handleSelectOne(req.id)}
+                        />
+                      </td>
+                      <Td center>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {isMultiItem && (
+                            <button
+                              type="button"
+                              onClick={() => toggleRowExpand(req.id)}
+                              className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-zinc-800 transition cursor-pointer text-gray-500 dark:text-gray-400"
+                              title={isExpanded ? 'Collapse line items' : 'Expand line items'}
+                            >
+                              <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180 text-gray-900 dark:text-white' : ''}`} />
+                            </button>
+                          )}
+                          <span className="font-semibold text-xs text-gray-600 dark:text-gray-300">
+                            {indexOfFirstItem + idx + 1}
                           </span>
-                          <span>Awaiting Signature</span>
-                        </button>
-                      )}
-                      {canProcess && (!req.isArchived && (req.statusId === resolvedStatusIds.PENDING || req.statusId === resolvedStatusIds.PENDING_SIGNATURE)) && (
-                        <button
-                          disabled={updatingId === req.id}
-                          onClick={() => {
-                            if (req.isCertificate && !printedCertificateIds.includes(req.id)) {
-                              showError('You need to process or print the certificate first.');
-                              return;
-                            }
-                            handleStatusUpdate(req.id, resolvedStatusIds.READY);
-                          }}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
-                            req.isCertificate && !printedCertificateIds.includes(req.id)
-                              ? 'opacity-40 filter blur-[0.5px] cursor-pointer'
-                              : ''
-                          } ${isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'}`}
-                          title={
-                            req.isCertificate && !printedCertificateIds.includes(req.id)
-                              ? 'Print certificate first'
-                              : req.statusId === resolvedStatusIds.PENDING_SIGNATURE
-                              ? 'Signature received — mark as Ready to claim'
-                              : 'Mark as Ready to claim'
-                          }
-                        >
-                          <CheckCircleIcon className="w-4 h-4" /> Ready
-                        </button>
-                      )}
-                      {/* Work Item #1: Done sets Completed — requires the
-                          Complete action, which Student Staff does have. */}
-                      {canComplete && !req.isArchived && req.statusId === resolvedStatusIds.READY && (
-                        <button
-                          disabled={updatingId === req.id}
-                          onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
-                          className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'}`}
-                        >
-                          <CheckCircleIcon className="w-4 h-4" /> Done
-                        </button>
-                      )}
+                        </div>
+                      </Td>
+                      <Td>
+                        <span className="font-bold">{req.studentName}</span>
+                      </Td>
+                      <Td center>
+                        <span className="text-xs font-bold tracking-wide">
+                          {req.userType.toUpperCase()}
+                        </span>
+                      </Td>
+                      <Td>
+                        {req.documentDetailsArray.length > 1 ? (
+                          <span className={`font-bold text-xs sm:text-sm ${isDark ? 'text-[#e4e6eb]' : 'text-gray-900'}`} title={req.documentDetailsArray.join(', ')}>
+                            {req.documentDetailsArray.length} Request
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-xs sm:text-sm" title={req.documentDetailsArray[0]}>
+                            {req.documentDetailsArray[0] || 'Unknown Document'}
+                          </span>
+                        )}
+                      </Td>
+                      <Td center>
+                        <div className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>{req.date}</div>
+                        <div className={isDark ? 'text-xs text-[#b0b3b8]' : 'text-xs text-gray-400'}>{req.time}</div>
+                      </Td>
+                      <Td center><span className={isDark ? 'font-semibold text-[#e4e6eb]' : 'font-semibold text-gray-700'}>{req.copies}</span></Td>
+                      <Td center>
+                        {getSummaryStatusPill(req)}
+                      </Td>
+                      <td className={`px-6 py-4 text-sm ${isDark ? 'text-[#e4e6eb]' : 'text-inherit'} w-[320px] min-w-[320px]`}>
+                        <div className="flex items-center justify-end gap-2 w-full">
+                          {/* For single-item requests ONLY, render direct parent row action button */}
+                          {!isMultiItem && canProcess && !req.isArchived && req.statusId === resolvedStatusIds.AWAITING_SUBMISSION && (
+                            <button
+                              disabled={updatingId === req.id}
+                              onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.PENDING)}
+                              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-purple-900/20 hover:bg-purple-900/30 text-purple-400 border border-purple-600' : 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200'}`}
+                              title="Confirm source document received."
+                            >
+                              <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
+                                isDark ? 'bg-purple-900/40 text-purple-400' : 'bg-white text-purple-700'
+                              }`}>
+                                <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
+                              </span>
+                              <span>Confirm Received</span>
+                            </button>
+                          )}
+                          {!isMultiItem && canProcess && !req.isArchived && req.statusId === resolvedStatusIds.PENDING && (
+                            <button
+                              disabled={updatingId === req.id}
+                              onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.PENDING_SIGNATURE)}
+                              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                                isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-200'
+                              }`}
+                            >
+                              <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
+                                isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-white text-amber-700'
+                              }`}>
+                                <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
+                              </span>
+                              <span>Pending Signature</span>
+                            </button>
+                          )}
+                          {!isMultiItem && canProcess && (!req.isArchived && (req.statusId === resolvedStatusIds.PENDING || req.statusId === resolvedStatusIds.PENDING_SIGNATURE)) && (
+                            <button
+                              disabled={updatingId === req.id}
+                              onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.READY)}
+                              className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                                isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'
+                              }`}
+                            >
+                              <CheckCircleIcon className="w-4 h-4" /> Ready
+                            </button>
+                          )}
+                          {!isMultiItem && canComplete && !req.isArchived && req.statusId === resolvedStatusIds.READY && (
+                            <button
+                              disabled={updatingId === req.id}
+                              onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
+                              className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'}`}
+                            >
+                              <CheckCircleIcon className="w-4 h-4" /> Done
+                            </button>
+                          )}
 
-                      <RowActionsDropdown
-                        req={req}
-                        viewMode={viewMode}
-                        resolvedStatusIds={resolvedStatusIds}
-                        canProcess={canProcess}
-                        onViewDetails={() => setSelectedRequest(req.rawRequest)}
-                        onGenerateCert={() => setCertRequest(req)}
-                        onArchive={() => handleArchiveOne(req.id)}
-                        onRestore={() => handleRestoreOne(req.id)}
-                        updatingId={updatingId}
-                        isDark={isDark}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))
+                          {/* Kebab Menu (RowActionsDropdown) rendered on all parent summary rows */}
+                          <RowActionsDropdown
+                            req={req}
+                            viewMode={viewMode}
+                            resolvedStatusIds={resolvedStatusIds}
+                            canProcess={canProcess}
+                            onViewDetails={() => setSelectedRequest(req.rawRequest)}
+                            onGenerateCert={() => setCertRequest(req)}
+                            onArchive={() => handleArchiveOne(req.id)}
+                            onRestore={() => handleRestoreOne(req.id)}
+                            updatingId={updatingId}
+                            isDark={isDark}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Accordion Sub-Rows for Multi-Item Requests */}
+                    {isExpanded && isMultiItem && subItems.map((subItem) => {
+                      const isItemAwaiting = subItem.statusId === resolvedStatusIds.AWAITING_SUBMISSION;
+                      const isItemReady = subItem.statusId === resolvedStatusIds.READY;
+                      const isItemDone = subItem.statusId === resolvedStatusIds.COMPLETED;
+                      const isItemPendingSig = subItem.statusId === resolvedStatusIds.PENDING_SIGNATURE;
+                      const itemStatusName = isItemAwaiting
+                        ? 'Awaiting Submission'
+                        : isItemReady
+                          ? 'Ready to Claim'
+                          : isItemPendingSig
+                            ? 'Pending Signature'
+                            : isItemDone
+                              ? 'Completed'
+                              : 'Processing';
+
+                      return (
+                        <tr key={`sub-${subItem.id}`} className={`transition-colors border-t border-gray-100 dark:border-zinc-800/60 ${isDark ? 'bg-[#18191a]/40 hover:bg-[#18191a]/80' : 'bg-gray-50/50 hover:bg-gray-50'}`}>
+                          {/* Col 1: Checkbox */}
+                          <td className="px-6 py-3 text-center"></td>
+
+                          {/* Col 2: Tree connector line */}
+                          <td className="px-2 py-3 text-center">
+                            <div className="flex items-center justify-center pl-2">
+                              <div className="w-3.5 h-4 border-l-2 border-b-2 border-gray-300 dark:border-zinc-600 rounded-bl-xs shrink-0 -mt-2" />
+                            </div>
+                          </td>
+
+                          {/* Col 3: Student Name */}
+                          <td className="px-6 py-3"></td>
+
+                          {/* Col 4: Classification */}
+                          <td className="px-6 py-3"></td>
+
+                          {/* Col 5: DOCUMENT Name */}
+                          <td className="px-6 py-3">
+                            <span className={`font-semibold text-xs sm:text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                              {subItem.name}
+                            </span>
+                          </td>
+
+                          {/* Col 6: DATE & TIME */}
+                          <td className="px-6 py-3"></td>
+
+                          {/* Col 7: QTY */}
+                          <Td center>
+                            <span className={`font-semibold text-xs ${isDark ? 'text-zinc-300' : 'text-gray-700'}`}>
+                              {subItem.qty}
+                            </span>
+                          </Td>
+
+                          {/* Col 8: STATUS Badge */}
+                          <Td center>
+                            <StatusBadge status={itemStatusName} />
+                          </Td>
+
+                          {/* Col 9: ACTIONS — Per-item Action Button */}
+                          <td className={`px-6 py-3 text-sm ${isDark ? 'text-[#e4e6eb]' : 'text-inherit'} w-[320px] min-w-[320px]`}>
+                            <div className="flex items-center justify-end gap-2 w-full">
+                              {canProcess && isItemAwaiting && (
+                                <button
+                                  type="button"
+                                  disabled={updatingId === req.id}
+                                  onClick={() => handleItemStatusUpdate(req.id, subItem, resolvedStatusIds.PENDING)}
+                                  className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                                    isDark ? 'bg-purple-900/20 hover:bg-purple-900/30 text-purple-400 border border-purple-600' : 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200'
+                                  }`}
+                                  title="Confirm source document received."
+                                >
+                                  <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
+                                    isDark ? 'bg-purple-900/40 text-purple-400' : 'bg-white text-purple-700'
+                                  }`}>
+                                    <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
+                                  </span>
+                                  <span>Confirm Received</span>
+                                </button>
+                              )}
+
+                              {canProcess && !isItemAwaiting && !isItemReady && !isItemDone && (
+                                <button
+                                  type="button"
+                                  disabled={updatingId === req.id}
+                                  onClick={() => handleItemStatusUpdate(req.id, subItem, resolvedStatusIds.READY)}
+                                  className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                                    isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'
+                                  }`}
+                                >
+                                  <CheckCircleIcon className="w-3.5 h-3.5" />
+                                  <span>Ready</span>
+                                </button>
+                              )}
+
+                              {isItemReady && (
+                                <button
+                                  type="button"
+                                  disabled={updatingId === req.id}
+                                  onClick={() => handleItemStatusUpdate(req.id, subItem, resolvedStatusIds.COMPLETED)}
+                                  className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${
+                                    isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'
+                                  }`}
+                                >
+                                  <CheckCircleIcon className="w-3.5 h-3.5 text-white" />
+                                  <span>Done</span>
+                                </button>
+                              )}
+
+                              <RowActionsDropdown
+                                req={req}
+                                viewMode={viewMode}
+                                resolvedStatusIds={resolvedStatusIds}
+                                canProcess={canProcess}
+                                onViewDetails={() => setSelectedRequest(req.rawRequest)}
+                                onGenerateCert={() => setCertRequest(req)}
+                                onArchive={() => handleArchiveOne(req.id)}
+                                onRestore={() => handleRestoreOne(req.id)}
+                                updatingId={updatingId}
+                                isDark={isDark}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -685,7 +1001,12 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
           handleNextPage={handleNextPage}
         />
       </div>
-      <RequestDetailsModal request={selectedRequest} onClose={() => setSelectedRequest(null)} />
+      <RequestDetailsModal
+        request={selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+        user={user}
+        onGenerateCert={(req) => setCertRequest(req)}
+      />
       <DeleteConfirmModal
         open={showDeleteConfirm}
         count={selectedIds.length}
@@ -697,7 +1018,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
       {certRequest && (
         <CertificateModal
           request={certRequest}
-          onCertificatePrinted={markCertificateAsPrinted}
+          onCertificatePrinted={handleCertificatePrinted}
           onClose={() => setCertRequest(null)}
         />
       )}

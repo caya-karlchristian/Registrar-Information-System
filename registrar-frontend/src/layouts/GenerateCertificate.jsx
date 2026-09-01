@@ -3,7 +3,7 @@ import InputGroup from "../components/InputGroup.jsx";
 import { useTheme } from "../context/ThemeContext";
 import { useReferenceData } from "../context/ReferenceDataContext";
 import { PrinterIcon } from "@heroicons/react/24/solid";
-import { getAcademicRecords, getCertifications, getCertificationLayouts } from "../services/api";
+import { getAcademicRecords, getCertifications, getCertificationLayouts, markCertificatesGenerated } from "../services/api";
 import { CertHeader, CertFooter, getTodayDate } from "../utils/helpers.jsx";
 import { CERT_CONFIG } from "../utils/Certification.jsx";
 import DropDown from "../components/DropDown.jsx";
@@ -396,9 +396,37 @@ useEffect(() => {
     };
     window.addEventListener("afterprint", handleAfterPrint, { once: true });
 
-    if (onCertificatePrinted && initialData?.requestId) {
+    if (initialData?.requestId) {
       const requestId = initialData.requestId;
-      onCertificatePrinted(requestId);
+
+      // Resolve which specific request_certificate row is currently
+      // selected, via the name -> id map CertificateModal.jsx built from
+      // the real backend data. formData.docType is a CERT_CONFIG numeric
+      // id here, not a name, so it's translated back through certIdToName
+      // and normalized the same way the map's keys were built. If it
+      // can't be resolved (no map entry, e.g. an older caller that never
+      // passed certificateIdsByName, or the ambiguous same-name-twice
+      // edge case noted in CertificateModal.jsx), certificateId stays
+      // undefined and markCertificatesGenerated falls back to its
+      // request-wide behavior — never a hard failure either way.
+      const selectedCertName = normalizeCertName(certIdToName[formData.docType]);
+      const certificateId = initialData?.certificateIdsByName?.[selectedCertName];
+
+      // Real, server-side "generated" signal — see
+      // DocumentRequestService::markCertificatesGenerated(). This is what
+      // the ReadyToClaim guards actually check now; the onCertificatePrinted
+      // callback below just invalidates the dashboard's cached request list
+      // so it reflects the change sooner than its 30s poll — it no longer
+      // gates anything by itself. Fire-and-forget: a failure here shouldn't
+      // block the print the staff member already completed, but is
+      // surfaced so it isn't silently lost.
+      markCertificatesGenerated(requestId, certificateId).catch((err) => {
+        console.error("Failed to record certificate as generated:", err);
+      });
+
+      if (onCertificatePrinted) {
+        onCertificatePrinted(requestId);
+      }
     }
   };
 

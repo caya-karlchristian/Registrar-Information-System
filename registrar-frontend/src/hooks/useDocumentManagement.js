@@ -34,8 +34,10 @@ export const useDocumentManagement = ({
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    // Checkbox inputs (requires_source_submission's toggle) carry their
+    // value in .checked, not .value — everything else keeps using .value.
+    setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
 
   const handleVoiceTextareaChange = (name) => (value) => {
@@ -52,6 +54,9 @@ export const useDocumentManagement = ({
       document_requirements: doc.document_requirements ?? "",
       document_process_period: doc.document_process_period ?? "",
       access_id: ACCESS_MAP_REVERSE[doc.access_id] ?? doc.access_id,
+      logbook_category_id: doc.logbook_category_id ?? "",
+      requires_source_submission: Boolean(doc.requires_source_submission),
+      fulfillment_track_id: doc.fulfillment_track_id ?? "",
     });
   };
 
@@ -65,6 +70,9 @@ export const useDocumentManagement = ({
       document_requirements: cert.certificate_requirements ?? "",
       document_process_period: cert.certificate_process_period ?? "",
       access_id: ACCESS_MAP_REVERSE[cert.access_id] ?? cert.access_id,
+      logbook_category_id: cert.logbook_category_id ?? "",
+      requires_source_submission: Boolean(cert.requires_source_submission),
+      fulfillment_track_id: cert.fulfillment_track_id ?? "",
     });
   };
 
@@ -124,11 +132,33 @@ export const useDocumentManagement = ({
       return;
     }
 
+    // logbook_category_id is nullable — "" from an unselected dropdown
+    // must become null (not the string ""), or the exists:logbook_category
+    // validation rule on the backend rejects it. Shared by both branches
+    // below since both payloads carry this field.
+    const normalizedLogbookCategoryId =
+      form.logbook_category_id === "" || form.logbook_category_id === null
+        ? null
+        : Number(form.logbook_category_id);
+
+    // Same nullability handling as logbook_category_id above —
+    // fulfillment_track_id is the field that actually enables Phase 3
+    // claim-ticket grouping (see RequestReleaseGroupService::
+    // assignReleaseGroups()); "" from an unselected dropdown means
+    // "standard track" (null), not an invalid value.
+    const normalizedFulfillmentTrackId =
+      form.fulfillment_track_id === "" || form.fulfillment_track_id === null
+        ? null
+        : Number(form.fulfillment_track_id);
+
     try {
       if (selectedType === "document") {
         const payload = {
           ...form,
           access_id: ACCESS_MAP[form.access_id] ?? form.access_id,
+          logbook_category_id: normalizedLogbookCategoryId,
+          requires_source_submission: Boolean(form.requires_source_submission),
+          fulfillment_track_id: normalizedFulfillmentTrackId,
         };
         if (isAdding) {
           const res = await createDocumentType(payload);
@@ -149,6 +179,9 @@ export const useDocumentManagement = ({
           certificate_requirements: form.document_requirements,
           certificate_process_period: form.document_process_period,
           access_id: ACCESS_MAP[form.access_id] ?? form.access_id,
+          logbook_category_id: normalizedLogbookCategoryId,
+          requires_source_submission: Boolean(form.requires_source_submission),
+          fulfillment_track_id: normalizedFulfillmentTrackId,
         };
         if (isAdding) {
           const res = await createCertification(payload);

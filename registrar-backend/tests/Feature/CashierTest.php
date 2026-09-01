@@ -40,10 +40,25 @@ function seedCashierReferenceData(): array
     RequestStatus::firstOrCreate(['status_id' => 4], ['status_name' => 'Forfeited']);
     RequestStatus::firstOrCreate(['status_id' => 5], ['status_name' => 'Cancelled']);
     $purpose = RequestPurpose::firstOrCreate(['request_purpose_id' => 1], ['purpose_name' => 'DFA']);
-    $docType = DocumentType::firstOrCreate(
-        ['document_type_id' => 1],
-        ['document_name' => 'Transcript of Records', 'document_description' => '', 'document_process_period' => 5, 'access_id' => 1]
-    );
+
+    // Retrieve or update ID 1 so its name and patterns explicitly match mock receipt lines
+    $docType = DocumentType::where('document_type_id', 1)->first();
+    if ($docType) {
+        $docType->update([
+            'document_name' => 'Transcript of Records',
+            'cashier_document_patterns' => json_encode(['Transcript of Records']),
+        ]);
+    } else {
+        $docType = DocumentType::create([
+            'document_type_id'          => 1,
+            'document_name'             => 'Transcript of Records',
+            'document_description'      => '',
+            'document_process_period'   => 5,
+            'access_id'                 => 1,
+            'cashier_document_patterns' => json_encode(['Transcript of Records']),
+        ]);
+    }
+
     return compact('purpose', 'docType');
 }
 
@@ -81,13 +96,6 @@ test('formatCustomerName combines middle initial and suffix', function () {
         ->toBe('MENDOZA, SABENIANO JAMES MARTIN A.');
 });
 
-// Regression test — incident 2026-08-11: RIS sent the full middle name
-// ("ROMANO, JEFFERSON CAMERO") instead of an initial to the live Cashier
-// API. The cashier system matches on or_no AND customer_name together, so
-// this caused a valid, already-paid OR number to be rejected as
-// "NOT_FOUND" — indistinguishable from an OR that genuinely doesn't exist.
-// This test locks in the middle-initial format so this can't silently
-// regress again.
 test('formatCustomerName never emits a full middle name (regression: incident 2026-08-11)', function () {
     $service = new CashierService();
     $formatted = $service->formatCustomerName('Romano', 'Jefferson', 'Camero', '');
@@ -250,7 +258,7 @@ test('matcher returns invalid when receipt does not contain the requested docume
     $docType = DocumentType::create(['document_name' => 'Transcript of Records', 'document_description' => '', 'cashier_document_patterns' => ['Transcript of Records'], 'document_process_period' => 5, 'access_id' => 1]);
 
     $result = $matcher->match(
-        cashierItems: [['document' => 'Diploma', 'quantity' => 1]],
+        cashierItems: [['document' => 'Diploma - 2nd Copy', 'quantity' => 1]],
         documents:    [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
         certificates: [],
     );
@@ -369,7 +377,6 @@ test('document request is rejected when OR number is already used', function () 
     ['user' => $user] = makeCashierStudent();
     ['purpose' => $purpose, 'docType' => $docType] = seedCashierReferenceData();
 
-    // Seed an existing request using the same OR
     DocumentRequest::factory()->create(['or_number' => '9999999', 'user_id' => $user->user_id]);
 
     $this->postJson('/api/document-requests', [
@@ -382,19 +389,14 @@ test('document request is rejected when OR number is already used', function () 
 });
 
 test('document request succeeds when cashier only accepts the full-middle-name format', function () {
-    // Regression coverage for the case NameMatcher exists to handle: the
-    // cashier's on-file name uses a format RIS's primary guess (initial)
-    // doesn't match, but a later candidate (full middle name) does.
     config(['services.cashier.api_key' => 'test-key']);
 
-    ['user' => $user, 'profile' => $profile] = makeCashierStudent(); // Dela Cruz, Juan, Santos
+    ['user' => $user, 'profile' => $profile] = makeCashierStudent();
     ['purpose' => $purpose, 'docType' => $docType] = seedCashierReferenceData();
 
     Http::fake(function ($request) {
         $body = $request->data();
 
-        // Only the full-middle-name format succeeds — simulates a cashier
-        // admin who typed the middle name out in full instead of an initial.
         if (($body['customer_name'] ?? null) === 'DELA CRUZ, JUAN SANTOS') {
             return Http::response([
                 'valid'  => true,
@@ -403,7 +405,9 @@ test('document request succeeds when cashier only accepts the full-middle-name f
                     'receipt_number'   => 1234567,
                     'customer_name'    => 'DELA CRUZ, JUAN SANTOS',
                     'transaction_date' => now()->toDateTimeString(),
-                    'items'            => [],
+                    'items'            => [
+                        ['document' => 'Transcript of Records', 'quantity' => 1]
+                    ],
                 ],
             ], 200);
         }
@@ -418,8 +422,6 @@ test('document request succeeds when cashier only accepts the full-middle-name f
         'documents'          => [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
     ])->assertCreated();
 
-    // Confirm RIS actually retried — not just that it got lucky on the
-    // first attempt — by checking the audit log recorded multiple attempts.
     $log = \App\Models\AuditLog::where('action', \App\Models\AuditLog::ACTION_CASHIER_VERIFICATION)
         ->latest('created_at')
         ->first();

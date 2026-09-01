@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getDocumentRequests,
@@ -14,7 +14,6 @@ import { useReferenceData } from '../context/ReferenceDataContext';
 import {
   resolveStatusIds,
   mapDocumentRequest,
-  PRINTED_CERTIFICATE_STORAGE_KEY,
   filterAndSortRequests,
 } from '../utils/staffDashboardUtils';
 
@@ -23,6 +22,7 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
   'admin_payment_verification',
   'admin_incomplete_request',
   'status_updated',
+  'awaiting_submission',
   'request_processing',
   'pending_signature',
   'ready_to_claim',
@@ -31,11 +31,13 @@ const DASHBOARD_REFETCH_TRIGGERS = new Set([
 ]);
 
 export const useStaffDashboard = (viewMode) => {
-  const { docTypeName, statuses: referenceStatuses } = useReferenceData();
+  const { docTypeName, statuses: referenceStatuses, documentTypes, certifications } = useReferenceData();
   const queryClient = useQueryClient();
   const { notifications } = useNotificationsContext();
 
   const [filterStatus, setFilterStatus] = useState('All');
+  const [filterClassification, setFilterClassification] = useState('All');
+  const [filterDocument, setFilterDocument] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -46,19 +48,8 @@ export const useStaffDashboard = (viewMode) => {
   const [certRequest, setCertRequest] = useState(null);
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-  const [filterClassification, setFilterClassification] = useState('All');
   const [classificationDropdownOpen, setClassificationDropdownOpen] = useState(false);
-
-  const [printedCertificateIds, setPrintedCertificateIds] = useState(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = window.localStorage.getItem(PRINTED_CERTIFICATE_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
+  const [documentDropdownOpen, setDocumentDropdownOpen] = useState(false);
 
   const requestStatuses = referenceStatuses ?? [];
   const resolvedStatusIds = resolveStatusIds(requestStatuses);
@@ -99,13 +90,8 @@ export const useStaffDashboard = (viewMode) => {
   }, [notifications[0]?.id, viewMode, queryClient, notifications]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(PRINTED_CERTIFICATE_STORAGE_KEY, JSON.stringify(printedCertificateIds));
-  }, [printedCertificateIds]);
-
-  useEffect(() => {
     setCurrentPage(1);
-  }, [filterStatus, filterClassification, searchTerm, sortOrder]);
+  }, [filterStatus, filterClassification, filterDocument, searchTerm, sortOrder]);
 
   /* ---------------- TANSTACK QUERY: MUTATIONS ---------------- */
   const invalidateRequests = () =>
@@ -158,14 +144,55 @@ export const useStaffDashboard = (viewMode) => {
     onError: (err) => alert('Error restoring request: ' + (err?.response?.data?.message || err.message)),
   });
 
+  const bulkReadyMutation = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map(id => updateDocumentRequest(id, { status_id: resolvedStatusIds.READY }))),
+    onSuccess: () => {
+      setSelectedIds([]);
+      invalidateRequests();
+    },
+    onError: (err) => {
+      console.error('Bulk ready status update failed:', err);
+    },
+  });
+
+  const bulkDoneMutation = useMutation({
+    mutationFn: (ids) => Promise.all(ids.map(id => updateDocumentRequest(id, { status_id: resolvedStatusIds.COMPLETED }))),
+    onSuccess: () => {
+      setSelectedIds([]);
+      invalidateRequests();
+    },
+    onError: (err) => {
+      console.error('Bulk completed status update failed:', err);
+    },
+  });
+
   const actionLoading = statusMutation.isPending || deleteMutation.isPending ||
     archiveSelectedMutation.isPending || restoreSelectedMutation.isPending ||
-    archiveOneMutation.isPending || restoreOneMutation.isPending;
+    archiveOneMutation.isPending || restoreOneMutation.isPending ||
+    bulkReadyMutation.isPending || bulkDoneMutation.isPending;
 
   const handleStatusUpdate = (id, newStatusId) => {
     setUpdatingId(id);
     statusMutation.mutate({ id, statusId: newStatusId }, {
       onSettled: () => setUpdatingId(null),
+    });
+  };
+
+  const handleBulkReady = (targetIds, callbacks = {}) => {
+    const ids = targetIds || selectedIds;
+    if (!ids || ids.length === 0) return;
+    bulkReadyMutation.mutate(ids, {
+      onSuccess: callbacks.onSuccess,
+      onError: callbacks.onError,
+    });
+  };
+
+  const handleBulkDone = (targetIds, callbacks = {}) => {
+    const ids = targetIds || selectedIds;
+    if (!ids || ids.length === 0) return;
+    bulkDoneMutation.mutate(ids, {
+      onSuccess: callbacks.onSuccess,
+      onError: callbacks.onError,
     });
   };
 
@@ -206,14 +233,38 @@ export const useStaffDashboard = (viewMode) => {
     restoreOneMutation.mutate(id, { onSettled: () => setUpdatingId(null) });
   };
 
-  const markCertificateAsPrinted = (requestId) => {
-    if (!requestId) return;
-    setPrintedCertificateIds(prev => (prev.includes(requestId) ? prev : [...prev, requestId]));
+  // Replaces the old markCertificateAsPrinted (localStorage-only flag that
+  // never reached the server — see staffDashboardUtils.js's
+  // certificatesGenerated for the real signal it's been replaced by).
+  // GenerateCertificate.jsx already persists the actual generated_at
+  // write itself via markCertificatesGenerated(); by the time this fires,
+  // the server already knows — this just invalidates the cached request
+  // list so the dashboard's next render reflects it instead of waiting
+  // out the 30s poll.
+  const handleCertificatePrinted = () => {
+    invalidateRequests();
   };
+
+  const documentOptions = useMemo(() => {
+    const set = new Set();
+    (requests || []).forEach(r => {
+      (r.documentDetailsArray || []).forEach(doc => {
+        if (doc) set.add(doc);
+      });
+    });
+    (documentTypes || []).forEach(d => {
+      if (d?.document_name) set.add(d.document_name);
+    });
+    (certifications || []).forEach(c => {
+      if (c?.certificate_name) set.add(`Certification: ${c.certificate_name}`);
+    });
+    return ['All', ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+  }, [requests, documentTypes, certifications]);
 
   const filteredData = filterAndSortRequests(requests, {
     filterStatus,
     filterClassification,
+    filterDocument,
     searchTerm,
     sortOrder,
     viewMode,
@@ -251,7 +302,11 @@ export const useStaffDashboard = (viewMode) => {
     setFilterClassification,
     classificationDropdownOpen,
     setClassificationDropdownOpen,
-    printedCertificateIds,
+    filterDocument,
+    setFilterDocument,
+    documentDropdownOpen,
+    setDocumentDropdownOpen,
+    documentOptions,
     resolvedStatusIds,
     requestStatuses,
     handleStatusUpdate,
@@ -262,6 +317,11 @@ export const useStaffDashboard = (viewMode) => {
     handleRestoreSelected,
     handleArchiveOne,
     handleRestoreOne,
-    markCertificateAsPrinted,
+    handleBulkReady,
+    handleBulkDone,
+    handleCertificatePrinted,
+    queryClient,
+    setUpdatingId,
+    updatingId,
   };
 };

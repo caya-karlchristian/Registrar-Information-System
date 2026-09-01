@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import DocumentManagement from "../layouts/DocumentManagement.jsx";
 import CertificateTemplateManagement from "../layouts/CertificateTemplateManagement.jsx";
 import SignatoryManagement from "../layouts/SignatoryManagement.jsx";
@@ -25,7 +26,15 @@ import { normalizeCertificateLayout, DEFAULT_CERTIFICATE_LAYOUT } from "../utils
 
 const DocumentAndCertificateManagement = () => {
   const { isDark } = useTheme();
-  const [activeTab, setActiveTab] = useState("documents"); // "documents", "certificates", or "archived"
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const validTabs = ["documents", "certificates", "signatories", "unmatched-cashier", "archived"];
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab = validTabs.includes(tabFromUrl) ? tabFromUrl : "documents";
+
+  const handleTabChange = (newTab) => {
+    setSearchParams({ tab: newTab });
+  };
   const [documents, setDocuments] = useState([]);
   const [certifications, setCertifications] = useState([]);
   const [layoutsByCertId, setLayoutsByCertId] = useState({});
@@ -39,8 +48,8 @@ const DocumentAndCertificateManagement = () => {
       try {
         setLoading(true);
         const [docsRes, certsRes, layoutsRes] = await Promise.all([
-          getDocumentTypes(),
-          getCertifications(),
+          getDocumentTypes(true),
+          getCertifications(true),
           getCertificationLayouts()
         ]);
         // Trust the real is_archived/archived_on values from the API now
@@ -135,14 +144,14 @@ const DocumentAndCertificateManagement = () => {
   return (
     <div className={`font-sans ${isDark ? 'text-[#e4e6eb]' : ''}`}>
       
-      {/* Tab Switcher Navigation */}
-      <div className="flex justify-center mx-4 sm:mx-6 mb-5">
+      {/* Tab Switcher Navigation (Hidden on mobile) */}
+      <div className="hidden md:flex justify-center mx-4 sm:mx-6 mb-5">
         <div className={`inline-flex px-8 py-3.5 rounded-full transition-all duration-300 hover:-translate-y-0.5 ${isDark
             ? 'bg-[#242526] border border-[#3e4042] shadow-[0_2px_8px_rgba(0,0,0,0.2)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)]'
             : 'bg-white border border-gray-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_16px_rgba(0,0,0,0.1)]'
           } gap-8 items-center`}>
           <button
-            onClick={() => setActiveTab("documents")}
+            onClick={() => handleTabChange("documents")}
             className={`text-sm relative rounded-full flex items-center justify-center shrink-0 font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${activeTab === "documents"
                 ? isDark
                   ? "text-yellow-400 font-bold"
@@ -155,7 +164,7 @@ const DocumentAndCertificateManagement = () => {
             Document Management
           </button>
           <button
-            onClick={() => setActiveTab("certificates")}
+            onClick={() => handleTabChange("certificates")}
             className={`text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${activeTab === "certificates"
                 ? isDark
                   ? "text-yellow-400 font-bold"
@@ -168,7 +177,7 @@ const DocumentAndCertificateManagement = () => {
             Certificate Logo Management
           </button>
           <button
-            onClick={() => setActiveTab("signatories")}
+            onClick={() => handleTabChange("signatories")}
             className={`text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${activeTab === "signatories"
                 ? isDark
                   ? "text-yellow-400 font-bold"
@@ -181,7 +190,7 @@ const DocumentAndCertificateManagement = () => {
             Signatories
           </button>
           <button
-            onClick={() => setActiveTab("unmatched-cashier")}
+            onClick={() => handleTabChange("unmatched-cashier")}
             className={`text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${activeTab === "unmatched-cashier"
                 ? isDark
                   ? "text-yellow-400 font-bold"
@@ -194,7 +203,7 @@ const DocumentAndCertificateManagement = () => {
             Unmatched Cashier Items
           </button>
           <button
-            onClick={() => setActiveTab("archived")}
+            onClick={() => handleTabChange("archived")}
             className={`text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${activeTab === "archived"
                 ? isDark
                   ? "text-yellow-400 font-bold"

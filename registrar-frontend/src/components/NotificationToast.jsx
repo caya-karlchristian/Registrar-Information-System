@@ -83,7 +83,7 @@ const NotificationToast = () => {
     return (
         <div 
             style={{
-                top: `${headerHeight + 16}px`,
+                top: `${headerHeight}px`,
             }}
             className="fixed toast-container-shifted right-3 lg:right-5 md:right-5 z-9999 flex flex-col gap-2 w-[min(340px,calc(100vw-2rem))] pointer-events-none"
         >            {toasts.map(toast => (

@@ -12,12 +12,14 @@ class DocumentType extends Model
     protected $fillable = [
         'document_name', 'document_description', 'document_requirements', 'document_process_period',
         'access_id', 'cashier_document_patterns', 'is_archived', 'archived_on', 'archived_by',
+        'logbook_category_id', 'requires_source_submission', 'fulfillment_track_id',
     ];
 
     protected $casts = [
-        'cashier_document_patterns' => 'array',
+        'cashier_document_patterns'  => 'array',
         'is_archived'                => 'boolean',
         'archived_on'                => 'datetime',
+        'requires_source_submission' => 'boolean',
     ];
 
     public function requestDocuments()
@@ -30,12 +32,39 @@ class DocumentType extends Model
         return $this->belongsTo(AccessType::class, 'access_id');
     }
 
+    public function logbookCategory()
+    {
+        return $this->belongsTo(LogbookCategory::class, 'logbook_category_id');
+    }
+
+    // fulfillment_track_id: added by migration 2026_08_29_000008_add_
+    // fulfillment_tracks_and_release_groups — see RequestReleaseGroupService,
+    // which groups a request's line items into separate claim tickets when
+    // they span more than one track. NULL = the implicit "standard" track.
+    public function fulfillmentTrack()
+    {
+        return $this->belongsTo(FulfillmentTrack::class, 'fulfillment_track_id');
+    }
+
     // Named archivedByUser() (not archivedBy()) so it serializes to
     // "archived_by_user" — "archived_by" is the raw FK column, same
     // convention as DocumentRequest::archivedByUser().
     public function archivedByUser()
     {
         return $this->belongsTo(SystemUser::class, 'archived_by', 'user_id');
+    }
+
+    /**
+     * The label this type should be logged under. Falls back to the
+     * type's own name when no logbook_category is set — most types don't
+     * collapse with anything else, so most rows won't set one (see
+     * logbook_category migration docblock). Only types that genuinely
+     * roll up into a shared umbrella line (e.g. every "Certified True
+     * Copy of X" variant) need logbook_category_id assigned.
+     */
+    public function logbookLabel(): string
+    {
+        return $this->logbookCategory?->name ?? $this->document_name;
     }
 
     /**

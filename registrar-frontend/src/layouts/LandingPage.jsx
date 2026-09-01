@@ -140,23 +140,22 @@ const LandingPage = () => {
         className="w-full shadow-sm fixed top-0 left-0 right-0 border-b-4 border-yellow-400 transition-all duration-200"
         style={{ backgroundColor: "#660000", zIndex: 9999 }}
       >
-        <div className="w-full px-4 py-4 flex justify-between items-center h-full">
-          {/* Left: logo + university name */}
-          <button className="flex space-x-4 items-center bg-transparent border-0 cursor-pointer p-0 select-none outline-none" onClick={() => scrollTo("hero")}>
-            <img
-              src={logoImage}
-              alt="PUP Logo"
-              className="w-16 h-16 lg:w-20 lg:h-20 drop-shadow-lg transition-all duration-200"
-            />
-            <div className="flex flex-col justify-center">
-              <h1 className="text-white font-bold text-[12px] uppercase lg:text-[22px] leading-tight font-inter text-left">
-                POLYTECHNIC UNIVERSITY OF THE PHILIPPINES - TAGUIG CAMPUS
-              </h1>
-              <p className="text-white text-[9px] uppercase lg:text-[13px] font-inter text-left">
-                THE COUNTRY'S 1ST POLYTECHNIC
-              </p>
-            </div>
-          </button>
+      <div className="w-full px-4 py-4 z-9999 flex justify-between items-center h-full">
+        <div className="flex space-x-4 items-center">
+          <img
+            src={logoImage}
+            alt="PUP Logo"
+            className="w-16 h-16 lg:w-20 lg:h-20 drop-shadow-lg dark:drop-shadow-2xl transition-all duration-200"
+          />
+          <div className="flex flex-col justify-center grow">
+            <h1 className="text-white dark:text-white font-semibold text-[13px] lg:text-[22px] leading-tight font-lucida tracking-wider">
+              Polytechnic University of the Philippines
+            </h1>
+            <p className="text-[#e6e0e0] dark:text-gray-300 text-[9px] lg:text-[13px] font-lucida tracking-widest mt-0.5">
+              The Country's 1st PolytechnicU
+            </p>
+          </div>
+        </div>
 
           {/* Right: nav links + sign in — hidden on mobile */}
           <div className="hidden md:relative md:flex items-center space-x-2 lg:space-x-3">

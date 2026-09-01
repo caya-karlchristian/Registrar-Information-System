@@ -42,6 +42,23 @@ class CertificationTypeController extends Controller
             'is_archived',
             'archived_on',
             'archived_by',
+            // Added alongside the 2026_08_29 logbook_category /
+            // requires_source_submission migration — without these two
+            // here, every response from this controller (index, show,
+            // store, update, layouts) would silently drop both columns
+            // even though they're set correctly in the DB and validated
+            // correctly by Store/UpdateCertificationTypeRequest. This
+            // whitelist is the only thing standing between the DB row
+            // and the JSON response, so new columns must be added here
+            // explicitly — they are not picked up automatically.
+            'logbook_category_id',
+            'requires_source_submission',
+            // FIXED (same bug, found again): fulfillment_track_id existed
+            // on the column, the model, and (as of this same change) the
+            // FormRequest validation rules — but was missing from this
+            // whitelist, so it was silently dropped from every response
+            // here even after being correctly saved to the DB.
+            'fulfillment_track_id',
         ];
     }
 
@@ -64,12 +81,26 @@ class CertificationTypeController extends Controller
         );
     }
 
-    public function index()
+    /**
+     * List certification types.
+     *
+     * Excludes archived items by default — see DocumentTypeController::
+     * index() for the full rationale; this endpoint has the identical
+     * shared-audience problem via getCertifications() in api.js.
+     */
+    public function index(Request $request)
     {
-        return response()->json(
-            CertificationType::query()->select($this->certColumns())->get(),
-            200
-        );
+        $includeArchived = $request->boolean('include_archived')
+            && Auth::user()
+            && in_array((int) Auth::user()->role_id, [3, 4], true);
+
+        $query = CertificationType::query()->select($this->certColumns());
+
+        if (!$includeArchived) {
+            $query->where('is_archived', false);
+        }
+
+        return response()->json($query->get(), 200);
     }
 
     public function show($id)
@@ -86,6 +117,17 @@ class CertificationTypeController extends Controller
     {
         $cert = CertificationType::create($request->validated());
 
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_CERTIFICATE_TYPE_CREATED, [
+            'certificate_type_id'       => $cert->certificate_type_id,
+            'certificate_name'          => $cert->certificate_name,
+            'cashier_document_patterns' => $cert->cashier_document_patterns,
+            'fulfillment_track_id'      => $cert->fulfillment_track_id,
+            'logbook_category_id'       => $cert->logbook_category_id,
+        ]);
+
         return response()->json($this->freshRecord($cert->certificate_type_id), 201);
     }
 
@@ -96,12 +138,25 @@ class CertificationTypeController extends Controller
             return response()->json(['message' => 'Certification type not found'], 404);
         }
 
-        $cert->update($request->validated());
+        $validated = $request->validated();
+        $cert->update($validated);
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_CERTIFICATE_TYPE_UPDATED, [
+            'certificate_type_id'       => $cert->certificate_type_id,
+            'certificate_name'          => $cert->certificate_name,
+            'changed_fields'            => array_keys($validated),
+            'cashier_document_patterns' => $cert->cashier_document_patterns,
+            'fulfillment_track_id'      => $cert->fulfillment_track_id,
+            'logbook_category_id'       => $cert->logbook_category_id,
+        ]);
 
         return response()->json($this->freshRecord($id), 200);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $cert = CertificationType::find($id);
         if (!$cert) {
@@ -120,6 +175,14 @@ class CertificationTypeController extends Controller
 
             throw $e;
         }
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_CERTIFICATE_TYPE_DELETED, [
+            'certificate_type_id' => $cert->certificate_type_id,
+            'certificate_name'    => $cert->certificate_name,
+        ]);
 
         return response()->json(['message' => 'Certification type deleted'], 200);
     }

@@ -1,96 +1,35 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
-  Squares2X2Icon,
-  TableCellsIcon,
-  ClipboardDocumentCheckIcon,
-  UserGroupIcon,
-  QuestionMarkCircleIcon,
   UserCircleIcon,
   ArrowRightStartOnRectangleIcon,
-  AcademicCapIcon,
-  ChartBarSquareIcon,
-  BookOpenIcon,
-  Cog6ToothIcon,
-  InboxIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
+  EllipsisHorizontalIcon,
   ChevronDownIcon,
-  ArrowPathIcon,
+  ChevronUpIcon,
   BriefcaseIcon,
   UserIcon,
-  ShieldCheckIcon,
-  XMarkIcon,
-  CalendarDaysIcon
+  AcademicCapIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from "../context/AuthProvider";
 import { useTheme } from "../context/ThemeContext";
 import ConfirmationModal from "../components/ConfirmationModal";
 import LineLoading from "../components/LineLoading.jsx";
-import { MODULE_KEYS, hasModuleAccess } from "../utils/policy";
-
-const ROLE_CONFIG = {
-  student: {
-    profileKey: 'student_profile',
-    profileLabel: (user) => user?.academic_record?.student_number || user?.email || 'Student',
-    items: [
-      { name: 'Dashboard', to: 'home', icon: Squares2X2Icon },
-      { name: 'Inbox', to: 'inbox', icon: InboxIcon },
-      { name: 'Document Lists', to: 'lists', icon: TableCellsIcon },
-      { name: 'Student Requests', to: 'request', icon: ClipboardDocumentCheckIcon },
-      { name: 'Student Profile', to: 'profile', icon: UserGroupIcon },
-      { name: 'FAQs & Support', to: 'faqs', icon: QuestionMarkCircleIcon },
-    ],
-  },
-  alumni: {
-    profileKey: 'alumni_profile',
-    profileLabel: (user) => user?.email || 'Alumni',
-    items: [
-      { name: 'Dashboard', to: 'home', icon: Squares2X2Icon },
-      { name: 'Inbox', to: 'inbox', icon: InboxIcon },
-      { name: 'Document Lists', to: 'lists', icon: TableCellsIcon },
-      { name: 'Alumni Request', to: 'request', icon: AcademicCapIcon },
-      { name: 'Alumni Profile', to: 'profile', icon: UserCircleIcon },
-      { name: 'FAQs & Support', to: 'faqs', icon: QuestionMarkCircleIcon },
-    ],
-  },
-  staff: {
-    profileKey: 'admin_profile',
-    profileLabel: (user) => user?.email,
-    items: [
-      { name: 'Dashboard', to: 'dashboard', icon: Squares2X2Icon, module: MODULE_KEYS.DASHBOARD },
-      { name: 'Inbox', to: 'inbox', icon: InboxIcon, module: MODULE_KEYS.INBOX },
-      // { name: 'Walk-In Request', to: 'request', icon: AcademicCapIcon },
-      { name: 'Admin Analytics', to: 'analytics', icon: ChartBarSquareIcon, module: MODULE_KEYS.ANALYTICS },
-      { name: 'Admin Logbook', to: 'logbook', icon: BookOpenIcon, module: MODULE_KEYS.LOGBOOK },
-      { name: 'Access Requests', to: 'access-requests', icon: ClipboardDocumentCheckIcon, module: MODULE_KEYS.ACCESS_REQUESTS },
-      { name: 'Business Calendar', to: 'business-calendar', icon: CalendarDaysIcon, module: MODULE_KEYS.BUSINESS_CALENDAR },
-      { name: 'Cashier OR Overrides', to: 'cashier-overrides', icon: ShieldCheckIcon, module: MODULE_KEYS.CASHIER_OVERRIDES },
-      { name: 'Admin Profile', to: 'profile', icon: UserCircleIcon, module: MODULE_KEYS.PROFILE },
-    ],
-  },
-  superAdmin: {
-    profileKey: null,
-    profileLabel: (user) => user?.email,
-    items: [
-      { name: 'Admin Management', to: 'user', icon: Squares2X2Icon },
-      { name: 'System Analytics', to: 'system-analytics', icon: ChartBarSquareIcon },
-      { name: 'Document Management', to: 'documents', icon: TableCellsIcon },
-      { name: 'Audit Trail', to: 'report', icon: UserCircleIcon },
-      { name: 'Announcement Management', to: 'settings', icon: Cog6ToothIcon },
-      { name: 'Business Calendar', to: 'business-calendar', icon: CalendarDaysIcon },
-      { name: 'Cashier OR Overrides', to: 'cashier-overrides', icon: ShieldCheckIcon },
-    ],
-  },
-};
+import SwitchRoleModal from "../components/SwitchRoleModal.jsx";
+import { hasModuleAccess } from "../utils/policy";
+import { ROLE_CONFIG } from "../utils/navigationConfig";
 
 const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
   const navigate = useNavigate();
-  const { user, logout, idpOffline, roleAssignments, switchRole, ROLE_ID_TO_NAME } = useAuth();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const { user, logout, roleAssignments, switchRole, ROLE_ID_TO_NAME } = useAuth();
   const [isSwitching, setIsSwitching] = useState(false);
   const { isDark } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [expandedParents, setExpandedParents] = useState({});
 
   const [modal, setModal] = useState({
     isOpen: false,
@@ -149,11 +88,13 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
       setIsSwitching(false);
     }
   };
+  
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try {
-      return localStorage.getItem('sidebar-collapsed') === 'true';
+      const saved = localStorage.getItem('sidebar-collapsed');
+      return saved !== null ? saved === 'true' : true;
     } catch (e) {
-      return false;
+      return true;
     }
   });
 
@@ -199,26 +140,62 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
   }, []);
 
   const baseConfig = ROLE_CONFIG[role] || ROLE_CONFIG.student;
-  // Items without a `module` tag (student/alumni/superAdmin items, plus
-  // any future staff item not covered by the policy system) always pass
-  // through. Items tagged with a `module` are only shown if the current
-  // user's assigned policy actually grants that module — see
-  // src/utils/policy.js.
-  const config = useMemo(() => ({
-    ...baseConfig,
-    items: baseConfig.items.filter((item) => !item.module || hasModuleAccess(user, item.module)),
-  }), [baseConfig, user]);
+  const config = useMemo(() => {
+    const sections = (baseConfig.sections || []).map((sec) => ({
+      ...sec,
+      items: sec.items.filter((item) => !item.module || hasModuleAccess(user, item.module)),
+    })).filter((sec) => sec.items.length > 0);
+    return { ...baseConfig, sections };
+  }, [baseConfig, user]);
+
   const profile = config.profileKey ? user?.[config.profileKey] : null;
+
+  useEffect(() => {
+    const currentPath = location.pathname;
+    setExpandedParents((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      (config.sections || []).forEach((sec) => {
+        sec.items.forEach((item) => {
+          if (item.children) {
+            const basePath = item.to.split('?')[0];
+            if (currentPath.includes(basePath)) {
+              if (!next[item.name]) {
+                next[item.name] = true;
+                changed = true;
+              }
+            }
+          }
+        });
+      });
+      return changed ? next : prev;
+    });
+  }, [location.pathname, searchParams, config]);
+
+  const isChildActive = (childTo, childTabKey) => {
+    const basePath = childTo.split('?')[0];
+    if (!location.pathname.includes(basePath)) return false;
+    if (childTabKey) {
+      const currentTab = searchParams.get('tab');
+      return currentTab?.toLowerCase() === childTabKey.toLowerCase();
+    }
+    return true;
+  };
+
+  const isParentActive = (item) => {
+    const basePath = item.to?.split('?')[0];
+    return Boolean(basePath && location.pathname.includes(basePath));
+  };
 
   const fullName = useMemo(() => {
     if (role === 'superAdmin') return 'SUPER ADMIN';
 
     const p =
       (profile?.first_name || profile?.last_name) ? profile :
-      (user?.admin_profile?.first_name || user?.admin_profile?.last_name) ? user.admin_profile :
-      (user?.student_profile?.first_name || user?.student_profile?.last_name) ? user.student_profile :
-      (user?.alumni_profile?.first_name || user?.alumni_profile?.last_name) ? user.alumni_profile :
-      null;
+        (user?.admin_profile?.first_name || user?.admin_profile?.last_name) ? user.admin_profile :
+          (user?.student_profile?.first_name || user?.student_profile?.last_name) ? user.student_profile :
+            (user?.alumni_profile?.first_name || user?.alumni_profile?.last_name) ? user.alumni_profile :
+              null;
 
     if (p) {
       const name = [p.first_name, p.last_name, p.suffix]
@@ -291,6 +268,181 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
 
   const closeModal = () => setModal((prev) => ({ ...prev, isOpen: false }));
 
+  const renderSections = (mobile = false) => {
+    const isCompact = !mobile && isCollapsed;
+
+    return (config.sections || []).map((section) => (
+      <div key={section.title} className="mb-3">
+        {!isCompact && (
+          <h3 className={`text-xs font-semibold px-4 pt-2 pb-1.5 select-none tracking-wide ${mobile
+            ? 'text-sky-300 font-bold uppercase tracking-widest text-[11px]'
+            : (isDark ? 'text-gray-400 uppercase tracking-wider' : 'text-gray-600 uppercase tracking-wider')
+            }`}>
+            {section.title}
+          </h3>
+        )}
+
+        <div className="space-y-1">
+          {section.items.map((item) => {
+            const hasChildren = Boolean(item.children && item.children.length > 0);
+            const parentActive = isParentActive(item);
+            const isExpanded = Boolean(expandedParents[item.name]);
+            const ItemIcon = item.icon;
+
+            if (hasChildren) {
+              return (
+                <div key={item.name} className="space-y-1">
+                  <div className="relative flex items-center">
+                    <NavLink
+                      to={item.to}
+                      onClick={(e) => {
+                        if (!isCompact) {
+                          setExpandedParents((prev) => ({
+                            ...prev,
+                            [item.name]: !prev[item.name],
+                          }));
+                        }
+                        if (mobile && onItemClick) onItemClick();
+                      }}
+                      className={`group relative flex items-center w-full rounded-xl transition-all duration-200 outline-none cursor-pointer ${isCompact ? 'justify-center p-3' : 'justify-between px-4 py-3'
+                        } ${parentActive
+                          ? (mobile
+                            ? 'bg-black/35 text-white font-bold shadow-sm'
+                            : (isDark ? 'bg-[#611825] text-white font-bold shadow-sm' : 'bg-pup-dark-maroon text-white font-bold shadow-md'))
+                          : (mobile
+                            ? 'text-white/85 hover:text-white hover:bg-white/10 font-semibold'
+                            : (isDark ? 'text-[#e4e6eb] hover:bg-white/5 font-bold' : 'text-[#700000] hover:bg-black/5 font-bold'))
+                        }`}
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <ItemIcon className={`w-5 h-5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${parentActive
+                          ? 'text-white'
+                          : (mobile ? 'text-white/80' : (isDark ? 'text-[#b91c1c]' : 'text-[#700000]'))
+                          }`} />
+                        {!isCompact && (
+                          <span className="text-sm truncate leading-snug">{item.name}</span>
+                        )}
+                      </div>
+
+                      {!isCompact && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setExpandedParents((prev) => ({
+                              ...prev,
+                              [item.name]: !prev[item.name],
+                            }));
+                          }}
+                          className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer"
+                          aria-label="Toggle submenu"
+                        >
+                          {isExpanded ? (
+                            <ChevronUpIcon className={`w-4 h-4 shrink-0 ${parentActive || mobile ? 'text-white' : (isDark ? 'text-gray-400' : 'text-gray-600')}`} />
+                          ) : (
+                            <ChevronDownIcon className={`w-4 h-4 shrink-0 ${parentActive || mobile ? 'text-white' : (isDark ? 'text-gray-400' : 'text-gray-600')}`} />
+                          )}
+                        </button>
+                      )}
+
+                      {isCompact && (
+                        <span className={`pointer-events-none absolute left-full ml-4 z-50 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-lg border transition-all duration-200 opacity-0 translate-x-[-8px] scale-95 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 ${isDark ? 'bg-[#242526] text-[#e4e6eb] border-[#3e4042]' : 'bg-white text-[#700000] border-gray-200'
+                          }`}>
+                          {item.name}
+                        </span>
+                      )}
+                    </NavLink>
+                  </div>
+
+                  {isExpanded && !isCompact && (
+                    <div className={`relative ml-6 pl-4 border-l my-1 space-y-1 ${mobile ? 'border-white/20' : (isDark ? 'border-neutral-700/80' : 'border-gray-400')
+                      }`}>
+                      {item.children.map((child) => {
+                        const childActive = isChildActive(child.to, child.tabKey);
+                        return (
+                          <NavLink
+                            key={child.name}
+                            to={child.to}
+                            onClick={() => {
+                              if (mobile && onItemClick) onItemClick();
+                            }}
+                            className={`block py-2 px-3 rounded-lg text-sm transition-all duration-200 outline-none ${childActive
+                              ? (mobile
+                                ? 'bg-black/40 text-white font-bold shadow-xs'
+                                : (isDark ? 'bg-[#4c121e] text-white font-bold shadow-xs border border-red-950/40' : 'bg-[#5c0000] text-white font-bold shadow-xs'))
+                              : (mobile
+                                ? 'text-white/80 hover:text-white hover:bg-white/10 font-semibold'
+                                : (isDark ? 'text-neutral-300 hover:text-white hover:bg-white/5 font-bold' : 'text-gray-700 hover:text-[#700000] hover:bg-black/5 font-semibold'))
+                              }`}
+                          >
+                            {child.name}
+                          </NavLink>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <NavLink
+                key={item.name}
+                to={item.to}
+                onClick={() => {
+                  if (mobile && onItemClick) onItemClick();
+                }}
+                className={({ isActive }) => `
+                  group relative flex items-center rounded-xl transition-all duration-200 outline-none
+                  ${isCompact ? 'justify-center p-3' : 'justify-between px-4 py-3'}
+                  ${isActive
+                    ? (mobile
+                      ? 'bg-black/35 text-white font-bold shadow-sm'
+                      : (isDark ? 'bg-[#611825] text-white font-bold shadow-sm' : 'bg-pup-dark-maroon text-white font-bold shadow-md'))
+                    : (mobile
+                      ? 'text-white/85 hover:text-white hover:bg-white/10 font-semibold'
+                      : (isDark ? 'text-[#e4e6eb] hover:bg-white/5 font-bold' : 'text-[#700000] hover:bg-black/5 font-bold'))
+                  }
+                `}
+              >
+                {({ isActive }) => (
+                  <>
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="relative shrink-0">
+                        <ItemIcon className={`w-5 h-5 transition-transform duration-200 group-hover:scale-105 ${isActive
+                          ? 'text-white'
+                          : (mobile ? 'text-white/80' : (isDark ? 'text-[#b91c1c]' : 'text-[#700000]'))
+                          }`} />
+                        {isCompact && item.badge && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#141414]" />
+                        )}
+                      </div>
+                      {!isCompact && <span className="text-sm leading-snug truncate">{item.name}</span>}
+                    </div>
+
+                    {!isCompact && item.badge && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#e53935] text-white shrink-0 ml-2">
+                        {item.badge}
+                      </span>
+                    )}
+
+                    {isCompact && (
+                      <span className={`pointer-events-none absolute left-full ml-4 z-50 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-lg border transition-all duration-200 opacity-0 translate-x-[-8px] scale-95 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 ${isDark ? 'bg-[#242526] text-[#e4e6eb] border-[#3e4042]' : 'bg-white text-[#700000] border-gray-200'
+                        }`}>
+                        {item.name}
+                      </span>
+                    )}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </div>
+      </div>
+    ));
+  };
+
   return (
     <>
       <LineLoading isVisible={isLoggingOut} />
@@ -309,179 +461,253 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
         style={{ top: `${headerHeight}px` }}
       >
         <div className="w-full overflow-hidden rounded-b-lg shadow-[0_18px_42px_rgba(0,0,0,0.3)]">
-          <div className={isDark ? 'bg-[#242526]' : 'bg-[#7a0000]'}>
-            {canUseSwitcher && (
-              <div className="px-4 py-3 border-b">
-                <button
-                  type="button"
-                  onClick={() => setIsSwitchModalOpen(true)}
-                  className={`w-full text-left flex items-center justify-between font-bold transition-all ${isDark ? 'text-[#e4e6eb]' : 'text-white'}`}
+          <div className={isDark ? 'bg-[#18191a]' : 'bg-[#7a0000]'}>
+            <nav className={`px-4 py-3 max-h-[70vh] overflow-y-auto space-y-3 ${isDark ? 'bg-[#141414]' : 'bg-[#5c0000]'}`}>
+              {/* Mobile User Profile & Switch Role Bar */}
+              <div className={`pb-3 border-b flex items-center justify-between gap-3 ${isDark ? 'border-neutral-800' : 'border-white/20'}`}>
+                <div
+                  onClick={() => {
+                    if (onItemClick) onItemClick();
+                    if (role === 'superAdmin') navigate('/super-admin/profile');
+                    else if (role === 'staff') navigate('/staff/profile');
+                    else if (role === 'student') navigate('/student/profile');
+                    else if (role === 'alumni') navigate('/alumni/profile');
+                  }}
+                  className="flex items-center gap-3.5 min-w-0 cursor-pointer flex-1"
                 >
-                  <div className="flex flex-col text-left">
-                    <span className="text-sm uppercase tracking-wider">{fullName}</span>
-                    <span className="text-[11px] font-semibold opacity-85">{config.profileLabel(user) || user?.email}</span>
+                  <div className="flex items-center justify-center w-11 h-11 rounded-full font-bold text-white bg-pup-dark-maroon shrink-0 text-sm">
+                    {initials}
                   </div>
-                  <ChevronDownIcon className={`h-5 w-5 ${isDark ? 'text-[#b0b3b8]' : 'text-white/85'}`} />
-                </button>
-              </div>
-            )}
-            <nav className={`space-y-px ${isDark ? 'bg-[#18191a]' : 'bg-[#5c0000]'}`}>
-              {config.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  onClick={onItemClick}
-                  className={({ isActive }) => `
-                      group flex items-center justify-between px-5 py-4 font-bold transition-all duration-200 outline-none
-                    ${isActive
-                      ? (isDark
-                        ? 'bg-[#3a3b3c] text-[#e4e6eb] hover:bg-[#4e4f50] hover:text-[#e4e6eb] dark:hover:bg-[#4e4f50] dark:hover:text-[#e4e6eb] active:bg-[#5a5b5c]'
-                        : 'bg-[#5a0000] text-[#fff2f2] hover:bg-[#670000] active:bg-[#730000]')
-                      : (isDark
-                        ? 'bg-[#18191a] text-[#b0b3b8] hover:bg-[#3a3b3c] hover:text-[#e4e6eb] dark:hover:bg-[#3a3b3c] dark:hover:text-[#e4e6eb] active:bg-[#4e4f50] active:text-[#e4e6eb]'
-                        : 'bg-[#7a0000] text-white hover:bg-[#8a0f0f] hover:text-[#fff3f3] active:bg-[#981a1a] active:text-white')}
-                    ${isDark ? 'focus-visible:bg-[#3a3b3c] focus-visible:text-[#e4e6eb]' : 'focus-visible:bg-[#8a0f0f] focus-visible:text-[#fff3f3]'}
-                  `}
-                >
-                  <span className="text-[16px] uppercase tracking-wider">{item.name}</span>
-                  <item.icon className={`h-5 w-5 transition-transform duration-200 group-hover:scale-110 group-active:scale-110 ${isDark ? 'text-[#b0b3b8]' : 'text-white/85'}`} />
-                </NavLink>
-              ))}
-            </nav>
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-semibold text-base text-white truncate leading-snug">
+                      {fullName}
+                    </span>
+                    <span className="text-xs text-gray-400 truncate leading-tight">
+                      {config.profileLabel(user) || user?.email}
+                    </span>
+                  </div>
+                </div>
 
+                {canUseSwitcher && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onItemClick) onItemClick();
+                      setIsSwitchModalOpen(true);
+                    }}
+                    className={`p-2.5 rounded-xl border transition-all cursor-pointer ${isDark
+                      ? 'bg-[#242526] hover:bg-[#3a3b3c] border-[#3e4042] text-white'
+                      : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+                      }`}
+                    title="Switch Role"
+                  >
+                    <ArrowPathIcon className="w-5 h-5 shrink-0" />
+                  </button>
+                )}
+              </div>
+
+              {renderSections(true)}
+            </nav>
             <button
               onClick={handleLogoutClick}
-              className={`group flex w-full items-center justify-between px-5 py-4 text-[16px] font-bold text-white transition-all duration-200 ${isDark ? 'bg-[#242526] hover:bg-[#3a3b3c] dark:hover:bg-[#3a3b3c] active:bg-[#4e4f50] focus-visible:bg-[#3a3b3c]' : 'bg-[#4f0000] hover:bg-[#640000] active:bg-[#750000] focus-visible:bg-[#640000]'}`}
+              className={`group flex w-full items-center justify-between px-5 py-4 text-[16px] font-bold text-white transition-all duration-200 ${isDark ? 'bg-[#4f0000] hover:bg-[#640000] active:bg-[#750000]' : 'bg-[#4f0000] hover:bg-[#640000] active:bg-[#750000]'}`}
             >
               <span>LOGOUT</span>
-              <ArrowRightStartOnRectangleIcon className={`h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5 ${isDark ? 'text-[#b0b3b8]' : 'text-white/85'}`} />
+              <ArrowRightStartOnRectangleIcon className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5 text-white/85" />
             </button>
           </div>
         </div>
       </div>
-
       <aside
         className={`
           hidden lg:fixed lg:left-0 lg:z-40 lg:flex lg:flex-col relative
           ${isCollapsed ? 'lg:w-20' : 'lg:w-72'}
-          ${isDark ? 'bg-[#18191a] border-[#3e4042]' : 'bg-[#E0E0E0] border-gray-300'} border-r transition-all duration-300 ease-in-out
+          ${isDark ? 'bg-[#141414] border-[#2c2d30]' : 'bg-[#E0E0E0] border-gray-300'} border-r transition-all duration-300 ease-in-out
         `}
         style={{
           top: `${headerHeight}px`,
           height: `calc(100vh - ${headerHeight}px)`
         }}
       >
-        {/* Toggle Button */}
-        <button
-          type="button"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className={`
-            hidden lg:flex absolute top-5 -right-5 z-9999 items-center justify-center w-10 h-8 rounded-full border shadow-md transition-all duration-300 hover:scale-110
-            ${isDark
-              ? 'bg-[#18191a] border-[#3e4042] text-[#e4e6eb] hover:bg-[#3a3b3c]'
-              : 'bg-[#E0E0E0] border-gray-300 text-[#700000] hover:bg-white'}
-          `}
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {isCollapsed ? (
-            <ChevronRightIcon className="w-4 h-4 font-bold" />
-          ) : (
-            <ChevronLeftIcon className="w-4 h-4 font-bold" />
-          )}
-        </button>
-
         <div className={`flex flex-col h-full ${isCollapsed ? 'overflow-visible' : 'overflow-hidden'}`}>
-          <div className={`shrink-0 transition-all duration-300 relative ${isCollapsed ? 'p-3' : 'p-6'}`}>
-            <button
-              type="button"
-              disabled={!canUseSwitcher}
-              onClick={() => setIsSwitchModalOpen(true)}
-              className={`w-full text-left flex items-center justify-between focus:outline-none min-w-0 ${canUseSwitcher
-                ? 'cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 p-2 rounded-2xl transition-all duration-200'
-                : ''
-                } ${isCollapsed ? 'justify-center p-0' : 'gap-3'}`}
+          {/* Top Full-width Profile Container Block with 3-Dots Menu */}
+          <div className={`relative shrink-0 transition-all duration-300 ${isDark ? 'bg-[#1b1c1e] border-b border-[#2a2b2e]' : 'bg-gray-200/90 border-b border-gray-300'
+            }`}>
+            <div
+              className={`group relative flex items-center w-full transition-all duration-200 outline-none ${isCollapsed
+                ? 'justify-center py-4 px-0'
+                : 'gap-3 py-4 px-4 justify-between hover:bg-white/5'
+                }`}
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className={`flex items-center justify-center rounded-full shrink-0 font-black text-white bg-pup-dark-maroon transition-all duration-300 border border-white/10 shadow-sm
-                    ${isCollapsed ? 'w-10 h-10 text-xs' : 'w-12 h-12 text-sm lg:w-14 lg:h-14 lg:text-base'}
-                  `}
-                >
-                  {initials}
+              <div
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                className={`flex items-center cursor-pointer min-w-0 ${isCollapsed ? 'justify-center w-full' : 'gap-3 flex-1'
+                  }`}
+              >
+                <div className="relative shrink-0 flex items-center justify-center">
+                  <div className={`flex items-center justify-center rounded-full font-black text-white bg-pup-dark-maroon ring-2 ring-white/10 ${isCollapsed ? 'w-11 h-11 text-xs' : 'w-11 h-11 text-xs'
+                    }`}>
+                    {initials}
+                  </div>
                 </div>
+
                 {!isCollapsed && (
-                  <div className="flex flex-col overflow-hidden transition-all duration-300 min-w-0">
-                    <h2 className={`font-black text-sm leading-tight uppercase truncate ${isDark ? 'text-[#e4e6eb]' : 'text-pup-maroon'}`}>
+                  <div className="flex flex-col text-left overflow-hidden min-w-0">
+                    <span className={`font-semibold text-sm truncate leading-snug ${isDark ? 'text-white' : 'text-gray-900'}`}>
                       {fullName}
-                    </h2>
-                    <span className={`text-[10px] font-semibold truncate ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>{config.profileLabel(user) || user?.email}</span>
+                    </span>
+                    <span className={`text-xs truncate leading-tight ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {config.profileLabel(user) || user?.email}
+                    </span>
                   </div>
                 )}
               </div>
-              {!isCollapsed && canUseSwitcher && (
-                <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`} />
-              )}
-            </button>
 
-            {!isCollapsed && <hr className={`mt-6 ${isDark ? 'border-[#3e4042]' : 'border-gray-400'}`} />}
+              {!isCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'hover:bg-white/10 text-gray-400 hover:text-white' : 'hover:bg-black/10 text-gray-500 hover:text-gray-900'
+                    }`}
+                  aria-label="Account options"
+                >
+                  <EllipsisHorizontalIcon className="w-6 h-6" />
+                </button>
+              )}
+
+              {isCollapsed && (
+                <span className={`pointer-events-none absolute left-full ml-4 z-50 rounded-lg px-3 py-2 text-xs font-semibold shadow-xl border transition-all duration-200 opacity-0 translate-x-[-8px] scale-95 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 whitespace-nowrap ${isDark
+                  ? 'bg-[#242526] text-[#e4e6eb] border-[#3e4042]'
+                  : 'bg-white text-gray-900 border-gray-200'
+                  }`}>
+                  <div className="font-bold">{fullName}</div>
+                  <div className="text-[10px] text-gray-400">{user?.email}</div>
+                </span>
+              )}
+            </div>
+
+            {/* 3-Dots Popover Dropdown Menu */}
+            {isProfileMenuOpen && (
+              <>
+                {/* Translucent Dim Backdrop */}
+                <div
+                  className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] transition-opacity"
+                  onClick={() => setIsProfileMenuOpen(false)}
+                />
+
+                {/* Popover Card */}
+                <div
+                  className={`absolute z-50 rounded-xl shadow-xl border p-1.5 overflow-hidden transition-all duration-200 ${isCollapsed ? 'left-full top-2 ml-3 w-44' : 'right-3 top-full mt-1.5 w-44'
+                    } ${isDark
+                      ? 'bg-[#1a1a1d]/95 backdrop-blur-md border-neutral-800 text-white'
+                      : 'bg-white/95 backdrop-blur-md border-gray-200 text-gray-900 shadow-xl'
+                    }`}
+                >
+                  <div className="space-y-0.5">
+                    {/* Profile */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        if (role === 'superAdmin') navigate('/super-admin/profile');
+                        else if (role === 'staff') navigate('/staff/profile');
+                        else if (role === 'student') navigate('/student/profile');
+                        else if (role === 'alumni') navigate('/alumni/profile');
+                        if (onItemClick) onItemClick();
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-900'
+                        }`}
+                    >
+                      <UserCircleIcon className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#b91c1c]' : 'text-[#700000]'}`} />
+                      <span>Profile</span>
+                    </button>
+
+                    {/* Switch role */}
+                    {canUseSwitcher && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileMenuOpen(false);
+                          setIsSwitchModalOpen(true);
+                        }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-900'
+                          }`}
+                      >
+                        <ArrowPathIcon className={`w-4 h-4 shrink-0 ${isDark ? 'text-[#b91c1c]' : 'text-[#700000]'}`} />
+                        <span>Switch role</span>
+                      </button>
+                    )}
+
+                    <div className={`my-0.5 border-t ${isDark ? 'border-neutral-800' : 'border-gray-200'}`} />
+
+                    {/* Log out */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        handleLogoutClick();
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${isDark ? 'hover:bg-red-950/40 text-red-400' : 'hover:bg-red-50 text-[#700000]'
+                        }`}
+                    >
+                      <ArrowRightStartOnRectangleIcon className={`w-4 h-4 shrink-0 ${isDark ? 'text-red-400' : 'text-[#700000]'}`} />
+                      <span className={isDark ? 'text-red-400' : 'text-[#700000]'}>Log out</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
-          <nav className={`flex-1 space-y-3 custom-scrollbar transition-all duration-300 ${isCollapsed ? 'px-2 py-3 overflow-visible' : 'px-4 py-3 overflow-y-auto'}`}>
-            {config.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={onItemClick}
-                className={({ isActive }) => `
-                  group relative flex items-center rounded-lg font-bold transition-all duration-200 outline-none
-                  ${isCollapsed ? 'justify-center p-3' : 'gap-4 px-4 py-4'}
-                  ${isActive
-                    ? (isDark
-                      ? 'bg-[#3a3b3c] text-[#e4e6eb] shadow-none hover:bg-[#4e4f50] active:bg-[#5a5b5c]'
-                      : 'bg-pup-dark-maroon text-white shadow-md shadow-[#700000]/25 hover:bg-[#5f0000] active:bg-[#6b0000]')
-                    : (isDark
-                      ? 'text-[#b0b3b8] hover:bg-[#3a3b3c] hover:text-[#e4e6eb] active:bg-[#4e4f50] active:text-[#e4e6eb]'
-                      : 'text-[#700000] hover:bg-black/5 hover:text-[#5c0000] active:bg-black/15 active:text-[#4a0000]')}
-                  ${isDark ? 'focus-visible:bg-[#3a3b3c] focus-visible:text-[#e4e6eb]' : 'focus-visible:bg-black/10 focus-visible:text-[#5c0000]'}
-                `}
-              >
-                <item.icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110 group-active:scale-110 shrink-0" />
-                {!isCollapsed && <span className="text-sm uppercase tracking-wider truncate">{item.name}</span>}
-                {isCollapsed && (
-                  <span className={`pointer-events-none absolute left-full ml-4 z-50 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-lg border transition-all duration-200 opacity-0 translate-x-[-8px] scale-95 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 ${isDark
-                    ? 'bg-[#242526] text-[#e4e6eb] border-[#3e4042]'
-                    : 'bg-white text-[#700000] border-gray-200'
-                    }`}>
-                    {item.name}
-                  </span>
-                )}
-              </NavLink>
-            ))}
+          <nav className={`flex-1 custom-scrollbar transition-all duration-300 ${isCollapsed ? 'px-2 py-3 overflow-visible' : 'px-3 py-2 overflow-y-auto'}`}>
+            {renderSections(false)}
           </nav>
 
-          <div className={`mt-auto shrink-0 transition-all duration-300 ${isCollapsed ? 'p-2 overflow-visible' : 'p-6 lg:p-3 lg:px-4'}`}>
+          {/* Bottom Collapse Sidebar Menu Item */}
+          <div className={`shrink-0 transition-all duration-300 ${isCollapsed ? 'p-2' : 'p-3 px-3'}`}>
+            <div className={`my-1 border-t ${isDark ? 'border-neutral-800' : 'border-gray-300'}`} />
+
             <button
               type="button"
-              onClick={handleLogoutClick}
-              className={`group relative flex items-center transition-all mb-4 font-bold text-sm uppercase ${isCollapsed ? 'justify-center w-full p-3 rounded-lg' : 'gap-2 px-5 py-2 rounded w-fit'} text-white ${isDark ? 'bg-[#242526] shadow-none hover:bg-[#3a3b3c] active:bg-[#4e4f50] focus-visible:bg-[#3a3b3c]' : 'bg-pup-dark-maroon shadow-md hover:bg-[#3a0303] active:bg-[#4a0707] focus-visible:bg-[#3a0303]'}`}
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className={`group relative flex items-center w-full rounded-xl font-medium transition-all duration-200 outline-none cursor-pointer ${isCollapsed ? 'justify-center p-3' : 'gap-3.5 px-4 py-3'
+                } ${isDark
+                  ? 'text-[#e4e6eb] hover:bg-white/5'
+                  : 'text-[#700000] hover:bg-black/5'
+                }`}
             >
-              <ArrowRightStartOnRectangleIcon className="w-5 h-5 shrink-0" />
-              {!isCollapsed && <span>Logout</span>}
+              <div className="flex items-center gap-3.5 min-w-0">
+                {isCollapsed ? (
+                  <svg className={`w-5 h-5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${isDark ? 'text-[#b91c1c]' : 'text-[#700000]'
+                    }`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+                    <path d="M9 3.5v17" />
+                    <path d="M13 10l2 2-2 2" />
+                  </svg>
+                ) : (
+                  <svg className={`w-5 h-5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${isDark ? 'text-[#b91c1c]' : 'text-[#700000]'
+                    }`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+                    <path d="M9 3.5v17" />
+                    <path d="M15 10l-2 2 2 2" />
+                  </svg>
+                )}
+                {!isCollapsed && (
+                  <span className="text-sm leading-snug truncate">
+                    Collapse sidebar
+                  </span>
+                )}
+              </div>
+
               {isCollapsed && (
-                <span className={`pointer-events-none absolute left-full ml-4 z-50 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-lg border transition-all duration-200 opacity-0 translate-x-[-8px] scale-95 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 ${isDark
+                <span className={`pointer-events-none absolute left-full ml-4 z-50 rounded-md px-2.5 py-1.5 text-xs font-semibold shadow-lg border transition-all duration-200 opacity-0 translate-x-[-8px] scale-95 group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100 whitespace-nowrap ${isDark
                   ? 'bg-[#242526] text-[#e4e6eb] border-[#3e4042]'
                   : 'bg-white text-[#700000] border-gray-200'
                   }`}>
-                  Logout
+                  Expand sidebar
                 </span>
               )}
             </button>
-            {!isCollapsed && (
-              <div className={`flex items-center justify-between text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#b0b3b8]' : 'text-gray-400'}`}>
-                <span>RIS @ 2026</span>
-                <span>v. 1.0.1</span>
-              </div>
-            )}
           </div>
         </div>
       </aside>
@@ -495,107 +721,16 @@ const Navigation = ({ isOpen, onItemClick, role = 'student' }) => {
         type={modal.type}
       />
 
-      {/* Switch Role Modal inside Navigation */}
-      {isSwitchModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-99999 flex items-center justify-center p-4">
-          <div className={`relative rounded-2xl shadow-2xl w-full max-w-md mx-auto overflow-hidden ${isDark ? 'bg-[#242526] border border-[#3e4042] text-[#e4e6eb]' : 'bg-white text-gray-900 border border-gray-200'
-            }`}>
-
-            {/* Header */}
-            <div className={`px-6 py-5 flex items-center justify-between rounded-t-2xl shrink-0 ${isDark ? 'bg-[#2a2a2f] border-b border-[#3e4042] text-[#e4e6eb]' : 'bg-pup-dark-maroon text-white'
-              }`}>
-              <div className="flex items-center gap-2 text-left">
-                <ShieldCheckIcon className="w-5 h-5 text-amber-500 shrink-0" />
-                <div>
-                  <h2 className="font-bold text-base uppercase tracking-wide">Switch Role</h2>
-                  <p className={`text-[10px] ${isDark ? 'text-[#b0b3b8]' : 'text-white/60'}`}>
-                    {user?.email || ''}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsSwitchModalOpen(false)}
-                className={`p-1.5 rounded-full hover:bg-white/20 transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white' : 'text-white/80 hover:text-white'
-                  }`}
-                aria-label="Close modal"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content Body */}
-            <div className="px-6 py-6 space-y-4">
-              <p className={`text-xs ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'} leading-relaxed`}>
-                Your account has multiple roles assigned. Please select the role context for your current session.
-              </p>
-
-              {/* List — one entry per Active role_assignments row this
-                  account currently holds (see GET /role-assignments/mine).
-                  Selecting a role calls the server-enforced
-                  POST /auth/switch-role, not a client-only override. */}
-              <div className="w-full space-y-3">
-                {switchableRoles.map((roleOption) => {
-                  const isSelected = user?.role_id === roleOption.role_id;
-                  const RoleIcon = roleOption.icon;
-                  return (
-                    <button
-                      key={roleOption.role_id}
-                      type="button"
-                      disabled={isSwitching}
-                      onClick={() => handleSwitchRole(roleOption.role_id)}
-                      className={`w-full text-left flex items-center justify-between p-3.5 border rounded-xl transition-all duration-200 group cursor-pointer active:scale-98 shadow-xs disabled:opacity-60 disabled:cursor-wait ${isSelected
-                        ? (isDark
-                          ? "bg-red-955/20 border-red-500/40 text-white font-bold"
-                          : "bg-red-50 border-red-200 text-pup-maroon font-bold")
-                        : (isDark
-                          ? "bg-[#18191a] border-[#3e4042] hover:bg-[#2c2d30] hover:border-gray-500 text-[#e4e6eb]"
-                          : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 text-gray-800")
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-200 bg-gradient-to-tr ${roleOption.grad} text-white shrink-0`}>
-                          <RoleIcon className="w-5 h-5" />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className={`font-bold text-sm transition-colors ${isSelected
-                            ? (isDark ? "text-red-400" : "text-pup-maroon")
-                            : (isDark ? "text-white group-hover:text-amber-400" : "text-gray-900 group-hover:text-pup-maroon")
-                            }`}>
-                            {roleOption.label}
-                          </span>
-                          <span className={`text-[11px] ${isDark ? 'text-[#b0b3b8]' : 'text-gray-500'}`}>
-                            {roleOption.description}
-                          </span>
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-red-600 text-white border border-red-500">
-                          Active
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Cancel Button */}
-              <div className="w-full pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsSwitchModalOpen(false)}
-                  className={`w-full px-4 py-2 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${isDark
-                    ? 'text-[#e4e6eb] bg-[#3a3b3c] hover:bg-[#4e4f50] border border-[#4e4f50]'
-                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200'
-                    }`}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SwitchRoleModal
+        isOpen={isSwitchModalOpen}
+        onClose={() => setIsSwitchModalOpen(false)}
+        switchableRoles={switchableRoles}
+        currentRoleId={user?.role_id}
+        isSwitching={isSwitching}
+        onSwitchRole={handleSwitchRole}
+        userEmail={user?.email || ''}
+        isDark={isDark}
+      />
     </>
   );
 };

@@ -5,6 +5,8 @@ import {
   ClipboardDocumentListIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  XMarkIcon,
+  XCircleIcon,
 } from '@heroicons/react/24/solid';
 import risImage from "../assets/RIS1.png";
 import CAYA_img from "../assets/members/CAYA.jpg";
@@ -13,6 +15,7 @@ import CORDOVA_img from "../assets/members/CORDOVA.jpg";
 import TOLENTINO_img from "../assets/members/TOLENTINO.jpg";
 import { getAnnouncements } from "../services/api";
 import { useNotificationsContext } from '../context/NotificationsContext';
+import { useHeaderResponsiveState } from '../utils/helpers';
 
 const ICON_CYCLE = [MegaphoneIcon, QuestionMarkCircleIcon, ClipboardDocumentListIcon];
 
@@ -50,12 +53,77 @@ const QUICK_QUESTIONS = [
   }
 ];
 
+const cleanPreviewText = (text) => {
+  if (!text) return "";
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/^[*-]\s+/gm, '')
+    .replace(/<[^>]*>/g, '')
+    .trim();
+};
+
+const renderFormattedContent = (content) => {
+  if (!content) return null;
+
+  const lines = content.split('\n');
+
+  return lines.map((line, lineIdx) => {
+    let trimmed = line.trim();
+
+    const isBullet = /^[*-]\s+/.test(trimmed);
+    if (isBullet) {
+      trimmed = trimmed.replace(/^[*-]\s+/, '');
+    }
+
+    const parts = trimmed.split(/(\*\*.*?\*\*)/g);
+    const formattedLine = parts.map((part, partIdx) => {
+      if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+        return <strong key={partIdx} className="font-bold text-gray-900">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+
+    if (isBullet) {
+      return (
+        <div key={lineIdx} className="flex items-start gap-2 my-1 pl-2">
+          <span className="text-[#800000] font-bold text-sm shrink-0">•</span>
+          <span className="text-gray-700 text-sm leading-relaxed">{formattedLine}</span>
+        </div>
+      );
+    }
+
+    if (!trimmed) {
+      return <div key={lineIdx} className="h-1.5" />;
+    }
+
+    return (
+      <p key={lineIdx} className="text-gray-700 text-sm leading-relaxed my-1">
+        {formattedLine}
+      </p>
+    );
+  });
+};
+
 const Tech4wardProfile = ({ bgImage }) => {
   const bg = bgImage || risImage;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [announcements, setAnnouncements] = useState([]);
   const [openFaqs, setOpenFaqs] = useState({});
   const [faqPageIndex, setFaqPageIndex] = useState(0);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+  const { headerHeight } = useHeaderResponsiveState(!!selectedAnnouncement);
+
+  // Lock body scroll when announcement modal is open
+  useEffect(() => {
+    if (selectedAnnouncement) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedAnnouncement]);
 
   const toggleFaq = (index) => {
     setOpenFaqs(prev => ({
@@ -99,8 +167,8 @@ const Tech4wardProfile = ({ bgImage }) => {
 
   const maxIndex = Math.max(0, announcements.length - 3);
   const safeIndex = Math.min(currentIndex, maxIndex);
-  const visibleAnnouncements = announcements.length <= 3 
-    ? announcements 
+  const visibleAnnouncements = announcements.length <= 3
+    ? announcements
     : announcements.slice(safeIndex, safeIndex + 3);
 
   const visibleFaqs = QUICK_QUESTIONS.slice(faqPageIndex * 4, (faqPageIndex + 1) * 4);
@@ -131,18 +199,28 @@ const Tech4wardProfile = ({ bgImage }) => {
               </div>
             ) : (
               visibleAnnouncements.map((item, index) => {
-                const tag = ["Important", "Notice", "Reminder"][(safeIndex + index) % 3];
-                const dateStr = item.created_at 
-                  ? new Date(item.created_at).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                const tag = "Announcement";
+                const dateStr = item.created_at
+                  ? new Date(item.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                   : "Recent";
                 return (
                   <div key={item.id} className="lp-announce-card lp-revealed">
-                    <div className="lp-announce-top">
-                      <span className="lp-announce-tag">{tag}</span>
-                      <span className="lp-announce-date">{dateStr}</span>
+                    <div>
+                      <div className="lp-announce-top">
+                        <span className="lp-announce-tag">{tag}</span>
+                        <span className="lp-announce-date">{dateStr}</span>
+                      </div>
+                      <h3 className="lp-announce-title">{item.title}</h3>
+                      <p className="lp-announce-desc">{cleanPreviewText(item.content)}</p>
                     </div>
-                    <h3 className="lp-announce-title">{item.title}</h3>
-                    <p className="lp-announce-desc">{item.content}</p>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAnnouncement({ ...item, tag, dateStr })}
+                      className="text-[#2563eb] hover:text-[#1d4ed8] font-semibold text-sm cursor-pointer mt-4 pt-2 flex items-center gap-1 group/readmore w-fit transition-colors"
+                    >
+                      Read more
+                      <span className="inline-block transform group-hover/readmore:translate-x-1 transition-transform">→</span>
+                    </button>
                   </div>
                 );
               })
@@ -157,7 +235,7 @@ const Tech4wardProfile = ({ bgImage }) => {
                   onClick={() => setCurrentIndex(i)}
                   className={`w-3.5 h-3.5 rounded-full transition-all border border-[#F8BF1E]/30 cursor-pointer ${
                     safeIndex === i ? "bg-[#F8BF1E] scale-110 shadow-md" : "bg-gray-300 hover:bg-gray-400"
-                  }`}
+                    }`}
                   aria-label={`Go to slide ${i + 1}`}
                 />
               ))}
@@ -190,12 +268,12 @@ const Tech4wardProfile = ({ bgImage }) => {
               const actualIndex = faqPageIndex * 4 + relativeIndex;
               const isOpen = !!openFaqs[actualIndex];
               return (
-                <div 
+                <div
                   key={actualIndex}
                   className="bg-[#450000] border border-white/10 rounded-3xl p-6 md:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col justify-start text-left h-fit hover:border-[#F8BF1E]/30"
                 >
                   <div className="flex justify-between items-center gap-4 w-full">
-                    <h3 
+                    <h3
                       onClick={() => toggleFaq(actualIndex)}
                       className="text-white hover:text-yellow-400 font-bold text-[14px] md:text-[16px] leading-snug cursor-pointer select-none grow transition-colors duration-200"
                     >
@@ -210,10 +288,10 @@ const Tech4wardProfile = ({ bgImage }) => {
                       </span>
                     </button>
                   </div>
-                  <div 
+                  <div
                     className={`overflow-hidden transition-all duration-300 ease-in-out ${
                       isOpen ? "max-h-40 opacity-100 mt-4" : "max-h-0 opacity-0"
-                    }`}
+                      }`}
                   >
                     <p className="text-gray-200 text-xs md:text-[13px] leading-relaxed text-justify">
                       {faq.answer}
@@ -232,7 +310,7 @@ const Tech4wardProfile = ({ bgImage }) => {
                   onClick={() => setFaqPageIndex(i)}
                   className={`w-3.5 h-3.5 rounded-full transition-all border cursor-pointer ${
                     faqPageIndex === i ? "bg-[#F8BF1E] border-[#F8BF1E] scale-110 shadow-md" : "bg-white/20 hover:bg-white/40 border-white/10"
-                  }`}
+                    }`}
                   aria-label={`Go to FAQ page ${i + 1}`}
                 />
               ))}
@@ -286,6 +364,58 @@ const Tech4wardProfile = ({ bgImage }) => {
         </div>
       </div>
       */}
+
+      {/* Announcement Detail Modal */}
+      {selectedAnnouncement && (
+        <div
+          style={{
+            top: `${headerHeight}px`,
+          }}
+          className="fixed inset-x-0 bottom-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn"
+          onClick={() => setSelectedAnnouncement(null)}
+        >
+          <div
+            className="relative rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col bg-white border border-gray-100 transform transition-all my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header matching RequestDetailModal.jsx */}
+            <div className="relative px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center shrink-0 bg-pup-maroon">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white leading-tight">
+                  {selectedAnnouncement.title}
+                </h3>
+                <p className="text-xs sm:text-sm text-yellow-200 mt-0.5 font-medium">
+                  {selectedAnnouncement.tag} • {selectedAnnouncement.dateStr}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedAnnouncement(null)}
+                aria-label="Close announcement"
+                className="absolute top-2 right-2 sm:top-3 sm:right-3 text-white hover:text-yellow-200 transition cursor-pointer"
+              >
+                <XCircleIcon className="w-7 h-7" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
+              {renderFormattedContent(selectedAnnouncement.content)}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-gray-100 flex justify-end shrink-0 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setSelectedAnnouncement(null)}
+                className="px-5 py-2 bg-pup-maroon hover:bg-pup-dark-maroon text-white font-semibold text-sm rounded-xl transition-all shadow-xs cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

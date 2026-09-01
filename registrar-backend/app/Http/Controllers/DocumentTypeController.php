@@ -17,9 +17,33 @@ class DocumentTypeController extends Controller
 {
     public function __construct(private AuditLogger $auditLogger) {}
 
-    public function index()
+    /**
+     * List document types.
+     *
+     * Excludes archived items by default: this endpoint is shared by both
+     * the admin catalog management screen and the live student/alumni
+     * request form (RequestForm.jsx, useAlumniRequest.js). The request
+     * form has no way to distinguish archived from active items, so an
+     * unfiltered list here means archived legacy document types remain
+     * selectable — and payable at the cashier — for new requests.
+     *
+     * Admin/registrar (role 3/4 — same roles already gated on store/
+     * update/archive/restore below) can pass ?include_archived=1 to see
+     * archived rows for management/restore purposes.
+     */
+    public function index(Request $request)
     {
-        return response()->json(DocumentType::all(), 200);
+        $includeArchived = $request->boolean('include_archived')
+            && Auth::user()
+            && in_array((int) Auth::user()->role_id, [3, 4], true);
+
+        $query = DocumentType::query();
+
+        if (!$includeArchived) {
+            $query->where('is_archived', false);
+        }
+
+        return response()->json($query->get(), 200);
     }
 
     public function show($id)
@@ -36,6 +60,17 @@ class DocumentTypeController extends Controller
     {
         $docType = DocumentType::create($request->validated());
 
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_DOCUMENT_TYPE_CREATED, [
+            'document_type_id'          => $docType->document_type_id,
+            'document_name'             => $docType->document_name,
+            'cashier_document_patterns' => $docType->cashier_document_patterns,
+            'fulfillment_track_id'      => $docType->fulfillment_track_id,
+            'logbook_category_id'       => $docType->logbook_category_id,
+        ]);
+
         return response()->json($docType, 201);
     }
 
@@ -46,12 +81,25 @@ class DocumentTypeController extends Controller
             return response()->json(['message' => 'Document type not found'], 404);
         }
 
-        $docType->update($request->validated());
+        $validated = $request->validated();
+        $docType->update($validated);
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_DOCUMENT_TYPE_UPDATED, [
+            'document_type_id'          => $docType->document_type_id,
+            'document_name'             => $docType->document_name,
+            'changed_fields'            => array_keys($validated),
+            'cashier_document_patterns' => $docType->cashier_document_patterns,
+            'fulfillment_track_id'      => $docType->fulfillment_track_id,
+            'logbook_category_id'       => $docType->logbook_category_id,
+        ]);
 
         return response()->json($docType, 200);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $docType = DocumentType::find($id);
         if (!$docType) {
@@ -70,6 +118,14 @@ class DocumentTypeController extends Controller
 
             throw $e;
         }
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_DOCUMENT_TYPE_DELETED, [
+            'document_type_id' => $docType->document_type_id,
+            'document_name'    => $docType->document_name,
+        ]);
 
         return response()->json(['message' => 'Document type deleted'], 200);
     }

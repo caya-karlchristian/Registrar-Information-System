@@ -17,6 +17,7 @@ import { AlertToastProvider } from './context/AlertToastContext.jsx';
 import { NotificationsProvider } from './context/NotificationsContext.jsx';
 import { ReferenceDataProvider } from './context/ReferenceDataContext.jsx';
 import FloatingActionMenu from './components/FloatingActionMenu.jsx';
+import { ScrollToTop } from './hooks/useScrollToTop';
 
 // Synchronous Role Shells & Main (for instant layout, header, sidebar & route evaluation)
 import StudentPage from './pages/StudentPage.jsx';
@@ -84,6 +85,7 @@ const App = () => {
         <ReferenceDataProvider>
           <NotificationsProvider>
             <div className="flex flex-col min-h-screen">
+              <ScrollToTop />
               {/* BUG FIX (QA #6) — resetKey={location.pathname} means that if
                   one page's render throws, clicking "Back to Login" (or any
                   navigation) actually clears the fallback instead of staying
@@ -194,6 +196,7 @@ const App = () => {
                     <Route path="business-calendar" element={<BusinessCalendarManagement />} />
                     <Route path="cashier-overrides" element={<CashierOrOverrideManagement />} />
                     <Route path="inbox" element={<InboxCenter />} />
+                    <Route path="profile" element={<ProfilePage userType="superAdmin" />} />
                   </Route>
 
                   <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,16 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDownIcon, XCircleIcon } from '@heroicons/react/24/solid';
-import { getDocumentTypes } from "../services/api";
+import { ChevronDownIcon, XCircleIcon, ArrowRightIcon, PrinterIcon } from '@heroicons/react/24/solid';
+import { getDocumentTypes, getDocumentRequest, updateRequestDocumentStatus, updateRequestCertificateStatus } from "../services/api";
 import { PROGRESS_MAP } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
+import { hasModuleAction } from '../utils/policy';
 import ClaimTicket from './ClaimTicket';
 
-const RequestDetailsModal = ({ request, onClose, user }) => {
-  const { docTypeName, purposeName, certName } = useReferenceData();
+/**
+ * Item-level "next action" for a single request_document/request_certificate
+ * row — mirrors RequestStatusEnum::allowedTransitions() on the backend, but
+ * only surfaces the single sensible forward action per stage (same
+ * convention the whole-request buttons in StaffDashboard.jsx already use)
+ * rather than a generic transition picker. The backend is still the
+ * authority: it validates the transition independently and this list only
+ * decides what a button is offered for, same as every other status button
+ * in this app.
+ *
+ * requiredAction mirrors RequestItemStatusService::authorizeItemStatusChange()
+ * — 'Complete' only for the move into Completed, 'Process' for everything
+ * else — so a button is hidden here exactly when the backend would reject
+ * it for lack of permission.
+ */
+const ITEM_NEXT_ACTIONS = {
+  12: [{ label: 'Confirm Received',      target: 1, requiredAction: 'Process'  }], // AwaitingSubmission -> Processing
+  1:  [
+    { label: 'Send for Signature',       target: 6, requiredAction: 'Process'  }, // Processing -> PendingSignature
+    { label: 'Mark Ready to Claim',      target: 2, requiredAction: 'Process'  }, // Processing -> ReadyToClaim
+  ],
+  6:  [{ label: 'Mark Ready to Claim',    target: 2, requiredAction: 'Process'  }], // PendingSignature -> ReadyToClaim
+  2:  [{ label: 'Mark Completed',         target: 3, requiredAction: 'Complete' }], // ReadyToClaim -> Completed
+};
+
+const RequestDetailsModal = ({ request, onClose, user, onGenerateCert }) => {
+  const { docTypeName, purposeName, certName, statusConfig } = useReferenceData();
   const [docTypes, setDocTypes] = useState([]);
+  const [liveRequest, setLiveRequest] = useState(request);
+  const [updatingItemKey, setUpdatingItemKey] = useState(null);
+  const [itemError, setItemError] = useState(null);
   const { isDark } = useTheme();
+
+  const canProcess  = hasModuleAction(user, 'dashboard', 'Process');
+  const canComplete = hasModuleAction(user, 'dashboard', 'Complete');
 
   useEffect(() => {
     const fetchTypes = async () => {
@@ -24,6 +56,15 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
     fetchTypes();
   }, []);
 
+  // Reset the local "live" copy whenever a different request is opened
+  // (or the modal is closed), so per-item status edits don't leak
+  // between requests and a freshly-opened request always starts from
+  // the parent-provided data.
+  useEffect(() => {
+    setLiveRequest(request);
+    setItemError(null);
+  }, [request]);
+
   useEffect(() => {
     if (request) {
       document.body.style.overflow = 'hidden';
@@ -36,9 +77,54 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
   }, [request]);
 
   if (!request) return null; //To identify the role of the user
-    const isStudent = request.student_profile != null;
-    const isAlumni = request.alumni_profile != null; 
-    const progress = PROGRESS_MAP[request.status_id] ?? 0;
+  const activeRequest = liveRequest ?? request?.rawRequest ?? request;
+  const isStudent = activeRequest.student_profile != null || request?.userType === 'Student';
+  const isAlumni = activeRequest.alumni_profile != null || request?.userType === 'Alumni'; 
+  const progress = PROGRESS_MAP[activeRequest.status_id ?? request?.statusId] ?? 0;
+  const requestDocs = activeRequest.documents ?? activeRequest.rawRequest?.documents ?? request?.documents ?? request?.rawRequest?.documents ?? [];
+  const requestCerts = activeRequest.certificates ?? activeRequest.rawRequest?.certificates ?? request?.certificates ?? request?.rawRequest?.certificates ?? [];
+
+  // Re-fetches the whole request after a single item's status changes,
+  // so the progress bar / aggregate status / other items all reflect
+  // whatever RequestItemStatusService::recomputeAggregateStatus() landed
+  // on server-side, rather than trying to predict the aggregate
+  // client-side.
+  const refreshRequest = async () => {
+    try {
+      const res = await getDocumentRequest(activeRequest.request_id);
+      setLiveRequest(res.data);
+    } catch (err) {
+      console.error("Failed to refresh request after item update:", err);
+    }
+  };
+
+  const advanceDocumentItem = async (item, targetStatusId) => {
+    const key = `doc-${item.request_document_id}`;
+    setUpdatingItemKey(key);
+    setItemError(null);
+    try {
+      await updateRequestDocumentStatus(activeRequest.request_id, item.request_document_id, targetStatusId);
+      await refreshRequest();
+    } catch (err) {
+      setItemError(err.response?.data?.message ?? 'Failed to update this item\'s status.');
+    } finally {
+      setUpdatingItemKey(null);
+    }
+  };
+
+  const advanceCertificateItem = async (item, targetStatusId) => {
+    const key = `cert-${item.request_certificate_id}`;
+    setUpdatingItemKey(key);
+    setItemError(null);
+    try {
+      await updateRequestCertificateStatus(activeRequest.request_id, item.request_certificate_id, targetStatusId);
+      await refreshRequest();
+    } catch (err) {
+      setItemError(err.response?.data?.message ?? 'Failed to update this item\'s status.');
+    } finally {
+      setUpdatingItemKey(null);
+    }
+  };
 
   const getDocName = (doc) => {
     // 1. Try the eager-loaded name from the backend relationship
@@ -50,7 +136,9 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
           "Unknown Document";
   };
 
-  const displayStatus = request.status?.status_name || request.status || 'N/A';
+  const displayStatus = activeRequest.status?.status_name || activeRequest.status || 'N/A';
+  const releaseGroups = activeRequest.release_groups ?? [];
+  const hasReleaseGroups = releaseGroups.length > 0;
 
   return createPortal(
     <div className="fixed inset-0 z-99999 flex items-center justify-center p-4">
@@ -58,7 +146,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
         className={`absolute inset-0 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/50'}`}
         onClick={onClose}
       />
-      <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl lg:max-w-4xl max-h-[calc(100vh-32px)] overflow-hidden flex flex-col print:w-full print:max-w-none print:shadow-none print:rounded-none ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
+      <div className={`relative rounded-2xl shadow-2xl w-full max-w-2xl lg:max-w-4xl max-h-[calc(100vh-64px)] overflow-hidden flex flex-col print:w-full print:max-w-none print:shadow-none print:rounded-none ${isDark ? 'bg-[#242526] border border-[#3e4042]' : 'bg-white'}`}>
 
 
         {/* Header */}
@@ -66,7 +154,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
           <div>
             <h3 className="text-base sm:text-lg font-bold text-white">Request Details</h3>
             <p className={`text-xs sm:text-sm wrap-break-word ${isDark ? 'text-[#b0b3b8]' : 'text-yellow-200'}`}>
-              Transaction ID: {request.uuid ?? `#${request.request_id}`}
+              Transaction ID: {activeRequest.uuid ?? `#${activeRequest.request_id}`}
             </p>
           </div>
           <button
@@ -102,23 +190,54 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
           </div>
           </Section>
 
-          {/* Claim Ticket — QR Code Claiming Policy v1.0 §3.2 access point 2
+          {/* Claim Ticket(s) — QR Code Claiming Policy v1.0 §3.2 access point 2
               (dashboard). Shown for the entire lifetime a request is still
-              claimable — Processing (25%), PendingSignature (60%), and
-              ReadyToClaim (75%) — matching the pop-up shown immediately on
-              submit (RequestForm.jsx/AlumniRequest.jsx) and the inbox
-              notification sent at request_submitted: the student can access
-              their ticket from day one, not only once it's Ready to Claim.
-              Staff can only ever *act* on a scan once the request is
+              claimable — AwaitingSubmission (10%), Processing (25%),
+              PendingSignature (60%), and ReadyToClaim (75%) — matching the
+              pop-up shown immediately on submit (RequestForm.jsx/
+              AlumniRequest.jsx) and the inbox notification sent at
+              request_submitted: the student can access their ticket from
+              day one, not only once it's Ready to Claim.
+              Staff can only ever *act* on a scan once the request/group is
               actually ReadyToClaim — that restriction is enforced
               server-side in the claim endpoint, not by hiding the ticket
               here. Hidden only once there's nothing left to claim:
-              Completed (100%) or Forfeited/Cancelled (0%). */}
+              Completed (100%) or Forfeited/Cancelled (0%).
+
+              Phase 3 (fulfillment_track grouping): a request whose items
+              span more than one track gets its OWN ticket per track (see
+              DocumentRequest::releaseGroups() / RequestReleaseGroupService)
+              — each is scanned/claimed independently. The overwhelming
+              majority of requests have zero release groups and fall
+              through to the single request-level ticket exactly as
+              before. */}
           {progress !== 0 && progress !== 100 && (
-            <Section title="Claim Ticket" isDark={isDark}>
-              <div className="flex justify-center w-full py-1 sm:py-2">
-                <ClaimTicket uuid={request.uuid} claimCode={request.claim_code} />
-              </div>
+            <Section title={hasReleaseGroups ? 'Claim Tickets' : 'Claim Ticket'} isDark={isDark}>
+              {hasReleaseGroups ? (
+                <div className="flex flex-col gap-4 w-full">
+                  {releaseGroups.map((group) => {
+                    const groupStatus = statusConfig(group.status_id);
+                    const trackLabel = group.fulfillment_track?.name ?? 'Standard';
+                    return (
+                      <div key={group.request_release_group_id} className={`rounded-lg border p-3 ${isDark ? 'border-[#3e4042]' : 'border-gray-200'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold uppercase tracking-wide">{trackLabel}</span>
+                          <span className={`inline-flex text-xs font-semibold px-2 py-0.5 rounded-full border ${groupStatus.classes}`}>
+                            {groupStatus.label}
+                          </span>
+                        </div>
+                        <div className="flex justify-center w-full py-1">
+                          <ClaimTicket uuid={group.uuid} claimCode={group.claim_code} small />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex justify-center w-full py-1 sm:py-2">
+                  <ClaimTicket uuid={activeRequest.uuid} claimCode={activeRequest.claim_code} />
+                </div>
+              )}
             </Section>
           )}
 
@@ -128,14 +247,14 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <p className="wrap-break-word">
                   <strong>Full Name:</strong>{' '}
-                  {request.student_profile
-                    ? `${request.student_profile.first_name} ${request.student_profile.middle_name ?? ''} ${request.student_profile.last_name}`.trim()
-                    : `${request.alumni_profile?.first_name ?? ''} ${request.alumni_profile?.middle_name ?? ''} ${request.alumni_profile?.last_name ?? ''}`.trim() || 'N/A'}
+                  {activeRequest.student_profile
+                    ? `${activeRequest.student_profile.first_name} ${activeRequest.student_profile.middle_name ?? ''} ${activeRequest.student_profile.last_name}`.trim()
+                    : `${activeRequest.alumni_profile?.first_name ?? ''} ${activeRequest.alumni_profile?.middle_name ?? ''} ${activeRequest.alumni_profile?.last_name ?? ''}`.trim() || 'N/A'}
                 </p>
-                <p className="wrap-break-word"><strong>Student Number:</strong> {request.academic_record?.student_number ?? request.alumni_academic_record?.student_number ?? 'N/A'}</p>
-                <p className="wrap-break-word"><strong>Date of Birth:</strong> {request.student_profile?.date_of_birth ?? request.alumni_profile?.date_of_birth ?? 'N/A'}</p>
-                <p className="wrap-break-word"><strong>Course:</strong> {request.academic_record?.course ?? request.alumni_academic_record?.course ?? 'N/A'}</p>
-                <p className="wrap-break-word"><strong>Year Level:</strong> {request.academic_record?.year_level ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Student Number:</strong> {activeRequest.academic_record?.student_number ?? activeRequest.alumni_academic_record?.student_number ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Date of Birth:</strong> {activeRequest.student_profile?.date_of_birth ?? activeRequest.alumni_profile?.date_of_birth ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Course:</strong> {activeRequest.academic_record?.course ?? activeRequest.alumni_academic_record?.course ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Year Level:</strong> {activeRequest.academic_record?.year_level ?? 'N/A'}</p>
               </div>
             </Section>
           )}
@@ -146,13 +265,13 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <p className="wrap-break-word">
                   <strong>Full Name:</strong>{' '}
-                  {request?.alumni_profile
-                    ? `${request.alumni_profile.first_name} ${request.alumni_profile.middle_name ?? ''} ${request.alumni_profile.last_name}`
+                  {activeRequest?.alumni_profile
+                    ? `${activeRequest.alumni_profile.first_name} ${activeRequest.alumni_profile.middle_name ?? ''} ${activeRequest.alumni_profile.last_name}`
                     : 'N/A'}
                 </p>
-                <p className="wrap-break-word"><strong>Student Number:</strong> {request.alumni_academic_record?.student_number ?? 'N/A'}</p>
-                <p className="wrap-break-word"><strong>Year of Graduation:</strong> {request.alumni_academic_record?.year_of_graduation ?? 'N/A'}</p>
-                <p className="wrap-break-word"><strong>Course:</strong> {request.alumni_academic_record?.course ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Student Number:</strong> {activeRequest.alumni_academic_record?.student_number ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Year of Graduation:</strong> {activeRequest.alumni_academic_record?.year_of_graduation ?? 'N/A'}</p>
+                <p className="wrap-break-word"><strong>Course:</strong> {activeRequest.alumni_academic_record?.course ?? 'N/A'}</p>
               </div>
             </Section>
           )}
@@ -163,33 +282,39 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <p className="wrap-break-word">
                 <strong>Date Requested:</strong>{' '}
-                  {request.requested_at ? new Date(request.requested_at).toLocaleDateString() : 'N/A'}
+                  {activeRequest.requested_at ? new Date(activeRequest.requested_at).toLocaleDateString() : 'N/A'}
               </p>
               <p className="wrap-break-word"><strong>Status:</strong> {displayStatus}</p>
-              <p className="wrap-break-word"><strong>Purpose:</strong> {request.request_purpose?.purpose_name ?? purposeName(request.request_purpose_id) ?? 'N/A'}</p>
+              <p className="wrap-break-word"><strong>Purpose:</strong> {activeRequest.request_purpose?.purpose_name ?? purposeName(activeRequest.request_purpose_id) ?? 'N/A'}</p>
             </div>
           </Section>
 
           {/* Documents Requested */}
           <Section title="Documents Requested" isDark={isDark}>
             <ul className="list-disc ml-4 sm:ml-5 space-y-2">
-              {request.documents
-                ?.filter((doc) => !getDocName(doc).toLowerCase().includes('certif'))
-                .map((doc, index) => (
-                  <li key={doc.request_document_id ?? index} className="wrap-break-word">
-                    <strong className="block sm:inline">{getDocName(doc)}</strong>
+              {requestDocs.map((doc, index) => (
+                <li key={doc.request_document_id ?? index} className="wrap-break-word">
+                  <strong className="block sm:inline">{getDocName(doc)}</strong>
+                  <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
+                    {doc.number_of_copies || 1} {(doc.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}
+                  </span>
+                </li>
+              ))}
+              {requestCerts.map((c, i) => {
+                const cName = c.certification_type?.certificate_name ?? certName(c.certificate_type_id) ?? 'Unknown Certification';
+                return (
+                  <li key={c.request_certificate_id ?? `cert-${i}`} className="wrap-break-word">
+                    <strong className="block sm:inline">CERTIFICATION: </strong>
+                    {cName}
                     <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
-                      {doc.number_of_copies || 1} {doc.number_of_copies > 1 ? 'Copies' : 'Copy'}
+                      {c.number_of_copies || 1} {(c.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}
                     </span>
                   </li>
-                ))}
-              {request.certificates?.map((c, i) => (
-                <li key={`cert-${i}`} className="wrap-break-word">
-                  <strong className="block sm:inline">CERTIFICATION: </strong>
-                  {c.certification_type?.certificate_name ?? 'Unknown'}
-                  <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
-                    {c.number_of_copies || 1} {(c.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}
-                  </span>
+                );
+              })}
+              {requestDocs.length === 0 && requestCerts.length === 0 && (request?.documentDetailsArray ?? activeRequest.documentDetailsArray)?.map((detail, index) => (
+                <li key={`detail-${index}`} className="wrap-break-word">
+                  <strong className="block sm:inline">{detail}</strong>
                 </li>
               ))}
             </ul>
@@ -200,13 +325,13 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <p className="wrap-break-word">
                 <strong>OR Number:</strong>{' '}
-                {request.or_number ?? 'N/A'}
+                {activeRequest.or_number ?? 'N/A'}
               </p>
 
               <p className="wrap-break-word">
                 <strong>Date of Payment:</strong>{' '}
-                {request.receipt_date
-                  ? new Date(request.receipt_date).toLocaleDateString()
+                {activeRequest.receipt_date
+                  ? new Date(activeRequest.receipt_date).toLocaleDateString()
                   : 'N/A'}
               </p>
 
@@ -222,6 +347,7 @@ const RequestDetailsModal = ({ request, onClose, user }) => {
 const getProgressLabel = (progress) => {
   switch (progress) {
     case 0:   return "Request was forfeited";
+    case 10:  return "Awaiting submission of source document";
     case 25:  return "Request received and under review";
     case 60:  return "Registrar processing complete — awaiting signature";
     case 75:  return "Document is ready to claim";
