@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import PropTypes from "prop-types";
 import { EnvelopeIcon, XMarkIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { createCashierOverride, searchCashierOverrideUsers } from "../services/api";
+import { useReferenceData } from "../context/ReferenceDataContext";
 import VoiceSearchInput from "./VoiceSearchInput.jsx";
 import VoiceTextareaInput from "./VoiceTextareaInput.jsx";
 import InputGroup from "./InputGroup.jsx";
+import DropdownGroup from "./DropDown.jsx";
 
 /**
  * Read-only detail view — reason and verified_items are the actual
@@ -289,6 +291,20 @@ CashierOverrideDetailsModal.propTypes = {
  * Modal form for creating a new cashier OR override with Voice inputs.
  */
 export const CreateCashierOverrideModal = ({ isDark, subtleText, onClose, onCreated, onError }) => {
+  const refData = useReferenceData();
+  const documentTypes = refData?.documentTypes ?? [];
+  const certifications = refData?.certifications ?? [];
+
+  const combinedDocOptions = useMemo(() => {
+    const docs = (documentTypes || [])
+      .filter((d) => !d.is_archived)
+      .map((d) => d.document_name);
+    const certs = (certifications || [])
+      .filter((c) => !c.is_archived)
+      .map((c) => c.certificate_name);
+    return Array.from(new Set([...docs, ...certs])).sort();
+  }, [documentTypes, certifications]);
+
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -364,7 +380,11 @@ export const CreateCashierOverrideModal = ({ isDark, subtleText, onClose, onCrea
   const validate = () => {
     const errs = {};
     if (!selectedUser?.user_id) errs.user_id = "Please select a student account.";
-    if (!orNumber.trim()) errs.or_number = "OR number is required.";
+    if (!orNumber.trim()) {
+      errs.or_number = "OR number is required.";
+    } else if (!/^\d{7}$/.test(orNumber.trim())) {
+      errs.or_number = "Official Receipt Number must be exactly 7 digits.";
+    }
     if (!reason.trim() || reason.trim().length < 10) {
       errs.reason = "Reason must be at least 10 characters long.";
     }
@@ -418,7 +438,7 @@ export const CreateCashierOverrideModal = ({ isDark, subtleText, onClose, onCrea
   return (
     <div className="fixed inset-0 z-9999 flex items-center justify-center pt-16 sm:pt-4 pb-4 px-3 sm:px-4 backdrop-blur-sm bg-black/60 overflow-y-auto">
       <div
-        className={`relative z-9999 w-full max-w-lg my-auto rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] overflow-hidden border flex flex-col max-h-[calc(100vh-5rem)] sm:max-h-[85vh] animate-in fade-in zoom-in duration-200 ${
+        className={`relative z-9999 w-full max-w-2xl my-auto rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] overflow-hidden border flex flex-col max-h-[calc(100vh-5rem)] sm:max-h-[85vh] animate-in fade-in zoom-in duration-200 ${
           isDark ? "bg-[#242526] border-[#3e4042] text-[#e4e6eb]" : "bg-white border-[#800000]/20 text-gray-900"
         }`}
       >
@@ -452,73 +472,78 @@ export const CreateCashierOverrideModal = ({ isDark, subtleText, onClose, onCrea
             Scoped to this one OR number and student only — every other request goes through Cashier API.
           </p>
 
-          {/* Student picker with VoiceSearchInput */}
-          <div className="relative" ref={searchRef}>
-            <label className="text-[11px] sm:text-xs font-semibold uppercase tracking-wide mb-1 block">
-              Student
-            </label>
-            <div className="relative">
-              <VoiceSearchInput
-                value={query}
-                onChange={(val) => {
-                  setQuery(val);
-                  if (!val) {
-                    setSelectedUser(null);
-                    setShowResults(false);
-                  }
-                }}
-                placeholder="Search by name or email…"
-              />
-            </div>
-            {showResults && !selectedUser && query.trim().length >= 2 && (
-              <div
-                className={`absolute z-20 w-full mt-1 rounded-lg border shadow-lg max-h-52 overflow-y-auto ${
-                  isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white border-gray-200"
-                }`}
-              >
-                {searching ? (
-                  <div className={`px-3 py-2.5 text-sm ${subtleText}`}>Searching…</div>
-                ) : results.length === 0 ? (
-                  <div className={`px-3 py-2.5 text-sm ${subtleText}`}>
-                    No matching student or alumni account.
-                  </div>
-                ) : (
-                  results.map((u) => (
-                    <button
-                      key={u.user_id}
-                      type="button"
-                      onClick={() => pickUser(u)}
-                      className={`w-full text-left px-3 py-2.5 text-sm cursor-pointer ${
-                        isDark ? "hover:bg-[#242526]" : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <div className="font-medium truncate">{u.full_name}</div>
-                      <div className={`text-xs ${subtleText} truncate`}>
-                        {u.email} · {u.role_name}
-                      </div>
-                    </button>
-                  ))
-                )}
+          {/* Student picker and OR Number on same row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+            {/* Student picker with VoiceSearchInput */}
+            <div className="relative" ref={searchRef}>
+              <label className="text-[11px] sm:text-xs font-semibold uppercase tracking-wide mb-1 block">
+                Name <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <VoiceSearchInput
+                  value={query}
+                  onChange={(val) => {
+                    setQuery(val);
+                    if (!val) {
+                      setSelectedUser(null);
+                      setShowResults(false);
+                    }
+                  }}
+                  placeholder="Search by name or email…"
+                />
               </div>
-            )}
-            {fieldErrors.user_id && <p className="text-xs text-red-500 mt-1">{fieldErrors.user_id}</p>}
-          </div>
+              {showResults && !selectedUser && query.trim().length >= 2 && (
+                <div
+                  className={`absolute z-20 w-full mt-1 rounded-lg border shadow-lg max-h-52 overflow-y-auto ${
+                    isDark ? "bg-[#1a1b1e] border-[#3e4042]" : "bg-white border-gray-200"
+                  }`}
+                >
+                  {searching ? (
+                    <div className={`px-3 py-2.5 text-sm ${subtleText}`}>Searching…</div>
+                  ) : results.length === 0 ? (
+                    <div className={`px-3 py-2.5 text-sm ${subtleText}`}>
+                      No matching student or alumni account.
+                    </div>
+                  ) : (
+                    results.map((u) => (
+                      <button
+                        key={u.user_id}
+                        type="button"
+                        onClick={() => pickUser(u)}
+                        className={`w-full text-left px-3 py-2.5 text-sm cursor-pointer ${
+                          isDark ? "hover:bg-[#242526]" : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <div className="font-medium truncate">{u.full_name}</div>
+                        <div className={`text-xs ${subtleText} truncate`}>
+                          {u.email} · {u.role_name}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+              {fieldErrors.user_id && <p className="text-xs text-red-500 mt-1">{fieldErrors.user_id}</p>}
+            </div>
 
-          {/* OR Number with InputGroup */}
-          <div>
-            <InputGroup
-              label="OR Number"
-              name="or_number"
-              value={orNumber}
-              onChange={(e) => {
-                setOrNumber(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, or_number: null }));
-              }}
-              placeholder="e.g. 0234891"
-              required
-              labelColor="text-[11px] sm:text-xs font-semibold uppercase tracking-wide"
-            />
-            {fieldErrors.or_number && <p className="text-xs text-red-500 mt-1">{fieldErrors.or_number}</p>}
+            {/* OR Number with InputGroup */}
+            <div>
+              <InputGroup
+                label="OR Number"
+                name="or_number"
+                value={orNumber}
+                onChange={(e) => {
+                  const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 7);
+                  setOrNumber(digitsOnly);
+                  setFieldErrors((prev) => ({ ...prev, or_number: null }));
+                }}
+                placeholder="e.g. 0234891"
+                maxLength={7}
+                required
+                labelColor="text-[11px] sm:text-xs font-semibold uppercase tracking-wide"
+              />
+              {fieldErrors.or_number && <p className="text-xs text-red-500 mt-1">{fieldErrors.or_number}</p>}
+            </div>
           </div>
 
           {/* Reason with VoiceTextareaInput */}
@@ -580,7 +605,7 @@ export const CreateCashierOverrideModal = ({ isDark, subtleText, onClose, onCrea
               <div className={`p-3 rounded-xl border space-y-2.5 ${isDark ? "bg-[#1a1b1e]/60 border-[#3e4042]" : "bg-gray-50/70 border-gray-200"}`}>
                 {/* Column Headers */}
                 <div className="grid grid-cols-[1fr_60px_76px_28px] sm:grid-cols-[1fr_72px_96px_32px] gap-2 px-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  <span>Document</span>
+                  <span>Document / Certification</span>
                   <span>Qty</span>
                   <span>Amount</span>
                   <span></span>
@@ -592,13 +617,12 @@ export const CreateCashierOverrideModal = ({ isDark, subtleText, onClose, onCrea
                     key={idx}
                     className="grid grid-cols-[1fr_60px_76px_28px] sm:grid-cols-[1fr_72px_96px_32px] gap-2 items-center"
                   >
-                    <input
-                      type="text"
+                    <DropdownGroup
+                      name={`document-${idx}`}
                       value={row.document}
                       onChange={(e) => updateItemRow(idx, "document", e.target.value)}
-                      placeholder="e.g. Transcript of Records"
-                      className={inputClasses}
-                      style={{ minWidth: 0, width: "100%" }}
+                      options={combinedDocOptions}
+                      direction="up"
                     />
                     <input
                       type="number"
