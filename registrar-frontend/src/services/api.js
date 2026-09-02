@@ -318,6 +318,58 @@ export const archiveDocumentRequests = (ids) => api.post(`/document-requests/arc
 export const restoreDocumentRequests = (ids) => api.post(`/document-requests/restore-bulk`, { request_ids: ids });
 
 // -------------------------------------------------------
+// BULK READY / BULK DONE (Multi-Item / Mixed-Status Batch rules) —
+// staff/admin only. Backed by RequestItemStatusService::bulkAdvanceItems()
+// on the server, NOT by updateDocumentRequest() — these do not flip a
+// request's own status_id directly. Instead, for every request id you
+// pass in, the backend checks that request's own request_document/
+// request_certificate children INDIVIDUALLY, advances whichever ones are
+// eligible, skips the rest without blocking eligible ones (on the same
+// request or a different one in the batch), and then recomputes each
+// affected request's aggregate status once at the end.
+//
+// Practical effect for the UI: you can safely pass a MIXED batch —
+// selected requests do not all need to be in the same status first. A
+// request with 2 of 3 items eligible will have those 2 updated and the
+// third left alone; the request's own status only advances once every
+// one of its items has. So the old client-side eligibility pre-filter
+// (checking req.statusId before calling these) is no longer required —
+// send whatever the user selected and read the response to see what
+// actually happened.
+//
+// bulkReadyItems  -> targets ReadyToClaim (eligible items must currently
+//                    be Processing or PendingSignature).
+// bulkDoneItems   -> targets Completed (only items currently
+//                    ReadyToClaim are eligible; this is the same "Ready
+//                    -> Completed only" rule the single-item and
+//                    whole-request endpoints already enforce).
+//
+// Both accept the same payload shape as archiveDocumentRequests/
+// restoreDocumentRequests above: { request_ids: number[] }, 1–200
+// distinct integers.
+//
+// Response shape (res.data), useful for building a real success/partial
+// toast instead of a flat pass/fail:
+//   {
+//     target_status: "ReadyToClaim" | "Completed",
+//     items_updated: [{ type: "document"|"certificate", id, request_id, old_status_id, new_status_id }],
+//     items_skipped: [{ type, id, request_id, reason, current_status? }],
+//        // reason is one of: "invalid_transition" | "certificate_not_generated"
+//     requests_processed: number[],       // request ids that had >=1 item updated
+//     requests_status_changed: number[],  // subset whose OWN aggregate status changed
+//     requests_skipped: [{ request_id, reason }],
+//        // reason is one of: "not_found" | "archived" | "no_eligible_items"
+//   }
+//
+// A 200 response can still contain zero items_updated (e.g. every
+// selected request was already Ready/Completed) — check items_updated.
+// length / items_skipped before assuming success, rather than relying on
+// promise resolution alone.
+// -------------------------------------------------------
+export const bulkReadyItems = (ids) => api.post(`/document-requests/bulk-ready`, { request_ids: ids });
+export const bulkDoneItems  = (ids) => api.post(`/document-requests/bulk-done`,  { request_ids: ids });
+
+// -------------------------------------------------------
 // CLAIMING (QR Code Claiming Policy v1.0) — staff/admin only.
 // Pass exactly one of the two: { uuid } from a decoded QR scan, or
 // { claim_code } from the manual-entry fallback field. Never both —
