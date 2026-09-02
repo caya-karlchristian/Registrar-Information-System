@@ -19,6 +19,14 @@ use Illuminate\Foundation\Http\FormRequest;
  * StoreDocumentRequestRequest, where both stay `nullable` — walk-in /
  * staff-created requests still skip OR verification entirely and never
  * hit this endpoint).
+ *
+ * NOTE: receipt_date previously also enforced a 7-day lookback window
+ * (`after_or_equal: now()->subDays(7)`), rejecting receipts older than a
+ * week. That restriction has been intentionally removed — a receipt of
+ * any age is now accepted, as long as it isn't dated in the future. If
+ * this window ever needs to come back (e.g. for a future policy change),
+ * reintroduce it here as a single source of truth rather than duplicating
+ * the check anywhere else.
  */
 class VerifyOfficialReceiptRequest extends FormRequest
 {
@@ -34,15 +42,14 @@ class VerifyOfficialReceiptRequest extends FormRequest
     {
         return [
             'or_number'     => 'required|string|max:50',
-            'receipt_date'  => 'required|date|after_or_equal:' . now()->subDays(7)->toDateString() . '|before_or_equal:' . now()->toDateString(),
+            'receipt_date'  => 'required|date|before_or_equal:' . now()->toDateString(),
         ];
     }
 
     public function messages(): array
     {
         return [
-            'receipt_date.after_or_equal'  => 'Date of payment must be within the last 7 days up to today.',
-            'receipt_date.before_or_equal' => 'Date of payment must be within the last 7 days up to today.',
+            'receipt_date.before_or_equal' => 'Date of payment cannot be in the future.',
         ];
     }
 }
