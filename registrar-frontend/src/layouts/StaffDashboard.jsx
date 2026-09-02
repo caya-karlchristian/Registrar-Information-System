@@ -368,30 +368,30 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
   const handleBulkReadyClick = () => {
     if (selectedIds.length === 0) return;
 
-    const eligibleRequests = requests.filter(
-      r => selectedIds.includes(r.id) &&
-      !r.isArchived &&
-      (r.statusId === resolvedStatusIds.PENDING || r.statusId === resolvedStatusIds.PENDING_SIGNATURE)
-    );
+    handleBulkReady(selectedIds, {
+      onSuccess: (res) => {
+        const data = res?.data || res;
+        const requestsStatusChangedCount = data?.requests_status_changed?.length || 0;
+        const itemsUpdatedCount = data?.items_updated?.length || 0;
+        const requestsProcessedCount = data?.requests_processed?.length || 0;
+        const itemsSkippedCount = data?.items_skipped?.length || 0;
+        const requestsSkippedCount = data?.requests_skipped?.length || 0;
 
-    if (eligibleRequests.length === 0) {
-      showError('None of the selected requests can be marked as Ready to Claim.');
-      return;
-    }
-
-    // TEMPORARILY DISABLED: Guard requiring certificate generation before marking requests as Ready.
-    // const unprintedCert = eligibleRequests.find(
-    //   r => r.isCertificate && !r.certificatesGenerated
-    // );
-    // if (unprintedCert) {
-    //   showError('You need to process or print the certificate first for selected certificate requests.');
-    //   return;
-    // }
-
-    const targetIds = eligibleRequests.map(r => r.id);
-    handleBulkReady(targetIds, {
-      onSuccess: () => {
-        showSuccess(`Successfully marked ${targetIds.length} request(s) as Ready to Claim.`);
+        if (requestsStatusChangedCount > 0) {
+          showSuccess(
+            `Successfully marked ${requestsStatusChangedCount} request(s) as Ready to Claim` +
+            `${requestsSkippedCount > 0 ? ` (${requestsSkippedCount} skipped)` : ''}.`
+          );
+        } else if (itemsUpdatedCount > 0) {
+          showSuccess(
+            `Successfully updated ${itemsUpdatedCount} item(s) across ${requestsProcessedCount} request(s) to Ready to Claim.`
+          );
+        } else {
+          showError(
+            `No items were updated` +
+            `${itemsSkippedCount > 0 || requestsSkippedCount > 0 ? ' (selected items are ineligible or already ready)' : '.'}`
+          );
+        }
       },
       onError: (err) => {
         showError('Error updating status: ' + (err?.response?.data?.message || err.message));
@@ -402,21 +402,30 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
   const handleBulkDoneClick = () => {
     if (selectedIds.length === 0) return;
 
-    const eligibleRequests = requests.filter(
-      r => selectedIds.includes(r.id) &&
-      !r.isArchived &&
-      r.statusId === resolvedStatusIds.READY
-    );
+    handleBulkDone(selectedIds, {
+      onSuccess: (res) => {
+        const data = res?.data || res;
+        const requestsStatusChangedCount = data?.requests_status_changed?.length || 0;
+        const itemsUpdatedCount = data?.items_updated?.length || 0;
+        const requestsProcessedCount = data?.requests_processed?.length || 0;
+        const itemsSkippedCount = data?.items_skipped?.length || 0;
+        const requestsSkippedCount = data?.requests_skipped?.length || 0;
 
-    if (eligibleRequests.length === 0) {
-      showError('None of the selected requests can be marked as Done (requests must be Ready for Pickup first).');
-      return;
-    }
-
-    const targetIds = eligibleRequests.map(r => r.id);
-    handleBulkDone(targetIds, {
-      onSuccess: () => {
-        showSuccess(`Successfully marked ${targetIds.length} request(s) as Done.`);
+        if (requestsStatusChangedCount > 0) {
+          showSuccess(
+            `Successfully marked ${requestsStatusChangedCount} request(s) as Completed` +
+            `${requestsSkippedCount > 0 ? ` (${requestsSkippedCount} skipped)` : ''}.`
+          );
+        } else if (itemsUpdatedCount > 0) {
+          showSuccess(
+            `Successfully updated ${itemsUpdatedCount} item(s) across ${requestsProcessedCount} request(s) to Completed.`
+          );
+        } else {
+          showError(
+            `No items were updated` +
+            `${itemsSkippedCount > 0 || requestsSkippedCount > 0 ? ' (selected items are not ready to be completed)' : '.'}`
+          );
+        }
       },
       onError: (err) => {
         showError('Error updating status: ' + (err?.response?.data?.message || err.message));
