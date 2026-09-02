@@ -156,7 +156,16 @@ jobs:
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
             echo "── Running migrations ───────────────────────────"
-            docker exec ris_backend php artisan migrate --force
+            # This is now the ONLY place migrations run — start.sh no
+            # longer runs `migrate` on container boot (that was racing
+            # against this exact step; see start.sh for the full
+            # history). --isolated uses an atomic lock in the redis
+            # cache store, so this is also safe against any accidental
+            # concurrent invocation (e.g. two deploys landing close
+            # together, or someone manually running migrate on the box):
+            # the second caller waits/no-ops on the lock instead of
+            # racing Schema::hasTable() checks with the first.
+            docker exec ris_backend php artisan migrate --force --isolated
 
             echo "── Publishing Telescope assets ──────────────────"
             docker exec ris_backend php artisan vendor:publish --tag=telescope-assets --force
