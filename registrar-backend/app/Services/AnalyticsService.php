@@ -50,6 +50,45 @@ class AnalyticsService
     }
 
     // -------------------------------------------------------------------------
+    // Logbook-category reporting rollup
+    // -------------------------------------------------------------------------
+
+    /**
+     * SQL expression producing a stable grouping key for "logbook reporting
+     * identity" — the value multiple document types collapse into when they
+     * share a logbook_category, and a value unique to a single document type
+     * when it has none.
+     *
+     * Per the spec (§6, §10): "Reports aggregate by logbook category rather
+     * than raw document names" via "request item → document type → logbook
+     * category." A naive `GROUP BY dt.logbook_category_id` cannot express
+     * this correctly on its own: standard SQL treats every NULL as
+     * belonging to the same group, so it would silently collapse ALL
+     * uncategorized document types (the majority — see the logbook_category
+     * migration's docblock) into one meaningless bucket instead of
+     * reporting each individually.
+     *
+     * This expression fixes that: when logbook_category_id IS NOT NULL, the
+     * key IS that category id, so every document type sharing a category
+     * (e.g. all 9 CTC/Authentication variants) rolls into one row. When it's
+     * NULL, the key falls back to the document type's own id, negated so it
+     * can never collide with a real (always-positive, auto-increment)
+     * logbook_category_id — each uncategorized document type then reports
+     * as its own distinct group, exactly matching
+     * DocumentType::logbookLabel()'s "falls back to the type's own name"
+     * behavior on the model side.
+     *
+     * @param  string  $alias  Alias of a joined document_type (or
+     *                         equivalent) table exposing logbook_category_id
+     *                         and $idColumn.
+     * @param  string  $idColumn  The type table's own primary key column.
+     */
+    private static function logbookGroupKeyExpression(string $alias, string $idColumn = 'document_type_id'): string
+    {
+        return "COALESCE({$alias}.logbook_category_id, -{$alias}.{$idColumn})";
+    }
+
+    // -------------------------------------------------------------------------
     // Overview KPIs
     // -------------------------------------------------------------------------
 
@@ -208,42 +247,87 @@ class AnalyticsService
     {
         [$from, $to] = $range;
 
-        // Processing-time-per-document-type subquery, built with the query
+        $groupKey = self::logbookGroupKeyExpression('dt2');
+
+        // Processing-time-per-logbook-group subquery, built with the query
         // builder (rather than a hand-written DB::raw string) so the date
         // range and archive exclusion can be bound/applied the same way as
         // everywhere else instead of living outside the query builder's
-        // reach. Two bugs fixed here vs. the previous version:
+        // reach. Grouped by the same logbook rollup key as the outer query
+        // (see logbookGroupKeyExpression()) and aggregated directly off the
+        // raw history rows — a true weighted average across every request
+        // in the group, not an "average of the per-document averages" that
+        // would silently over-weight low-volume document types once several
+        // of them start sharing a logbook_category. Two bugs fixed here vs.
+        // the original version:
         //   1. business_minutes, not minutes_processed — see processingTime()
         //      for the full explanation of why these differ.
         //   2. This subquery previously had no whereBetween('changed_at', ...)
         //      at all, so avg_processing_min silently ignored the selected
         //      date range and always computed an all-time average regardless
         //      of whether "Today," "This Month," or "This Year" was picked.
-        $processingTimeByType = $this->excludeArchived(
+        $processingTimeByGroup = $this->excludeArchived(
             DB::table('request_history as rh')
                 ->join('request_document as rd2', 'rh.request_id', '=', 'rd2.request_id')
+                ->join('document_type as dt2', 'rd2.document_type_id', '=', 'dt2.document_type_id')
                 ->join('document_request as dr2', 'rh.request_id', '=', 'dr2.request_id')
                 ->whereBetween('rh.changed_at', [$from, $to])
                 ->whereNotNull('rh.business_minutes'),
             'dr2'
         )
             ->select(
-                'rd2.document_type_id',
+                DB::raw("{$groupKey} as group_key"),
                 DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes')
             )
-            ->groupBy('rd2.document_type_id');
+            ->groupBy(DB::raw($groupKey));
 
+        $outerGroupKey = self::logbookGroupKeyExpression('dt');
+
+        // Reporting aggregation (spec §6, §10): "request item → document
+        // type → logbook category." Every document type sharing a
+        // logbook_category_id rolls into one row here (e.g. the 9 CTC/
+        // Authentication variants report as a single "Certified True Copy
+        // of Authentication" line), while document types with no category
+        // assigned continue reporting individually under their own name —
+        // see logbookGroupKeyExpression()'s docblock for why a bare
+        // `GROUP BY logbook_category_id` can't do this on its own.
         $rows = $this->excludeArchived(
             DB::table('request_document as rd')
                 ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+                ->leftJoin('logbook_category as lc', 'dt.logbook_category_id', '=', 'lc.logbook_category_id')
                 ->join('document_request as dr', 'rd.request_id', '=', 'dr.request_id')
-                ->leftJoinSub($processingTimeByType, 'pt', 'pt.document_type_id', '=', 'dt.document_type_id')
+                ->leftJoinSub($processingTimeByGroup, 'pt', function ($join) use ($outerGroupKey) {
+                    $join->on(DB::raw($outerGroupKey), '=', 'pt.group_key');
+                })
                 ->whereBetween('dr.requested_at', [$from, $to]),
             'dr'
         )
             ->select(
-                'dt.document_type_id',
-                'dt.document_name',
+                // Representative id — the document type's own id when it
+                // isn't part of a category, or an arbitrary-but-stable
+                // member id when several document types are rolled into one
+                // logbook_category row. Consumers that need every
+                // underlying document type should use document_type_ids
+                // (below) instead of relying on this single id.
+                DB::raw('MIN(dt.document_type_id) as document_type_id'),
+                'dt.logbook_category_id',
+                // The logbook-reporting label: the shared category name
+                // when one is assigned, falling back to the document
+                // type's own name when logbook_category_id is NULL —
+                // exactly DocumentType::logbookLabel()'s rule, applied at
+                // the aggregate level. MAX() (not a bare column) is
+                // required to satisfy ONLY_FULL_GROUP_BY — safe here
+                // because every row folded into one group shares the same
+                // category (and therefore the same lc.name), or is the
+                // sole row for its own document (so MAX(dt.document_name)
+                // is just that one value).
+                DB::raw('COALESCE(MAX(lc.name), MAX(dt.document_name)) as document_name'),
+                // How many distinct document types were rolled into this
+                // row — 1 for an uncategorized document type, >1 for a
+                // genuine logbook_category rollup. Lets API consumers tell
+                // "single document" and "umbrella category" rows apart
+                // without a second lookup.
+                DB::raw('COUNT(DISTINCT dt.document_type_id) as document_type_count'),
                 // Renamed from total_requests: this counts request_document
                 // line items, not distinct requests — a request with 2
                 // document types is counted once per type here. That's
@@ -252,18 +336,20 @@ class AnalyticsService
                 // confusion against overview()'s distinct-request count.
                 DB::raw('COUNT(rd.request_document_id) as total_documents'),
                 DB::raw('SUM(rd.number_of_copies) as total_copies'),
-                'pt.avg_minutes as avg_processing_min'
+                DB::raw('MAX(pt.avg_minutes) as avg_processing_min')
             )
-            ->groupBy('dt.document_type_id', 'dt.document_name', 'pt.avg_minutes')
+            ->groupBy(DB::raw($outerGroupKey), 'dt.logbook_category_id')
             ->orderByDesc('total_documents')
             ->get();
 
         return $rows->map(fn ($row) => [
-            'document_type_id'   => $row->document_type_id,
-            'document_name'      => $row->document_name,
-            'total_documents'    => (int) $row->total_documents,
-            'total_copies'       => (int) $row->total_copies,
-            'avg_processing_min' => $row->avg_processing_min,
+            'document_type_id'    => $row->document_type_id,
+            'logbook_category_id' => $row->logbook_category_id,
+            'document_name'       => $row->document_name,
+            'document_type_count' => (int) $row->document_type_count,
+            'total_documents'     => (int) $row->total_documents,
+            'total_copies'        => (int) $row->total_copies,
+            'avg_processing_min'  => $row->avg_processing_min,
         ])->all();
     }
 
@@ -312,23 +398,35 @@ class AnalyticsService
         // filter on — this query previously had no path to is_archived /
         // deleted_at at all, so archived/deleted requests' processing times
         // silently skewed the "Processing Time" chart.
+        // Grouped by logbook_category (falling back to the document type's
+        // own name when unset) — see logbookGroupKeyExpression()'s docblock
+        // and byDocumentType() for the full rationale. min/avg/max/
+        // sample_count are computed directly off the raw history rows
+        // within each group, so a rolled-up category's numbers are a true
+        // aggregate across every underlying document type, not an average
+        // of pre-computed per-document averages.
+        $groupKey = self::logbookGroupKeyExpression('dt');
+
         $byDocTypeQuery = DB::table('request_history as rh')
             ->join('request_document as rd', 'rh.request_id', '=', 'rd.request_id')
             ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+            ->leftJoin('logbook_category as lc', 'dt.logbook_category_id', '=', 'lc.logbook_category_id')
             ->join('document_request as dr', 'rh.request_id', '=', 'dr.request_id')
             ->whereBetween('rh.changed_at', [$from, $to])
             ->whereNotNull('rh.business_minutes');
 
         $byDocType = $this->excludeArchived($byDocTypeQuery, 'dr')
             ->select(
-                'dt.document_type_id',
-                'dt.document_name',
+                DB::raw('MIN(dt.document_type_id) as document_type_id'),
+                'dt.logbook_category_id',
+                DB::raw('COALESCE(MAX(lc.name), MAX(dt.document_name)) as document_name'),
+                DB::raw('COUNT(DISTINCT dt.document_type_id) as document_type_count'),
                 DB::raw('ROUND(MIN(rh.business_minutes), 1) as min_minutes'),
                 DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes'),
                 DB::raw('ROUND(MAX(rh.business_minutes), 1) as max_minutes'),
                 DB::raw('COUNT(*) as sample_count')
             )
-            ->groupBy('dt.document_type_id', 'dt.document_name')
+            ->groupBy(DB::raw($groupKey), 'dt.logbook_category_id')
             ->orderBy('avg_minutes')
             ->get();
 
@@ -496,9 +594,15 @@ class AnalyticsService
         // a table to filter on — neither had a path to is_archived /
         // deleted_at previously, so SLA turnaround stats included segments
         // from requests that are now archived or soft-deleted.
+        // Both grouped by logbook_category (falling back to the document
+        // type's own name when unset) — see logbookGroupKeyExpression()'s
+        // docblock and byDocumentType() for the full rationale.
+        $groupKey = self::logbookGroupKeyExpression('dt');
+
         $registrarTimeQuery = DB::table('request_history as rh')
             ->join('request_document as rd', 'rh.request_id', '=', 'rd.request_id')
             ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+            ->leftJoin('logbook_category as lc', 'dt.logbook_category_id', '=', 'lc.logbook_category_id')
             ->join('document_request as dr', 'rh.request_id', '=', 'dr.request_id')
             ->where('rh.old_status_id', RequestStatusEnum::Processing->value)
             ->whereBetween('rh.changed_at', [$from, $to])
@@ -506,20 +610,23 @@ class AnalyticsService
 
         $registrarTime = $this->excludeArchived($registrarTimeQuery, 'dr')
             ->select(
-                'dt.document_type_id',
-                'dt.document_name',
+                DB::raw('MIN(dt.document_type_id) as document_type_id'),
+                'dt.logbook_category_id',
+                DB::raw('COALESCE(MAX(lc.name), MAX(dt.document_name)) as document_name'),
+                DB::raw('COUNT(DISTINCT dt.document_type_id) as document_type_count'),
                 DB::raw('ROUND(MIN(rh.business_minutes), 1) as min_minutes'),
                 DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes'),
                 DB::raw('ROUND(MAX(rh.business_minutes), 1) as max_minutes'),
                 DB::raw('COUNT(*) as sample_count')
             )
-            ->groupBy('dt.document_type_id', 'dt.document_name')
+            ->groupBy(DB::raw($groupKey), 'dt.logbook_category_id')
             ->orderBy('avg_minutes')
             ->get();
 
         $signatureTimeQuery = DB::table('request_history as rh')
             ->join('request_document as rd', 'rh.request_id', '=', 'rd.request_id')
             ->join('document_type as dt', 'rd.document_type_id', '=', 'dt.document_type_id')
+            ->leftJoin('logbook_category as lc', 'dt.logbook_category_id', '=', 'lc.logbook_category_id')
             ->join('document_request as dr', 'rh.request_id', '=', 'dr.request_id')
             ->where('rh.old_status_id', RequestStatusEnum::PendingSignature->value)
             ->whereBetween('rh.changed_at', [$from, $to])
@@ -527,14 +634,16 @@ class AnalyticsService
 
         $signatureTime = $this->excludeArchived($signatureTimeQuery, 'dr')
             ->select(
-                'dt.document_type_id',
-                'dt.document_name',
+                DB::raw('MIN(dt.document_type_id) as document_type_id'),
+                'dt.logbook_category_id',
+                DB::raw('COALESCE(MAX(lc.name), MAX(dt.document_name)) as document_name'),
+                DB::raw('COUNT(DISTINCT dt.document_type_id) as document_type_count'),
                 DB::raw('ROUND(MIN(rh.business_minutes), 1) as min_minutes'),
                 DB::raw('ROUND(AVG(rh.business_minutes), 1) as avg_minutes'),
                 DB::raw('ROUND(MAX(rh.business_minutes), 1) as max_minutes'),
                 DB::raw('COUNT(*) as sample_count')
             )
-            ->groupBy('dt.document_type_id', 'dt.document_name')
+            ->groupBy(DB::raw($groupKey), 'dt.logbook_category_id')
             ->orderBy('avg_minutes')
             ->get();
 
