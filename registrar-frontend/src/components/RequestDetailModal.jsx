@@ -304,8 +304,7 @@ const RequestDetailsModal = ({ request, onClose, user, onGenerateCert }) => {
                 const cName = c.certification_type?.certificate_name ?? certName(c.certificate_type_id) ?? 'Unknown Certification';
                 return (
                   <li key={c.request_certificate_id ?? `cert-${i}`} className="wrap-break-word">
-                    <strong className="block sm:inline">CERTIFICATION: </strong>
-                    {cName}
+                    <strong className="block sm:inline">{cName}</strong>
                     <span className={`inline-flex mt-1 sm:mt-0 sm:ml-2 text-xs font-semibold px-2 py-0.5 rounded-full ${isDark ? 'bg-yellow-900/40 text-yellow-300' : 'bg-yellow-200'}`}>
                       {c.number_of_copies || 1} {(c.number_of_copies || 1) > 1 ? 'Copies' : 'Copy'}
                     </span>

@@ -187,16 +187,8 @@ export const mapDocumentRequest = (r, resolvedStatusIds, docTypeName) => {
   const certificatesGenerated = !(r.certificates?.length > 0)
     || r.certificates.every(c => c.generated_at != null);
 
-  const isCertificate = Boolean(
-    (r.certificates && r.certificates.length > 0) ||
-      r.documents?.some(d => {
-        const name =
-          d.document_type?.document_name?.toLowerCase() ||
-          docTypeName(d.document_type_id)?.toLowerCase() ||
-          '';
-        return name.includes('cert');
-      })
-  );
+  const hasCertificates = Boolean(r.certificates && r.certificates.length > 0);
+  const isCertificate = hasCertificates;
 
   const getDocName = d =>
     d.document_type?.document_name ||

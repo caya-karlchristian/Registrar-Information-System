@@ -64,9 +64,8 @@ const RowActionsDropdown = ({
     };
   }, [isOpen]);
 
-  // TEMPORARILY DISABLED: Guard for Generate Certificate button.
-  // Temporarily allowing Generate Certificate action for all active non-archived requests for testing/manual override.
-  const showGenerateCert = canProcess && !req.isArchived;
+  // Feature flag: Generate Certificate is currently disabled until certificate templates are available.
+  const showGenerateCert = false;
   // Previously: const showGenerateCert = canProcess && !req.isArchived && (req.isCertificate || req.hasCertificates || (req.certificates && req.certificates.length > 0)) && req.statusId !== resolvedStatusIds.COMPLETED;
   const isUpdating = updatingId === req.id;
 
