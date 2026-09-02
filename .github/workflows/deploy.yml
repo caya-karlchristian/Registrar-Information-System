@@ -152,20 +152,35 @@ jobs:
             echo "── Pulling image from ECR ───────────────────────"
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
 
+            echo "── Running migrations ───────────────────────────"
+            # Migrate BEFORE (re)starting the long-running containers, as
+            # a disposable one-off container. This closes a gap the
+            # previous ordering left open: `docker compose up -d` returns
+            # as soon as containers are *launched*, not once they're
+            # actually ready — there's no healthcheck on the backend
+            # service — so running migrate *after* up -d meant new
+            # application code could accept traffic for a brief window
+            # before its own schema migration had finished. Migrating
+            # first guarantees the schema is fully up to date before
+            # anything new is serving requests.
+            #
+            # This is still the ONLY place migrations run — start.sh no
+            # longer runs `migrate` on container boot (see start.sh for
+            # the full race-condition history). --isolated remains as
+            # defense-in-depth: an atomic lock via the redis cache store,
+            # in case of any future concurrent migrate invocation.
+            #
+            # --no-deps assumes redis is already running from the prior
+            # deploy — true in steady state, since it uses `restart:
+            # always` and isn't recreated unless its own image/config
+            # changes. On a from-scratch environment stand-up (no
+            # containers running at all yet), start it manually first:
+            # `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d redis`.
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              run --rm --no-deps backend php artisan migrate --force --isolated
+
             echo "── Starting containers ──────────────────────────"
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-
-            echo "── Running migrations ───────────────────────────"
-            # This is now the ONLY place migrations run — start.sh no
-            # longer runs `migrate` on container boot (that was racing
-            # against this exact step; see start.sh for the full
-            # history). --isolated uses an atomic lock in the redis
-            # cache store, so this is also safe against any accidental
-            # concurrent invocation (e.g. two deploys landing close
-            # together, or someone manually running migrate on the box):
-            # the second caller waits/no-ops on the lock instead of
-            # racing Schema::hasTable() checks with the first.
-            docker exec ris_backend php artisan migrate --force --isolated
 
             echo "── Publishing Telescope assets ──────────────────"
             docker exec ris_backend php artisan vendor:publish --tag=telescope-assets --force
