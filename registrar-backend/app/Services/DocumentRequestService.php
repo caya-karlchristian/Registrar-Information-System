@@ -290,23 +290,18 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                 // A non-zero count means the request includes certificate items.
                 $submittedCertCount = $documentRequest->certificates()->count();
 
-                // Only enforce the print-first rule when this request actually
-                // includes certificate items. Document-only requests skip this guard.
+                // TEMPORARILY DISABLED (business decision, not a bug) —
+                // this print-first guard is off across all three
+                // enforcement points (whole-request here, per-item in
+                // RequestItemStatusService::guardCertificateGenerated(),
+                // per-group in RequestReleaseGroupService::
+                // claimReleaseGroup()), matching the frontend, which
+                // disabled its own copy first (see "TEMPORARILY DISABLED"
+                // in StaffDashboard.jsx's handleBulkReadyClick()).
+                // generated_at is still recorded normally by
+                // markCertificatesGenerated() below — re-enabling later
+                // just means restoring the abort() in all three places.
                 if ($submittedCertCount > 0) {
-                    // FIXED (was a no-op): this used to check
-                    // whereNotNull('certificate_type_id'), which is a
-                    // non-nullable column set once at request creation — it
-                    // is never null, so this could never actually block
-                    // anything. Now checks generated_at (see migration
-                    // 2026_08_29_000010_add_generated_at_to_request_certificate),
-                    // set by markCertificatesGenerated() below when staff
-                    // actually print/generate the certificate — a real
-                    // persisted signal, replacing the client-only
-                    // printedCertificateIds localStorage flag that never
-                    // reached the server. Kept in parity with
-                    // RequestItemStatusService::guardCertificateGenerated(),
-                    // which enforces the same rule at the per-item level —
-                    // update both together if this condition ever changes.
                     // $generatedCount = $documentRequest->certificates()
                     //     ->whereNotNull('generated_at')
                     //     ->count();
