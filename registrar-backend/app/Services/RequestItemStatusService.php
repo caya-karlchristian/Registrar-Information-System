@@ -7,6 +7,7 @@ use App\Models\DocumentRequest;
 use App\Models\RequestCertificate;
 use App\Models\RequestDocument;
 use App\Models\RequestHistory;
+use App\Models\RequestReleaseGroup;
 use App\Models\SystemUser;
 use App\Contracts\NotificationServiceInterface;
 use App\Services\Concerns\FlushesAnalyticsCache;
@@ -40,6 +41,16 @@ use Illuminate\Support\Facades\DB;
  * item-level transition are the same kind of event at a different
  * granularity, and should stay behaviorally identical wherever the schema
  * doesn't force a difference.
+ *
+ * BULK OPERATIONS — bulkAdvanceItems() (used by DocumentRequestController::
+ * bulkReadyItems()/bulkDoneItems()) applies this same per-item eligibility
+ * logic across a whole batch of selected requests at once: every request's
+ * document/certificate children are evaluated and advanced individually,
+ * ineligible items are skipped without blocking eligible ones (on the same
+ * request or on a different one in the batch), and each affected request's
+ * (and, where applicable, release group's) aggregate status is recomputed
+ * once at the end from the resulting child statuses — never per-item, to
+ * avoid redundant history/notification writes for a single batch action.
  */
 class RequestItemStatusService
 {
@@ -103,6 +114,10 @@ class RequestItemStatusService
 
             $this->recomputeAggregateStatus($documentRequest);
 
+            if ($item->request_release_group_id !== null) {
+                $this->recomputeReleaseGroupAggregate((int) $item->request_release_group_id);
+            }
+
             $this->flushAnalyticsCache();
 
             return $item->refresh();
@@ -139,10 +154,278 @@ class RequestItemStatusService
 
             $this->recomputeAggregateStatus($documentRequest);
 
+            if ($item->request_release_group_id !== null) {
+                $this->recomputeReleaseGroupAggregate((int) $item->request_release_group_id);
+            }
+
             $this->flushAnalyticsCache();
 
             return $item->refresh();
         });
+    }
+
+    // -------------------------------------------------------------------------
+    // Bulk operations — Bulk Ready / Bulk Done
+    // -------------------------------------------------------------------------
+
+    /**
+     * Advances every ELIGIBLE request_document/request_certificate row
+     * belonging to the given set of document_request ids to $targetStatus,
+     * skipping ineligible items/requests without letting them block
+     * eligible ones, then rolls up each affected request's (and release
+     * group's) aggregate status once processing is complete.
+     *
+     * Eligibility, per item:
+     *   - The item's CURRENT status must legally transition to
+     *     $targetStatus (RequestStatusEnum::allowedTransitions()) — this
+     *     alone is what excludes items that are already at or past the
+     *     target (e.g. already ReadyToClaim/Completed/Forfeited when
+     *     bulk-marking Ready, or not-yet-Ready when bulk-marking Done),
+     *     since none of those have $targetStatus in their allowed set.
+     *   - Certificates additionally run certificateGeneratedIneligibility
+     *     Reason() — see that method's docblock for why it currently
+     *     always passes (a live, intentional business decision, not a
+     *     bug), shared with the single-item and whole-request enforcement
+     *     points so re-enabling it later is a one-line change that
+     *     applies everywhere at once, including here.
+     *
+     * Eligibility, per request:
+     *   - An archived request is entirely skipped (read-only, same rule
+     *     as every other write path) — restoring must happen first via
+     *     DocumentRequestService::restoreRequest().
+     *   - A request id that doesn't exist is reported back, not thrown,
+     *     so one typo/stale id in a large batch doesn't fail the whole
+     *     call — same "skip and report" contract as
+     *     DocumentRequestService::archiveRequests()/restoreRequests().
+     *
+     * Runs as ONE database transaction covering the whole batch (matching
+     * archiveRequests()/restoreRequests()' existing convention) —
+     * BulkRequestIdsRequest caps a batch at 200 request ids, which keeps
+     * the row-lock footprint and transaction lifetime bounded even in the
+     * worst case (every request having several line items).
+     *
+     * @param  int[] $requestIds
+     * @return array{
+     *   target_status: string,
+     *   items_updated: array<int, array{type: string, id: int, request_id: int, old_status_id: int, new_status_id: int}>,
+     *   items_skipped: array<int, array{type: string, id: int, request_id: int, reason: string, current_status?: string}>,
+     *   requests_processed: int[],
+     *   requests_status_changed: int[],
+     *   requests_skipped: array<int, array{request_id: int, reason: string}>,
+     * }
+     */
+    public function bulkAdvanceItems(array $requestIds, RequestStatusEnum $targetStatus): array
+    {
+        // Coarse+fine gate up front, same shape as authorizeItemStatusChange()
+        // is used for a single item — the target status is fixed for the
+        // whole batch, so this only needs to run once rather than per item.
+        $this->authorizeItemStatusChange($targetStatus);
+
+        return DB::transaction(function () use ($requestIds, $targetStatus) {
+            $result = [
+                'target_status'           => $targetStatus->name,
+                'items_updated'           => [],
+                'items_skipped'           => [],
+                'requests_processed'      => [],
+                'requests_status_changed' => [],
+                'requests_skipped'        => [],
+            ];
+
+            // withArchived() is required here: DocumentRequest's default
+            // ExcludeArchivedScope would otherwise filter archived requests
+            // out of this query entirely, making them indistinguishable
+            // from a nonexistent id below (both would fall through to
+            // 'not_found' instead of the correct 'archived' reason).
+            /** @var \Illuminate\Support\Collection<int, DocumentRequest> $documentRequests */
+            $documentRequests = DocumentRequest::withArchived()
+                ->whereIn('request_id', $requestIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('request_id');
+
+            foreach ($requestIds as $requestId) {
+                if (!$documentRequests->has((int) $requestId)) {
+                    $result['requests_skipped'][] = ['request_id' => (int) $requestId, 'reason' => 'not_found'];
+                }
+            }
+
+            $processableRequestIds = [];
+            foreach ($documentRequests as $documentRequest) {
+                if ($documentRequest->is_archived) {
+                    $result['requests_skipped'][] = [
+                        'request_id' => (int) $documentRequest->request_id,
+                        'reason'     => 'archived',
+                    ];
+                    continue;
+                }
+                $processableRequestIds[] = $documentRequest->request_id;
+            }
+
+            if (empty($processableRequestIds)) {
+                return $result;
+            }
+
+            $documents = RequestDocument::whereIn('request_id', $processableRequestIds)
+                ->lockForUpdate()
+                ->get();
+
+            $certificates = RequestCertificate::whereIn('request_id', $processableRequestIds)
+                ->lockForUpdate()
+                ->get();
+
+            $touchedRequestIds      = [];
+            $touchedReleaseGroupIds = [];
+
+            foreach ($documents as $item) {
+                $outcome = $this->attemptBulkItemTransition(
+                    documentRequest: $documentRequests[$item->request_id],
+                    item:            $item,
+                    itemType:        'document',
+                    itemId:          $item->request_document_id,
+                    targetStatus:    $targetStatus,
+                );
+
+                if ($outcome['action'] === 'skipped') {
+                    $result['items_skipped'][] = $outcome['entry'];
+                    continue;
+                }
+
+                $result['items_updated'][] = $outcome['entry'];
+                $touchedRequestIds[$item->request_id] = true;
+                if ($item->request_release_group_id !== null) {
+                    $touchedReleaseGroupIds[$item->request_release_group_id] = true;
+                }
+            }
+
+            foreach ($certificates as $item) {
+                $ineligibilityReason = $this->certificateGeneratedIneligibilityReason($item, $targetStatus);
+                if ($ineligibilityReason !== null) {
+                    $result['items_skipped'][] = [
+                        'type'       => 'certificate',
+                        'id'         => $item->request_certificate_id,
+                        'request_id' => (int) $item->request_id,
+                        'reason'     => $ineligibilityReason,
+                    ];
+                    continue;
+                }
+
+                $outcome = $this->attemptBulkItemTransition(
+                    documentRequest: $documentRequests[$item->request_id],
+                    item:            $item,
+                    itemType:        'certificate',
+                    itemId:          $item->request_certificate_id,
+                    targetStatus:    $targetStatus,
+                );
+
+                if ($outcome['action'] === 'skipped') {
+                    $result['items_skipped'][] = $outcome['entry'];
+                    continue;
+                }
+
+                $result['items_updated'][] = $outcome['entry'];
+                $touchedRequestIds[$item->request_id] = true;
+                if ($item->request_release_group_id !== null) {
+                    $touchedReleaseGroupIds[$item->request_release_group_id] = true;
+                }
+            }
+
+            foreach (array_keys($touchedReleaseGroupIds) as $groupId) {
+                $this->recomputeReleaseGroupAggregate((int) $groupId);
+            }
+
+            foreach ($processableRequestIds as $requestId) {
+                if (!isset($touchedRequestIds[$requestId])) {
+                    $result['requests_skipped'][] = [
+                        'request_id' => (int) $requestId,
+                        'reason'     => 'no_eligible_items',
+                    ];
+                    continue;
+                }
+
+                $documentRequest   = $documentRequests[$requestId];
+                $oldParentStatusId = (int) $documentRequest->status_id;
+
+                $this->recomputeAggregateStatus($documentRequest);
+
+                $result['requests_processed'][] = (int) $requestId;
+
+                if ((int) $documentRequest->status_id !== $oldParentStatusId) {
+                    $result['requests_status_changed'][] = (int) $requestId;
+                }
+            }
+
+            if (!empty($result['items_updated'])) {
+                $this->flushAnalyticsCache();
+            }
+
+            return $result;
+        });
+    }
+
+    /**
+     * Evaluates and, if eligible, applies ONE line item's transition
+     * inside bulkAdvanceItems(). This is the single place that decides
+     * "invalid_transition" eligibility for the bulk path (the certificate-
+     * generated check is a separate, earlier gate the caller applies
+     * before reaching here — see certificateGeneratedIneligibilityReason()),
+     * so there is exactly one implementation of "does this item's current
+     * status allow the target" to keep in sync, rather than deciding it
+     * once to apply the update and a second time to explain a skip.
+     *
+     * @param RequestDocument|RequestCertificate $item
+     * @return array{
+     *   action: 'updated'|'skipped',
+     *   entry: array{type: string, id: int, request_id: int, old_status_id?: int, new_status_id?: int, reason?: string, current_status?: string},
+     * }
+     */
+    private function attemptBulkItemTransition(
+        DocumentRequest $documentRequest,
+        RequestDocument|RequestCertificate $item,
+        string $itemType,
+        int $itemId,
+        RequestStatusEnum $targetStatus,
+    ): array {
+        // Defensive default mirrors validateTransition()'s single-item
+        // handling — a NULL item status "shouldn't be reachable in
+        // practice" (see that method's comment), but a bulk pass over
+        // many rows should degrade the same way a single-item update
+        // would rather than throwing and aborting the whole batch.
+        $currentStatus = RequestStatusEnum::from($item->status_id ?? RequestStatusEnum::Processing->value);
+
+        if (!in_array($targetStatus, $currentStatus->allowedTransitions(), true)) {
+            return [
+                'action' => 'skipped',
+                'entry'  => [
+                    'type'           => $itemType,
+                    'id'             => $itemId,
+                    'request_id'     => (int) $item->request_id,
+                    'reason'         => 'invalid_transition',
+                    'current_status' => $currentStatus->name,
+                ],
+            ];
+        }
+
+        $oldStatusId = $item->status_id;
+        $item->update(['status_id' => $targetStatus->value]);
+
+        $this->recordItemHistory(
+            $documentRequest,
+            $oldStatusId,
+            $targetStatus->value,
+            requestDocumentId:    $itemType === 'document' ? $itemId : null,
+            requestCertificateId: $itemType === 'certificate' ? $itemId : null,
+        );
+
+        return [
+            'action' => 'updated',
+            'entry'  => [
+                'type'          => $itemType,
+                'id'            => $itemId,
+                'request_id'    => (int) $item->request_id,
+                'old_status_id' => (int) $oldStatusId,
+                'new_status_id' => $targetStatus->value,
+            ],
+        ];
     }
 
     // -------------------------------------------------------------------------
@@ -161,32 +444,61 @@ class RequestItemStatusService
     }
 
     /**
-     * TEMPORARILY DISABLED (business decision, not a bug) — the
-     * "certificate must be generated before ReadyToClaim" guard is
-     * intentionally off across all three enforcement points:
-     * DocumentRequestService::updateRequest() (whole-request — was
-     * already dead code here), this method (per-item), and
-     * RequestReleaseGroupService::claimReleaseGroup() (per-group). The
-     * frontend disabled its own copy of this check first (see
-     * "TEMPORARILY DISABLED" in StaffDashboard.jsx's
-     * handleBulkReadyClick()); this keeps the backend from being
-     * stricter than the UI it's serving. generated_at itself is
-     * untouched — DocumentRequestService::markCertificatesGenerated()
-     * still records it — so re-enabling later just means restoring the
-     * abort() below (and the matching call sites in the other two
-     * files) with no data migration needed.
+     * Throwing wrapper around certificateGeneratedIneligibilityReason()
+     * for the single-item path (advanceCertificateItem()) — aborts the
+     * request/response cycle on ineligibility, exactly as before this was
+     * extracted into a shared, reason-returning check.
      */
     private function guardCertificateGenerated(RequestCertificate $item, RequestStatusEnum $targetStatus): void
     {
-        return;
+        if ($this->certificateGeneratedIneligibilityReason($item, $targetStatus) !== null) {
+            abort(422, 'Certificate must be generated before marking as Ready to Claim.');
+        }
+    }
+
+    /**
+     * TEMPORARILY DISABLED (business decision, not a bug) — the
+     * "certificate must be generated before ReadyToClaim" rule is
+     * intentionally off across every enforcement point that now shares
+     * this single method: DocumentRequestService::updateRequest()
+     * (whole-request — was already dead code before this rule existed),
+     * guardCertificateGenerated() above (single-item), bulkAdvanceItems()
+     * (Bulk Ready — see that method's docblock), and
+     * RequestReleaseGroupService::claimReleaseGroup() (per-group, which
+     * keeps its own independent copy of this same disabled check — see
+     * that method's docblock). The frontend disabled its own copy of this
+     * check first (see "TEMPORARILY DISABLED" in StaffDashboard.jsx's
+     * handleBulkReadyClick()); this keeps the backend from being stricter
+     * than the UI it's serving.
+     *
+     * generated_at itself is untouched — DocumentRequestService::
+     * markCertificatesGenerated() still records it — so re-enabling this
+     * rule later is a ONE-LINE change: uncomment the body below (and
+     * remove the early `return null;`). Because every enforcement point
+     * in this file now calls THIS method rather than re-implementing the
+     * check, that one change takes effect for the single-item endpoint
+     * and every bulk batch simultaneously, with no risk of one call site
+     * being re-enabled while another is missed. RequestReleaseGroupService
+     * keeps a separate copy (documented there) since it has no dependency
+     * on this class today.
+     *
+     * @return string|null a machine-readable ineligibility reason (for
+     *         bulkAdvanceItems()' items_skipped reporting), or null if
+     *         the item is eligible.
+     */
+    private function certificateGeneratedIneligibilityReason(RequestCertificate $item, RequestStatusEnum $targetStatus): ?string
+    {
+        return null;
 
         // if ($targetStatus !== RequestStatusEnum::ReadyToClaim) {
-        //     return;
+        //     return null;
         // }
         //
         // if ($item->generated_at === null) {
-        //     abort(422, 'Certificate must be generated before marking as Ready to Claim.');
+        //     return 'certificate_not_generated';
         // }
+        //
+        // return null;
     }
 
     private function validateTransition(?int $currentStatusId, int $targetStatusId): RequestStatusEnum
@@ -327,6 +639,68 @@ class RequestItemStatusService
 
         $this->recordItemHistory($documentRequest, $oldStatusId, $leastAdvancedStatusId);
         $this->notifyOwnerOfStatusChange($documentRequest);
+    }
+
+    /**
+     * Recomputes ONE release group's status_id as the "earliest-stage-
+     * wins" aggregate of its own member items — same computation as
+     * recomputeAggregateStatus() above, scoped to request_release_group_id
+     * instead of request_id. Mirrors RequestReleaseGroupService::
+     * recomputeParentAggregate()'s per-request version, at group
+     * granularity.
+     *
+     * This closes a gap that predates bulk operations: assignReleaseGroups()
+     * sets a group's initial status_id once, at creation, and
+     * RequestReleaseGroupService::claimReleaseGroup() sets it again on
+     * claim — but nothing previously kept a group's status_id in sync
+     * as its individual member items advanced one at a time (via
+     * advanceDocumentItem()/advanceCertificateItem()) or in a batch (via
+     * bulkAdvanceItems()) in between those two points. A stale group
+     * status_id doesn't affect claiming (claimReleaseGroup() only reads it
+     * to decide the group's own eligibility, and student-facing status is
+     * read from document_request, not from this table) but IS surfaced
+     * directly by groupCompletionState(), so it must track reality.
+     *
+     * A group with zero (still) member items is left untouched rather
+     * than guessed at, matching recomputeAggregateStatus()'s same
+     * defensive choice for an empty request.
+     */
+    private function recomputeReleaseGroupAggregate(int $releaseGroupId): void
+    {
+        // lockForUpdate() here (rather than a plain find()) guards against
+        // a concurrent RequestReleaseGroupService::claimReleaseGroup() call
+        // racing this rollup for the same group — both callers now take a
+        // row lock before reading/writing this group's status_id.
+        $group = RequestReleaseGroup::lockForUpdate()->find($releaseGroupId);
+
+        if (!$group) {
+            return;
+        }
+
+        $memberStatusIds = DB::table('request_document')
+            ->where('request_release_group_id', $releaseGroupId)
+            ->whereNotNull('status_id')
+            ->pluck('status_id')
+            ->merge(
+                DB::table('request_certificate')
+                    ->where('request_release_group_id', $releaseGroupId)
+                    ->whereNotNull('status_id')
+                    ->pluck('status_id')
+            );
+
+        if ($memberStatusIds->isEmpty()) {
+            return;
+        }
+
+        $leastAdvancedStatusId = $memberStatusIds
+            ->sortBy(fn (int $statusId) => self::STAGE_RANK[$statusId] ?? PHP_INT_MAX)
+            ->first();
+
+        if ((int) $leastAdvancedStatusId === (int) $group->status_id) {
+            return;
+        }
+
+        $group->update(['status_id' => $leastAdvancedStatusId]);
     }
 
     /**

@@ -161,6 +161,19 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::get('counts',                      [DocumentRequestController::class, 'counts'])->middleware(['role:3,4', 'module:dashboard,View']);
         Route::post('archive-bulk',                [DocumentRequestController::class, 'archiveBulk'])->middleware('role:3');
         Route::post('restore-bulk',                [DocumentRequestController::class, 'restoreBulk'])->middleware('role:3');
+        // Bulk Ready / Bulk Done — Multi-Item/Mixed-Status Batch rules.
+        // Same coarse role/module gate as the single-item status routes
+        // below (updateDocumentItemStatus()/updateCertificateItemStatus()):
+        // the fine-grained Process-vs-Complete check happens inside
+        // RequestItemStatusService once the actual target status is known,
+        // same split update()/the single-item routes already use. Kept
+        // under /document-requests (not /request-documents) since the
+        // input is a batch of REQUEST ids, not line-item ids — the service
+        // resolves each request's own eligible children internally.
+        Route::post('bulk-ready', [DocumentRequestController::class, 'bulkReadyItems'])
+            ->middleware(['role:3', 'module:dashboard,Process|Complete']);
+        Route::post('bulk-done',  [DocumentRequestController::class, 'bulkDoneItems'])
+            ->middleware(['role:3', 'module:dashboard,Process|Complete']);
         Route::post('claim',                       [DocumentRequestController::class, 'claim'])->middleware(['role:3', 'module:dashboard,Complete']);
         // Dedicated throttle on top of the group's throttle:60,1 — OR
         // numbers look sequential (see cashier sample data), so this is a

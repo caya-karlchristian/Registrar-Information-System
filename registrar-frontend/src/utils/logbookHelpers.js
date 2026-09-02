@@ -234,11 +234,24 @@ export const getDocumentNames = (row) =>
     .map((n) => String(n).trim())
     .filter(Boolean);
 
-/** Extract certification type names from a request row */
+/**
+ * Extract certification type names from a request row.
+ *
+ * The backend eager-loads this relation as `certificationType` (see
+ * RequestCertificate::certificationType() / DocumentRequestController::
+ * RELATIONS => 'certificates.certificationType'), and Eloquent serializes
+ * relations under their exact method name — not a snake_cased version of
+ * it. The `certification_type` key below is kept only as a defensive
+ * fallback for any alternate payload shape; it is not what this app's API
+ * actually returns, so it must never be the *only* lookup or this always
+ * resolves to an empty string (request_certificate itself has no
+ * certificate_name column to fall back to).
+ */
 export const getCertificationNames = (row) =>
   (Array.isArray(row?.certificates) ? row.certificates : [])
     .map(
       (c) =>
+        c?.certificationType?.certificate_name ??
         c?.certification_type?.certificate_name ??
         c?.certificate_name ??
         c?.name ??
@@ -246,4 +259,86 @@ export const getCertificationNames = (row) =>
     )
     .filter(Boolean)
     .map((n) => String(n).trim())
+    .filter(Boolean);
+
+// ---------------------------------------------------------------------------
+// Logbook rollup helpers
+// ---------------------------------------------------------------------------
+// A document_type/certificate_type row can optionally point at a shared
+// logbook_category (see the backend's 2026_08_29_000000_create_logbook_
+// categories_table migration and DocumentType::logbookLabel() /
+// CertificationType::logbookLabel()): several differently-processed types
+// (e.g. every "Certified True Copy of X" variant) can be configured to
+// collapse into ONE umbrella line in the logbook and its DOCX export,
+// without merging their actual processing identity.
+//
+// These helpers are the single source of truth for resolving that display
+// label on the frontend, mirroring the backend's own fallback rule
+// exactly: category name if the type has one assigned, otherwise the
+// type's own name. Both Logbook.jsx (on-screen grouping/filtering) and the
+// DOCX export must resolve labels the same way, or the exported document
+// could silently disagree with what staff saw on screen.
+
+/**
+ * Resolve the label a single document/certificate type should be logged
+ * and exported under.
+ *
+ * @param {number|string|null|undefined} categoryId - the type's logbook_category_id (may be null/blank/absent).
+ * @param {string} ownName - the type's own display name (document_name / certificate_name), used as the fallback.
+ * @param {Map<number, string>|undefined} categoryNameById - lookup built from GET /logbook-categories, keyed by logbook_category_id.
+ * @returns {string} Always a non-empty, trimmed string.
+ */
+export const resolveLogbookLabel = (categoryId, ownName, categoryNameById) => {
+  const fallback = String(ownName ?? '').trim() || 'Unspecified';
+
+  if (categoryId === null || categoryId === undefined || categoryId === '') {
+    return fallback;
+  }
+
+  const numericId = Number(categoryId);
+  if (Number.isNaN(numericId)) return fallback;
+
+  const resolved = categoryNameById?.get?.(numericId);
+  const trimmedResolved = resolved ? String(resolved).trim() : '';
+  return trimmedResolved || fallback;
+};
+
+/**
+ * Logbook display labels for every document line item on a request row.
+ *
+ * Reads each item's own embedded document type (`documentType`, eager-
+ * loaded by the backend — see DocumentRequestController::RELATIONS)
+ * rather than joining against a separately-fetched active-catalog list,
+ * so this keeps resolving correctly even for archived/legacy document
+ * types that may no longer appear in the live dropdown.
+ *
+ * @param {object} row - a request row with a `documents` array.
+ * @param {Map<number, string>|undefined} categoryNameById - lookup built from GET /logbook-categories.
+ * @returns {string[]} De-duplicated, non-empty labels are NOT enforced here — callers decide whether duplicates matter.
+ */
+export const getDocumentLogbookLabels = (row, categoryNameById) =>
+  (Array.isArray(row?.documents) ? row.documents : [])
+    .map((d) => {
+      const type = d?.documentType ?? d?.document_type;
+      const categoryId = type?.logbook_category_id ?? d?.logbook_category_id ?? null;
+      const ownName = type?.document_name ?? d?.document_name ?? '';
+      if (!ownName && categoryId === null) return '';
+      return resolveLogbookLabel(categoryId, ownName, categoryNameById);
+    })
+    .filter(Boolean);
+
+/**
+ * Logbook display labels for every certificate line item on a request
+ * row. Same convention as getDocumentLogbookLabels() above — see that
+ * function's docblock.
+ */
+export const getCertificationLogbookLabels = (row, categoryNameById) =>
+  (Array.isArray(row?.certificates) ? row.certificates : [])
+    .map((c) => {
+      const type = c?.certificationType ?? c?.certification_type;
+      const categoryId = type?.logbook_category_id ?? c?.logbook_category_id ?? null;
+      const ownName = type?.certificate_name ?? c?.certificate_name ?? c?.name ?? '';
+      if (!ownName && categoryId === null) return '';
+      return resolveLogbookLabel(categoryId, ownName, categoryNameById);
+    })
     .filter(Boolean);
