@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RequestStatusEnum;
 use App\Models\DocumentRequest;
 use App\Models\RequestCertificate;
 use App\Models\RequestDocument;
@@ -36,12 +37,13 @@ use Throwable;
  * Responsibilities: validate input, authorize, delegate to DocumentRequestService, return JSON.
  * Business logic lives entirely in DocumentRequestService.
  *
- * Validation for store()/update()/archiveBulk()/restoreBulk() now lives in
- * App\Http\Requests\DocumentRequest\* — see each class's rules(). Their
- * authorize() methods also replace the explicit $this->authorize() calls
- * store()/update() used to make (archive()/restore()/view()/delete() below
- * still call $this->authorize() directly since those don't take a
- * FormRequest — there's nothing to validate on those routes).
+ * Validation for store()/update()/archiveBulk()/restoreBulk()/
+ * bulkReadyItems()/bulkDoneItems() now lives in App\Http\Requests\
+ * DocumentRequest\* — see each class's rules(). Their authorize() methods
+ * also replace the explicit $this->authorize() calls store()/update() used
+ * to make (archive()/restore()/view()/delete() below still call
+ * $this->authorize() directly since those don't take a FormRequest —
+ * there's nothing to validate on those routes).
  */
 class DocumentRequestController extends Controller
 {
@@ -893,6 +895,84 @@ class DocumentRequestController extends Controller
             $this->auditLogger->log($request, $actor, AuditLog::ACTION_REQUEST_RESTORED, [
                 'request_id' => $requestId,
                 'bulk'       => true,
+            ]);
+        }
+
+        return response()->json($result, 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /document-requests/bulk-ready  { request_ids: [...] }
+    //
+    // "Bulk Ready" — Multi-Item/Mixed-Status Batch rules. Reuses
+    // BulkRequestIdsRequest (already validates request_ids as a 1–200
+    // item array of distinct integers and gates on isStaff()) rather than
+    // adding a near-duplicate FormRequest, since this endpoint takes the
+    // exact same input shape as archiveBulk()/restoreBulk() above — the
+    // target status (ReadyToClaim) is fixed by which endpoint is called,
+    // never taken from the request body, so there is no separate "status"
+    // field to validate.
+    //
+    // Delegates entirely to RequestItemStatusService::bulkAdvanceItems(),
+    // which evaluates every selected request's document/certificate
+    // children individually, skips ineligible items/requests without
+    // blocking eligible ones, and rolls up each affected request's (and
+    // release group's) aggregate status afterward — see that method's
+    // docblock for the full eligibility rules.
+    // -------------------------------------------------------------------------
+    public function bulkReadyItems(BulkRequestIdsRequest $request): JsonResponse
+    {
+        /** @var SystemUser $actor */
+        $actor     = Auth::user();
+        $validated = $request->validated();
+
+        $result = $this->itemStatusService->bulkAdvanceItems(
+            $validated['request_ids'],
+            RequestStatusEnum::ReadyToClaim,
+        );
+
+        // One audit entry per request whose AGGREGATE status actually
+        // changed as a result of this batch — not per item, and not for
+        // requests where every item was skipped — mirroring how
+        // archiveBulk()/restoreBulk() above log one entry per request
+        // actually affected, not one per id submitted.
+        foreach ($result['requests_status_changed'] as $requestId) {
+            $this->auditLogger->log($request, $actor, AuditLog::ACTION_REQUEST_STATUS_CHANGED, [
+                'request_id'     => $requestId,
+                'bulk'           => true,
+                'target_status'  => RequestStatusEnum::ReadyToClaim->name,
+            ]);
+        }
+
+        return response()->json($result, 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /document-requests/bulk-done  { request_ids: [...] }
+    //
+    // "Bulk Done" — mirrors bulkReadyItems() exactly, targeting Completed
+    // instead of ReadyToClaim. Per the Mixed-Status Batch rule, only
+    // items currently ReadyToClaim are eligible (RequestStatusEnum::
+    // ReadyToClaim is the only case whose allowedTransitions() includes
+    // Completed), so this naturally excludes anything not already ready
+    // for pickup without any extra branching here.
+    // -------------------------------------------------------------------------
+    public function bulkDoneItems(BulkRequestIdsRequest $request): JsonResponse
+    {
+        /** @var SystemUser $actor */
+        $actor     = Auth::user();
+        $validated = $request->validated();
+
+        $result = $this->itemStatusService->bulkAdvanceItems(
+            $validated['request_ids'],
+            RequestStatusEnum::Completed,
+        );
+
+        foreach ($result['requests_status_changed'] as $requestId) {
+            $this->auditLogger->log($request, $actor, AuditLog::ACTION_REQUEST_STATUS_CHANGED, [
+                'request_id'     => $requestId,
+                'bulk'           => true,
+                'target_status'  => RequestStatusEnum::Completed->name,
             ]);
         }
 
