@@ -115,7 +115,7 @@ jobs:
             docker compose -f docker-compose.staging.yml up -d
 
             echo "── Running migrations ────────────────────────────"
-            docker exec ris_staging_backend php artisan migrate --force
+            docker exec ris_staging_backend php artisan migrate --force --isolated
 
             echo "── Caching config and routes ─────────────────────"
             docker exec ris_staging_backend php artisan config:cache

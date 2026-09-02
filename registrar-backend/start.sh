@@ -12,8 +12,31 @@ if [ ! -L public/storage ] && [ ! -e public/storage ]; then
 	php artisan storage:link || true
 fi
 
-# Run migrations
-php artisan migrate --force || true
+# Migrations are intentionally NOT run here.
+#
+# This container's CMD runs on every boot: initial deploy, container
+# restart, host reboot, `docker compose up` on an unchanged image, etc.
+# Running `php artisan migrate` on every one of those was racing against
+# the deploy pipeline's own explicit `php artisan migrate --force --isolated`
+# step (see .github/workflows/deploy.yml), which runs moments after
+# `docker compose up -d` returns — `up -d` only waits for the container
+# process to start, not for this script to finish. Two concurrent,
+# unlocked `migrate` runs against the same database is a real race
+# (observed in production: "Table 'fulfillment_track' already exists",
+# both runs passing Schema::hasTable() before either committed its
+# Schema::create()).
+#
+# The previous `|| true` on this line made it worse by silently
+# swallowing genuine migration failures on every boot.
+#
+# Migrations now run exactly once per deploy, explicitly, from the CI
+# pipeline, with Laravel's --isolated flag (atomic lock via the redis
+# cache store) as defense-in-depth against any future double-run. If a
+# migration is pending when this container boots, the app will surface
+# that as a real error (e.g. missing column) instead of silently
+# racing/masking it — which is the correct failure mode: it means the
+# deploy pipeline's migrate step didn't run or didn't finish, and that
+# needs to be visible, not papered over here.
 
 # Clear and cache config — but never in local dev. Caching bakes the
 # current env vars (including APP_ENV) into bootstrap/cache/config.php,
@@ -71,8 +94,8 @@ find /var/www/html/storage/app/public -type f -exec chmod 644 {} \;
 find /var/www/html/storage/app/public -type d -exec chmod 755 {} \;
 
 # Re-assert ownership on storage/ and bootstrap/cache/ right before php-fpm
-# starts. Everything above this line (migrate, optimize, etc.) runs as root
-# — the container's default user, since no USER directive drops privileges
+# starts. Everything above this line (optimize, etc.) runs as root — the
+# container's default user, since no USER directive drops privileges
 # before this script runs. If any of those commands write a log line, they
 # recreate storage/logs/laravel.log owned by root, and every future write
 # from php-fpm (which runs as www-data per www.conf) then fails with
