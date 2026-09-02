@@ -3,7 +3,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthProvider';
 import { hasModuleAction } from '../utils/policy';
-import { getAllLogbookData, getDocumentTypes, getCertifications } from '../services/api'; // FE-3 migration: uses getLogbookData() from API; now pages through via getAllLogbookData() since the backend endpoint is paginated
+import { getAllLogbookData, getDocumentTypes, getCertifications, getLogbookCategories } from '../services/api'; // FE-3 migration: uses getLogbookData() from API; now pages through via getAllLogbookData() since the backend endpoint is paginated
 import {
   formatMinutesDuration,
   getProcessedAt,
@@ -12,8 +12,9 @@ import {
   getCourse,
   getGender,
   getEmail,
-  getDocumentNames,
-  getCertificationNames,
+  getDocumentLogbookLabels,
+  getCertificationLogbookLabels,
+  resolveLogbookLabel,
   formatDateLong,
   getClaimedAt,
 } from '../utils/logbookHelpers.js';
@@ -49,10 +50,10 @@ const LogbookRecords = () => {
   const [data, setData] = useState([]);
   const [dbDocTypes, setDbDocTypes] = useState([]);
   const [availableCertifications, setAvailableCertifications] = useState([]);
+  const [logbookCategories, setLogbookCategories] = useState([]);
   const [historyByRequestId, setHistoryByRequestId] = useState({});
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedDocTypeId, setSelectedDocTypeId] = useState("");
   const [selectedExportOption, setSelectedExportOption] = useState('All Document');
   const [exporting, setExporting] = useState(false);
   const [toastSuccess, setToastSuccess] = useState('');
@@ -76,19 +77,22 @@ const LogbookRecords = () => {
     const fetchLogbookData = async () => {
       setLoading(true);
       try {
-        const [logbookRows, typesRes, certRes] = await Promise.all([
+        const [logbookRows, typesRes, certRes, categoriesRes] = await Promise.all([
           getAllLogbookData(),
           getDocumentTypes(),
           getCertifications(),
+          getLogbookCategories(),
         ]);
 
         const requests = toRows(logbookRows);
         const types = toRows(typesRes.data);
         const certifications = toRows(certRes.data);
+        const categories = toRows(categoriesRes.data);
 
         setData(requests);
         setDbDocTypes(types);
         setAvailableCertifications(certifications);
+        setLogbookCategories(categories);
         setHistoryByRequestId({});
         setCurrentPage(1);
       } catch (error) {
@@ -96,6 +100,7 @@ const LogbookRecords = () => {
         setData([]);
         setDbDocTypes([]);
         setAvailableCertifications([]);
+        setLogbookCategories([]);
         setHistoryByRequestId({});
         setToastError((error && (error.message || error.toString())) || 'Error loading logbook records.');
       } finally {
@@ -105,7 +110,9 @@ const LogbookRecords = () => {
     fetchLogbookData();
   }, []);
 
-  // Map of document type id -> document name for quick lookups
+  // Map of document type id -> document's own name (pre-rollup), used only
+  // for the "is this catalog's magic 'Certification' row present" check
+  // below — unrelated to logbook_category grouping.
   const activeDocMap = useMemo(() => {
     if (dbDocTypes.length > 0) {
       return Object.fromEntries(dbDocTypes.map(t => [t.document_type_id, t.document_name]));
@@ -113,13 +120,60 @@ const LogbookRecords = () => {
     return {};
   }, [dbDocTypes]);
 
-  // Build document filter dropdown options
+  // logbook_category_id -> category name, from GET /logbook-categories.
+  // Single source of truth for the rollup: several document/certificate
+  // types can share one category so they log/export as one umbrella line
+  // (see logbookHelpers.js's "Logbook rollup helpers" section for why).
+  const logbookCategoryNameById = useMemo(() => {
+    const map = new Map();
+    logbookCategories.forEach((c) => {
+      const id = Number(c?.logbook_category_id);
+      if (!Number.isNaN(id) && c?.name) {
+        map.set(id, c.name);
+      }
+    });
+    return map;
+  }, [logbookCategories]);
+
+  // Map of document_type_id -> resolved logbook label (category name if
+  // assigned, otherwise the type's own name). Drives the Document Type
+  // dropdown so types that roll up under the same category collapse into
+  // a single selectable option, matching what the backend's
+  // DocumentType::logbookLabel() considers "the same logbook line".
+  const docLogbookLabelById = useMemo(() => {
+    const map = {};
+    dbDocTypes.forEach((t) => {
+      map[t.document_type_id] = resolveLogbookLabel(
+        t?.logbook_category_id,
+        t?.document_name,
+        logbookCategoryNameById
+      );
+    });
+    return map;
+  }, [dbDocTypes, logbookCategoryNameById]);
+
+  // Map of certificate_type_id -> resolved logbook label. Same rollup
+  // convention as docLogbookLabelById above.
+  const certLogbookLabelById = useMemo(() => {
+    const map = {};
+    availableCertifications.forEach((c) => {
+      map[c.certificate_type_id] = resolveLogbookLabel(
+        c?.logbook_category_id,
+        c?.certificate_name,
+        logbookCategoryNameById
+      );
+    });
+    return map;
+  }, [availableCertifications, logbookCategoryNameById]);
+
+  // Build document filter dropdown options — one entry per distinct
+  // logbook label (post-rollup), not per raw document type.
   const docOptions = useMemo(() => {
     const options = ['All Document'];
     const seen = new Set(['all document']);
 
-    Object.values(activeDocMap).forEach((name) => {
-      const normalized = String(name || '').trim();
+    Object.values(docLogbookLabelById).forEach((label) => {
+      const normalized = String(label || '').trim();
       if (!normalized) return;
       const key = normalized.toLowerCase();
       if (seen.has(key)) return;
@@ -127,20 +181,25 @@ const LogbookRecords = () => {
       options.push(normalized);
     });
 
+    // Structural marker, unrelated to logbook_category rollup: a document
+    // type literally named "Certification" signals that certification
+    // filtering should be offered. Checked against the type's own raw
+    // name (activeDocMap), not its rolled-up label, since collapsing it
+    // under a category would never change what this marker means.
     if (Object.values(activeDocMap).some((name) => String(name || '').trim().toLowerCase() === 'certification')) {
       options.splice(1, 0, 'All Certification');
     }
 
     return options;
-  }, [activeDocMap]);
+  }, [docLogbookLabelById, activeDocMap]);
 
-  // List of distinct certification names
+  // List of distinct certification logbook labels (post-rollup)
   const certificationOptions = useMemo(() => {
     const options = [];
     const seen = new Set();
 
-    availableCertifications.forEach((cert) => {
-      const normalized = String(cert?.certificate_name || '').trim();
+    Object.values(certLogbookLabelById).forEach((label) => {
+      const normalized = String(label || '').trim();
       if (!normalized) return;
       const key = normalized.toLowerCase();
       if (seen.has(key)) return;
@@ -149,13 +208,17 @@ const LogbookRecords = () => {
     });
 
     return options;
-  }, [availableCertifications]);
+  }, [certLogbookLabelById]);
 
-  // Label displayed for the currently selected document/export option
+  // Label displayed for the currently selected document/export option.
+  // docOptions/certificationOptions are already resolved logbook labels,
+  // so the dropdown's raw selected value IS the label — no id lookup
+  // needed (and none is possible 1:1 once a label can represent more
+  // than one underlying document/certificate type).
   const selectedDocLabel = useMemo(() => {
     if (selectedExportOption === 'All Certification') return 'All Certification';
-    return activeDocMap[selectedDocTypeId] || selectedExportOption || 'All Document';
-  }, [selectedDocTypeId, activeDocMap, selectedExportOption]);
+    return selectedExportOption || 'All Document';
+  }, [selectedExportOption]);
 
   // Whether the UI is currently focused on certification-specific filters/exports
   const isCertificationMode = useMemo(() => {
@@ -194,19 +257,21 @@ const LogbookRecords = () => {
     if (isCertificationMode) {
       const targetCertification = String(selectedCertificationLabel || 'All Certification').trim().toLowerCase();
       return completedOnly.filter((item) => {
-        const certNames = getCertificationNames(item).map((name) => String(name).trim().toLowerCase());
-        if (targetCertification === 'all certification') return certNames.length > 0;
-        return certNames.includes(targetCertification);
+        const certLabels = getCertificationLogbookLabels(item, logbookCategoryNameById)
+          .map((label) => label.trim().toLowerCase());
+        if (targetCertification === 'all certification') return certLabels.length > 0;
+        return certLabels.includes(targetCertification);
       });
     }
 
-    if (!selectedDocTypeId) return completedOnly;
+    if (!selectedExportOption || selectedExportOption === 'All Document') return completedOnly;
 
-    const targetId = Number(selectedDocTypeId);
-    return completedOnly.filter(item =>
-      item.documents?.some(d => Number(d.document_type_id) === targetId)
+    const targetLabel = String(selectedExportOption).trim().toLowerCase();
+    return completedOnly.filter((item) =>
+      getDocumentLogbookLabels(item, logbookCategoryNameById)
+        .some((label) => label.trim().toLowerCase() === targetLabel)
     );
-  }, [selectedDocTypeId, data, isCertificationMode, selectedCertificationLabel, dateFrom, dateTo]);
+  }, [selectedExportOption, data, isCertificationMode, selectedCertificationLabel, logbookCategoryNameById, dateFrom, dateTo]);
 
   // Sort filtered data by request timestamp (most recent first)
   const sortedData = useMemo(() => {
@@ -225,32 +290,39 @@ const LogbookRecords = () => {
     return sortedData.slice(indexOfFirstItem, indexOfLastItem);
   }, [indexOfFirstItem, indexOfLastItem, sortedData]);
 
-  // Build sections for DOCX export
+  // Build sections for DOCX export. Section titles/grouping are the
+  // resolved logbook label (post-rollup) so the exported document groups
+  // requests exactly the way the on-screen filter/dropdown does — never
+  // the raw, pre-rollup document/certificate type name.
   const getExportSections = () => {
     if (isCertificationMode) {
       if (selectedCertificationLabel && selectedCertificationLabel !== 'All Certification') {
         return [{ title: selectedCertificationLabel, rows: sortedData }];
       }
-      const certNames = certificationOptions.filter(n => String(n || '').trim().toLowerCase() !== 'all certification');
-      return certNames.map((name) => ({
-        title: name,
+      const certLabels = certificationOptions.filter(n => String(n || '').trim().toLowerCase() !== 'all certification');
+      return certLabels.map((label) => ({
+        title: label,
         rows: sortedData.filter((row) =>
-          getCertificationNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())
+          getCertificationLogbookLabels(row, logbookCategoryNameById)
+            .map(x => x.toLowerCase())
+            .includes(String(label).trim().toLowerCase())
         ),
       }));
     }
 
-    if (selectedDocTypeId) {
+    if (selectedExportOption && selectedExportOption !== 'All Document') {
       return [{ title: selectedDocLabel, rows: sortedData }];
     }
 
-    const docNames = Object.values(activeDocMap).map(n => String(n || '').trim()).filter(Boolean);
-    const uniqueDocNames = Array.from(new Set(docNames));
+    const docLabels = Object.values(docLogbookLabelById).map(n => String(n || '').trim()).filter(Boolean);
+    const uniqueDocLabels = Array.from(new Set(docLabels));
 
-    return uniqueDocNames.map((name) => ({
-      title: name,
+    return uniqueDocLabels.map((label) => ({
+      title: label,
       rows: sortedData.filter((row) =>
-        getDocumentNames(row).map(x => x.toLowerCase()).includes(String(name).trim().toLowerCase())
+        getDocumentLogbookLabels(row, logbookCategoryNameById)
+          .map(x => x.toLowerCase())
+          .includes(String(label).trim().toLowerCase())
       ),
     }));
   };
@@ -339,15 +411,12 @@ const LogbookRecords = () => {
                   value={selectedExportOption}
                   labelColor={isDark ? 'text-[#b0b3b8]' : 'text-gray-600'}
                   onChange={(e) => {
-                    if (e.target.value === 'All Document' || e.target.value === 'All Certification') {
-                      setSelectedDocTypeId('');
-                      setSelectedExportOption(e.target.value);
-                      setSelectedCertificationLabel('');
-                      setCurrentPage(1);
-                      return;
-                    }
-                    const id = Object.keys(activeDocMap).find(key => activeDocMap[key] === e.target.value) || '';
-                    setSelectedDocTypeId(id);
+                    // docOptions/certificationOptions values are already
+                    // resolved logbook labels (see docLogbookLabelById /
+                    // certLogbookLabelById above), so the selected value
+                    // can be used directly for filtering — no id lookup
+                    // needed, and none is possible 1:1 once a label can
+                    // represent more than one underlying type.
                     setSelectedExportOption(e.target.value);
                     setSelectedCertificationLabel('');
                     setCurrentPage(1);

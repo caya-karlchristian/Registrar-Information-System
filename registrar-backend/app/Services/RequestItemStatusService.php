@@ -231,8 +231,14 @@ class RequestItemStatusService
                 'requests_skipped'        => [],
             ];
 
+            // withArchived() is required here: DocumentRequest's default
+            // ExcludeArchivedScope would otherwise filter archived requests
+            // out of this query entirely, making them indistinguishable
+            // from a nonexistent id below (both would fall through to
+            // 'not_found' instead of the correct 'archived' reason).
             /** @var \Illuminate\Support\Collection<int, DocumentRequest> $documentRequests */
-            $documentRequests = DocumentRequest::whereIn('request_id', $requestIds)
+            $documentRequests = DocumentRequest::withArchived()
+                ->whereIn('request_id', $requestIds)
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('request_id');
