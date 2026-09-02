@@ -18,13 +18,13 @@ fi
 # restart, host reboot, `docker compose up` on an unchanged image, etc.
 # Running `php artisan migrate` on every one of those was racing against
 # the deploy pipeline's own explicit `php artisan migrate --force --isolated`
-# step (see .github/workflows/deploy.yml), which runs moments after
-# `docker compose up -d` returns — `up -d` only waits for the container
-# process to start, not for this script to finish. Two concurrent,
-# unlocked `migrate` runs against the same database is a real race
-# (observed in production: "Table 'fulfillment_track' already exists",
-# both runs passing Schema::hasTable() before either committed its
-# Schema::create()).
+# step (see .github/workflows/deploy.yml, which now runs that step as a
+# disposable one-off container BEFORE `docker compose up -d` even starts
+# this container). Regardless of ordering relative to `up -d`, this
+# script must never also invoke `migrate` — two concurrent, unlocked
+# `migrate` runs against the same database is a real race (observed in
+# production: "Table 'fulfillment_track' already exists", both runs
+# passing Schema::hasTable() before either committed its Schema::create()).
 #
 # The previous `|| true` on this line made it worse by silently
 # swallowing genuine migration failures on every boot.

@@ -111,11 +111,23 @@ jobs:
             echo "── Pulling image from ECR ───────────────────────"
             docker compose -f docker-compose.staging.yml pull
 
+            echo "── Running migrations ────────────────────────────"
+            # Migrate BEFORE (re)starting the long-running containers —
+            # see deploy.yml for the full reasoning (no healthcheck on
+            # the backend service means `up -d` doesn't guarantee the
+            # app is actually ready, so migrating first avoids a window
+            # where new code could serve traffic before its own schema
+            # migration finishes).
+            #
+            # --no-deps assumes mysql/redis are already running from the
+            # prior deploy (restart: unless-stopped). On a from-scratch
+            # stand-up, start them first:
+            # `docker compose -f docker-compose.staging.yml up -d mysql redis`.
+            docker compose -f docker-compose.staging.yml \
+              run --rm --no-deps backend php artisan migrate --force --isolated
+
             echo "── Starting containers ──────────────────────────"
             docker compose -f docker-compose.staging.yml up -d
-
-            echo "── Running migrations ────────────────────────────"
-            docker exec ris_staging_backend php artisan migrate --force --isolated
 
             echo "── Caching config and routes ─────────────────────"
             docker exec ris_staging_backend php artisan config:cache
