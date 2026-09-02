@@ -39,12 +39,25 @@ test('verify-or requires or_number and receipt_date', function () {
         ->assertJsonValidationErrors(['or_number', 'receipt_date']);
 });
 
-test('verify-or rejects a receipt_date older than 7 days', function () {
+test('verify-or accepts a receipt_date older than 7 days', function () {
+    // The 7-day lookback window has been removed: any past date is valid,
+    // it no longer has to fall within the last week.
+    config(['services.cashier.api_key' => '']);
     makeVerifyOrStudent();
 
     $this->postJson('/api/document-requests/verify-or', [
         'or_number'    => '1234567',
         'receipt_date' => now()->subDays(10)->toDateString(),
+    ])->assertOk()
+      ->assertJsonPath('valid', true);
+});
+
+test('verify-or still rejects a receipt_date in the future', function () {
+    makeVerifyOrStudent();
+
+    $this->postJson('/api/document-requests/verify-or', [
+        'or_number'    => '1234567',
+        'receipt_date' => now()->addDay()->toDateString(),
     ])->assertStatus(422)
       ->assertJsonValidationErrors(['receipt_date']);
 });
