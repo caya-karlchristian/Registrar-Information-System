@@ -8,6 +8,8 @@ import {
   restoreDocumentRequest,
   archiveDocumentRequests,
   restoreDocumentRequests,
+  bulkReadyItems,
+  bulkDoneItems,
 } from '../services/api';
 import { useNotificationsContext } from '../context/NotificationsContext';
 import { useReferenceData } from '../context/ReferenceDataContext';
@@ -145,7 +147,7 @@ export const useStaffDashboard = (viewMode) => {
   });
 
   const bulkReadyMutation = useMutation({
-    mutationFn: (ids) => Promise.all(ids.map(id => updateDocumentRequest(id, { status_id: resolvedStatusIds.READY }))),
+    mutationFn: (ids) => bulkReadyItems(ids),
     onSuccess: () => {
       setSelectedIds([]);
       invalidateRequests();
@@ -156,7 +158,7 @@ export const useStaffDashboard = (viewMode) => {
   });
 
   const bulkDoneMutation = useMutation({
-    mutationFn: (ids) => Promise.all(ids.map(id => updateDocumentRequest(id, { status_id: resolvedStatusIds.COMPLETED }))),
+    mutationFn: (ids) => bulkDoneItems(ids),
     onSuccess: () => {
       setSelectedIds([]);
       invalidateRequests();
