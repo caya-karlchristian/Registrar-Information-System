@@ -161,35 +161,32 @@ class RequestItemStatusService
     }
 
     /**
-     * Mirrors the "certificate must be generated before ReadyToClaim"
-     * guard DocumentRequestService::updateRequest() applies at the
-     * whole-request level — added here for parity, since without it the
-     * per-item "Mark Ready to Claim" button could bypass a check the
-     * whole-request button enforces.
-     *
-     * FIXED (was a no-op on both paths): this used to check
-     * $item->certificate_type_id === null, but certificate_type_id is a
-     * non-nullable column set at request creation — it is never null by
-     * the time staff can act on the item, so the check could never
-     * actually block anything. Now reads generated_at (see migration
-     * 2026_08_29_000010_add_generated_at_to_request_certificate), a real
-     * persisted signal set by DocumentRequestService::
-     * markCertificatesGenerated() when staff actually print/generate the
-     * certificate — replacing the old client-only printedCertificateIds
-     * localStorage flag, which never reached the server. Both this check
-     * and DocumentRequestService::updateRequest()'s whole-request
-     * equivalent were updated together so they can't drift out of
-     * parity again.
+     * TEMPORARILY DISABLED (business decision, not a bug) — the
+     * "certificate must be generated before ReadyToClaim" guard is
+     * intentionally off across all three enforcement points:
+     * DocumentRequestService::updateRequest() (whole-request — was
+     * already dead code here), this method (per-item), and
+     * RequestReleaseGroupService::claimReleaseGroup() (per-group). The
+     * frontend disabled its own copy of this check first (see
+     * "TEMPORARILY DISABLED" in StaffDashboard.jsx's
+     * handleBulkReadyClick()); this keeps the backend from being
+     * stricter than the UI it's serving. generated_at itself is
+     * untouched — DocumentRequestService::markCertificatesGenerated()
+     * still records it — so re-enabling later just means restoring the
+     * abort() below (and the matching call sites in the other two
+     * files) with no data migration needed.
      */
     private function guardCertificateGenerated(RequestCertificate $item, RequestStatusEnum $targetStatus): void
     {
-        if ($targetStatus !== RequestStatusEnum::ReadyToClaim) {
-            return;
-        }
+        return;
 
-        if ($item->generated_at === null) {
-            abort(422, 'Certificate must be generated before marking as Ready to Claim.');
-        }
+        // if ($targetStatus !== RequestStatusEnum::ReadyToClaim) {
+        //     return;
+        // }
+        //
+        // if ($item->generated_at === null) {
+        //     abort(422, 'Certificate must be generated before marking as Ready to Claim.');
+        // }
     }
 
     private function validateTransition(?int $currentStatusId, int $targetStatusId): RequestStatusEnum

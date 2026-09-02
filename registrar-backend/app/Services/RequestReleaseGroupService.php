@@ -169,25 +169,18 @@ class RequestReleaseGroupService
                 abort(422, "This ticket's items are not ready to claim (currently {$currentStatus->name}).");
             }
 
-            // Same "certificate must be generated" guard
-            // DocumentRequestService::updateRequest() applies at the
-            // whole-request level, scoped here to just this group's own
-            // certificate items.
-            //
-            // FIXED (was a no-op): this used to check
-            // whereNotNull('certificate_type_id'), a non-nullable column
-            // set once at request creation — it could never actually
-            // block anything. Now checks generated_at (see migration
-            // 2026_08_29_000010_add_generated_at_to_request_certificate),
-            // the same real, persisted signal the other two guards
-            // (DocumentRequestService::updateRequest() and
-            // RequestItemStatusService::guardCertificateGenerated()) were
-            // updated to use. This was the last of the three copies of
-            // this guard still on the old, non-functional check.
+            // TEMPORARILY DISABLED (business decision, not a bug) — see
+            // RequestItemStatusService::guardCertificateGenerated()'s
+            // docblock for the full reasoning: this guard is off across
+            // all three enforcement points (whole-request, per-item,
+            // per-group) to match the frontend, which disabled its own
+            // copy first. generated_at is still recorded normally by
+            // DocumentRequestService::markCertificatesGenerated() —
+            // re-enabling later just means restoring the abort() below.
             $groupCertificates = RequestCertificate::where('request_release_group_id', $group->request_release_group_id)->get();
-            if ($groupCertificates->isNotEmpty() && $groupCertificates->whereNotNull('generated_at')->isEmpty()) {
-                abort(422, 'Certificate must be generated before marking as Ready to Claim.');
-            }
+            // if ($groupCertificates->isNotEmpty() && $groupCertificates->whereNotNull('generated_at')->isEmpty()) {
+            //     abort(422, 'Certificate must be generated before marking as Ready to Claim.');
+            // }
 
             $groupDocuments = RequestDocument::where('request_release_group_id', $group->request_release_group_id)->get();
 
