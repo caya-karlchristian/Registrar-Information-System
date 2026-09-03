@@ -526,35 +526,29 @@ class DocumentRequestController extends Controller
             $profile->suffix      ?? '',
         );
 
-        $verification = null;
-        $matchedName  = null;
-        $attemptsLog  = [];
+        // Candidate name formattings are tried in two phases inside
+        // CashierService::verifyPaymentAny(): the primary (most-likely)
+        // format alone first, then — only if that comes back as a
+        // genuine NOT_FOUND rather than an API outage — the remaining
+        // candidates CONCURRENTLY via Http::pool(). This replaces the
+        // old fully-sequential retry loop, which meant a genuine name
+        // mismatch — the common case this candidate list exists to
+        // solve, not a rare edge case — paid a full HTTP timeout once
+        // per candidate, up to NameMatcher::MAX_CANDIDATES times, on a
+        // single "Next" click. See verifyPaymentAny()'s docblock for the
+        // full two-phase rationale. Priority order (most-likely-correct
+        // first) is still respected: if more than one candidate matches,
+        // the earliest one in $candidates wins, same as the old
+        // sequential loop.
+        $result = $this->cashierService->verifyPaymentAny($orNumber, $candidates);
 
-        foreach ($candidates as $candidate) {
-            $attempt = $this->cashierService->verifyPayment($orNumber, $candidate);
-
-            $attemptsLog[] = [
-                'name'   => $candidate,
-                'valid'  => $attempt['valid'],
-                'reason' => $attempt['reason'] ?? null,
-            ];
-
-            $verification = $attempt;
-            $matchedName  = $candidate;
-
-            if ($attempt['valid']) {
-                break; // found a formatting the cashier accepts — stop here
-            }
-
-            // Only worth trying alternate formattings when the failure is
-            // a real lookup miss. An API_ERROR (server error / connection
-            // failure) won't be fixed by a different name string, and
-            // retrying it 2-3x in a row would just add latency to an
-            // already-failing request for no benefit.
-            if (($attempt['reason'] ?? null) === 'API_ERROR') {
-                break;
-            }
-        }
+        $verification = [
+            'valid'  => $result['valid'],
+            'reason' => $result['reason'],
+            'data'   => $result['data'],
+        ];
+        $matchedName = $result['matched_name'];
+        $attemptsLog = $result['attempts'];
 
         $isMockAttempt = $verification['data']['_mock'] ?? false;
 

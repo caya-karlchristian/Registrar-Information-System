@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Contracts\CashierServiceInterface;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -105,6 +108,252 @@ class CashierService implements CashierServiceInterface
                 'data'   => null,
             ];
         }
+    }
+
+    /**
+     * Verify an OR number, trying several candidate customer-name
+     * formattings — the first alone, then (only if needed) the rest
+     * CONCURRENTLY via Http::pool().
+     *
+     * Why this exists
+     * ----------------
+     * NameMatcher::candidatesFor() can return up to MAX_CANDIDATES (16)
+     * plausible name formattings for the same person, because the
+     * cashier system's "Customer Name" field is free text an admin
+     * typed by hand (see NameMatcher's class docblock). The original
+     * caller-side retry loop tried these ONE AT A TIME, waiting up to
+     * TIMEOUT seconds for each before moving to the next. For a genuine
+     * name mismatch — the common failure case the retry loop exists to
+     * solve, not a rare edge case — that meant up to MAX_CANDIDATES
+     * sequential round trips, each paying the full timeout, on a single
+     * "Next" click. Reported by users as OR verification "taking a long
+     * time".
+     *
+     * Two-phase design — this is deliberately NOT "just pool everything"
+     * ---------------------------------------------------------------
+     * An earlier version of this method pooled all candidates at once.
+     * That fixed the reported slowness but introduced a real regression:
+     * it turned every verification — including the common case where the
+     * primary name format already matches — into N concurrent calls
+     * instead of 1, and it meant a genuine name mismatch during a
+     * Cashier API outage would fire up to MAX_CANDIDATES calls at an
+     * already-struggling third-party system instead of failing fast
+     * after one. Splitting into two phases keeps both of those cases
+     * exactly as cheap as the original sequential code:
+     *
+     *   Phase 1 — try ONLY the single most-likely candidate, via the
+     *   existing single-call verifyPayment(). This is the fast path for
+     *   the common outcomes:
+     *     - primary format matches → 1 call total, same as before.
+     *     - Cashier API is down (API_ERROR) → 1 call total, fails fast,
+     *       exactly like the old loop's early-exit did. Phase 2 is never
+     *       reached, so an outage never gets amplified into a burst of
+     *       calls.
+     *
+     *   Phase 2 — only entered once Phase 1 comes back as a genuine
+     *   NOT_FOUND (the API is reachable, it just doesn't recognise the
+     *   primary format). From here every remaining candidate is a real
+     *   guess and this is exactly the slow path users reported, so the
+     *   remaining candidates are run concurrently instead of
+     *   sequentially, bounding the cost to roughly one more round trip
+     *   regardless of how many candidates are left.
+     *
+     * Priority order is preserved throughout: if more than one candidate
+     * would match, the earliest one in $customerNames wins, matching the
+     * semantics the old sequential loop had.
+     *
+     * Mock mode (no CASHIER_API_KEY configured) never touches the
+     * network — verifyPayment() short-circuits to the mock response on
+     * the very first call, so Phase 2 is never reached and behaviour is
+     * unchanged from before.
+     *
+     * @param  string   $orNo           The OR number from the request form
+     * @param  string[] $customerNames  Candidate name formattings, in priority order
+     * @return array{
+     *     valid:        bool,
+     *     reason:       string|null,
+     *     data:         array|null,
+     *     matched_name: string|null,
+     *     attempts:     array<int, array{name: string, valid: bool, reason: string|null}>,
+     * }
+     */
+    public function verifyPaymentAny(string $orNo, array $customerNames): array
+    {
+        $customerNames = array_values(array_filter(
+            $customerNames,
+            static fn (string $name): bool => trim($name) !== ''
+        ));
+
+        if ($customerNames === []) {
+            return [
+                'valid'        => false,
+                'reason'       => 'NOT_FOUND',
+                'data'         => null,
+                'matched_name' => null,
+                'attempts'     => [],
+            ];
+        }
+
+        // -------------------------------------------------------------
+        // Phase 1 — single call, the primary (most-likely) format only.
+        // Covers the happy path and the outage path at the same cost as
+        // the original sequential implementation. See docblock above.
+        // -------------------------------------------------------------
+        $primary        = $customerNames[0];
+        $primaryAttempt = $this->verifyPayment($orNo, $primary);
+
+        $attempts = [[
+            'name'   => $primary,
+            'valid'  => $primaryAttempt['valid'],
+            'reason' => $primaryAttempt['reason'] ?? null,
+        ]];
+
+        if ($primaryAttempt['valid']) {
+            return [
+                'valid'        => true,
+                'reason'       => null,
+                'data'         => $primaryAttempt['data'] ?? null,
+                'matched_name' => $primary,
+                'attempts'     => $attempts,
+            ];
+        }
+
+        // API_ERROR won't be fixed by a different name string, and — same
+        // reasoning as the old loop — firing more calls at a system
+        // that's already failing infrastructurally would only add load
+        // to an outage, not resolve it. Bail out here, exactly as before.
+        if (($primaryAttempt['reason'] ?? null) === 'API_ERROR') {
+            return [
+                'valid'        => false,
+                'reason'       => 'API_ERROR',
+                'data'         => null,
+                'matched_name' => null,
+                'attempts'     => $attempts,
+            ];
+        }
+
+        $remaining = array_slice($customerNames, 1);
+
+        if ($remaining === []) {
+            return [
+                'valid'        => false,
+                'reason'       => 'NOT_FOUND',
+                'data'         => null,
+                'matched_name' => null,
+                'attempts'     => $attempts,
+            ];
+        }
+
+        // -------------------------------------------------------------
+        // Phase 2 — the primary format was a genuine miss (confirmed
+        // reachable API, NOT_FOUND). Every remaining candidate here is a
+        // real guess, so run them concurrently instead of sequentially —
+        // this is the actual slow path being fixed. Pool keys are the
+        // array index (not the name string) so this stays correct even
+        // in the unexpected case of two identical candidate strings.
+        // -------------------------------------------------------------
+        $responses = Http::pool(fn (Pool $pool) => collect($remaining)
+            ->map(fn (string $candidate, int $index) => $pool
+                ->as($index)
+                ->withToken($this->apiKey)
+                ->timeout(self::TIMEOUT)
+                ->post($this->apiUrl, [
+                    'or_no'         => $orNo,
+                    'customer_name' => $candidate,
+                ]))
+            ->all());
+
+        $parsed = [];
+
+        foreach ($remaining as $index => $candidate) {
+            $result = $this->parsePoolResult($responses[$index] ?? null);
+
+            $attempts[] = [
+                'name'   => $candidate,
+                'valid'  => $result['valid'],
+                'reason' => $result['reason'],
+            ];
+
+            $parsed[$index] = $result;
+        }
+
+        foreach ($remaining as $index => $candidate) {
+            if ($parsed[$index]['valid']) {
+                return [
+                    'valid'        => true,
+                    'reason'       => null,
+                    'data'         => $parsed[$index]['data'],
+                    'matched_name' => $candidate,
+                    'attempts'     => $attempts,
+                ];
+            }
+        }
+
+        // Only report the overall failure as an outage (API_ERROR) if
+        // every Phase 2 attempt failed for infrastructure reasons. A mix
+        // of API_ERROR and NOT_FOUND means the API is reachable and
+        // simply didn't recognise any candidate — that's a lookup miss,
+        // not an outage, and should surface to the user as NOT_FOUND.
+        $allApiErrors = collect($parsed)->every(
+            static fn (array $r): bool => $r['reason'] === 'API_ERROR'
+        );
+
+        return [
+            'valid'        => false,
+            'reason'       => $allApiErrors ? 'API_ERROR' : 'NOT_FOUND',
+            'data'         => null,
+            'matched_name' => null,
+            'attempts'     => $attempts,
+        ];
+    }
+
+    /**
+     * Normalize one slot of an Http::pool() result into the same shape
+     * verifyPayment() returns for a single call.
+     *
+     * Http::pool() never throws for an individual request's connection
+     * failure — instead the corresponding slot in the returned array
+     * holds the Illuminate\Http\Client\ConnectionException object itself
+     * in place of a Response, so one slow/broken candidate can't take
+     * down the rest of the pool. Any other unexpected slot type is
+     * treated the same as a connection failure defensively, rather than
+     * risking an uncaught error on a third-party response shape this
+     * code doesn't control.
+     */
+    private function parsePoolResult(mixed $response): array
+    {
+        if ($response instanceof ConnectionException) {
+            Log::error('CashierService: Connection failed (pool)', [
+                'message' => $response->getMessage(),
+            ]);
+
+            return ['valid' => false, 'reason' => 'API_ERROR', 'data' => null];
+        }
+
+        if (!$response instanceof HttpResponse) {
+            Log::error('CashierService: Unexpected pool result type', [
+                'type' => get_debug_type($response),
+            ]);
+
+            return ['valid' => false, 'reason' => 'API_ERROR', 'data' => null];
+        }
+
+        if ($response->serverError()) {
+            Log::error('CashierService: API server error (pool)', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+
+            return ['valid' => false, 'reason' => 'API_ERROR', 'data' => null];
+        }
+
+        $body = $response->json();
+
+        return [
+            'valid'  => $body['valid']  ?? false,
+            'reason' => $body['reason'] ?? null,
+            'data'   => $body['data']   ?? null,
+        ];
     }
 
     /**
