@@ -64,10 +64,8 @@ const RowActionsDropdown = ({
     };
   }, [isOpen]);
 
-  // TEMPORARILY DISABLED: Guard for Generate Certificate button.
-  // Temporarily allowing Generate Certificate action for all active non-archived requests for testing/manual override.
-  const showGenerateCert = canProcess && !req.isArchived;
-  // Previously: const showGenerateCert = canProcess && !req.isArchived && (req.isCertificate || req.hasCertificates || (req.certificates && req.certificates.length > 0)) && req.statusId !== resolvedStatusIds.COMPLETED;
+  // Feature flag: Generate Certificate is currently disabled until certificate templates are available.
+  const showGenerateCert = false;
   const isUpdating = updatingId === req.id;
 
   return (
@@ -289,7 +287,7 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
     if (raw.certificates && raw.certificates.length > 0) {
       raw.certificates.forEach((c) => {
         const certName = c.certification_type?.certificate_name;
-        const name = certName ? `Certification: ${certName}` : 'Certificate';
+        const name = certName || 'Certificate';
         const qty = Number(c.number_of_copies) || 1;
         items.push({
           type: 'cert',
@@ -800,57 +798,66 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                       <td className={`px-6 py-4 text-sm ${isDark ? 'text-[#e4e6eb]' : 'text-inherit'} w-[320px] min-w-[320px]`}>
                         <div className="flex items-center justify-end gap-2 w-full">
                           {/* For single-item requests ONLY, render direct parent row action button */}
-                          {!isMultiItem && canProcess && !req.isArchived && req.statusId === resolvedStatusIds.AWAITING_SUBMISSION && (
-                            <button
-                              disabled={updatingId === req.id}
-                              onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.PENDING)}
-                              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-purple-900/20 hover:bg-purple-900/30 text-purple-400 border border-purple-600' : 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200'}`}
-                              title="Confirm source document received."
-                            >
-                              <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
-                                isDark ? 'bg-purple-900/40 text-purple-400' : 'bg-white text-purple-700'
-                              }`}>
-                                <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
-                              </span>
-                              <span>Confirm Received</span>
-                            </button>
-                          )}
-                          {!isMultiItem && canProcess && !req.isArchived && req.statusId === resolvedStatusIds.PENDING && (
-                            <button
-                              disabled={updatingId === req.id}
-                              onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.PENDING_SIGNATURE)}
-                              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
-                                isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-200'
-                              }`}
-                            >
-                              <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
-                                isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-white text-amber-700'
-                              }`}>
-                                <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
-                              </span>
-                              <span>Pending Signature</span>
-                            </button>
-                          )}
-                          {!isMultiItem && canProcess && (!req.isArchived && (req.statusId === resolvedStatusIds.PENDING || req.statusId === resolvedStatusIds.PENDING_SIGNATURE)) && (
-                            <button
-                              disabled={updatingId === req.id}
-                              onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.READY)}
-                              className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
-                                isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'
-                              }`}
-                            >
-                              <CheckCircleIcon className="w-4 h-4" /> Ready
-                            </button>
-                          )}
-                          {!isMultiItem && canComplete && !req.isArchived && req.statusId === resolvedStatusIds.READY && (
-                            <button
-                              disabled={updatingId === req.id}
-                              onClick={() => handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
-                              className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'}`}
-                            >
-                              <CheckCircleIcon className="w-4 h-4" /> Done
-                            </button>
-                          )}
+                          {(() => {
+                            const effectiveStatusId = subItems.length === 1 ? subItems[0].statusId : req.statusId;
+                            const singleSubItem = subItems[0];
+
+                            return (
+                              <>
+                                {!isMultiItem && canProcess && !req.isArchived && effectiveStatusId === resolvedStatusIds.AWAITING_SUBMISSION && (
+                                  <button
+                                    disabled={updatingId === req.id}
+                                    onClick={() => singleSubItem ? handleItemStatusUpdate(req.id, singleSubItem, resolvedStatusIds.PENDING) : handleStatusUpdate(req.id, resolvedStatusIds.PENDING)}
+                                    className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${isDark ? 'bg-purple-900/20 hover:bg-purple-900/30 text-purple-400 border border-purple-600' : 'bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-200'}`}
+                                    title="Confirm source document received."
+                                  >
+                                    <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
+                                      isDark ? 'bg-purple-900/40 text-purple-400' : 'bg-white text-purple-700'
+                                    }`}>
+                                      <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
+                                    </span>
+                                    <span>Confirm Received</span>
+                                  </button>
+                                )}
+                                {!isMultiItem && canProcess && !req.isArchived && effectiveStatusId === resolvedStatusIds.PENDING && (
+                                  <button
+                                    disabled={updatingId === req.id}
+                                    onClick={() => singleSubItem ? handleItemStatusUpdate(req.id, singleSubItem, resolvedStatusIds.PENDING_SIGNATURE) : handleStatusUpdate(req.id, resolvedStatusIds.PENDING_SIGNATURE)}
+                                    className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                                      isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-200'
+                                    }`}
+                                  >
+                                    <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
+                                      isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-white text-amber-700'
+                                    }`}>
+                                      <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
+                                    </span>
+                                    <span>Pending Signature</span>
+                                  </button>
+                                )}
+                                {!isMultiItem && canProcess && (!req.isArchived && (effectiveStatusId === resolvedStatusIds.PENDING || effectiveStatusId === resolvedStatusIds.PENDING_SIGNATURE)) && (
+                                  <button
+                                    disabled={updatingId === req.id}
+                                    onClick={() => singleSubItem ? handleItemStatusUpdate(req.id, singleSubItem, resolvedStatusIds.READY) : handleStatusUpdate(req.id, resolvedStatusIds.READY)}
+                                    className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                                      isDark ? 'bg-blue-900/20 hover:bg-blue-900/30 text-blue-400 border border-blue-600' : 'bg-blue-500 hover:bg-blue-700'
+                                    }`}
+                                  >
+                                    <CheckCircleIcon className="w-4 h-4" /> Ready
+                                  </button>
+                                )}
+                                {!isMultiItem && canComplete && !req.isArchived && effectiveStatusId === resolvedStatusIds.READY && (
+                                  <button
+                                    disabled={updatingId === req.id}
+                                    onClick={() => singleSubItem ? handleItemStatusUpdate(req.id, singleSubItem, resolvedStatusIds.COMPLETED) : handleStatusUpdate(req.id, resolvedStatusIds.COMPLETED)}
+                                    className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap ${isDark ? 'bg-green-900/20 hover:bg-green-900/30 text-green-400 border border-green-600' : 'bg-green-500 hover:bg-green-700'}`}
+                                  >
+                                    <CheckCircleIcon className="w-4 h-4" /> Done
+                                  </button>
+                                )}
+                              </>
+                            );
+                          })()}
 
                           {/* Kebab Menu (RowActionsDropdown) rendered on all parent summary rows */}
                           <RowActionsDropdown
@@ -944,6 +951,24 @@ const StaffDashboard = ({ viewMode = 'active', isEmbedded = false, onScanToClaim
                                     <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
                                   </span>
                                   <span>Confirm Received</span>
+                                </button>
+                              )}
+
+                              {canProcess && !isItemAwaiting && !isItemReady && !isItemDone && !isItemPendingSig && (
+                                <button
+                                  type="button"
+                                  disabled={updatingId === req.id}
+                                  onClick={() => handleItemStatusUpdate(req.id, subItem, resolvedStatusIds.PENDING_SIGNATURE)}
+                                  className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg shadow transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                                    isDark ? 'bg-amber-900/20 hover:bg-amber-900/30 text-amber-400 border border-amber-600' : 'bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-200'
+                                  }`}
+                                >
+                                  <span className={`flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${
+                                    isDark ? 'bg-amber-900/40 text-amber-400' : 'bg-white text-amber-700'
+                                  }`}>
+                                    <CheckIcon className="w-2.5 h-2.5" strokeWidth={4} />
+                                  </span>
+                                  <span>Pending Signature</span>
                                 </button>
                               )}
 

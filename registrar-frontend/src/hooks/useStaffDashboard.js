@@ -258,7 +258,7 @@ export const useStaffDashboard = (viewMode) => {
       if (d?.document_name) set.add(d.document_name);
     });
     (certifications || []).forEach(c => {
-      if (c?.certificate_name) set.add(`Certification: ${c.certificate_name}`);
+      if (c?.certificate_name) set.add(c.certificate_name);
     });
     return ['All', ...Array.from(set).sort((a, b) => a.localeCompare(b))];
   }, [requests, documentTypes, certifications]);
