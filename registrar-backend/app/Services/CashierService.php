@@ -237,7 +237,7 @@ class CashierService implements CashierServiceInterface
         if ($remaining === []) {
             return [
                 'valid'        => false,
-                'reason'       => 'NOT_FOUND',
+                'reason'       => $primaryAttempt['reason'] ?? 'NOT_FOUND',
                 'data'         => null,
                 'matched_name' => null,
                 'attempts'     => $attempts,
@@ -289,18 +289,39 @@ class CashierService implements CashierServiceInterface
             }
         }
 
-        // Only report the overall failure as an outage (API_ERROR) if
-        // every Phase 2 attempt failed for infrastructure reasons. A mix
-        // of API_ERROR and NOT_FOUND means the API is reachable and
-        // simply didn't recognise any candidate — that's a lookup miss,
-        // not an outage, and should surface to the user as NOT_FOUND.
-        $allApiErrors = collect($parsed)->every(
-            static fn (array $r): bool => $r['reason'] === 'API_ERROR'
-        );
+        // Determine the overall failure reason across every attempt made
+        // (Phase 1 + Phase 2). This must NOT collapse everything down to
+        // just NOT_FOUND/API_ERROR — the cashier API can in principle
+        // return other reason codes, and DocumentRequestController's
+        // message mapping already has a generic fallback for exactly
+        // that case (see its `match ($reason) { ... default => ... }`).
+        // Silently rewriting an unrecognised reason to NOT_FOUND would
+        // both hide a real API contract change and break that fallback.
+        //
+        // - If every attempt failed for infrastructure reasons
+        //   (API_ERROR), report the overall failure as an outage — this
+        //   is the concurrent-execution equivalent of the old sequential
+        //   loop's early-exit-on-API_ERROR: with everything fired at
+        //   once we can't stop early, but we also shouldn't tell the
+        //   user "not found" when the truth is "couldn't be checked".
+        // - Otherwise, at least one attempt got a genuine answer from a
+        //   reachable API. Surface the last such reason in priority
+        //   order — this matches what the original sequential loop left
+        //   behind in $verification when it tried every candidate
+        //   without finding a match and without hitting an API_ERROR
+        //   along the way (it always ends on the last candidate tried).
+        $nonApiErrorReasons = array_values(array_filter(
+            array_map(static fn (array $a) => $a['reason'], $attempts),
+            static fn (?string $reason): bool => $reason !== 'API_ERROR'
+        ));
+
+        $overallReason = $nonApiErrorReasons === []
+            ? 'API_ERROR'
+            : end($nonApiErrorReasons);
 
         return [
             'valid'        => false,
-            'reason'       => $allApiErrors ? 'API_ERROR' : 'NOT_FOUND',
+            'reason'       => $overallReason,
             'data'         => null,
             'matched_name' => null,
             'attempts'     => $attempts,
