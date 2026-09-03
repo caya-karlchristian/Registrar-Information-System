@@ -191,3 +191,23 @@ Schedule::command('security-events:prune')
     ->withoutOverlapping()
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/scheduler.log'));
+
+/*
+|--------------------------------------------------------------------------
+| Scheduled Commands — Job-Health Monitoring Retention
+|--------------------------------------------------------------------------
+|
+| Daily: prune job_run_logs rows older than
+| config('job_monitoring.retention_days') — this table's own retention
+| sweep, same shape as security-events:prune above (which it runs
+| directly after). 08:30 keeps it clear of every other 08:xx job's
+| window. See PruneJobRunLogs and the create_job_run_logs_table
+| migration for why this table exists.
+|--------------------------------------------------------------------------
+*/
+
+Schedule::command('job-run-logs:prune')
+    ->dailyAt('08:30')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/scheduler.log'));

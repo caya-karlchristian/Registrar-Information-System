@@ -458,6 +458,7 @@ export const postAnalyticsAiQuery      = (body  = {}) => api.post("/analytics/ai
 export const getAdminRosterHealth         = ()             => api.get("/system-analytics/admin-roster-health");
 export const getAccessRequestThroughput   = (params = {}) => api.get("/system-analytics/access-request-throughput", { params });
 export const getCashierVerificationHealth = (params = {}) => api.get("/system-analytics/cashier-verification-health", { params });
+export const getScheduledJobsHealth       = ()             => api.get("/system-analytics/scheduled-jobs-health");
 
 // -------------------------------------------------------
 // ANNOUNCEMENTS (read: all authenticated | write: Super Admin)

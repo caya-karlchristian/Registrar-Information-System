@@ -6,6 +6,7 @@ import {
 import {
   DocumentTextIcon, UsersIcon, ClockIcon, ShieldExclamationIcon,
   BanknotesIcon, ExclamationTriangleIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon,
+  ServerIcon, CheckCircleIcon, XCircleIcon,
 } from '@heroicons/react/24/outline';
 import DropdownGroup from '../components/DropDown';
 import { StatCardSkeleton, ChartCardSkeleton } from '../components/LoadingSkeleton';
@@ -15,6 +16,7 @@ import {
   getAdminRosterHealth,
   getAccessRequestThroughput,
   getCashierVerificationHealth,
+  getScheduledJobsHealth,
 } from '../services/api';
 
 // ─── Constants ────────────────────────────────────────────────────────────
@@ -62,6 +64,7 @@ const SuperAdminAnalyticsDashboard = () => {
   const [roster, setRoster]         = useState(null);
   const [accessThroughput, setAccessThroughput] = useState(null);
   const [cashierHealth, setCashierHealth]       = useState(null);
+  const [jobsHealth, setJobsHealth]             = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -84,14 +87,16 @@ const SuperAdminAnalyticsDashboard = () => {
       getAdminRosterHealth(),
       getAccessRequestThroughput(params),
       getCashierVerificationHealth(params),
+      getScheduledJobsHealth(),
     ])
-      .then(([ovRes, volRes, rosterRes, accessRes, cashierRes]) => {
+      .then(([ovRes, volRes, rosterRes, accessRes, cashierRes, jobsRes]) => {
         if (cancelled) return;
         setOverview(ovRes.data);
         setVolumeData(volRes.data);
         setRoster(rosterRes.data);
         setAccessThroughput(accessRes.data);
         setCashierHealth(cashierRes.data);
+        setJobsHealth(jobsRes.data);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -360,6 +365,55 @@ const SuperAdminAnalyticsDashboard = () => {
           )
         }
       </div>
+
+      {/* ── Scheduled jobs health ── */}
+      <div>
+        <ChartHeader title="Scheduled Jobs Health" sub="Last Run Per Job — Not Date-Filtered" isDark={isDark} />
+        {loading || !jobsHealth
+          ? <ChartCardSkeleton isDark={isDark} />
+          : (
+            <div className={`border p-6 rounded-4xl shadow-sm min-w-0 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-slate-200 bg-white'}`}>
+              {jobsHealth.needs_attention > 0 && (
+                <div className={`flex items-center gap-2 mb-4 px-3.5 py-2.5 rounded-2xl text-xs font-bold border ${isDark ? 'bg-rose-950/40 border-rose-900 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
+                  <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
+                  {jobsHealth.needs_attention} job(s) need attention — failed, stalled, or never recorded a run.
+                </div>
+              )}
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-[#9a9a9a]' : 'text-slate-400'}`}>
+                    <th className="text-left pb-2">Job</th>
+                    <th className="text-left pb-2">Schedule</th>
+                    <th className="text-left pb-2">Status</th>
+                    <th className="text-right pb-2">Last Run</th>
+                    <th className="text-right pb-2">Rows</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobsHealth.jobs.map((job) => (
+                    <tr key={job.job_name} className={`border-t align-top ${isDark ? 'border-[#3e4042]' : 'border-slate-100'}`}>
+                      <td className="py-2.5 font-bold">
+                        <div>{job.job_name}</div>
+                        {job.error_message && (
+                          <div className={`text-[11px] font-normal mt-0.5 truncate max-w-xs ${isDark ? 'text-rose-400' : 'text-rose-600'}`} title={job.error_message}>
+                            {job.error_message}
+                          </div>
+                        )}
+                      </td>
+                      <td className={`py-2.5 ${isDark ? 'text-[#b0b3b8]' : 'text-slate-500'}`}>{job.schedule}</td>
+                      <td className="py-2.5"><JobStatusBadge status={job.status} /></td>
+                      <td className={`py-2.5 text-right ${isDark ? 'text-[#b0b3b8]' : 'text-slate-500'}`}>
+                        {job.last_started_at ? new Date(job.last_started_at).toLocaleString() : '—'}
+                      </td>
+                      <td className="py-2.5 text-right font-bold">{job.rows_affected ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </div>
     </div>
   );
 };
@@ -424,6 +478,30 @@ const MiniStat = ({ label, value, isDark }) => (
     <p className={`text-xl font-black ${isDark ? 'text-[#e4e6eb]' : 'text-slate-800'}`}>{value?.toLocaleString?.() ?? value}</p>
   </div>
 );
+
+// Status pill for the Scheduled Jobs Health table — mirrors the JobRunLog
+// status values the backend actually sends ('success' | 'failed' | 'running'
+// | 'stalled' | 'never_run', see SuperAdminAnalyticsService::
+// scheduledJobsHealth()), plus a safe fallback for anything unrecognized
+// rather than rendering a blank pill.
+const JOB_STATUS_STYLES = {
+  success:   { label: 'Success',    icon: CheckCircleIcon,        className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  failed:    { label: 'Failed',     icon: XCircleIcon,            className: 'bg-rose-50 text-rose-700 border-rose-200' },
+  running:   { label: 'Running',    icon: ClockIcon,               className: 'bg-blue-50 text-blue-700 border-blue-200' },
+  stalled:   { label: 'Stalled',    icon: ExclamationTriangleIcon, className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  never_run: { label: 'Never Run',  icon: ExclamationTriangleIcon, className: 'bg-slate-100 text-slate-500 border-slate-200' },
+};
+
+const JobStatusBadge = ({ status }) => {
+  const style = JOB_STATUS_STYLES[status] ?? { label: status, icon: ServerIcon, className: 'bg-slate-100 text-slate-500 border-slate-200' };
+  const Icon = style.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${style.className}`}>
+      <Icon className="w-3.5 h-3.5" />
+      {style.label}
+    </span>
+  );
+};
 
 const EmptyRow = ({ label, isDark }) => (
   <p className={`text-xs italic ${isDark ? 'text-[#7a7a7a]' : 'text-slate-400'}`}>{label}</p>
