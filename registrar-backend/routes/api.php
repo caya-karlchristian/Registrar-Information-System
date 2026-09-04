@@ -22,6 +22,7 @@ use App\Http\Controllers\LogbookCategoryController;
 use App\Http\Controllers\FulfillmentTrackController;
 use App\Http\Controllers\UnmatchedCashierItemController;
 use App\Http\Controllers\CashierOrOverrideController;
+use App\Http\Controllers\FreeRequestController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
@@ -276,6 +277,38 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::get('cashier-overrides',              [CashierOrOverrideController::class, 'index']);
         Route::post('cashier-overrides',              [CashierOrOverrideController::class, 'store']);
         Route::post('cashier-overrides/{id}/revoke',  [CashierOrOverrideController::class, 'revoke']);
+    });
+
+    // Free Document/Certificate Request (FESPEC-0008) — the admin
+    // Free Request page. Staff on-behalf-of filing for the Free
+    // Documents/Certificates Request Policy and the First Copy Free
+    // Issuance for Graduates Policy — see FreeRequestController's own
+    // docblock for why this has no Laravel Policy class (same
+    // model-less, route-middleware-gated pattern as cashier_overrides
+    // directly above).
+    //
+    // 'View' covers the read-only search/eligibility actions every
+    // Free Request page user needs just to see the screen. 'File' is
+    // the actual filing action. 'Verify' and 'Override' are NOT
+    // route-level gates — a single POST /free-requests call may or may
+    // not require either depending on what's being filed, so those two
+    // are enforced inside FreeRequestService::assertCapability() at the
+    // moment they're actually exercised (see that method's docblock).
+    // Gating store() at 'File' here is still correct even for a filing
+    // that turns out to need Verify/Override: File is a strict subset
+    // of what those two additionally require, never a bypass of them.
+    Route::middleware(['role:3,4', 'module:free_requests,View'])->group(function () {
+        // Distinct throttle prefix, same reasoning as cashier-overrides'
+        // own search-users route immediately above.
+        Route::get('free-requests/search-accounts', [FreeRequestController::class, 'searchAccounts'])
+            ->middleware('throttle:30,1,free-requests-search-accounts');
+
+        Route::post('free-requests/eligibility', [FreeRequestController::class, 'eligibility'])
+            ->middleware('throttle:30,1,free-requests-eligibility');
+    });
+
+    Route::middleware(['role:3,4', 'module:free_requests,File'])->group(function () {
+        Route::post('free-requests', [FreeRequestController::class, 'store']);
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.
