@@ -141,6 +141,14 @@ test('resolving an item appends to a certificate type\'s patterns', function () 
 
 test('resolving does not duplicate a pattern that already normalises the same way', function () {
     actingAsAdmin();
+    // NOT "Informative Copy of Grades" — DatabaseSeeder ($seed = true on the
+    // base TestCase) already creates a real DocumentType with that exact
+    // pattern. Reusing it here would make this test's own freshly-created
+    // $docType a SECOND type claiming the same normalised label — a genuine
+    // cross-type conflict App\Rules\CashierPatternsAreConflictFree /
+    // CashierPatternConflictChecker now correctly rejects (see resolve()'s
+    // conflict check). This test is specifically about same-type dedup, so
+    // it needs a label nothing else in the seeded data already owns.
     $item = makeUnmatchedItem('  regression test fee.');
     $docType = DocumentType::create([
         'document_name'             => 'Regression Test Document',
