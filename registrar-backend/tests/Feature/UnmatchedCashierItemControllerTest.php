@@ -141,20 +141,20 @@ test('resolving an item appends to a certificate type\'s patterns', function () 
 
 test('resolving does not duplicate a pattern that already normalises the same way', function () {
     actingAsAdmin();
-    $item = makeUnmatchedItem('  informative copy of grades.');
+    $item = makeUnmatchedItem('  regression test fee.');
     $docType = DocumentType::create([
-        'document_name'             => 'Informative Copy of Grades',
+        'document_name'             => 'Regression Test Document',
         'document_description'      => '',
         'document_process_period'   => 5,
         'access_id'                 => 1,
-        'cashier_document_patterns' => ['Informative Copy of Grades'],
+        'cashier_document_patterns' => ['Regression Test Fee'],
     ]);
 
     $this->postJson("/api/unmatched-cashier-items/{$item->unmatched_cashier_item_id}/resolve", [
         'document_type_id' => $docType->document_type_id,
     ])->assertOk();
 
-    expect($docType->fresh()->cashier_document_patterns)->toBe(['Informative Copy of Grades']);
+    expect($docType->fresh()->cashier_document_patterns)->toBe(['Regression Test Fee']);
 });
 
 test('resolving requires exactly one of document_type_id or certificate_type_id', function () {
