@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\RequestChannelEnum;
 use App\Enums\RequestStatusEnum;
 use App\Models\CertificationType;
 use App\Models\DocumentRequest;
@@ -39,13 +40,13 @@ class DocumentRequestService implements DocumentRequestServiceInterface
      *
      * @throws \Illuminate\Http\Exceptions\HttpResponseException
      */
-    public function createRequest(SystemUser $user, array $validated): DocumentRequest
+    public function createRequest(SystemUser $user, array $validated, RequestChannelEnum $channel = RequestChannelEnum::SelfService): DocumentRequest
     {
         $initialStatus = $this->requestRequiresSourceSubmission($validated)
             ? RequestStatusEnum::AwaitingSubmission
             : RequestStatusEnum::Processing;
 
-        $requestData = $this->buildRequestData($user, $validated, $initialStatus);
+        $requestData = $this->buildRequestData($user, $validated, $initialStatus, $channel);
 
         // BUG FIX (createRequest was never transactional): the parent
         // document_request row, every request_document/request_certificate
@@ -680,7 +681,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         return false;
     }
 
-    private function buildRequestData(SystemUser $user, array $validated, RequestStatusEnum $initialStatus): array
+    private function buildRequestData(SystemUser $user, array $validated, RequestStatusEnum $initialStatus, RequestChannelEnum $channel = RequestChannelEnum::SelfService): array
     {
         $base = [
             'user_id'            => $user->user_id,
@@ -688,6 +689,7 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             'request_purpose_id' => $validated['request_purpose_id'],
             'or_number'          => $validated['or_number'] ?? null,
             'receipt_date'       => $validated['receipt_date'] ?? null,
+            'channel'            => $channel->value,
         ];
 
         if ($user->isStudent()) {

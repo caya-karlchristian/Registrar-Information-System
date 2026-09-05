@@ -2,6 +2,7 @@
 
 namespace App\Contracts;
 
+use App\Enums\RequestChannelEnum;
 use App\Models\DocumentRequest;
 use App\Models\SystemUser;
 
@@ -19,8 +20,18 @@ interface DocumentRequestServiceInterface
      * Create a new document request for a student or alumni user,
      * attach its document and certificate line-items, and send
      * the relevant notifications.
+     *
+     * $channel defaults to SelfService — every pre-existing call site
+     * (the student/alumni Request pages) keeps creating self-service
+     * requests unchanged. FESPEC-0008's FreeRequestService is the only
+     * caller that ever passes AdminFiledFree, so the whole write —
+     * parent row, line items, release groups, AND the channel itself —
+     * lands inside the exact same transaction createRequest() already
+     * wraps everything else in, rather than a second, separate update
+     * after the fact that could theoretically leave a request created
+     * with the wrong channel if it failed.
      */
-    public function createRequest(SystemUser $user, array $validated): DocumentRequest;
+    public function createRequest(SystemUser $user, array $validated, RequestChannelEnum $channel = RequestChannelEnum::SelfService): DocumentRequest;
 
     /**
      * Update a document request (status, OR number, receipt date).

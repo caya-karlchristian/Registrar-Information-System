@@ -33,6 +33,14 @@ class DocumentRequest extends Model
         'archived_by',
         'restored_on',
         'restored_by',
+        // FESPEC-0008 — Free Document/Certificate Request. Was previously
+        // absent here, which meant the column could only ever be set via
+        // its DB default ('self_service') or a forceFill() — DocumentRequest
+        // ::create() would silently drop it. See RequestChannelEnum and
+        // DocumentRequestService::createRequest()'s $channel parameter,
+        // which is what actually writes 'admin_filed_free' for a free
+        // request filed via FreeRequestService.
+        'channel',
     ];
 
     protected $casts = [
@@ -107,6 +115,21 @@ class DocumentRequest extends Model
         return $code;
     }
 
+    /**
+     * FESPEC-0008 — Free Document/Certificate Request. Requests filed by
+     * a Registrar Admin on the requestor's behalf via the Free Request
+     * page (RequestChannelEnum::AdminFiledFree), as opposed to the
+     * default self_service channel every request used before this
+     * feature existed. Centralizes the raw channel string comparison so
+     * FreeRequestEligibilityService, FreeRequestService, and any future
+     * reporting query (Phase 8 — Observability) all agree on what
+     * counts as "a free request" without repeating the literal string.
+     */
+    public function scopeAdminFiledFree($query)
+    {
+        return $query->where('channel', \App\Enums\RequestChannelEnum::AdminFiledFree->value);
+    }
+
     public function user()
     {
         return $this->belongsTo(SystemUser::class, 'user_id');
@@ -175,6 +198,17 @@ class DocumentRequest extends Model
     public function notifications()
     {
         return $this->hasMany(Notification::class, 'request_id');
+    }
+
+    /**
+     * FESPEC-0008 — Free Document/Certificate Request. Present only for
+     * requests filed via the free channel that included a COG/TOR line
+     * item — see GraduateVerification's docblock. Null for every
+     * self-service request and for a free LOA-only request.
+     */
+    public function graduateVerification()
+    {
+        return $this->hasOne(GraduateVerification::class, 'document_request_id', 'request_id');
     }
 
     // Named archivedByUser() (not archivedBy()) so it serializes to

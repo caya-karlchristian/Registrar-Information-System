@@ -216,6 +216,109 @@ export const searchCashierOverrideUsers = (q) =>
   api.get("/cashier-overrides/search-users", { params: { q } });
 
 // -------------------------------------------------------
+// FREE DOCUMENT/CERTIFICATE REQUESTS (FESPEC-0008) — Admin with the
+// "free_requests" module, or Super Admin. Staff on-behalf-of filing for
+// the Free Documents/Certificates Request Policy and the First Copy
+// Free Issuance for Graduates Policy. Same on-behalf-of shape as
+// CASHIER OR OVERRIDES above (search an account, then act on it), but
+// with a read-only eligibility pre-check step in between — see
+// FreeRequestController on the backend for the full design rationale.
+//
+// 'View' (search-accounts, eligibility) vs 'File' (store) are two
+// separate module actions server-side — searchFreeRequestAccounts()
+// and checkFreeRequestEligibility() only need 'View'; fileFreeRequest()
+// needs 'File'. A user with only 'View' can staff the lookup/eligibility
+// screen but will get a 403 attempting to actually file — surface that
+// the same way other module-gated 403s are already handled in this app,
+// rather than trying to pre-guess it client-side.
+// -------------------------------------------------------
+
+// GET /free-requests/search-accounts?q=... — typeahead lookup for the
+// student/alumni account staff are filing on behalf of. Distinct from
+// searchGrantableUsers()/searchCashierOverrideUsers() above: this one
+// returns FreeRequestAccountResource, which additionally carries
+// student_number / program / year_of_graduation — the exact fields the
+// First Copy policy's in-person records-check step (§3.4) is verified
+// against, not just a name/email picker.
+export const searchFreeRequestAccounts = (q) =>
+  api.get("/free-requests/search-accounts", { params: { q } });
+
+// POST /free-requests/eligibility — read-only pre-check. Shows staff the
+// eligibility indicator for every item under consideration BEFORE they
+// commit to filing. Never writes anything server-side; the backend
+// re-runs this same check again, under a row lock, at actual filing
+// time, so treat this response as advisory only — it can go stale
+// between here and the fileFreeRequest() call (e.g. another admin files
+// the graduate's one-time COG in the meantime).
+//
+// data: { target_user_id, documents?: [{ document_type_id }],
+//          certificates?: [{ certificate_type_id }] }
+//
+// Response shape (res.data):
+//   { target_user_id, results: [{
+//       eligible, kind: "document"|"certificate", type_id, type_label,
+//       reason_code, reason, requires_graduate_verification,
+//       free_issuance_limit, remaining
+//   }] }
+// reason_code is a stable machine-readable slug (e.g. "not_graduate",
+// "limit_reached", "not_free_eligible") — switch on that for UI
+// state, not the human-readable `reason` sentence.
+export const checkFreeRequestEligibility = (data) =>
+  api.post("/free-requests/eligibility", data);
+
+// POST /free-requests — files the free request on behalf of
+// target_user_id. Mirrors createDocumentRequest()'s documents/
+// certificates array shape, plus three fields specific to this
+// admin-filed flow:
+//   - override / override_reason: staff have independently determined
+//     an ineligible item should be filed anyway. override_reason is
+//     required (min 10 chars) when override is true.
+//   - verification: { credentials_verified, records_checked } — the
+//     in-person attestation checkboxes. Only actually enforced by the
+//     backend when the filing includes a COG/TOR item; omit entirely
+//     for an LOA-only filing.
+//
+// On success (201): { document_request, was_overridden,
+//   graduate_verification_performed } — document_request comes fully
+// loaded (status, requestPurpose, documents.documentType,
+// certificates.certificationType, graduateVerification), so no
+// follow-up getDocumentRequest() call is needed to render a
+// confirmation screen.
+//
+// On ineligible-without-override (422): { message, errors: [...] } —
+// `errors` is the same per-item shape as the eligibility endpoint above,
+// reflecting the AT-FILING-TIME check (which can differ from whatever
+// checkFreeRequestEligibility() showed earlier) — re-render the
+// eligibility indicator from this array rather than the stale one.
+export const fileFreeRequest = (data) => api.post("/free-requests", data);
+
+// GET /free-requests/reports/monthly-volume?year=2026 — Phase 8
+// observability. Free-issuance COUNT actually claimed, grouped by
+// calendar month and document/certificate type — a graduate's one-time
+// COG/TOR only shows up here the month they scan/type their claim code,
+// not the month staff filed it, so this can lag a filing by however
+// long the item took to process. Gated by the same 'free_requests'
+// module 'View' action as searchFreeRequestAccounts()/
+// checkFreeRequestEligibility() above, not a separate reports
+// permission — this codebase doesn't have one yet.
+//
+// year is optional (server defaults to the current year in the
+// registrar's display timezone, Asia/Manila) — omit it to show the
+// current year on first load.
+//
+// Response shape (res.data): { year, data: [{ month: "2026-04",
+//   type_label: "Transcript of Records", count: 3 }, ...] } — flat/tidy
+// rows, one per (month, type) pair, already sorted month-then-type-label
+// ascending. This is the same long-format shape
+// getAuditLogs()/getSecurityEvents() already hand ReportManagement.jsx
+// for its table+CSV-export pattern (see auditLogSheet.js) — feed it
+// into that same table pattern, or pivot it client-side into a
+// month-by-type grid/chart if a visual breakdown is wanted; the backend
+// intentionally doesn't pre-shape it either way.
+export const getFreeRequestMonthlyVolumeReport = (year) =>
+  api.get("/free-requests/reports/monthly-volume", { params: year ? { year } : {} });
+
+// -------------------------------------------------------
 // SIGNATORIES (certificate signees) — read/write: Admin only
 // (unlike document-types/certifications, GET is admin-only here too —
 // see routes/api.php)

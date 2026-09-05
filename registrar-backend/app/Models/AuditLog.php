@@ -182,6 +182,26 @@ class AuditLog extends Model
     public const ACTION_CASHIER_OVERRIDE_REVOKED  = 'cashier_override_revoked';
 
     // -------------------------------------------------------
+    // FESPEC-0008 — Free Document/Certificate Request.
+    //
+    // Every step of the admin-filed free-request flow is logged
+    // separately (Phase 7 — Security Hardening: "who searched for which
+    // account, who verified whose credentials, who approved"), rather
+    // than folded into the existing ACTION_REQUEST_STATUS_CHANGED /
+    // ACTION_ADMIN_UPDATED entries a self-service request would produce —
+    // this is a fraud-relevant surface (free-of-charge issuance) and
+    // needs its own distinctly filterable trail.
+    // -------------------------------------------------------
+    public const ACTION_FREE_REQUEST_ACCOUNT_SEARCHED = 'free_request_account_searched';
+    public const ACTION_FREE_REQUEST_GRADUATE_VERIFIED = 'free_request_graduate_verified';
+    public const ACTION_FREE_REQUEST_FILED             = 'free_request_filed';
+    // Written whenever FreeRequestEligibilityService returns ineligible
+    // and staff holding the 'free_requests','Override' capability file
+    // the request anyway — metadata always carries a 'reason' key (see
+    // FreeRequestPolicy::override()), never written without one.
+    public const ACTION_FREE_REQUEST_ELIGIBILITY_OVERRIDDEN = 'free_request_eligibility_overridden';
+
+    // -------------------------------------------------------
     // Relationship back to the acting user (nullable — may be deleted)
     // -------------------------------------------------------
     public function user()
