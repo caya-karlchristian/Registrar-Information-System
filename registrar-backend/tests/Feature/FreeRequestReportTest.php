@@ -24,35 +24,37 @@ uses(RefreshDatabase::class);
  * Phase 8 — Observability: the free-issuance monthly volume report.
  *
  * Deliberately self-contained: every fixture helper below uses a unique
- * `frr` prefix, following the same per-file-prefix convention already
+ * `frv` prefix, following the same per-file-prefix convention already
  * established by FreeRequestEligibilityServiceTest (frMake*),
- * FreeRequestServiceTest (frs*), FreeRequestControllerTest (frc*), and
- * FreeRequestSecurityHardeningTest (frh*) — so this file can run
- * alongside all of them in the same Pest process with no risk of
- * "cannot redeclare function".
+ * FreeRequestServiceTest (frs*), FreeRequestControllerTest (frc*),
+ * FreeRequestSecurityHardeningTest (frh*), and FreeRequestRegressionTest
+ * (frr*) — so this file can run alongside all five in the same Pest
+ * process with no risk of "cannot redeclare function". (`frr` was
+ * already taken by FreeRequestRegressionTest — `frv`, for "volume", is
+ * the prefix actually used throughout this file.)
  *
  * Central fixture concern this file has that the others don't: getting
  * a free request into a genuinely CLAIMED state, with a controllable
  * claimed-at timestamp. FreeRequestReportService reads that timestamp
  * from request_history.changed_at (see that class's docblock for why),
- * not from any column on document_request itself — so frrClaimAt()
+ * not from any column on document_request itself — so frvClaimAt()
  * writes both status_id AND a request_history row, exactly mirroring
  * what DocumentRequestService::claimRequest() → recordHistory() would
  * have written for a real QR/claim_code scan, rather than relying on
  * document_request.status_id alone the way the lighter-weight
  * assertions in FreeRequestServiceTest do.
  */
-function frrService(): FreeRequestService
+function frvService(): FreeRequestService
 {
     return app(FreeRequestService::class);
 }
 
-function frrReportService(): FreeRequestReportService
+function frvReportService(): FreeRequestReportService
 {
     return app(FreeRequestReportService::class);
 }
 
-function frrMakeAdmin(array $actions): SystemUser
+function frvMakeAdmin(array $actions): SystemUser
 {
     $policy = Policy::create([
         'name'        => 'Test Report Free Requests '.implode('-', $actions).' '.uniqid(),
@@ -71,7 +73,7 @@ function frrMakeAdmin(array $actions): SystemUser
     return $admin;
 }
 
-function frrMakeAlumni(): SystemUser
+function frvMakeAlumni(): SystemUser
 {
     $user   = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_ALUMNI, 'status' => 'Activated']);
     $alumni = Alumni::create([
@@ -97,7 +99,7 @@ function frrMakeAlumni(): SystemUser
     return $user->fresh();
 }
 
-function frrMakeGraduateScopedCertType(int $limit = 5, int $accessId = 2): CertificationType
+function frvMakeGraduateScopedCertType(int $limit = 5, int $accessId = 2): CertificationType
 {
     return CertificationType::create([
         'certificate_name'           => 'Test Fixture COG (Report)',
@@ -109,7 +111,7 @@ function frrMakeGraduateScopedCertType(int $limit = 5, int $accessId = 2): Certi
     ]);
 }
 
-function frrMakeUnlimitedDocType(int $accessId = 1): DocumentType
+function frvMakeUnlimitedDocType(int $accessId = 1): DocumentType
 {
     return DocumentType::create([
         'document_name'           => 'Test Fixture LOA (Report)',
@@ -121,7 +123,7 @@ function frrMakeUnlimitedDocType(int $accessId = 1): DocumentType
     ]);
 }
 
-function frrPurposeId(): int
+function frvPurposeId(): int
 {
     return RequestPurpose::query()->value('request_purpose_id')
         ?? RequestPurpose::create(['purpose_name' => 'Personal Copy'])->request_purpose_id;
@@ -134,7 +136,7 @@ function frrPurposeId(): int
  * since request_history is an append-only log of when things actually
  * happened, not a value the report itself can be told directly.
  */
-function frrClaimAt(DocumentRequest $documentRequest, Carbon $changedAt): void
+function frvClaimAt(DocumentRequest $documentRequest, Carbon $changedAt): void
 {
     $documentRequest->documents()->update(['status_id' => RequestStatusEnum::Completed->value]);
     $documentRequest->certificates()->update(['status_id' => RequestStatusEnum::Completed->value]);
@@ -152,44 +154,44 @@ function frrClaimAt(DocumentRequest $documentRequest, Carbon $changedAt): void
 // ── Core aggregation ──────────────────────────────────────────────────
 
 test('a claimed LOA request is counted in its claimed month under its own type label', function () {
-    $actor   = frrMakeAdmin(['View', 'File']);
+    $actor   = frvMakeAdmin(['View', 'File']);
     $student = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'status' => 'Activated']);
     \App\Models\StudentProfile::factory()->create(['user_id' => $student->user_id]);
-    $docType = frrMakeUnlimitedDocType();
+    $docType = frvMakeUnlimitedDocType();
 
-    $result = frrService()->fileFreeRequest($actor, $student->fresh(), [
-        'request_purpose_id' => frrPurposeId(),
+    $result = frvService()->fileFreeRequest($actor, $student->fresh(), [
+        'request_purpose_id' => frvPurposeId(),
         'documents'          => [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
         'certificates'       => [],
     ]);
 
-    frrClaimAt($result->documentRequest, Carbon::create(2026, 3, 15, 9, 0, 0, 'Asia/Manila'));
+    frvClaimAt($result->documentRequest, Carbon::create(2026, 3, 15, 9, 0, 0, 'Asia/Manila'));
 
-    $rows = frrReportService()->monthlyVolume(2026);
+    $rows = frvReportService()->monthlyVolume(2026);
 
     expect($rows->firstWhere('type_label', $docType->document_name))
         ->toMatchArray(['month' => '2026-03', 'type_label' => $docType->document_name, 'count' => 1]);
 });
 
 test('two claims of the same type in the same month are summed into one row', function () {
-    $actor    = frrMakeAdmin(['View', 'File']);
-    $docType  = frrMakeUnlimitedDocType();
+    $actor    = frvMakeAdmin(['View', 'File']);
+    $docType  = frvMakeUnlimitedDocType();
     $students = [];
 
     for ($i = 0; $i < 2; $i++) {
         $student = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'status' => 'Activated']);
         \App\Models\StudentProfile::factory()->create(['user_id' => $student->user_id]);
 
-        $result = frrService()->fileFreeRequest($actor, $student->fresh(), [
-            'request_purpose_id' => frrPurposeId(),
+        $result = frvService()->fileFreeRequest($actor, $student->fresh(), [
+            'request_purpose_id' => frvPurposeId(),
             'documents'          => [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
             'certificates'       => [],
         ]);
 
-        frrClaimAt($result->documentRequest, Carbon::create(2026, 5, 10 + $i, 9, 0, 0, 'Asia/Manila'));
+        frvClaimAt($result->documentRequest, Carbon::create(2026, 5, 10 + $i, 9, 0, 0, 'Asia/Manila'));
     }
 
-    $rows = frrReportService()->monthlyVolume(2026);
+    $rows = frvReportService()->monthlyVolume(2026);
     $row  = $rows->firstWhere('type_label', $docType->document_name);
 
     expect($row['month'])->toBe('2026-05');
@@ -197,12 +199,12 @@ test('two claims of the same type in the same month are summed into one row', fu
 });
 
 test('a filed but never-claimed (Forfeited) free request contributes nothing', function () {
-    $actor   = frrMakeAdmin(['View', 'File']);
-    $alumni  = frrMakeAlumni();
-    $docType = frrMakeUnlimitedDocType(accessId: 3);
+    $actor   = frvMakeAdmin(['View', 'File']);
+    $alumni  = frvMakeAlumni();
+    $docType = frvMakeUnlimitedDocType(accessId: 3);
 
-    $result = frrService()->fileFreeRequest($actor, $alumni, [
-        'request_purpose_id' => frrPurposeId(),
+    $result = frvService()->fileFreeRequest($actor, $alumni, [
+        'request_purpose_id' => frvPurposeId(),
         'documents'          => [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
         'certificates'       => [],
     ]);
@@ -212,7 +214,7 @@ test('a filed but never-claimed (Forfeited) free request contributes nothing', f
     // leaves an unclaimed request.
     $result->documentRequest->update(['status_id' => RequestStatusEnum::Forfeited->value]);
 
-    $rows = frrReportService()->monthlyVolume(now('Asia/Manila')->year);
+    $rows = frvReportService()->monthlyVolume(now('Asia/Manila')->year);
 
     expect($rows->firstWhere('type_label', $docType->document_name))->toBeNull();
 });
@@ -220,9 +222,9 @@ test('a filed but never-claimed (Forfeited) free request contributes nothing', f
 test('a self-service (paid) claimed request is excluded from the free-issuance report', function () {
     $selfServiceRequest = DocumentRequest::factory()->create(['channel' => 'self_service']);
 
-    frrClaimAt($selfServiceRequest, Carbon::create(2026, 3, 20, 9, 0, 0, 'Asia/Manila'));
+    frvClaimAt($selfServiceRequest, Carbon::create(2026, 3, 20, 9, 0, 0, 'Asia/Manila'));
 
-    $rows = frrReportService()->monthlyVolume(2026);
+    $rows = frvReportService()->monthlyVolume(2026);
 
     // The self-service request has no request_document/request_certificate
     // rows in this fixture, so its absence alone doesn't prove the
@@ -234,21 +236,21 @@ test('a self-service (paid) claimed request is excluded from the free-issuance r
 });
 
 test('a claim outside the requested year is excluded', function () {
-    $actor   = frrMakeAdmin(['View', 'File']);
-    $alumni  = frrMakeAlumni();
-    $docType = frrMakeUnlimitedDocType(accessId: 3);
+    $actor   = frvMakeAdmin(['View', 'File']);
+    $alumni  = frvMakeAlumni();
+    $docType = frvMakeUnlimitedDocType(accessId: 3);
 
-    $result = frrService()->fileFreeRequest($actor, $alumni, [
-        'request_purpose_id' => frrPurposeId(),
+    $result = frvService()->fileFreeRequest($actor, $alumni, [
+        'request_purpose_id' => frvPurposeId(),
         'documents'          => [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
         'certificates'       => [],
     ]);
 
     // Claimed in December 2025 — querying for 2026 must not pick this up.
-    frrClaimAt($result->documentRequest, Carbon::create(2025, 12, 31, 23, 0, 0, 'Asia/Manila'));
+    frvClaimAt($result->documentRequest, Carbon::create(2025, 12, 31, 23, 0, 0, 'Asia/Manila'));
 
-    $rows2026 = frrReportService()->monthlyVolume(2026);
-    $rows2025 = frrReportService()->monthlyVolume(2025);
+    $rows2026 = frvReportService()->monthlyVolume(2026);
+    $rows2025 = frvReportService()->monthlyVolume(2025);
 
     expect($rows2026->firstWhere('type_label', $docType->document_name))->toBeNull();
     expect($rows2025->firstWhere('type_label', $docType->document_name)['count'])->toBe(1);
@@ -261,43 +263,43 @@ test('a claim just after a Manila calendar-year boundary in UTC is attributed to
     // AuditLogController::resolveDateBoundary() already exists to avoid
     // for audit log filters, and FreeRequestReportService::monthlyVolume()
     // must get right the same way.
-    $actor   = frrMakeAdmin(['View', 'File']);
-    $alumni  = frrMakeAlumni();
-    $docType = frrMakeUnlimitedDocType(accessId: 3);
+    $actor   = frvMakeAdmin(['View', 'File']);
+    $alumni  = frvMakeAlumni();
+    $docType = frvMakeUnlimitedDocType(accessId: 3);
 
-    $result = frrService()->fileFreeRequest($actor, $alumni, [
-        'request_purpose_id' => frrPurposeId(),
+    $result = frvService()->fileFreeRequest($actor, $alumni, [
+        'request_purpose_id' => frvPurposeId(),
         'documents'          => [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
         'certificates'       => [],
     ]);
 
-    frrClaimAt($result->documentRequest, Carbon::create(2026, 1, 1, 7, 0, 0, 'Asia/Manila'));
+    frvClaimAt($result->documentRequest, Carbon::create(2026, 1, 1, 7, 0, 0, 'Asia/Manila'));
 
-    $rows = frrReportService()->monthlyVolume(2026);
+    $rows = frvReportService()->monthlyVolume(2026);
     $row  = $rows->firstWhere('type_label', $docType->document_name);
 
     expect($row['month'])->toBe('2026-01');
 });
 
 test('an ineligible-but-overridden filing is still counted once claimed, same as any other free issuance', function () {
-    $actor    = frrMakeAdmin(['View', 'File', 'Override']);
-    $alumni   = frrMakeAlumni();
-    $certType = frrMakeGraduateScopedCertType(limit: 0); // 0 remaining — forces an override
+    $actor    = frvMakeAdmin(['View', 'File', 'Override']);
+    $alumni   = frvMakeAlumni();
+    $certType = frvMakeGraduateScopedCertType(limit: 0); // 0 remaining — forces an override
 
-    $result = frrService()->fileFreeRequest(
+    $result = frvService()->fileFreeRequest(
         actor: $actor,
         targetUser: $alumni,
         validated: [
-            'request_purpose_id' => frrPurposeId(),
+            'request_purpose_id' => frvPurposeId(),
             'documents'          => [],
             'certificates'       => [['certificate_type_id' => $certType->certificate_type_id, 'number_of_copies' => 1]],
         ],
         options: ['override' => true, 'override_reason' => 'Test fixture override.'],
     );
 
-    frrClaimAt($result->documentRequest, Carbon::create(2026, 7, 1, 9, 0, 0, 'Asia/Manila'));
+    frvClaimAt($result->documentRequest, Carbon::create(2026, 7, 1, 9, 0, 0, 'Asia/Manila'));
 
-    $rows = frrReportService()->monthlyVolume(2026);
+    $rows = frvReportService()->monthlyVolume(2026);
 
     expect($rows->firstWhere('type_label', $certType->certificate_name))
         ->toMatchArray(['month' => '2026-07', 'type_label' => $certType->certificate_name, 'count' => 1]);
@@ -306,23 +308,23 @@ test('an ineligible-but-overridden filing is still counted once claimed, same as
 // ── HTTP layer ─────────────────────────────────────────────────────────
 
 test('the report endpoint requires the free_requests View capability', function () {
-    frrMakeAdmin([]); // no actions at all
+    frvMakeAdmin([]); // no actions at all
 
     $this->getJson('/api/free-requests/reports/monthly-volume?year=2026')
         ->assertStatus(403);
 });
 
 test('the report endpoint returns claimed volume grouped by month and type', function () {
-    $actor   = frrMakeAdmin(['View', 'File']);
-    $docType = frrMakeUnlimitedDocType(accessId: 3);
-    $alumni  = frrMakeAlumni();
+    $actor   = frvMakeAdmin(['View', 'File']);
+    $docType = frvMakeUnlimitedDocType(accessId: 3);
+    $alumni  = frvMakeAlumni();
 
-    $result = frrService()->fileFreeRequest($actor, $alumni, [
-        'request_purpose_id' => frrPurposeId(),
+    $result = frvService()->fileFreeRequest($actor, $alumni, [
+        'request_purpose_id' => frvPurposeId(),
         'documents'          => [['document_type_id' => $docType->document_type_id, 'number_of_copies' => 1]],
         'certificates'       => [],
     ]);
-    frrClaimAt($result->documentRequest, Carbon::create(2026, 4, 5, 9, 0, 0, 'Asia/Manila'));
+    frvClaimAt($result->documentRequest, Carbon::create(2026, 4, 5, 9, 0, 0, 'Asia/Manila'));
 
     $response = $this->getJson('/api/free-requests/reports/monthly-volume?year=2026')
         ->assertStatus(200)
@@ -335,7 +337,7 @@ test('the report endpoint returns claimed volume grouped by month and type', fun
 });
 
 test('an out-of-range year is rejected with a validation error, not silently clamped', function () {
-    frrMakeAdmin(['View']);
+    frvMakeAdmin(['View']);
 
     $this->getJson('/api/free-requests/reports/monthly-volume?year=1899')
         ->assertStatus(422);
