@@ -10,6 +10,7 @@ use App\Models\DocumentType;
 use App\Models\Policy;
 use App\Models\RequestHistory;
 use App\Models\RequestPurpose;
+use App\Models\StudentAcademicRecord;
 use App\Models\SystemUser;
 use App\Services\FreeRequestReportService;
 use App\Services\FreeRequestService;
@@ -135,6 +136,18 @@ function frvPurposeId(): int
  * way to control "which month was this claimed in" for this report,
  * since request_history is an append-only log of when things actually
  * happened, not a value the report itself can be told directly.
+ *
+ * $changedAt is accepted in whatever timezone is convenient for the
+ * test to reason in (Asia/Manila, per every call site below), but is
+ * explicitly normalized to UTC before being written. `changed_at` is
+ * a naive UTC DATETIME column (see RequestHistory's docblock and
+ * config/app.php) populated in production exclusively via now(), which
+ * is already in app.timezone (UTC) — Eloquent's `datetime` cast does
+ * NOT convert a Carbon instance's timezone on save, it simply formats
+ * the instant as-is. Passing a Manila-zoned Carbon straight through
+ * would silently persist Manila wall-clock digits into a column every
+ * reader (including this report's own UTC-window query) interprets as
+ * UTC, shifting every timestamp 8 hours later than intended.
  */
 function frvClaimAt(DocumentRequest $documentRequest, Carbon $changedAt): void
 {
@@ -146,7 +159,7 @@ function frvClaimAt(DocumentRequest $documentRequest, Carbon $changedAt): void
         'request_id'    => $documentRequest->request_id,
         'old_status_id' => RequestStatusEnum::ReadyToClaim->value,
         'new_status_id' => RequestStatusEnum::Completed->value,
-        'changed_at'    => $changedAt,
+        'changed_at'    => $changedAt->copy()->utc(),
         'changed_by'    => null, // matches ShredExpiredRequests/system-style rows; actor identity isn't this report's concern
     ]);
 }
@@ -156,7 +169,8 @@ function frvClaimAt(DocumentRequest $documentRequest, Carbon $changedAt): void
 test('a claimed LOA request is counted in its claimed month under its own type label', function () {
     $actor   = frvMakeAdmin(['View', 'File']);
     $student = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'status' => 'Activated']);
-    \App\Models\StudentProfile::factory()->create(['user_id' => $student->user_id]);
+    $profile = \App\Models\StudentProfile::factory()->create(['user_id' => $student->user_id]);
+    StudentAcademicRecord::factory()->create(['student_profile_id' => $profile->student_profile_id]);
     $docType = frvMakeUnlimitedDocType();
 
     $result = frvService()->fileFreeRequest($actor, $student->fresh(), [
@@ -180,7 +194,8 @@ test('two claims of the same type in the same month are summed into one row', fu
 
     for ($i = 0; $i < 2; $i++) {
         $student = SystemUser::factory()->create(['role_id' => SystemUser::ROLE_STUDENT, 'status' => 'Activated']);
-        \App\Models\StudentProfile::factory()->create(['user_id' => $student->user_id]);
+        $profile = \App\Models\StudentProfile::factory()->create(['user_id' => $student->user_id]);
+        StudentAcademicRecord::factory()->create(['student_profile_id' => $profile->student_profile_id]);
 
         $result = frvService()->fileFreeRequest($actor, $student->fresh(), [
             'request_purpose_id' => frvPurposeId(),
@@ -282,7 +297,15 @@ test('a claim just after a Manila calendar-year boundary in UTC is attributed to
 });
 
 test('an ineligible-but-overridden filing is still counted once claimed, same as any other free issuance', function () {
-    $actor    = frvMakeAdmin(['View', 'File', 'Override']);
+    // limit: 0 makes this a graduate-scoped (COG/TOR-like) cert type —
+    // free_issuance_limit !== null — so per FreeRequestService's
+    // capability rules it needs BOTH Override (to bypass the
+    // already-exhausted eligibility check) AND Verify (graduate
+    // verification is still required for this type regardless of the
+    // override), plus a completed verification confirmation. Mirrors
+    // the same combination FreeRequestServiceTest's COG-with-Verify
+    // tests exercise individually.
+    $actor    = frvMakeAdmin(['View', 'File', 'Verify', 'Override']);
     $alumni   = frvMakeAlumni();
     $certType = frvMakeGraduateScopedCertType(limit: 0); // 0 remaining — forces an override
 
@@ -294,7 +317,11 @@ test('an ineligible-but-overridden filing is still counted once claimed, same as
             'documents'          => [],
             'certificates'       => [['certificate_type_id' => $certType->certificate_type_id, 'number_of_copies' => 1]],
         ],
-        options: ['override' => true, 'override_reason' => 'Test fixture override.'],
+        options: [
+            'override'        => true,
+            'override_reason' => 'Test fixture override.',
+            'verification'    => ['credentials_verified' => true, 'records_checked' => true],
+        ],
     );
 
     frvClaimAt($result->documentRequest, Carbon::create(2026, 7, 1, 9, 0, 0, 'Asia/Manila'));
