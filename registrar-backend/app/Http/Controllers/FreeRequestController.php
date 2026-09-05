@@ -9,6 +9,7 @@ use App\Http\Resources\FreeRequestAccountResource;
 use App\Models\AuditLog;
 use App\Models\SystemUser;
 use App\Services\AuditLogger;
+use App\Services\FreeRequestLogger;
 use App\Services\FreeRequestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -75,6 +76,13 @@ class FreeRequestController extends Controller
             'result_count' => $accounts->count(),
         ]);
 
+        // Phase 8 — structured, ops-facing log (see FreeRequestLogger's
+        // docblock for why this exists alongside, not instead of, the
+        // audit_logs row just above).
+        FreeRequestLogger::log(FreeRequestLogger::ACTION_ACCOUNT_SEARCHED, $request, $actor, [
+            'result_count' => $accounts->count(),
+        ]);
+
         return FreeRequestAccountResource::collection($accounts);
     }
 
@@ -99,6 +107,19 @@ class FreeRequestController extends Controller
             $validated['documents'] ?? [],
             $validated['certificates'] ?? [],
         );
+
+        // Phase 8 — no audit_logs row is written here (see this method's
+        // own docblock: nothing has happened yet worth a compliance
+        // record), but it's still useful ops signal — e.g. spotting a
+        // spike in ineligible pre-checks for one document type.
+        FreeRequestLogger::log(FreeRequestLogger::ACTION_ELIGIBILITY_CHECKED, $request, Auth::user(), [
+            'target_user_id' => $targetUser->user_id,
+            'results'        => array_map(fn ($r) => [
+                'kind'     => $r->kind->value,
+                'type_id'  => $r->typeId,
+                'eligible' => $r->eligible,
+            ], $results),
+        ]);
 
         return response()->json([
             'target_user_id' => $targetUser->user_id,
@@ -150,6 +171,21 @@ class FreeRequestController extends Controller
                 ],
             );
         } catch (FreeRequestIneligibleException $e) {
+            // Phase 8 — the one outcome this controller previously never
+            // logged anywhere at all (not audit_logs, not this channel).
+            // Worth capturing here specifically: a spike in rejections
+            // for one document type, or from one actor, is exactly the
+            // kind of thing ops/oversight would want to notice without
+            // having to reconstruct it from what's absent in audit_logs.
+            FreeRequestLogger::log(FreeRequestLogger::ACTION_REJECTED, $request, $actor, [
+                'target_user_id' => $targetUser->user_id,
+                'errors'         => array_map(fn ($r) => [
+                    'kind'        => $r->kind->value,
+                    'type_id'     => $r->typeId,
+                    'reason_code' => $r->reasonCode,
+                ], $e->results),
+            ]);
+
             return response()->json([
                 'message' => $e->getMessage(),
                 'errors'  => array_map(fn ($r) => $r->toArray(), $e->results),
@@ -169,11 +205,25 @@ class FreeRequestController extends Controller
             ], $result->eligibilitySnapshots),
         ]);
 
+        // Phase 8 — same event, structured-log channel. See
+        // FreeRequestLogger's docblock: written alongside, not instead
+        // of, every AuditLogger call above/below.
+        FreeRequestLogger::log(FreeRequestLogger::ACTION_FILED, $request, $actor, [
+            'target_user_id' => $targetUser->user_id,
+            'request_id'     => $documentRequest->request_id,
+            'item_count'     => count($result->eligibilitySnapshots),
+        ]);
+
         if ($result->graduateVerificationPerformed) {
             $this->auditLogger->log($request, $actor, AuditLog::ACTION_FREE_REQUEST_GRADUATE_VERIFIED, [
                 'target_user_id'           => $targetUser->user_id,
                 'request_id'               => $documentRequest->request_id,
                 'graduate_verification_id' => $result->graduateVerification?->graduate_verification_id,
+            ]);
+
+            FreeRequestLogger::log(FreeRequestLogger::ACTION_GRADUATE_VERIFIED, $request, $actor, [
+                'target_user_id' => $targetUser->user_id,
+                'request_id'     => $documentRequest->request_id,
             ]);
         }
 
@@ -183,6 +233,16 @@ class FreeRequestController extends Controller
                 'request_id'      => $documentRequest->request_id,
                 'overridden_items' => $result->overriddenTypeLabels,
                 'reason'          => $result->overrideReason,
+            ]);
+
+            // Reason text is deliberately excluded here — same "no raw
+            // free-text beyond IDs/labels" rule this class's docblock
+            // states, and the full reason is already durably captured
+            // in the audit_logs row immediately above.
+            FreeRequestLogger::log(FreeRequestLogger::ACTION_OVERRIDDEN, $request, $actor, [
+                'target_user_id'    => $targetUser->user_id,
+                'request_id'        => $documentRequest->request_id,
+                'overridden_items'  => $result->overriddenTypeLabels,
             ]);
         }
 

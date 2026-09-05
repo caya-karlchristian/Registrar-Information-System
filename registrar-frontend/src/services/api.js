@@ -292,6 +292,32 @@ export const checkFreeRequestEligibility = (data) =>
 // eligibility indicator from this array rather than the stale one.
 export const fileFreeRequest = (data) => api.post("/free-requests", data);
 
+// GET /free-requests/reports/monthly-volume?year=2026 — Phase 8
+// observability. Free-issuance COUNT actually claimed, grouped by
+// calendar month and document/certificate type — a graduate's one-time
+// COG/TOR only shows up here the month they scan/type their claim code,
+// not the month staff filed it, so this can lag a filing by however
+// long the item took to process. Gated by the same 'free_requests'
+// module 'View' action as searchFreeRequestAccounts()/
+// checkFreeRequestEligibility() above, not a separate reports
+// permission — this codebase doesn't have one yet.
+//
+// year is optional (server defaults to the current year in the
+// registrar's display timezone, Asia/Manila) — omit it to show the
+// current year on first load.
+//
+// Response shape (res.data): { year, data: [{ month: "2026-04",
+//   type_label: "Transcript of Records", count: 3 }, ...] } — flat/tidy
+// rows, one per (month, type) pair, already sorted month-then-type-label
+// ascending. This is the same long-format shape
+// getAuditLogs()/getSecurityEvents() already hand ReportManagement.jsx
+// for its table+CSV-export pattern (see auditLogSheet.js) — feed it
+// into that same table pattern, or pivot it client-side into a
+// month-by-type grid/chart if a visual breakdown is wanted; the backend
+// intentionally doesn't pre-shape it either way.
+export const getFreeRequestMonthlyVolumeReport = (year) =>
+  api.get("/free-requests/reports/monthly-volume", { params: year ? { year } : {} });
+
 // -------------------------------------------------------
 // SIGNATORIES (certificate signees) — read/write: Admin only
 // (unlike document-types/certifications, GET is admin-only here too —

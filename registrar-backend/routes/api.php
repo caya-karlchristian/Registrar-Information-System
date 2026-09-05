@@ -23,6 +23,7 @@ use App\Http\Controllers\FulfillmentTrackController;
 use App\Http\Controllers\UnmatchedCashierItemController;
 use App\Http\Controllers\CashierOrOverrideController;
 use App\Http\Controllers\FreeRequestController;
+use App\Http\Controllers\FreeRequestReportController;
 use App\Http\Controllers\AlumniSystemController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\PolicyController;
@@ -305,6 +306,16 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
 
         Route::post('free-requests/eligibility', [FreeRequestController::class, 'eligibility'])
             ->middleware('throttle:30,1,free-requests-eligibility');
+
+        // Phase 8 — Observability. Same 'View' gate as the two routes
+        // above (see FreeRequestReportController's own docblock on why
+        // this doesn't have its own module/action yet), and the same
+        // 30/min read-only throttle bucket family used elsewhere in
+        // this group — this is a periodic admin report, not a
+        // high-frequency page, so it doesn't need its own tighter or
+        // looser limit.
+        Route::get('free-requests/reports/monthly-volume', [FreeRequestReportController::class, 'monthlyVolume'])
+            ->middleware('throttle:30,1,free-requests-reports');
     });
 
     Route::middleware(['role:3,4', 'module:free_requests,File'])->group(function () {
