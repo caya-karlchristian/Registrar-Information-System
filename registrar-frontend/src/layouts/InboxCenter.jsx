@@ -20,6 +20,7 @@ import { useNotificationsContext as useNotifications } from '../context/Notifica
 import { useTheme } from '../context/ThemeContext';
 import { InboxListSkeleton, InboxPreviewSkeleton } from '../components/LoadingSkeleton';
 import ClaimTicket from '../components/ClaimTicket';
+import RequirementsListCard from '../components/RequirementsListCard';
 import qrCode from '../assets/qrcode.png';
 // CATEGORY_MAP lives in src/constants/notificationCategories.js
 // InboxCenter only uses the .category label from each entry.
@@ -430,6 +431,23 @@ const InboxCenter = () => {
 
                   <div className={`flex-1 overflow-y-auto p-4 md:p-6 space-y-4 ${isDark ? 'bg-[#1a1b1e]' : 'bg-gray-50'}`}>
                     <div className="space-y-4">
+
+                      {/* ── Message Description / Body ── */}
+                      {(selectedMail.preview || selectedMail._raw?.message) && (
+                        <div className={`rounded-xl border p-4 sm:p-5 ${isDark ? 'border-[#3e4042] bg-[#242526]' : 'border-gray-200 bg-white shadow-xs'}`}>
+                          <p className={`text-sm sm:text-base leading-relaxed ${isDark ? 'text-[#e4e6eb]' : 'text-gray-800'}`}>
+                            {selectedMail._raw?.message || selectedMail.preview}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* ── Requirements Checklist Card ── */}
+                      <RequirementsListCard
+                        requirementsList={requirementsList}
+                        isChecklistOpen={isChecklistOpen}
+                        onToggle={() => setIsChecklistOpen((prev) => !prev)}
+                        isDark={isDark}
+                      />
 
 
                       {/* ── Pending Signature Notice Box ── */}
