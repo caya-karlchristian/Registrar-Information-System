@@ -101,7 +101,14 @@ export const ROLE_CONFIG = {
       {
         title: 'Overview',
         items: [
-          { name: 'System analytics', to: 'system-analytics', icon: ChartBarSquareIcon },
+          {
+            name: 'System analytics',
+            to: 'system-analytics',
+            icon: ChartBarSquareIcon,
+            children: [
+              { name: 'Admin roster health', to: 'system-analytics?tab=roster', tabKey: 'roster' },
+            ],
+          },
           { name: 'Audit trail', to: 'report', icon: UserCircleIcon },
         ],
       },
