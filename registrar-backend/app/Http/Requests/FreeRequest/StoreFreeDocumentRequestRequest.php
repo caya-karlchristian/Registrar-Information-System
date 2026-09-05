@@ -46,11 +46,23 @@ class StoreFreeDocumentRequestRequest extends FormRequest
 
             'request_purpose_id' => 'required|integer|exists:request_purpose,request_purpose_id',
 
-            'documents'                          => 'nullable|array',
+            // Phase 7 — Security Hardening: cap the number of line items
+            // per filing. This feature has exactly three in-scope types
+            // (COG, TOR, LOA) today, so 20 is already generous headroom
+            // — the real purpose is closing a resource-exhaustion vector:
+            // fileFreeRequest() holds a row lock on the TARGET user
+            // (SystemUser::lockForUpdate()) for the entire duration of
+            // FreeRequestEligibilityService::checkMany()'s loop, so an
+            // uncapped array lets one malicious/misbehaving request hold
+            // that lock open proportionally to array size, starving every
+            // other free-request filing for that same graduate. The same
+            // cap is applied on the read-only eligibility pre-check for
+            // consistency, even though no lock is held there.
+            'documents'                          => 'nullable|array|max:20',
             'documents.*.document_type_id'       => 'required_with:documents|integer|exists:document_type,document_type_id',
             'documents.*.number_of_copies'       => 'required_with:documents|integer|min:1|max:10',
 
-            'certificates'                       => 'nullable|array',
+            'certificates'                       => 'nullable|array|max:20',
             'certificates.*.certificate_type_id' => 'required_with:certificates|integer|exists:certificate_type,certificate_type_id',
             'certificates.*.number_of_copies'    => 'nullable|integer|min:1|max:10',
 

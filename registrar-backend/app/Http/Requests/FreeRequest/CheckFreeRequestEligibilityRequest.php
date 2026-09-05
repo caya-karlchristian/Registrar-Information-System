@@ -26,6 +26,13 @@ use Illuminate\Foundation\Http\FormRequest;
  * Route sits behind 'role:3,4' + 'module:free_requests,View' in
  * routes/api.php — authorize() only needs to confirm shape, not
  * re-check module access.
+ *
+ * Phase 7 — Security Hardening: 'documents'/'certificates' are capped at
+ * max:20 items, same reasoning as StoreFreeDocumentRequestRequest's own
+ * cap — see that class's docblock. No row lock is held on this
+ * read-only path, but the cap is kept consistent between both endpoints
+ * so the pre-check and the actual filing never disagree on what's a
+ * valid-shaped request.
  */
 class CheckFreeRequestEligibilityRequest extends FormRequest
 {
@@ -39,11 +46,22 @@ class CheckFreeRequestEligibilityRequest extends FormRequest
         return [
             'target_user_id' => 'required|integer|exists:users,user_id',
 
-            'documents'                    => 'nullable|array',
+            'documents'                     => 'nullable|array|max:20',
             'documents.*.document_type_id' => 'required_with:documents|integer|exists:document_type,document_type_id',
+            // Phase 7 — Security Hardening: optional here (unlike the
+            // Store request, where it's required for documents) since
+            // this is a pre-check that may run before staff have picked
+            // a quantity yet. Defaults to 1 inside
+            // FreeRequestEligibilityService::checkMany() when omitted —
+            // same default DocumentRequestService already applies to
+            // certificates. Feeds check()'s Rule 5 (quantity vs.
+            // remaining) so the indicator staff see before filing
+            // matches what fileFreeRequest() will actually enforce.
+            'documents.*.number_of_copies' => 'nullable|integer|min:1|max:10',
 
-            'certificates'                       => 'nullable|array',
+            'certificates'                       => 'nullable|array|max:20',
             'certificates.*.certificate_type_id' => 'required_with:certificates|integer|exists:certificate_type,certificate_type_id',
+            'certificates.*.number_of_copies'    => 'nullable|integer|min:1|max:10',
         ];
     }
 

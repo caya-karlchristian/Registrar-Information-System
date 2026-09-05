@@ -308,7 +308,20 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
     });
 
     Route::middleware(['role:3,4', 'module:free_requests,File'])->group(function () {
-        Route::post('free-requests', [FreeRequestController::class, 'store']);
+        // Phase 7 — Security Hardening: this was the one action in the
+        // whole free-request flow with no rate limit at all — every
+        // read-only endpoint above (search-accounts, eligibility) had
+        // one, but the actual write/filing action did not. Tighter than
+        // the 30/min read limiters above: this performs a real DB write
+        // (a free-of-charge document/certificate issuance) and briefly
+        // holds a row lock on the target account (see
+        // FreeRequestService::fileFreeRequest()'s docblock), so it's
+        // both a higher-value abuse target and more expensive per call.
+        // 10/min per authenticated admin is generous for genuine
+        // counter-service filing pace while meaningfully bounding
+        // automated abuse or override brute-forcing.
+        Route::post('free-requests', [FreeRequestController::class, 'store'])
+            ->middleware('throttle:10,1,free-requests-store');
     });
 
     // Request history — READ ONLY. History is written only by DocumentRequestService.

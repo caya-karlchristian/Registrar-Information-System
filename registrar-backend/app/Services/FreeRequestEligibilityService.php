@@ -77,10 +77,26 @@ use App\Models\SystemUser;
  * lets a graduate whose first attempt lapsed unclaimed file again
  * without being permanently blocked. free_issuance_limit = NULL (LOA)
  * skips this count entirely — always eligible on this rule.
+ *
+ * ── Rule 5 — requested quantity vs. remaining (Phase 7 hardening) ──────
+ * $quantity is the number_of_copies actually being requested for this
+ * line item, not just "is the type eligible at all". Rule 4 above only
+ * asks "has the limit already been fully consumed" (remaining <= 0);
+ * without this rule, a SINGLE filing with e.g. remaining = 1 but
+ * number_of_copies = 5 would sail through as "eligible" and
+ * DocumentRequestService::createRequest() would fulfil all 5 copies
+ * under one admin_filed_free request — bypassing the First Copy Free
+ * Issuance Policy's one-time cap in a single API call, since
+ * priorClaimedCount() counts CLAIMED REQUESTS containing the type, not
+ * individual copies issued. A type with free_issuance_limit = NULL
+ * (LOA) has no such cap by policy, so $quantity is never restricted for
+ * unlimited types — only checked once $remaining has been computed for
+ * a finite-limit type. Defaults to 1 (every existing caller/test that
+ * doesn't pass a quantity keeps behaving exactly as before).
  */
 class FreeRequestEligibilityService
 {
-    public function check(SystemUser $targetUser, FreeRequestItemKindEnum $kind, int $typeId): FreeRequestEligibilityResult
+    public function check(SystemUser $targetUser, FreeRequestItemKindEnum $kind, int $typeId, int $quantity = 1): FreeRequestEligibilityResult
     {
         $type = $this->resolveType($kind, $typeId);
 
@@ -169,6 +185,24 @@ class FreeRequestEligibilityService
                     remaining: 0,
                 );
             }
+
+            // Rule 5 (see class docblock) — copies remain, but not
+            // enough to cover THIS filing's requested quantity. Only
+            // reachable for finite-limit types; unlimited types (LOA,
+            // free_issuance_limit === null) never enter this branch at
+            // all, so no quantity cap is ever applied to them.
+            if ($quantity > $remaining) {
+                return FreeRequestEligibilityResult::ineligible(
+                    kind: $kind,
+                    typeId: $typeId,
+                    typeLabel: $typeLabel,
+                    reasonCode: FreeRequestEligibilityResult::REASON_QUANTITY_EXCEEDS_REMAINING,
+                    reason: "Only {$remaining} free " . ($remaining === 1 ? 'copy' : 'copies') . " of {$typeLabel} remain for this account, but {$quantity} " . ($quantity === 1 ? 'was' : 'were') . " requested.",
+                    requiresGraduateVerification: $requiresGraduateVerification,
+                    freeIssuanceLimit: $type->free_issuance_limit,
+                    remaining: $remaining,
+                );
+            }
         }
 
         return FreeRequestEligibilityResult::eligible(
@@ -187,8 +221,13 @@ class FreeRequestEligibilityService
      * StoreDocumentRequestRequest's 'documents' / 'certificates' arrays
      * so FreeRequestService can pass validated input straight through.
      *
-     * @param array<int,array{document_type_id:int}> $documents
-     * @param array<int,array{certificate_type_id:int}> $certificates
+     * number_of_copies is read from each line item (defaulting to 1 when
+     * absent, matching DocumentRequestService's own default for
+     * certificates) and fed into check()'s Rule 5 quantity-vs-remaining
+     * check — see that method's docblock.
+     *
+     * @param array<int,array{document_type_id:int,number_of_copies?:int}> $documents
+     * @param array<int,array{certificate_type_id:int,number_of_copies?:int}> $certificates
      * @return FreeRequestEligibilityResult[]
      */
     public function checkMany(SystemUser $targetUser, array $documents, array $certificates): array
@@ -196,11 +235,21 @@ class FreeRequestEligibilityService
         $results = [];
 
         foreach ($documents as $doc) {
-            $results[] = $this->check($targetUser, FreeRequestItemKindEnum::Document, (int) $doc['document_type_id']);
+            $results[] = $this->check(
+                $targetUser,
+                FreeRequestItemKindEnum::Document,
+                (int) $doc['document_type_id'],
+                (int) ($doc['number_of_copies'] ?? 1),
+            );
         }
 
         foreach ($certificates as $cert) {
-            $results[] = $this->check($targetUser, FreeRequestItemKindEnum::Certificate, (int) $cert['certificate_type_id']);
+            $results[] = $this->check(
+                $targetUser,
+                FreeRequestItemKindEnum::Certificate,
+                (int) $cert['certificate_type_id'],
+                (int) ($cert['number_of_copies'] ?? 1),
+            );
         }
 
         return $results;

@@ -31,6 +31,14 @@ class FreeRequestEligibilityResult
     public const REASON_NOT_GRADUATE          = 'not_graduate';
     public const REASON_LIMIT_REACHED         = 'limit_reached';
     public const REASON_INVALID_TARGET_ROLE   = 'invalid_target_role';
+    // Phase 7 — Security Hardening. A finite-limit (graduate-scoped)
+    // type has copies remaining (REASON_LIMIT_REACHED did NOT fire),
+    // but the quantity requested in THIS line item exceeds what's left
+    // — e.g. 1 remaining but number_of_copies: 5 was requested. See
+    // FreeRequestEligibilityService::check()'s "Rule 5" docblock for
+    // why this must be checked here rather than left to
+    // number_of_copies' own min/max shape validation.
+    public const REASON_QUANTITY_EXCEEDS_REMAINING = 'quantity_exceeds_remaining';
 
     public function __construct(
         public readonly bool $eligible,
