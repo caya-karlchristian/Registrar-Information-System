@@ -297,6 +297,22 @@ class SuperAdminAnalyticsService
      * of silently being absent, which is itself important signal (e.g.
      * the scheduler container never having been deployed with a newly
      * added command registered).
+     *
+     * Each job's `status` is one of:
+     *   'running'   — a run is currently in progress (started, not yet
+     *                 past the stalled ceiling below).
+     *   'success' | 'failed' — the latest run's own outcome.
+     *   'stalled'   — the latest run has sat in 'running' past
+     *                 $stalledAfterMinutes: the process almost certainly
+     *                 died mid-run without ever closing out its row.
+     *   'overdue'   — the latest run finished (successfully) long enough
+     *                 ago that the job should have started again by now
+     *                 and hasn't — see JobRunLog::EXPECTED_INTERVAL_MINUTES.
+     *                 This is the case a 'stalled'-only check can't see:
+     *                 last run looked completely fine, the schedule just
+     *                 never fired again (scheduler container down across
+     *                 an entire tick, e.g. during a deploy).
+     *   'never_run' — no row for this job_name has ever been written.
      */
     public function scheduledJobsHealth(): array
     {
@@ -336,10 +352,33 @@ class SuperAdminAnalyticsService
                     && $run->status === JobRunLog::STATUS_RUNNING
                     && $run->started_at->diffInMinutes($now) >= $stalledAfterMinutes;
 
+                // 'overdue' — see JobRunLog::EXPECTED_INTERVAL_MINUTES's
+                // docblock for the full reasoning. Deliberately scoped to
+                // STATUS_SUCCESS only: a 'failed' latest row is already
+                // surfaced via STATUS_FAILED below and still proves the
+                // container was alive and the schedule fired, and a
+                // 'running'/'stalled' row is already covered by its own
+                // branch above — overdue exists specifically to catch
+                // "the last run looked completely fine, but the schedule
+                // itself never fired again," which only a genuinely
+                // successful latest row can mask.
+                $maxGapMinutes = JobRunLog::EXPECTED_INTERVAL_MINUTES[$jobName] ?? null;
+                $overdue = !$stalled
+                    && $run
+                    && $run->status === JobRunLog::STATUS_SUCCESS
+                    && $maxGapMinutes !== null
+                    && $run->started_at->diffInMinutes($now) > $maxGapMinutes;
+
+                $status = match (true) {
+                    $stalled => 'stalled',
+                    $overdue => 'overdue',
+                    default  => $run->status ?? 'never_run',
+                };
+
                 return [
                     'job_name'         => $jobName,
                     'schedule'         => $scheduleLabel,
-                    'status'           => $stalled ? 'stalled' : ($run->status ?? 'never_run'),
+                    'status'           => $status,
                     'last_started_at'  => $run?->started_at,
                     'last_finished_at' => $run?->finished_at,
                     'duration_ms'      => $run?->duration_ms,
@@ -350,7 +389,7 @@ class SuperAdminAnalyticsService
             ->values();
 
         $needsAttention = $jobs->filter(
-            fn (array $job) => in_array($job['status'], [JobRunLog::STATUS_FAILED, 'stalled', 'never_run'], true)
+            fn (array $job) => in_array($job['status'], [JobRunLog::STATUS_FAILED, 'stalled', 'never_run', 'overdue'], true)
         )->count();
 
         return [

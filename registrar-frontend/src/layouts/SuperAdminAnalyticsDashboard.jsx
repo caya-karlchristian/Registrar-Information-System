@@ -376,7 +376,7 @@ const SuperAdminAnalyticsDashboard = () => {
               {jobsHealth.needs_attention > 0 && (
                 <div className={`flex items-center gap-2 mb-4 px-3.5 py-2.5 rounded-2xl text-xs font-bold border ${isDark ? 'bg-rose-950/40 border-rose-900 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-700'}`}>
                   <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
-                  {jobsHealth.needs_attention} job(s) need attention — failed, stalled, or never recorded a run.
+                  {jobsHealth.needs_attention} job(s) need attention — failed, stalled, overdue, or never recorded a run.
                 </div>
               )}
               <table className="w-full text-sm">
@@ -481,14 +481,22 @@ const MiniStat = ({ label, value, isDark }) => (
 
 // Status pill for the Scheduled Jobs Health table — mirrors the JobRunLog
 // status values the backend actually sends ('success' | 'failed' | 'running'
-// | 'stalled' | 'never_run', see SuperAdminAnalyticsService::
+// | 'stalled' | 'overdue' | 'never_run', see SuperAdminAnalyticsService::
 // scheduledJobsHealth()), plus a safe fallback for anything unrecognized
 // rather than rendering a blank pill.
+//
+// 'overdue' gets its own (orange, distinct from amber 'stalled') style
+// rather than reusing 'stalled' — they're different failure modes a
+// SuperAdmin needs to tell apart at a glance: 'stalled' means a run is
+// stuck mid-execution right now, 'overdue' means the last run finished
+// cleanly but the job never started again on schedule (e.g. the
+// scheduler container was down across an entire tick).
 const JOB_STATUS_STYLES = {
   success:   { label: 'Success',    icon: CheckCircleIcon,        className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   failed:    { label: 'Failed',     icon: XCircleIcon,            className: 'bg-rose-50 text-rose-700 border-rose-200' },
   running:   { label: 'Running',    icon: ClockIcon,               className: 'bg-blue-50 text-blue-700 border-blue-200' },
   stalled:   { label: 'Stalled',    icon: ExclamationTriangleIcon, className: 'bg-amber-50 text-amber-700 border-amber-200' },
+  overdue:   { label: 'Overdue',    icon: ExclamationTriangleIcon, className: 'bg-orange-50 text-orange-700 border-orange-200' },
   never_run: { label: 'Never Run',  icon: ExclamationTriangleIcon, className: 'bg-slate-100 text-slate-500 border-slate-200' },
 };
 
