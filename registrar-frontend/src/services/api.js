@@ -421,6 +421,89 @@ export const archiveDocumentRequests = (ids) => api.post(`/document-requests/arc
 export const restoreDocumentRequests = (ids) => api.post(`/document-requests/restore-bulk`, { request_ids: ids });
 
 // -------------------------------------------------------
+// WITHDRAWN STATUS (Deficiency Notice & Withdrawn Status — Phase 1/2) —
+// staff/admin only (same role:3 + module:dashboard,Process gate as the
+// other admin status actions above). Terminal — a withdrawn request can
+// never transition again. Does NOT touch or_number/receipt_date; the
+// paid OR stays permanently attached for finance reconciliation.
+//
+// data shape:
+//   {
+//     withdrawal_reason: "wrong_item_paid" | "duplicate_submission"
+//                       | "student_no_longer_needs" | "other",
+//     withdrawal_detail?: string,   // REQUIRED when withdrawal_reason === "other",
+//                                   // max 2000 chars — this is the staff-typed
+//                                   // free text, e.g. from a required textarea
+//                                   // that only appears when "Other" is picked
+//     superseded_by_request_id?: number, // optional — id of the corrected/
+//                                         // resubmitted request, if any
+//   }
+//
+// On success returns the updated DocumentRequest (with its withdrawal_reason,
+// withdrawal_detail, and superseded_by_request_id fields set) — re-render
+// from the response rather than re-fetching. On failure the backend already
+// distinguishes an invalid-transition 422 (e.g. trying to withdraw a
+// ReadyToClaim or already-Completed/Withdrawn request) from a 422 validation
+// error (missing/invalid reason, missing detail when reason is "other") —
+// surface err.response.data.message / err.response.data.errors as-is.
+//
+// NOTE: if this request currently has an open Deficiency Notice, the
+// backend auto-voids it as part of this same call (cascading this
+// withdrawal_reason/detail into the notice's void_reason) — no separate
+// call needed, and no separate notification is sent for that voiding.
+// See DocumentRequestService::withdraw()'s docblock.
+// -------------------------------------------------------
+export const withdrawDocumentRequest = (id, data) =>
+  api.post(`/document-requests/${id}/withdraw`, data);
+
+// -------------------------------------------------------
+// DEFICIENCY NOTICE (Deficiency Notice & Withdrawn Status — Phase 3/4) —
+// staff/admin only, same gate as WITHDRAWN STATUS above. A notice is a
+// named, cleared/voidable HOLD on a request — issuing, clearing, or
+// voiding one never changes document_request.status_id. At most one
+// OPEN notice can exist per request at a time (issue() 422s otherwise).
+//
+// getDocumentRequest(id) already eager-loads the request's currently-open
+// notice (if any) under the request payload — check that first before
+// assuming issueDeficiencyNotice() is available; the UI should show the
+// "on hold" banner + Clear/Void actions instead of an Issue button
+// whenever an open notice is already present.
+//
+// issueDeficiencyNotice(requestId, data) — data shape:
+//   {
+//     item_key: "missing_signature" | "missing_valid_id" | "other",
+//     detail?: string,  // REQUIRED when item_key === "other", max 2000 chars
+//   }
+//   Do NOT send item_label — it's a server-derived, denormalized display
+//   value resolved from item_key at issue time; the backend rejects/ignores
+//   any client-supplied value for it.
+//
+// clearDeficiencyNotice(noticeId) — marks the notice resolved (item was
+//   submitted); processing may resume. No body. 422s if the notice is
+//   already cleared or voided.
+//
+// voidDeficiencyNotice(noticeId, voidReason) — the "never resolved"
+//   escalation outcome (student unreachable, deceased, etc.). Does NOT
+//   auto-transition the parent request — that stays a manual staff
+//   decision (e.g. calling withdrawDocumentRequest() separately once
+//   they've reviewed the case; consider prompting for that in the same
+//   UI action after a successful void). void_reason is required, max
+//   2000 chars. 422s if the notice is already cleared or voided.
+//
+// All three act on the DEFICIENCY NOTICE'S OWN id — request.open_deficiency_notice
+// .remark_id (the relation is eager-loaded onto every getDocumentRequest()/
+// getDocumentRequests() response under that snake_case key) — NOT the
+// parent document request's id. clear()/void() are not nested under
+// /document-requests/{id}/....
+// -------------------------------------------------------
+export const issueDeficiencyNotice = (requestId, data) =>
+  api.post(`/document-requests/${requestId}/deficiency-notices`, data);
+export const clearDeficiencyNotice = (noticeId) =>
+  api.post(`/deficiency-notices/${noticeId}/clear`);
+export const voidDeficiencyNotice = (noticeId, voidReason) =>
+  api.post(`/deficiency-notices/${noticeId}/void`, { void_reason: voidReason });
+
+// -------------------------------------------------------
 // BULK READY / BULK DONE (Multi-Item / Mixed-Status Batch rules) —
 // staff/admin only. Backed by RequestItemStatusService::bulkAdvanceItems()
 // on the server, NOT by updateDocumentRequest() — these do not flip a
