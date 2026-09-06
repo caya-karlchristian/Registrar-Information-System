@@ -73,6 +73,14 @@ class AuditLog extends Model
     // reconciliation, duplicate-submission tracking) that it should not
     // share that gap.
     public const ACTION_REQUEST_WITHDRAWN      = 'request_withdrawn';
+    // Deficiency Notice & Withdrawn Status — Phase 3. Logged
+    // unconditionally by DeficiencyNoticeController, same "always audit,
+    // never conditionally" stance ACTION_REQUEST_WITHDRAWN documents
+    // above — a hold that pauses processing (and its resolution) is
+    // audit-sensitive for the same reason a terminal status change is.
+    public const ACTION_DEFICIENCY_NOTICE_ISSUED  = 'deficiency_notice_issued';
+    public const ACTION_DEFICIENCY_NOTICE_CLEARED = 'deficiency_notice_cleared';
+    public const ACTION_DEFICIENCY_NOTICE_VOIDED  = 'deficiency_notice_voided';
 
     // Document / certificate type management — archiving
     public const ACTION_DOCUMENT_TYPE_ARCHIVED    = 'document_type_archived';

@@ -72,6 +72,14 @@ class DocumentRequestController extends Controller
         // one fulfillment_track. Loading fulfillmentTrack alongside it
         // so the frontend can label each ticket without a second call.
         'releaseGroups.fulfillmentTrack',
+        // Deficiency Notice & Withdrawn Status — Phase 3. Almost always
+        // null — cheap single-row nullable hasOne lookup, same
+        // "always eager-load, it's cheap" reasoning as supersedingRequest
+        // above. Lets the frontend render the hold banner/staleness
+        // badge (Phase 4) straight from show()'s payload, at no extra
+        // round trip — see DocumentRequest::openDeficiencyNotice()'s
+        // docblock and this feature's Phase 3 exit criteria.
+        'openDeficiencyNotice.issuedByUser',
     ];
 
     public function __construct(

@@ -131,4 +131,18 @@ class DocumentRequestPolicy
     {
         return $user->isStaff() && $user->hasModuleAccess('dashboard', 'Process');
     }
+
+    // -------------------------------------------------------
+    // Issue a Deficiency Notice (Deficiency Notice & Withdrawn Status —
+    // Phase 3). Same tier as withdraw() above — always exactly
+    // 'Process', never conditional on request content, same clean
+    // single-action shape. Fine-grained business rules (archived/
+    // withdrawn parent, an already-open notice) are enforced by
+    // DeficiencyNoticeService::issue(), not here — this policy only
+    // answers "may this user issue notices at all."
+    // -------------------------------------------------------
+    public function issueDeficiencyNotice(SystemUser $user, DocumentRequest $request): bool
+    {
+        return $user->isStaff() && $user->hasModuleAccess('dashboard', 'Process');
+    }
 }

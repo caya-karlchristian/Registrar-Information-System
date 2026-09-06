@@ -254,4 +254,29 @@ class DocumentRequest extends Model
     {
         return $this->belongsTo(self::class, 'superseded_by_request_id', 'request_id');
     }
+
+    // Deficiency Notice & Withdrawn Status — Phase 3.
+    public function remarks()
+    {
+        return $this->hasMany(RequestRemark::class, 'request_id', 'request_id');
+    }
+
+    /**
+     * The single currently-open Deficiency Notice for this request, if
+     * any — almost always null. Scoped hasOne (rather than resolving
+     * "the open one" out of remarks() in PHP) so DocumentRequestController
+     * ::show() can eager-load it directly (see that controller's
+     * RELATIONS constant) at no extra round trip, per this feature's
+     * Phase 3 exit criteria. Safe to eager-load unconditionally: at most
+     * one row can ever match (enforced by DeficiencyNoticeService::
+     * issue()'s row-locked guard — see the create_request_remarks_table
+     * migration's docblock for why that's a service-level check rather
+     * than a DB constraint), so this is a cheap single-row lookup even
+     * though it's phrased as a hasOne over a hasMany relation.
+     */
+    public function openDeficiencyNotice()
+    {
+        return $this->hasOne(RequestRemark::class, 'request_id', 'request_id')
+            ->where('status', RequestRemark::STATUS_OPEN);
+    }
 }
