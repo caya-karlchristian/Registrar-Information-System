@@ -8,6 +8,7 @@ use App\Http\Controllers\RequestStatusController;
 use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\CertificationTypeController;
 use App\Http\Controllers\DocumentRequestController;
+use App\Http\Controllers\DeficiencyNoticeController;
 use App\Http\Controllers\RequestDocumentController;
 use App\Http\Controllers\RequestHistoryController;
 use App\Http\Controllers\AuthController;
@@ -197,6 +198,26 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show'])->middleware('module:dashboard,View');
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware(['role:3', 'module:dashboard,Process|Complete']);
+        // Deficiency Notice & Withdrawn Status — Phase 1. Same coarse
+        // role/module gate as every other admin status-write action on
+        // this resource. Unlike update(), withdraw() always requires
+        // exactly 'Process' — never 'Complete' — since it can only ever
+        // be reached from AwaitingSubmission/Processing/PendingSignature
+        // (see RequestStatusEnum::allowedTransitions()), the same clean
+        // single-action shape as claim() above requiring exactly
+        // 'Complete'. Fine-grained enforcement happens in
+        // DocumentRequestPolicy::withdraw(), called from
+        // WithdrawDocumentRequestRequest::authorize().
+        Route::post('{documentRequest}/withdraw', [DocumentRequestController::class, 'withdraw'])
+            ->middleware(['role:3', 'module:dashboard,Process']);
+        // Deficiency Notice & Withdrawn Status — Phase 3. Same coarse
+        // role/module gate as withdraw() above — always exactly
+        // 'Process', never 'Complete', same clean single-action shape.
+        // Fine-grained enforcement happens in
+        // DocumentRequestPolicy::issueDeficiencyNotice(), called from
+        // IssueDeficiencyNoticeRequest::authorize().
+        Route::post('{documentRequest}/deficiency-notices', [DeficiencyNoticeController::class, 'issue'])
+            ->middleware(['role:3', 'module:dashboard,Process']);
         // Item-level status — see RequestItemStatusService and
         // DocumentRequestController::updateDocumentItemStatus()/
         // updateCertificateItemStatus(). Same coarse role/module gate as
@@ -221,6 +242,23 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::patch('{documentRequest}/archive', [DocumentRequestController::class, 'archive'])->middleware('role:3');
         Route::patch('{documentRequest}/restore', [DocumentRequestController::class, 'restore'])->middleware('role:3');
         Route::delete('{documentRequest}', [DocumentRequestController::class, 'destroy'])->middleware('role:3');
+    });
+
+    // Deficiency Notice & Withdrawn Status — Phase 3. clear()/void() act
+    // on a RequestRemark directly (not nested under a specific
+    // document-requests/{documentRequest} URL) since a Deficiency Notice
+    // is addressable by its own id once issued — same flat-resource
+    // shape request-history's own top-level routes already use
+    // elsewhere in this file. Same coarse role/module gate as every
+    // other admin status-write action on this feature; fine-grained
+    // enforcement happens in RequestRemarkPolicy::clear()/void(),
+    // called from ClearDeficiencyNoticeRequest::authorize()/
+    // VoidDeficiencyNoticeRequest::authorize().
+    Route::prefix('deficiency-notices')->group(function () {
+        Route::post('{deficiencyNotice}/clear', [DeficiencyNoticeController::class, 'clear'])
+            ->middleware(['role:3', 'module:dashboard,Process']);
+        Route::post('{deficiencyNotice}/void', [DeficiencyNoticeController::class, 'void'])
+            ->middleware(['role:3', 'module:dashboard,Process']);
     });
 
     // Request documents (line-items)
