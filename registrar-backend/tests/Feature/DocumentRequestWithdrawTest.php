@@ -330,11 +330,18 @@ test('withdrawing a request leaves or_number and receipt_date untouched', functi
         'withdrawal_reason' => WithdrawalReasonEnum::WrongItemPaid->value,
     ])->assertOk();
 
-    $this->assertDatabaseHas('document_request', [
-        'request_id'   => $docReq->request_id,
-        'or_number'    => 'OR-2026-000123',
-        'receipt_date' => '2026-09-01',
-    ]);
+    // Assert through the model's `date` cast rather than a raw
+    // assertDatabaseHas() string match. SQLite has no native DATE type,
+    // so it round-trips `date`-cast columns as `Y-m-d H:i:s`; comparing
+    // the raw column against a bare `Y-m-d` string is driver-dependent
+    // and fails on SQLite even when the value is untouched. Re-fetching
+    // through Eloquent and comparing the cast Carbon instance is
+    // correct regardless of the underlying database driver.
+    $fresh = $docReq->fresh();
+
+    $this->assertSame('OR-2026-000123', $fresh->or_number);
+    $this->assertNotNull($fresh->receipt_date);
+    $this->assertTrue($fresh->receipt_date->isSameDay('2026-09-01'));
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
