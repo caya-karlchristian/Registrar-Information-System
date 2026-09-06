@@ -9,6 +9,7 @@ use App\Models\CertificationType;
 use App\Models\DocumentRequest;
 use App\Models\DocumentType;
 use App\Models\RequestHistory;
+use App\Models\RequestRemark;
 use App\Models\SystemUser;
 use App\Contracts\DocumentRequestServiceInterface;
 use App\Contracts\NotificationServiceInterface;
@@ -656,7 +657,15 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         // needs that cache invalidated once this durably commits.
         $statusChanged = false;
 
-        $documentRequest = DB::transaction(function () use ($documentRequest, $data, &$statusChanged) {
+        // Deficiency Notice & Withdrawn Status — Phase 5 (Cross-Feature
+        // Hardening & Edge Cases: "Withdraw while a Deficiency Notice is
+        // open"). Set inside the transaction below when an open notice
+        // gets auto-voided as part of this withdrawal, so the caller
+        // (DocumentRequestController::withdraw()) can write its own
+        // audit_logs entry for the voided notice without a second query.
+        $autoVoidedRemarkId = null;
+
+        $documentRequest = DB::transaction(function () use ($documentRequest, $data, &$statusChanged, &$autoVoidedRemarkId) {
             // Re-fetch with a row-level lock — same concurrency guarantee
             // as updateRequest(): a second concurrent write blocks here
             // until the first transaction commits, then re-reads the
@@ -685,15 +694,54 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                 abort(422, "Transition from {$currentStatus->name} to Withdrawn is not allowed.");
             }
 
-            // TODO (Phase 5 — Cross-Feature Hardening & Edge Cases): once
-            // the Deficiency Notice feature ships (request_remarks table),
-            // add a guard here for "cannot withdraw a request that
-            // already has an open Deficiency Notice without also
-            // resolving/voiding the notice first" — see the
-            // implementation plan's Phase 1 guard note and Phase 5's
-            // "Withdraw while a Deficiency Notice is open" decision
-            // (block vs. auto-void). Deliberately not implemented yet:
-            // request_remarks does not exist until Phase 3.
+            // Deficiency Notice & Withdrawn Status — Phase 5 ("Withdraw
+            // while a Deficiency Notice is open"). Decision taken per the
+            // implementation plan's recommendation: AUTO-VOID rather than
+            // block, so staff never need two trips (clear/void the notice,
+            // THEN withdraw) to close out a case that's already decided.
+            // The notice's void_reason cascades from this same
+            // withdrawal_reason/withdrawal_detail, so anyone reviewing the
+            // notice later sees exactly why it was closed — one clean
+            // audit trail instead of two independently-maintained ones.
+            //
+            // Row-locked in the same parent-then-child order
+            // DeficiencyNoticeService::issue() already establishes
+            // (document_request locked above, then the remark) — no new
+            // deadlock risk from doing this here instead of via
+            // DeficiencyNoticeService::void().
+            //
+            // Deliberately NOT delegating to DeficiencyNoticeService::
+            // void(): that method sends its notification immediately
+            // after its OWN DB::transaction() closure returns. Called
+            // from inside this method's transaction, that inner
+            // "transaction" is really just a savepoint — the notification
+            // would fire before this OUTER withdrawal transaction actually
+            // commits, exactly the "notification for a change that might
+            // still roll back" problem notifyOwnerOfWithdrawal()'s
+            // docblock below already exists to avoid. The void itself is
+            // therefore inlined here (a three-column update, not complex
+            // enough to justify the cross-cutting risk), while any
+            // notification about it is deferred to the post-commit block
+            // below, alongside notifyOwnerOfWithdrawal().
+            $openRemark = RequestRemark::where('request_id', $documentRequest->request_id)
+                ->where('status', RequestRemark::STATUS_OPEN)
+                ->lockForUpdate()
+                ->first();
+
+            if ($openRemark) {
+                $openRemark->update([
+                    'status'      => RequestRemark::STATUS_VOIDED,
+                    'voided_by'   => Auth::id(),
+                    'voided_at'   => now(),
+                    'void_reason' => 'Automatically voided — parent request was withdrawn: '
+                        . $this->resolveWithdrawalReasonText(
+                            $data['withdrawal_reason'],
+                            $data['withdrawal_detail'] ?? null,
+                        ),
+                ]);
+
+                $autoVoidedRemarkId = $openRemark->remark_id;
+            }
 
             if (!empty($data['superseded_by_request_id'])) {
                 // withArchived() so an archived-but-real request can still
@@ -726,6 +774,16 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             return $documentRequest;
         }); // end DB::transaction
 
+        // Deficiency Notice & Withdrawn Status — Phase 5. Transient —
+        // never persisted (not in $fillable, never passed to update()) —
+        // so DocumentRequestController::withdraw() can write its own
+        // audit_logs entry for the voided notice without a second query,
+        // and so API consumers can tell an auto-void happened without a
+        // separate round trip to fetch the notice. Harmless to include in
+        // the JSON response: null on every withdrawal that didn't touch
+        // an open notice, which is the overwhelming majority.
+        $documentRequest->setAttribute('auto_voided_deficiency_notice_id', $autoVoidedRemarkId);
+
         // Fired AFTER commit, not inside the transaction closure above —
         // unlike updateRequest()'s notifyOwnerOfStatusChange() call (which
         // runs inside its transaction), a withdrawal notification
@@ -735,6 +793,25 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         // reasoning createRequest() already documents for keeping
         // notifications outside its own transaction.
         $this->notifyOwnerOfWithdrawal($documentRequest);
+
+        // Deficiency Notice & Withdrawn Status — Phase 5. Deliberately
+        // NOT sending a second, separate deficiency_notice_voided
+        // notification to the student here. The withdrawal notification
+        // just sent above is already the complete, definitive explanation
+        // from the student's point of view ("your request has been
+        // withdrawn: <reason>") — a second "your request will not
+        // proceed: <cascaded reason>" notification moments later tells
+        // them nothing new and reads as a confusing duplicate for what
+        // is, from where they sit, one event. The notice is still fully
+        // and correctly voided in request_remarks (its own void_reason/
+        // voided_by/voided_at) and audited via
+        // AuditLog::ACTION_DEFICIENCY_NOTICE_VOIDED (see
+        // DocumentRequestController::withdraw()) — this only skips the
+        // redundant customer-facing message, not the audit trail. Revisit
+        // if registrar/student feedback wants the explicit second notice;
+        // wire it from $autoVoidedRemarkId using the same
+        // 'deficiency_notice_voided' trigger DeficiencyNoticeService::
+        // void() uses.
 
         if ($statusChanged) {
             $this->flushAnalyticsCache();
@@ -757,11 +834,10 @@ class DocumentRequestService implements DocumentRequestServiceInterface
         $owner = SystemUser::find($documentRequest->user_id);
         if (!$owner) return;
 
-        $reason = WithdrawalReasonEnum::from($documentRequest->withdrawal_reason);
-
-        $reasonText = $reason === WithdrawalReasonEnum::Other
-            ? ($documentRequest->withdrawal_detail ?: $reason->label())
-            : $reason->label();
+        $reasonText = $this->resolveWithdrawalReasonText(
+            $documentRequest->withdrawal_reason,
+            $documentRequest->withdrawal_detail,
+        );
 
         $this->notificationService->send(
             recipient:    $owner,
@@ -772,6 +848,33 @@ class DocumentRequestService implements DocumentRequestServiceInterface
             ],
             requestId:    $documentRequest->request_id,
         );
+    }
+
+    /**
+     * Deficiency Notice & Withdrawn Status — Phase 1/5.
+     *
+     * Resolves the human-readable text for a withdrawal_reason value, for
+     * substitution into a notification message or a cascaded
+     * request_remarks.void_reason. For every reason except Other, this is
+     * simply WithdrawalReasonEnum::label() (e.g. "Wrong item was paid
+     * for"); for Other, the staff-entered free-text detail is used
+     * instead — a generic "Other" would tell the reader nothing they
+     * don't already know, whereas the detail is the whole point of
+     * having chosen Other. Shared by notifyOwnerOfWithdrawal() (the
+     * student-facing request_withdrawn notification) and withdraw()'s
+     * Phase 5 auto-void cascade.
+     *
+     * Takes raw strings rather than a DocumentRequest so it can be called
+     * from inside withdraw()'s transaction closure against $data, before
+     * $documentRequest->withdrawal_reason has actually been persisted.
+     */
+    private function resolveWithdrawalReasonText(string $withdrawalReason, ?string $withdrawalDetail): string
+    {
+        $reason = WithdrawalReasonEnum::from($withdrawalReason);
+
+        return $reason === WithdrawalReasonEnum::Other
+            ? ($withdrawalDetail ?: $reason->label())
+            : $reason->label();
     }
 
     // -------------------------------------------------------------------------

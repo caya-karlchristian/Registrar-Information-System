@@ -681,11 +681,36 @@ class DocumentRequestController extends Controller
 
         $documentRequest = $this->requestService->withdraw($documentRequest, $validated);
 
+        // Deficiency Notice & Withdrawn Status — Phase 5 ("Withdraw while
+        // a Deficiency Notice is open"). DocumentRequestService::
+        // withdraw() auto-voids an open notice (if any) as part of this
+        // same staff action — see that method's docblock for why block-
+        // vs-auto-void was decided in favor of auto-void. Read via the
+        // transient (never-persisted) attribute it sets on the returned
+        // model rather than issuing a second query for it.
+        $autoVoidedRemarkId = $documentRequest->getAttribute('auto_voided_deficiency_notice_id');
+
         $this->auditLogger->log($request, $actor, AuditLog::ACTION_REQUEST_WITHDRAWN, [
-            'request_id'                => $documentRequest->request_id,
-            'withdrawal_reason'         => $documentRequest->withdrawal_reason,
-            'superseded_by_request_id'  => $documentRequest->superseded_by_request_id,
+            'request_id'                       => $documentRequest->request_id,
+            'withdrawal_reason'                => $documentRequest->withdrawal_reason,
+            'superseded_by_request_id'         => $documentRequest->superseded_by_request_id,
+            'auto_voided_deficiency_notice_id' => $autoVoidedRemarkId,
         ]);
+
+        // A second, distinct audit entry for the notice itself — so
+        // anyone auditing request_remarks activity specifically (e.g.
+        // "show me every time notice #N changed state") sees this
+        // resolution too, exactly as they would had staff called
+        // DeficiencyNoticeController::void() directly instead of it
+        // happening automatically. Keeps both audit trails (the
+        // request's and the notice's) independently complete.
+        if ($autoVoidedRemarkId) {
+            $this->auditLogger->log($request, $actor, AuditLog::ACTION_DEFICIENCY_NOTICE_VOIDED, [
+                'request_id'  => $documentRequest->request_id,
+                'remark_id'   => $autoVoidedRemarkId,
+                'auto_voided' => true,
+            ]);
+        }
 
         return response()->json($documentRequest->load(self::RELATIONS), 200);
     }
