@@ -136,7 +136,9 @@ export const getPrograms = () => api.get("/programs");
 // DOCUMENT TYPES (read: all | write: Admin+)
 // -------------------------------------------------------
 export const getDocumentTypes  = (includeArchived = false) =>
-  api.get("/document-types", { params: includeArchived ? { include_archived: 1 } : {} });
+  api.get("/document-types", {
+    params: includeArchived ? { include_archived: 1 } : {},
+  });
 export const getDocumentType   = (id)        => api.get(`/document-types/${id}`);
 export const createDocumentType = (data)     => api.post("/document-types", data);
 export const updateDocumentType = (id, data) => api.put(`/document-types/${id}`, data);
@@ -171,7 +173,9 @@ export const deleteFulfillmentTrack = (id)       => api.delete(`/fulfillment-tra
 // CERTIFICATIONS (read: all | write: Admin+)
 // -------------------------------------------------------
 export const getCertifications         = (includeArchived = false) =>
-  api.get("/certifications", { params: includeArchived ? { include_archived: 1 } : {} });
+  api.get("/certifications", {
+    params: includeArchived ? { include_archived: 1 } : {},
+  });
 export const getCertification          = (id)        => api.get(`/certifications/${id}`);
 export const createCertification       = (data)      => api.post("/certifications", data);
 export const updateCertification       = (id, data)  => api.put(`/certifications/${id}`, data);
