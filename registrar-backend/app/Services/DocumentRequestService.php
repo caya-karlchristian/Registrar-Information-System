@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\RequestChannelEnum;
 use App\Enums\RequestStatusEnum;
+use App\Enums\WithdrawalReasonEnum;
 use App\Models\CertificationType;
 use App\Models\DocumentRequest;
 use App\Models\DocumentType;
@@ -627,6 +628,150 @@ class DocumentRequestService implements DocumentRequestServiceInterface
                 'skipped'  => array_values(array_diff($requestIds, $eligible)),
             ];
         });
+    }
+
+    // -------------------------------------------------------------------------
+    // Withdraw
+    // -------------------------------------------------------------------------
+    //
+    // Deficiency Notice & Withdrawn Status — Phase 1. Deliberately a
+    // separate method from updateRequest() (same reasoning as
+    // archiveRequest()/restoreRequest() being separate): withdrawal
+    // carries its own required reason field and its own dedicated route/
+    // permission tier, rather than being one more thing PUT
+    // /document-requests/{id} has to branch on.
+
+    /**
+     * @param array{
+     *     withdrawal_reason: string,
+     *     withdrawal_detail?: string|null,
+     *     superseded_by_request_id?: int|null,
+     * } $data
+     */
+    public function withdraw(DocumentRequest $documentRequest, array $data): DocumentRequest
+    {
+        // Same BUG FIX rationale as updateRequest() above (RIS-PROCESS-BUGS
+        // #9): analytics are cached for 10 minutes under the "analytics"
+        // tag, so a request that just left the active queue via Withdrawn
+        // needs that cache invalidated once this durably commits.
+        $statusChanged = false;
+
+        $documentRequest = DB::transaction(function () use ($documentRequest, $data, &$statusChanged) {
+            // Re-fetch with a row-level lock — same concurrency guarantee
+            // as updateRequest(): a second concurrent write blocks here
+            // until the first transaction commits, then re-reads the
+            // committed state rather than racing against it.
+            $documentRequest = DocumentRequest::lockForUpdate()
+                ->findOrFail($documentRequest->request_id);
+
+            // Archive Rules: same "archived records are read-only" guard
+            // updateRequest() and markCertificatesGenerated() already
+            // enforce. Restoring must happen first via restoreRequest().
+            if ($documentRequest->is_archived) {
+                abort(422, 'This request is archived and is read-only. Restore it first.');
+            }
+
+            $oldStatusId   = $documentRequest->status_id;
+            $currentStatus = RequestStatusEnum::from((int) $oldStatusId);
+
+            // Enforce the same allowedTransitions() map updateRequest()
+            // uses — Withdrawn is only reachable from AwaitingSubmission,
+            // Processing, or PendingSignature (see RequestStatusEnum's
+            // docblock). This also naturally rejects withdrawing an
+            // already-Withdrawn/Completed/Forfeited request, since none
+            // of those terminal statuses list Withdrawn among their
+            // allowed transitions.
+            if (!in_array(RequestStatusEnum::Withdrawn, $currentStatus->allowedTransitions(), true)) {
+                abort(422, "Transition from {$currentStatus->name} to Withdrawn is not allowed.");
+            }
+
+            // TODO (Phase 5 — Cross-Feature Hardening & Edge Cases): once
+            // the Deficiency Notice feature ships (request_remarks table),
+            // add a guard here for "cannot withdraw a request that
+            // already has an open Deficiency Notice without also
+            // resolving/voiding the notice first" — see the
+            // implementation plan's Phase 1 guard note and Phase 5's
+            // "Withdraw while a Deficiency Notice is open" decision
+            // (block vs. auto-void). Deliberately not implemented yet:
+            // request_remarks does not exist until Phase 3.
+
+            if (!empty($data['superseded_by_request_id'])) {
+                // withArchived() so an archived-but-real request can still
+                // be referenced — the point of this pointer is historical
+                // record-keeping, not "is that other request currently
+                // active."
+                $supersedingExists = DocumentRequest::withArchived()
+                    ->where('request_id', $data['superseded_by_request_id'])
+                    ->exists();
+
+                if (!$supersedingExists) {
+                    abort(422, 'superseded_by_request_id does not reference an existing request.');
+                }
+
+                if ((int) $data['superseded_by_request_id'] === (int) $documentRequest->request_id) {
+                    abort(422, 'A request cannot supersede itself.');
+                }
+            }
+
+            $documentRequest->update([
+                'status_id'                => RequestStatusEnum::Withdrawn->value,
+                'withdrawal_reason'        => $data['withdrawal_reason'],
+                'withdrawal_detail'        => $data['withdrawal_detail'] ?? null,
+                'superseded_by_request_id' => $data['superseded_by_request_id'] ?? null,
+            ]);
+
+            $this->recordStatusHistory($documentRequest, $oldStatusId);
+            $statusChanged = true;
+
+            return $documentRequest;
+        }); // end DB::transaction
+
+        // Fired AFTER commit, not inside the transaction closure above —
+        // unlike updateRequest()'s notifyOwnerOfStatusChange() call (which
+        // runs inside its transaction), a withdrawal notification
+        // reaching a student for a withdrawal that later turned out to
+        // roll back would be actively confusing ("your request was
+        // withdrawn" followed by no actual change). Matches the
+        // reasoning createRequest() already documents for keeping
+        // notifications outside its own transaction.
+        $this->notifyOwnerOfWithdrawal($documentRequest);
+
+        if ($statusChanged) {
+            $this->flushAnalyticsCache();
+        }
+
+        return $documentRequest;
+    }
+
+    /**
+     * Builds and sends the request_withdrawn notification. For every
+     * reason except Other, the message substitutes
+     * WithdrawalReasonEnum::label() (e.g. "Wrong item was paid for"). For
+     * Other, it substitutes the staff-entered withdrawal_detail free text
+     * instead — a generic "Other" would tell the student nothing they
+     * don't already know, whereas the detail they typed is the whole
+     * point of choosing Other in the first place.
+     */
+    private function notifyOwnerOfWithdrawal(DocumentRequest $documentRequest): void
+    {
+        $owner = SystemUser::find($documentRequest->user_id);
+        if (!$owner) return;
+
+        $reason = WithdrawalReasonEnum::from($documentRequest->withdrawal_reason);
+
+        $reasonText = $reason === WithdrawalReasonEnum::Other
+            ? ($documentRequest->withdrawal_detail ?: $reason->label())
+            : $reason->label();
+
+        $this->notificationService->send(
+            recipient:    $owner,
+            triggerEvent: RequestStatusEnum::Withdrawn->notificationTrigger(),
+            data:         [
+                'request_id'        => $documentRequest->request_id,
+                'withdrawal_reason' => $reasonText,
+            ],
+            requestId:    $documentRequest->request_id,
+        );
     }
 
     // -------------------------------------------------------------------------

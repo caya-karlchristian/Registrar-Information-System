@@ -197,6 +197,18 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::get('{documentRequest}', [DocumentRequestController::class, 'show'])->middleware('module:dashboard,View');
         Route::post('/', [DocumentRequestController::class, 'store'])->middleware('role:1,2');
         Route::put('{documentRequest}',    [DocumentRequestController::class, 'update'])->middleware(['role:3', 'module:dashboard,Process|Complete']);
+        // Deficiency Notice & Withdrawn Status — Phase 1. Same coarse
+        // role/module gate as every other admin status-write action on
+        // this resource. Unlike update(), withdraw() always requires
+        // exactly 'Process' — never 'Complete' — since it can only ever
+        // be reached from AwaitingSubmission/Processing/PendingSignature
+        // (see RequestStatusEnum::allowedTransitions()), the same clean
+        // single-action shape as claim() above requiring exactly
+        // 'Complete'. Fine-grained enforcement happens in
+        // DocumentRequestPolicy::withdraw(), called from
+        // WithdrawDocumentRequestRequest::authorize().
+        Route::post('{documentRequest}/withdraw', [DocumentRequestController::class, 'withdraw'])
+            ->middleware(['role:3', 'module:dashboard,Process']);
         // Item-level status — see RequestItemStatusService and
         // DocumentRequestController::updateDocumentItemStatus()/
         // updateCertificateItemStatus(). Same coarse role/module gate as

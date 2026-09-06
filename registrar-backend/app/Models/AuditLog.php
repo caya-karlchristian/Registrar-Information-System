@@ -65,6 +65,14 @@ class AuditLog extends Model
     // never succeed against request_document/request_history's FK
     // constraints — see that method's docblock for the full reasoning.
     public const ACTION_REQUEST_DELETED        = 'request_deleted';
+    // Deficiency Notice & Withdrawn Status — Phase 1. Always logged (see
+    // DocumentRequestController::withdraw()) — unlike the single-item
+    // update() endpoint, which currently does not audit-log status
+    // changes at all (only bulk-ready/bulk-done and archive/restore do).
+    // Withdrawal is financially/audit-sensitive enough (wrong-item-paid
+    // reconciliation, duplicate-submission tracking) that it should not
+    // share that gap.
+    public const ACTION_REQUEST_WITHDRAWN      = 'request_withdrawn';
 
     // Document / certificate type management — archiving
     public const ACTION_DOCUMENT_TYPE_ARCHIVED    = 'document_type_archived';

@@ -15,6 +15,7 @@ use App\Http\Requests\DocumentRequest\ClaimDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\StoreDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\UpdateDocumentRequestRequest;
 use App\Http\Requests\DocumentRequest\VerifyOfficialReceiptRequest;
+use App\Http\Requests\DocumentRequest\WithdrawDocumentRequestRequest;
 use App\Http\Requests\RequestItem\UpdateRequestCertificateStatusRequest;
 use App\Http\Requests\RequestItem\UpdateRequestDocumentStatusRequest;
 use App\Services\DocumentRequestService;
@@ -60,6 +61,12 @@ class DocumentRequestController extends Controller
         'certificates.certificationType',
         'certificates.status',
         'archivedByUser',
+        // Deficiency Notice & Withdrawn Status — Phase 1. Nearly always
+        // null (only set when withdrawal_reason implies a duplicate/
+        // corrected resubmission) — cheap to always eager-load since
+        // it's a single nullable belongsTo, same reasoning as
+        // archivedByUser above.
+        'supersedingRequest',
         // Phase 3 — see DocumentRequest::releaseGroups(). Nearly always
         // empty; only populated for requests whose items span more than
         // one fulfillment_track. Loading fulfillmentTrack alongside it
@@ -638,6 +645,39 @@ class DocumentRequestController extends Controller
         $validated = $request->validated();
 
         $documentRequest = $this->requestService->updateRequest($documentRequest, $validated);
+
+        return response()->json($documentRequest->load(self::RELATIONS), 200);
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /document-requests/{documentRequest}/withdraw
+    //
+    // Deficiency Notice & Withdrawn Status — Phase 1. Deliberately a
+    // separate route/method from update() (same reasoning as archive()/
+    // restore() being separate from update()) — see
+    // WithdrawDocumentRequestRequest and DocumentRequestService::withdraw().
+    //
+    // Always logged to audit_logs, unconditionally — unlike update(),
+    // which currently only logs a status change via the bulk-ready/
+    // bulk-done endpoints (see AuditLog::ACTION_REQUEST_WITHDRAWN's
+    // docblock). Withdrawal closes out a request permanently and is
+    // financially/audit-sensitive (wrong-item-paid reconciliation,
+    // duplicate-submission tracking), so it should not inherit that gap.
+    // -------------------------------------------------------------------------
+    public function withdraw(WithdrawDocumentRequestRequest $request, DocumentRequest $documentRequest)
+    {
+        $validated = $request->validated();
+
+        /** @var SystemUser $actor */
+        $actor = Auth::user();
+
+        $documentRequest = $this->requestService->withdraw($documentRequest, $validated);
+
+        $this->auditLogger->log($request, $actor, AuditLog::ACTION_REQUEST_WITHDRAWN, [
+            'request_id'                => $documentRequest->request_id,
+            'withdrawal_reason'         => $documentRequest->withdrawal_reason,
+            'superseded_by_request_id'  => $documentRequest->superseded_by_request_id,
+        ]);
 
         return response()->json($documentRequest->load(self::RELATIONS), 200);
     }

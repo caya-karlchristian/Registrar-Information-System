@@ -118,4 +118,17 @@ class DocumentRequestPolicy
     {
         return $user->isStaff();
     }
+
+    // -------------------------------------------------------
+    // Withdraw a request (Deficiency Notice & Withdrawn Status — Phase 1)
+    // Same tier as other admin status actions — requires the 'Process'
+    // dashboard action, same as update() requires for every target
+    // status except Completed. Unlike update(), this is always exactly
+    // one action (never conditional on request content), same clean
+    // single-action shape as claim() above.
+    // -------------------------------------------------------
+    public function withdraw(SystemUser $user, DocumentRequest $request): bool
+    {
+        return $user->isStaff() && $user->hasModuleAccess('dashboard', 'Process');
+    }
 }

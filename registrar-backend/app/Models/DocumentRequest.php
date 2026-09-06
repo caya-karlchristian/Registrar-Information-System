@@ -41,6 +41,16 @@ class DocumentRequest extends Model
         // which is what actually writes 'admin_filed_free' for a free
         // request filed via FreeRequestService.
         'channel',
+        // Deficiency Notice & Withdrawn Status — Phase 1. Written only by
+        // DocumentRequestService::withdraw() (see migration
+        // 2026_09_05_000000_add_withdrawn_status). withdrawal_reason is a
+        // WithdrawalReasonEnum value; withdrawal_detail is the required
+        // free text when withdrawal_reason = 'other'; superseded_by_request_id
+        // optionally points at the request that actually proceeds when
+        // this one is withdrawn as a mistake/duplicate.
+        'withdrawal_reason',
+        'withdrawal_detail',
+        'superseded_by_request_id',
     ];
 
     protected $casts = [
@@ -226,5 +236,22 @@ class DocumentRequest extends Model
     public function restoredByUser()
     {
         return $this->belongsTo(SystemUser::class, 'restored_by', 'user_id');
+    }
+
+    // Deficiency Notice & Withdrawn Status — Phase 1. Named
+    // supersedingRequest() (not supersededByRequest()) for the same
+    // "*ing = the other end of the relation, raw column stays the FK
+    // name" reason archivedByUser()/restoredByUser() are named the way
+    // they are — "superseded_by_request_id" is the raw FK column, this
+    // is the relation that column points TO. Self-referencing on this
+    // same table; ExcludeArchivedScope still applies to the related
+    // model, so an archived superseding request resolves to null here
+    // same as any other query on this model — acceptable, since the
+    // withdrawal_reason/withdrawal_detail text on THIS row already
+    // explains the withdrawal on its own without needing that relation
+    // to resolve.
+    public function supersedingRequest()
+    {
+        return $this->belongsTo(self::class, 'superseded_by_request_id', 'request_id');
     }
 }
